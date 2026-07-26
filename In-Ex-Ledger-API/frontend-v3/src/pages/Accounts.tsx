@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronDown,
   CreditCard,
@@ -16,23 +16,18 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import useSessionDismissed from '../hooks/useSessionDismissed'
-
-type AccountStatus = 'Active' | 'Needs details' | 'Archived'
-
-type AccountRecord = {
-  id: number
-  name: string
-  type: 'Checking' | 'Savings' | 'Credit Card' | 'Cash' | 'Loan'
-  institution: string
-  lastFour: string
-  transactionCount: number
-  status: AccountStatus
-  tone: string
-}
+import {
+  deleteAccount,
+  loadAccounts,
+  saveAccountDraft,
+  type AccountDraft,
+  type AccountRecord,
+  type AccountStatus,
+} from '../lib/accountsApi'
 
 const accounts: AccountRecord[] = [
   {
-    id: 1,
+    id: 'mock-1',
     name: 'Business Checking',
     type: 'Checking',
     institution: 'Chase',
@@ -42,7 +37,7 @@ const accounts: AccountRecord[] = [
     tone: 'blue',
   },
   {
-    id: 2,
+    id: 'mock-2',
     name: 'Operating Savings',
     type: 'Savings',
     institution: 'Bank of America',
@@ -52,7 +47,7 @@ const accounts: AccountRecord[] = [
     tone: 'green',
   },
   {
-    id: 3,
+    id: 'mock-3',
     name: 'Business Credit Card',
     type: 'Credit Card',
     institution: 'American Express',
@@ -62,7 +57,7 @@ const accounts: AccountRecord[] = [
     tone: 'violet',
   },
   {
-    id: 4,
+    id: 'mock-4',
     name: 'Cash on hand',
     type: 'Cash',
     institution: 'Manual',
@@ -72,7 +67,7 @@ const accounts: AccountRecord[] = [
     tone: 'yellow',
   },
   {
-    id: 5,
+    id: 'mock-5',
     name: 'Equipment loan',
     type: 'Loan',
     institution: 'Wells Fargo',
@@ -85,8 +80,40 @@ const accounts: AccountRecord[] = [
 
 function Accounts(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<AccountRecord | null>(null)
+  const [accountRows, setAccountRows] = useState<AccountRecord[]>(accounts)
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [dataError, setDataError] = useState('')
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('accounts-details')
+  const filteredAccounts = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    if (!normalizedSearch) {
+      return accountRows
+    }
+    return accountRows.filter((account) => [
+      account.name,
+      account.type,
+      account.institution,
+      account.status,
+    ].some((value) => value.toLowerCase().includes(normalizedSearch)))
+  }, [accountRows, searchTerm])
+  const activeCount = accountRows.filter((account) => account.status === 'Active').length
+  const bankCount = accountRows.filter((account) => ['Checking', 'Savings'].includes(account.type)).length
+  const creditCardCount = accountRows.filter((account) => account.type === 'Credit Card').length
+  const needsDetailsCount = accountRows.filter((account) => account.status === 'Needs details').length
+
+  async function refreshAccounts() {
+    setDataError('')
+    try {
+      const loadedAccounts = await loadAccounts()
+      setAccountRows(loadedAccounts.length ? loadedAccounts : [])
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to load accounts.')
+      setAccountRows(accounts)
+    }
+  }
 
   useEffect(() => {
     document.body.classList.toggle('modal-is-open', drawerOpen)
@@ -94,11 +121,36 @@ function Accounts(props: PageProps) {
     return () => document.body.classList.remove('modal-is-open')
   }, [drawerOpen])
 
+  useEffect(() => {
+    void refreshAccounts()
+  }, [])
+
   return (
     <AppShell
       {...props}
       searchPlaceholder="Search accounts, institutions, transaction links"
-      overlay={drawerOpen ? <AccountDrawer onClose={() => setDrawerOpen(false)} /> : null}
+      overlay={drawerOpen ? (
+        <AccountDrawer
+          account={editingAccount}
+          onClose={() => {
+            setDrawerOpen(false)
+            setEditingAccount(null)
+          }}
+          onSave={(draft) => {
+            void saveAccountDraft(draft, editingAccount)
+              .then((savedAccount) => {
+                setAccountRows((rows) => (
+                  editingAccount
+                    ? rows.map((row) => (row.id === savedAccount.id ? savedAccount : row))
+                    : [savedAccount, ...rows]
+                ))
+                setDrawerOpen(false)
+                setEditingAccount(null)
+              })
+              .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to save account.'))
+          }}
+        />
+      ) : null}
     >
         <main className="transactions-page accounts-page">
           <section className="page-heading">
@@ -107,30 +159,50 @@ function Accounts(props: PageProps) {
               <h1>Accounts</h1>
               <p>Create the accounts your transactions are assigned to. Bank sync can come later without changing the structure.</p>
             </div>
-            <button className="primary-button" type="button" onClick={() => setDrawerOpen(true)}>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => {
+                setEditingAccount(null)
+                setDrawerOpen(true)
+              }}
+            >
               <Plus size={18} />
               Add account
             </button>
           </section>
 
-          {noticeVisible ? (
+          {noticeVisible && needsDetailsCount > 0 ? (
             <section className="top-alert" aria-label="Account details needed">
               <ToggleLeft size={17} />
               <div>
-                <strong>1 account needs details</strong>
+                <strong>{needsDetailsCount} {needsDetailsCount === 1 ? 'account needs' : 'accounts need'} details</strong>
                 <span>Add missing institution or last-four details before exports.</span>
               </div>
-              <button type="button">Review</button>
+              <button type="button" onClick={() => setSearchTerm('Needs details')}>Review</button>
               <button className="top-alert-close" type="button" aria-label="Dismiss alert" onClick={dismissNotice}>
                 <X size={16} />
               </button>
             </section>
           ) : null}
 
+          {dataError ? (
+            <section className="top-alert" role="alert">
+              <ToggleLeft size={17} />
+              <div>
+                <strong>{dataError}</strong>
+                <span>Showing local preview accounts until live data is available.</span>
+              </div>
+              <button className="top-alert-close" type="button" aria-label="Dismiss data warning" onClick={() => setDataError('')}>
+                <X size={16} />
+              </button>
+            </section>
+          ) : null}
+
           <section className="summary-strip account-summary" aria-label="Account setup summary">
-            <SummaryItem label="Active accounts" value="4" tone="net" icon={Wallet} />
-            <SummaryItem label="Bank accounts" value="2" tone="income" icon={Landmark} />
-            <SummaryItem label="Credit cards" value="1" tone="expense" icon={CreditCard} />
+            <SummaryItem label="Active accounts" value={String(activeCount)} tone="net" icon={Wallet} />
+            <SummaryItem label="Bank accounts" value={String(bankCount)} tone="income" icon={Landmark} />
+            <SummaryItem label="Credit cards" value={String(creditCardCount)} tone="expense" icon={CreditCard} />
             <SummaryItem label="Currency" value="USD" tone="review" icon={Wallet} />
           </section>
 
@@ -138,7 +210,7 @@ function Accounts(props: PageProps) {
             <div className="table-toolbar">
               <label className="field search-field">
                 <Search size={18} />
-                <input type="search" placeholder="Search accounts" />
+                <input type="search" placeholder="Search accounts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
               </label>
 
               <div className="filter-actions">
@@ -167,7 +239,7 @@ function Accounts(props: PageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {accounts.map((account) => (
+                  {filteredAccounts.map((account) => (
                     <tr key={account.id}>
                       <td data-label="Account">
                         <div className="merchant-cell">
@@ -188,12 +260,51 @@ function Accounts(props: PageProps) {
                         <StatusPill status={account.status} />
                       </td>
                       <td data-label="Actions" className="action-col">
-                        <button className="row-action" type="button" aria-label={`Actions for ${account.name}`}>
+                        <button
+                          className="row-action"
+                          type="button"
+                          aria-label={`Actions for ${account.name}`}
+                          aria-expanded={actionMenuId === account.id}
+                          onClick={() => setActionMenuId((id) => (id === account.id ? null : account.id))}
+                        >
                           <MoreHorizontal size={18} />
                         </button>
+                        {actionMenuId === account.id ? (
+                          <div className="row-action-menu">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAccount(account)
+                                setDrawerOpen(true)
+                                setActionMenuId(null)
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="is-danger"
+                              type="button"
+                              onClick={() => {
+                                void deleteAccount(account.id)
+                                  .then(() => {
+                                    setAccountRows((rows) => rows.filter((row) => row.id !== account.id))
+                                    setActionMenuId(null)
+                                  })
+                                  .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to delete account.'))
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
+                  {filteredAccounts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="empty-table-cell">No accounts match this search.</td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -280,13 +391,43 @@ function ProgressivePanel({
   )
 }
 
-function AccountDrawer({ onClose }: { onClose: () => void }) {
+const emptyDraft: AccountDraft = {
+  name: '',
+  type: '',
+}
+
+function AccountDrawer({
+  account,
+  onClose,
+  onSave,
+}: {
+  account: AccountRecord | null
+  onClose: () => void
+  onSave: (draft: AccountDraft) => void
+}) {
+  const [draft, setDraft] = useState<AccountDraft>(() => account ? { name: account.name, type: account.type } : emptyDraft)
+  const [error, setError] = useState('')
+  const isEditing = Boolean(account)
+
+  function updateDraft<K extends keyof AccountDraft>(key: K, value: AccountDraft[K]) {
+    setDraft((current) => ({ ...current, [key]: value }))
+    setError('')
+  }
+
+  function submitAccount() {
+    if (!draft.name.trim() || !draft.type) {
+      setError('Add an account name and type.')
+      return
+    }
+    onSave(draft)
+  }
+
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside className="transaction-drawer account-drawer" role="dialog" aria-modal="true" aria-label="Add account" onMouseDown={(event) => event.stopPropagation()}>
+      <aside className="transaction-drawer account-drawer" role="dialog" aria-modal="true" aria-label={isEditing ? 'Edit account' : 'Add account'} onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer-header">
           <div>
-            <h2>Add account</h2>
+            <h2>{isEditing ? 'Edit account' : 'Add account'}</h2>
             <p>Start manually. Plaid can be connected later when bank sync is ready.</p>
           </div>
           <button className="icon-button" type="button" aria-label="Close drawer" onClick={onClose}>
@@ -314,11 +455,11 @@ function AccountDrawer({ onClose }: { onClose: () => void }) {
         <form className="drawer-form" onSubmit={(event) => event.preventDefault()}>
           <label>
             Account name
-            <input placeholder="Business Checking" />
+            <input placeholder="Business Checking" value={draft.name} onChange={(event) => updateDraft('name', event.target.value)} />
           </label>
           <label>
             Account type
-            <select defaultValue="">
+            <select value={draft.type} onChange={(event) => updateDraft('type', event.target.value as AccountDraft['type'])}>
               <option value="" disabled>
                 Select account type
               </option>
@@ -344,14 +485,15 @@ function AccountDrawer({ onClose }: { onClose: () => void }) {
               <textarea aria-label="Account notes" placeholder="Internal note" />
             </div>
           </details>
+          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
         </form>
 
         <div className="drawer-actions">
           <button className="secondary-button" type="button" onClick={onClose}>
             Cancel
           </button>
-          <button className="primary-button" type="button">
-            Save account
+          <button className="primary-button" type="button" onClick={submitAccount}>
+            {isEditing ? 'Save changes' : 'Save account'}
           </button>
         </div>
       </aside>
