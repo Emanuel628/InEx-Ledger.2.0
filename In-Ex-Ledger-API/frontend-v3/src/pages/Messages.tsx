@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Archive,
   ChevronDown,
@@ -18,39 +18,80 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import {
+  archiveMessage,
+  deleteMessage,
+  loadArchivedMessages,
+  loadInboxMessages,
+  loadMessageThread,
+  loadSentMessages,
+  loadUnreadCounts,
+  markMessageRead,
+  replyToMessage,
+  sendGeneralMessage,
+  sendSupportMessage,
+  type MessageRecord,
+  type MessageType,
+  type UnreadCounts,
+} from '../lib/messagesApi'
 
-type MessageType = 'Invoice reply' | 'Support' | 'Account notice' | 'General'
+type LaneLabel = 'Inbox' | 'Invoices' | 'Support' | 'Notices' | 'Sent' | 'Archived'
 
-type MessageThread = {
-  id: number
-  sender: string
-  email: string
-  subject: string
-  preview: string
-  type: MessageType
-  followUp?: string
-  date: string
-  unread: boolean
-  tone: string
+const laneIcons: Record<LaneLabel, LucideIcon> = {
+  Inbox: Mail,
+  Invoices: FileText,
+  Support: Headphones,
+  Notices: Archive,
+  Sent: Send,
+  Archived: Archive,
 }
 
-const lanes = [
-  { label: 'Inbox', count: 0, icon: Mail },
-  { label: 'Invoices', count: 0, icon: FileText },
-  { label: 'Support', count: 0, icon: Headphones },
-  { label: 'Notices', count: 0, icon: Archive },
-  { label: 'Archived', count: 0, icon: Archive },
-] satisfies { label: string; count: number; icon: LucideIcon }[]
-
-const threads: MessageThread[] = []
-
 function Messages(props: PageProps) {
-  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null)
+  const [selectedThread, setSelectedThread] = useState<MessageRecord | null>(null)
+  const [threadMessages, setThreadMessages] = useState<MessageRecord[]>([])
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeType, setComposeType] = useState<'general' | 'support'>('general')
   const [lanesCollapsed, setLanesCollapsed] = useState(false)
+  const [activeLane, setActiveLane] = useState<LaneLabel>('Inbox')
+  const [inbox, setInbox] = useState<MessageRecord[]>([])
+  const [sent, setSent] = useState<MessageRecord[]>([])
+  const [archived, setArchived] = useState<MessageRecord[]>([])
+  const [unreadCounts, setUnreadCounts] = useState<UnreadCounts>({ total: 0, messages: 0, support: 0, notifications: 0 })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Unread'>('All')
+  const [typeFilter, setTypeFilter] = useState<'All' | MessageType>('All')
+  const [loadingData, setLoadingData] = useState(true)
+  const [dataError, setDataError] = useState('')
+
+  async function refreshMessages() {
+    setLoadingData(true)
+    setDataError('')
+    try {
+      const [nextInbox, nextSent, nextArchived, counts] = await Promise.all([
+        loadInboxMessages(),
+        loadSentMessages(),
+        loadArchivedMessages(),
+        loadUnreadCounts(),
+      ])
+      setInbox(nextInbox)
+      setSent(nextSent)
+      setArchived(nextArchived)
+      setUnreadCounts(counts)
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to load messages.')
+      setInbox([])
+      setSent([])
+      setArchived([])
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  useEffect(() => {
+    void refreshMessages()
+  }, [])
 
   useEffect(() => {
     document.body.classList.toggle('modal-is-open', detailOpen || composeOpen)
@@ -58,17 +99,131 @@ function Messages(props: PageProps) {
     return () => document.body.classList.remove('modal-is-open')
   }, [detailOpen, composeOpen])
 
+  const lanes = useMemo(() => {
+    const supportCount = inbox.filter((message) => message.type === 'Support').length
+    const invoiceCount = inbox.filter((message) => message.type === 'Invoice reply').length
+    const noticeCount = inbox.filter((message) => message.type === 'Account notice').length
+
+    return [
+      { label: 'Inbox' as const, count: inbox.length || unreadCounts.messages, icon: laneIcons.Inbox },
+      { label: 'Invoices' as const, count: invoiceCount, icon: laneIcons.Invoices },
+      { label: 'Support' as const, count: supportCount || unreadCounts.support, icon: laneIcons.Support },
+      { label: 'Notices' as const, count: noticeCount || unreadCounts.notifications, icon: laneIcons.Notices },
+      { label: 'Sent' as const, count: sent.length, icon: laneIcons.Sent },
+      { label: 'Archived' as const, count: archived.length, icon: laneIcons.Archived },
+    ]
+  }, [archived.length, inbox, sent.length, unreadCounts])
+
+  const laneMessages = useMemo(() => {
+    if (activeLane === 'Sent') return sent
+    if (activeLane === 'Archived') return archived
+    if (activeLane === 'Invoices') return inbox.filter((message) => message.type === 'Invoice reply')
+    if (activeLane === 'Support') return inbox.filter((message) => message.type === 'Support')
+    if (activeLane === 'Notices') return inbox.filter((message) => message.type === 'Account notice')
+    return inbox
+  }, [activeLane, archived, inbox, sent])
+
+  const visibleThreads = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    return laneMessages.filter((message) => {
+      const matchesStatus = statusFilter === 'All' || message.unread
+      const matchesType = typeFilter === 'All' || message.type === typeFilter
+      const matchesSearch = !normalizedSearch || [
+        message.sender,
+        message.email,
+        message.subject,
+        message.preview,
+        message.type,
+      ].some((value) => value.toLowerCase().includes(normalizedSearch))
+
+      return matchesStatus && matchesType && matchesSearch
+    })
+  }, [laneMessages, searchTerm, statusFilter, typeFilter])
+
+  async function openThread(thread: MessageRecord) {
+    setSelectedThread(thread)
+    setThreadMessages([])
+    setDetailOpen(true)
+    try {
+      const messages = await loadMessageThread(thread.id)
+      setThreadMessages(messages)
+      if (thread.unread) {
+        await markMessageRead(thread.id)
+        void refreshMessages()
+      }
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to open message.')
+    }
+  }
+
+  async function handleArchive(thread: MessageRecord) {
+    try {
+      await archiveMessage(thread.id)
+      setDetailOpen(false)
+      await refreshMessages()
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to archive message.')
+    }
+  }
+
+  async function handleDelete(thread: MessageRecord) {
+    if (!window.confirm(`Delete "${thread.subject}"?`)) {
+      return
+    }
+    try {
+      await deleteMessage(thread.id)
+      setDetailOpen(false)
+      await refreshMessages()
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to delete message.')
+    }
+  }
+
+  async function handleReply(thread: MessageRecord, body: string) {
+    try {
+      await replyToMessage(thread.id, body)
+      setDetailOpen(false)
+      await refreshMessages()
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to send reply.')
+    }
+  }
+
+  async function handleCompose(payload: { to: string; cc: string; subject: string; body: string }) {
+    try {
+      if (composeType === 'support') {
+        await sendSupportMessage(payload.subject, payload.body)
+      } else {
+        await sendGeneralMessage(payload.to, payload.cc, payload.subject, payload.body)
+      }
+      setComposeOpen(false)
+      await refreshMessages()
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to send message.')
+    }
+  }
+
   return (
     <AppShell
       {...props}
       searchPlaceholder="Search messages, clients, invoices"
       overlay={
         <>
-          {detailOpen && selectedThread ? <MessageDetailModal thread={selectedThread} onClose={() => setDetailOpen(false)} /> : null}
+          {detailOpen && selectedThread ? (
+            <MessageDetailModal
+              thread={selectedThread}
+              messages={threadMessages}
+              onArchive={handleArchive}
+              onClose={() => setDetailOpen(false)}
+              onDelete={handleDelete}
+              onReply={handleReply}
+            />
+          ) : null}
           {composeOpen ? (
             <ComposeModal
               mode={composeType}
               onClose={() => setComposeOpen(false)}
+              onSend={handleCompose}
             />
           ) : null}
         </>
@@ -107,6 +262,19 @@ function Messages(props: PageProps) {
           </div>
         </section>
 
+        {dataError ? (
+          <section className="top-alert" role="alert">
+            <Mail size={18} />
+            <div>
+              <strong>{dataError}</strong>
+              <span>Try again or refresh the page.</span>
+            </div>
+            <button className="top-alert-close" type="button" aria-label="Dismiss message warning" onClick={() => setDataError('')}>
+              <X size={16} />
+            </button>
+          </section>
+        ) : null}
+
         <section className={`messages-workspace ${lanesCollapsed ? 'message-lanes-are-collapsed' : ''}`} aria-label="Message center">
           <aside className="message-lanes" aria-label="Message lanes">
             <div className="message-lanes-header">
@@ -120,7 +288,12 @@ function Messages(props: PageProps) {
               </button>
             </div>
             {lanes.map(({ label, count, icon: Icon }) => (
-              <button className={label === 'Invoices' ? 'is-selected' : ''} type="button" key={label}>
+              <button
+                className={label === activeLane ? 'is-selected' : ''}
+                type="button"
+                key={label}
+                onClick={() => setActiveLane(label)}
+              >
                 <Icon size={18} />
                 <span>{label}</span>
                 <strong>{count}</strong>
@@ -132,43 +305,55 @@ function Messages(props: PageProps) {
             <div className="message-list-toolbar">
               <label className="field search-field">
                 <Search size={18} />
-                <input type="search" placeholder="Search or refine" />
+                <input type="search" placeholder="Search or refine" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
               </label>
-              <button className="secondary-button" type="button">
-                Needs reply
+              <label className="select-button">
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'All' | 'Unread')}>
+                  <option value="All">All messages</option>
+                  <option value="Unread">Unread only</option>
+                </select>
                 <ChevronDown size={16} />
-              </button>
-              <button className="secondary-button" type="button">
-                All
+              </label>
+              <label className="select-button">
+                <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'All' | MessageType)}>
+                  <option value="All">All types</option>
+                  <option value="Invoice reply">Invoice replies</option>
+                  <option value="Support">Support</option>
+                  <option value="Account notice">Notices</option>
+                  <option value="General">General</option>
+                </select>
                 <ChevronDown size={16} />
-              </button>
+              </label>
               <button className="icon-button" type="button" aria-label="Message filters">
                 <SlidersHorizontal size={18} />
               </button>
             </div>
 
             <div className="message-rows">
-              {threads.length ? (
-                threads.map((thread) => (
+              {loadingData ? (
+                <div className="empty-panel">
+                  <Mail size={28} />
+                  <strong>Loading messages</strong>
+                  <p>Your conversations will appear here.</p>
+                </div>
+              ) : visibleThreads.length ? (
+                visibleThreads.map((thread) => (
                   <button
                     className={`message-row-card ${selectedThread?.id === thread.id ? 'is-selected' : ''}`}
                     type="button"
                     key={thread.id}
-                    onClick={() => {
-                      setSelectedThread(thread)
-                      setDetailOpen(true)
-                    }}
+                    onClick={() => void openThread(thread)}
                   >
                     <span className={`message-unread-dot ${thread.unread ? 'is-visible' : ''}`} />
                     <span className={`merchant-icon merchant-${thread.tone}`}>{getInitials(thread.sender)}</span>
                     <span className="message-row-main">
                       <strong>{thread.sender}</strong>
                       <span>{thread.subject}</span>
-                      <small>{thread.preview}</small>
+                      <small>{thread.preview || 'No preview available'}</small>
                     </span>
                     <span className="message-row-meta">
                       <TypePill type={thread.type} />
-                      {thread.followUp ? <span className="follow-up-chip">{thread.followUp}</span> : null}
+                      {thread.threadCount > 1 ? <span className="follow-up-chip">{thread.threadCount} messages</span> : null}
                     </span>
                     <span className="message-row-date">{thread.date}</span>
                     <MoreHorizontal size={18} />
@@ -214,7 +399,36 @@ function TypePill({ type }: { type: MessageType }) {
   return <span className={`type-pill ${className}`}>{type}</span>
 }
 
-function MessageDetailModal({ thread, onClose }: { thread: MessageThread; onClose: () => void }) {
+function MessageDetailModal({
+  thread,
+  messages,
+  onArchive,
+  onClose,
+  onDelete,
+  onReply,
+}: {
+  thread: MessageRecord
+  messages: MessageRecord[]
+  onArchive: (thread: MessageRecord) => Promise<void>
+  onClose: () => void
+  onDelete: (thread: MessageRecord) => Promise<void>
+  onReply: (thread: MessageRecord, body: string) => Promise<void>
+}) {
+  const [replyBody, setReplyBody] = useState('')
+  const [sending, setSending] = useState(false)
+  const visibleMessages = messages.length ? messages : [thread]
+
+  async function submitReply() {
+    if (!replyBody.trim()) return
+    setSending(true)
+    try {
+      await onReply(thread, replyBody)
+      setReplyBody('')
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
     <div className="message-modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
@@ -232,7 +446,7 @@ function MessageDetailModal({ thread, onClose }: { thread: MessageThread; onClos
               <span className={`merchant-icon merchant-${thread.tone}`}>{getInitials(thread.sender)}</span>
               <div>
                 <strong>{thread.sender}</strong>
-                <span>{thread.email}</span>
+                <span>{thread.email || 'No email on file'}</span>
               </div>
             </div>
           </div>
@@ -242,11 +456,11 @@ function MessageDetailModal({ thread, onClose }: { thread: MessageThread; onClos
         </div>
 
         <div className="message-reading-actions">
-          <button type="button">
+          <button type="button" onClick={() => void onArchive(thread)}>
             <Archive size={17} />
-            Archive
+            {thread.archived ? 'Unarchive' : 'Archive'}
           </button>
-          <button type="button">
+          <button type="button" onClick={() => void onDelete(thread)}>
             <Trash2 size={17} />
             Delete
           </button>
@@ -259,28 +473,24 @@ function MessageDetailModal({ thread, onClose }: { thread: MessageThread; onClos
 
         <div className="message-modal-body">
           <div className="message-bubbles">
-            <MessageBubble sender={thread.sender} time="1h ago">
-              Thanks for the details. Can you clarify the hosting line item before we approve this invoice?
-            </MessageBubble>
-            <MessageBubble sender="You" time="45m ago" sent>
-              Good question. It is an annual charge for managed hosting renewal starting May 1, 2026.
-            </MessageBubble>
-            <MessageBubble sender={thread.sender} time="20m ago">
-              Got it, thanks. Please go ahead and process the payment.
-            </MessageBubble>
+            {visibleMessages.map((message) => (
+              <MessageBubble key={message.id} sender={message.sender} time={message.date} sent={message.senderId === message.receiverId}>
+                {message.body || message.preview || 'No message body available.'}
+              </MessageBubble>
+            ))}
           </div>
 
           <div className="message-reply-box">
-            <textarea placeholder="Write your reply..." aria-label="Write your reply" />
+            <textarea placeholder="Write your reply..." aria-label="Write your reply" value={replyBody} onChange={(event) => setReplyBody(event.target.value)} />
             <div className="message-reply-actions">
               <button className="secondary-button" type="button">Snippets</button>
               <button className="secondary-button" type="button">
                 <Paperclip size={17} />
                 Attach
               </button>
-              <button className="primary-button" type="button">
+              <button className="primary-button" type="button" disabled={sending || !replyBody.trim()} onClick={() => void submitReply()}>
                 <Send size={18} />
-                Send reply
+                {sending ? 'Sending' : 'Send reply'}
               </button>
             </div>
           </div>
@@ -290,7 +500,32 @@ function MessageDetailModal({ thread, onClose }: { thread: MessageThread; onClos
   )
 }
 
-function ComposeModal({ mode, onClose }: { mode: 'general' | 'support'; onClose: () => void }) {
+function ComposeModal({
+  mode,
+  onClose,
+  onSend,
+}: {
+  mode: 'general' | 'support'
+  onClose: () => void
+  onSend: (payload: { to: string; cc: string; subject: string; body: string }) => Promise<void>
+}) {
+  const [to, setTo] = useState('')
+  const [cc, setCc] = useState('')
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+
+  async function submitForm() {
+    setSending(true)
+    try {
+      await onSend({ to, cc, subject, body })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const canSend = Boolean(body.trim() && (mode === 'support' || to.trim()))
+
   return (
     <div className="message-modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
@@ -311,19 +546,24 @@ function ComposeModal({ mode, onClose }: { mode: 'general' | 'support'; onClose:
           </button>
         </div>
 
-        <form className="compose-form" onSubmit={(event) => event.preventDefault()}>
-          <label>
-            To
-            <input
-              defaultValue={mode === 'support' ? 'support@inexledger.com' : ''}
-              placeholder="name@example.com, billing@example.com"
-            />
-          </label>
+        <form
+          className="compose-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (canSend) void submitForm()
+          }}
+        >
           {mode === 'support' ? null : (
-            <label>
-              CC
-              <input placeholder="owner@example.com, bookkeeper@example.com" />
-            </label>
+            <>
+              <label>
+                To
+                <input value={to} onChange={(event) => setTo(event.target.value)} placeholder="name@example.com, billing@example.com" />
+              </label>
+              <label>
+                CC
+                <input value={cc} onChange={(event) => setCc(event.target.value)} placeholder="owner@example.com, bookkeeper@example.com" />
+              </label>
+            </>
           )}
           {mode === 'support' ? (
             <label>
@@ -336,19 +576,19 @@ function ComposeModal({ mode, onClose }: { mode: 'general' | 'support'; onClose:
           ) : null}
           <label>
             Subject
-            <input placeholder="Brief subject" />
+            <input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Brief subject" />
           </label>
           <label>
             Message
-            <textarea placeholder="Write your message..." />
+            <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write your message..." />
           </label>
         </form>
 
         <div className="message-modal-actions">
           <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
-          <button className="primary-button" type="button">
+          <button className="primary-button" type="button" disabled={sending || !canSend} onClick={() => void submitForm()}>
             <Send size={18} />
-            Send
+            {sending ? 'Sending' : 'Send'}
           </button>
         </div>
       </section>

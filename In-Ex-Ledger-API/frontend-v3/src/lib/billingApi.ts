@@ -1,0 +1,137 @@
+import { apiRequest } from './apiClient'
+
+export type BillingInterval = 'monthly' | 'yearly'
+
+export type BillingSubscription = {
+  effectiveTier?: string | null
+  effectiveTierName?: string | null
+  effectiveStatus?: string | null
+  status?: string | null
+  isPaid?: boolean | null
+  isTrialing?: boolean | null
+  cancelAtPeriodEnd?: boolean | null
+  isCanceledWithRemainingAccess?: boolean | null
+  maxBusinessesAllowed?: number | null
+  additionalBusinesses?: number | null
+  activeBusinessCount?: number | null
+  currentPeriodEnd?: string | null
+  trialEndsAt?: string | null
+  billingInterval?: BillingInterval | string | null
+  currency?: string | null
+  stripeCustomerId?: string | null
+  stripeSubscriptionId?: string | null
+}
+
+export type BillingPrice = {
+  base: number
+  addon: number
+  labelKey?: string
+}
+
+export type BillingPricing = {
+  currency: string
+  verified: boolean
+  pricing: Record<BillingInterval, BillingPrice>
+}
+
+export type BillingPaymentMethod = {
+  type?: string
+  brand?: string
+  bankName?: string
+  last4?: string
+  expMonth?: number | null
+  expYear?: number | null
+}
+
+export type BillingInvoice = {
+  id: string
+  number?: string | null
+  amount_paid?: number | null
+  amount_due?: number | null
+  currency?: string | null
+  status?: string | null
+  created?: number | null
+  hosted_invoice_url?: string | null
+  invoice_pdf?: string | null
+}
+
+export type BillingOverview = {
+  subscription: BillingSubscription
+  paymentMethod: BillingPaymentMethod | null
+  invoices: BillingInvoice[]
+  portalAvailable: boolean
+}
+
+export async function loadBillingOverview() {
+  return apiRequest<BillingOverview>('/api/billing/overview')
+}
+
+export async function loadBillingPricing() {
+  return apiRequest<BillingPricing>('/api/billing/pricing')
+}
+
+export async function startCheckout(billingInterval: BillingInterval, additionalBusinesses = 0) {
+  const data = await apiRequest<{ url: string }>('/api/billing/checkout-session', {
+    method: 'POST',
+    body: JSON.stringify({
+      billingInterval,
+      additionalBusinesses,
+      returnPath: '/subscription',
+    }),
+  })
+  window.location.assign(data.url)
+}
+
+export async function openBillingPortal() {
+  const data = await apiRequest<{ url: string }>('/api/billing/customer-portal', { method: 'POST' })
+  window.location.assign(data.url)
+}
+
+export async function cancelSubscription() {
+  const data = await apiRequest<{ subscription: BillingSubscription }>('/api/billing/cancel', { method: 'POST' })
+  return data.subscription
+}
+
+export async function resumeSubscription(billingInterval?: BillingInterval) {
+  const data = await apiRequest<{ subscription: BillingSubscription }>('/api/billing/resume', {
+    method: 'POST',
+    body: JSON.stringify(billingInterval ? { billingInterval } : {}),
+  })
+  return data.subscription
+}
+
+export function formatSubscriptionMoney(amount: number, currency = 'usd') {
+  try {
+    return new Intl.NumberFormat(currency.toLowerCase() === 'cad' ? 'en-CA' : 'en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount)
+  } catch {
+    return `${currency.toUpperCase()} ${amount.toFixed(2)}`
+  }
+}
+
+export function formatBillingInvoiceAmount(invoice: BillingInvoice) {
+  const value = Number(invoice.amount_paid || invoice.amount_due || 0) / 100
+  return formatSubscriptionMoney(value, invoice.currency || 'usd')
+}
+
+export function formatBillingDateFromUnix(value?: number | null) {
+  if (!value) return ''
+  return new Date(value * 1000).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+export function formatSubscriptionDate(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
