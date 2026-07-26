@@ -41,6 +41,7 @@ const {
   buildVerificationEmail,
   buildPasswordResetEmail,
   buildPasswordChangedEmail,
+  buildDuplicateSignupNoticeEmail,
   buildNewSignInAlertEmail,
   buildEmailChangeEmail,
   buildEmailChangedConfirmationEmail,
@@ -1056,7 +1057,27 @@ router.post("/register", authLimiter, async (req, res) => {
     const existing = await client.query("SELECT id FROM users WHERE email = $1", [email]);
     if (existing.rowCount > 0) {
       await client.query("ROLLBACK");
-      return res.status(409).json({ error: "Email already registered" });
+      // Respond exactly as a successful registration would (see /forgot-password
+      // for the same policy) so this endpoint can't be used to enumerate which
+      // emails already have accounts. No verification_state / signup_bootstrap_token
+      // is issued here since the account may already be verified. The existing
+      // account owner is notified instead, so a leaked/guessed email doesn't
+      // silently go unnoticed.
+      try {
+        const lang = await getPreferredLanguageForEmail(email);
+        const { token: resetToken } = await createPasswordResetToken(email);
+        const emailContent = buildDuplicateSignupNoticeEmail(lang, {
+          loginLink: `${getAppBaseUrl(req)}/login`,
+          resetLink: buildPasswordResetLink(req, resetToken)
+        });
+        await sendAppEmail({ to: email, ...emailContent });
+      } catch (emailErr) {
+        logError("Duplicate-signup notice email failed:", emailErr);
+      }
+      return res.status(201).json({
+        success: true,
+        message: "Account created. Check your email!"
+      });
     }
 
     const deletedAccount = await getDeletedAccountRecordByEmail(email, client);
