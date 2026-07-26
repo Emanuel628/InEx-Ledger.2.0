@@ -220,7 +220,7 @@ test("messages support-email stores an outbound support thread and reply-to rout
 
     assert.equal(res.status, 201);
     assert.equal(fixture.state.sentEmails.length, 1);
-    assert.match(String(fixture.state.sentEmails[0].reply_to || ""), /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i);
+    assert.match(String(fixture.state.sentEmails[0].replyTo || ""), /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i);
     assert.equal(fixture.state.insertedMessages.length, 1);
     assert.equal(fixture.state.auditCalls.length, 1);
     assert.equal(fixture.state.auditCalls[0].metadata.delivery, "email");
@@ -258,7 +258,7 @@ test("messages send-email delivers to typed external recipients and stores the o
     assert.equal(res.status, 201);
     assert.equal(fixture.state.sentEmails.length, 1);
     assert.deepEqual(fixture.state.sentEmails[0].to, ["client@example.com", "second@example.com"]);
-    assert.match(String(fixture.state.sentEmails[0].reply_to || ""), /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i);
+    assert.match(String(fixture.state.sentEmails[0].replyTo || ""), /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i);
     assert.equal(fixture.state.insertedMessages.length, 1);
     assert.equal(fixture.state.auditCalls.length, 0);
     assert.match(fixture.state.insertedMessages[0].params[6], /client@example\.com/i);

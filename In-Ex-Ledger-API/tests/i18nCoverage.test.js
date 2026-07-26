@@ -12,6 +12,11 @@ const I18N_PATH = path.join(PUBLIC_DIR, "js", "i18n.js");
 const LANGS = ["en", "es", "fr"];
 const VISIBLE_ATTRS = ["placeholder", "aria-label", "title", "alt"];
 const SKIP_TEXT_TAGS = new Set(["script", "style", "svg", "noscript", "template"]);
+const I18N_KEY_SCAN_EXEMPT_DIRS = new Set([
+  // The React v3 bundle is not backed by public/js/i18n.js. Minification also
+  // creates local t(...) calls that look like legacy translation lookups.
+  "app-v3"
+]);
 const I18N_HTML_COVERAGE_EXEMPT_FILES = new Set([
   // Public copy-heavy pages are currently translated separately or left as static SEO/legal content.
   "help.html",
@@ -21,11 +26,13 @@ const I18N_HTML_COVERAGE_EXEMPT_FILES = new Set([
   "terms.html"
 ]);
 
-function walkFiles(dir, collected = []) {
+function walkFiles(dir, collected = [], options = {}) {
+  const skipDirectories = options.skipDirectories || new Set();
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      walkFiles(fullPath, collected);
+      if (skipDirectories.has(entry.name)) continue;
+      walkFiles(fullPath, collected, options);
       continue;
     }
     if (/\.(html|js)$/.test(entry.name)) {
@@ -69,7 +76,7 @@ function extractDefinedKeys() {
 
 function extractUsedKeys() {
   const used = new Set();
-  const files = walkFiles(PUBLIC_DIR);
+  const files = walkFiles(PUBLIC_DIR, [], { skipDirectories: I18N_KEY_SCAN_EXEMPT_DIRS });
 
   for (const file of files) {
     const source = fs.readFileSync(file, "utf8");
