@@ -218,6 +218,18 @@ function loadAuthRouterFixture(options = {}) {
               return { rows: [], rowCount: 0 };
             }
 
+            if (/DELETE FROM email_change_requests\s+WHERE user_id = \$2\s+AND \(token_hash = \$1 OR token::text = \$3\)/i.test(sql)) {
+              state.consumedTokenHash = params[0];
+              state.consumedRawToken = params[2];
+              if (options.confirmTokenValue && params[0] === `hashed:${options.confirmTokenValue}` && params[1] === "user_email_change_001") {
+                return {
+                  rows: [{ user_id: "user_email_change_001", new_email: "new@example.com" }],
+                  rowCount: 1
+                };
+              }
+              return { rows: [], rowCount: 0 };
+            }
+
             if (/UPDATE users SET email = \$1 WHERE id = \$2/i.test(sql)) {
               state.updatedEmail = { email: params[0], userId: params[1] };
               return { rows: [], rowCount: 1 };
@@ -315,5 +327,52 @@ test("confirm-email-change consumes the hashed token path and revokes existing s
     assert.equal(fixture.state.emailPayloads.length, 2);
   } finally {
     fixture.cleanup();
+  }
+});
+
+test("request-email-change can send a 6 digit code and confirm it through the authenticated MFA-style path", async () => {
+  const fixture = loadAuthRouterFixture();
+  let requestFixtureCleaned = false;
+
+  try {
+    const requestResponse = await request(fixture.app)
+      .post("/api/auth/request-email-change")
+      .send({
+        newEmail: "new@example.com",
+        currentPassword: "CurrentPass123!",
+        verificationMode: "mfa_code"
+      });
+
+    assert.equal(requestResponse.status, 200);
+    assert.equal(requestResponse.body.verification_mode, "mfa_code");
+
+    const codeMatch = String(fixture.state.emailPayloads[0].text || "").match(/\b(\d{6})\b/);
+    assert.ok(codeMatch, "email should contain a 6 digit verification code");
+    assert.equal(fixture.state.insertedEmailChangeParams[3], `hashed:${codeMatch[1]}`);
+
+    fixture.cleanup();
+    requestFixtureCleaned = true;
+
+    const confirmFixture = loadAuthRouterFixture({ confirmTokenValue: codeMatch[1] });
+    try {
+      const confirmResponse = await request(confirmFixture.app)
+        .post("/api/auth/confirm-email-change")
+        .send({ code: codeMatch[1] });
+
+      assert.equal(confirmResponse.status, 200);
+      assert.equal(confirmResponse.body.success, true);
+      assert.equal(confirmFixture.state.consumedTokenHash, `hashed:${codeMatch[1]}`);
+      assert.equal(confirmFixture.state.consumedRawToken, codeMatch[1]);
+      assert.deepEqual(confirmFixture.state.updatedEmail, {
+        email: "new@example.com",
+        userId: "user_email_change_001"
+      });
+    } finally {
+      confirmFixture.cleanup();
+    }
+  } finally {
+    if (!requestFixtureCleaned) {
+      fixture.cleanup();
+    }
   }
 });

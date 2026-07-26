@@ -29,6 +29,12 @@ export type PrivacySettings = {
   dataResidency: string
 }
 
+export type AccountingLock = {
+  isLocked?: boolean
+  lockedThroughDate?: string | null
+  note?: string | null
+}
+
 export type OnboardingDraft = {
   businessName: string
   region: 'US' | 'CA'
@@ -81,6 +87,22 @@ export async function saveBusinessProfile(businessId: string, profile: BusinessP
       gst_hst_method: profile.gst_hst_method || null,
     }),
   })
+}
+
+export async function loadAccountingLock() {
+  const response = await apiRequest<{ lock: AccountingLock | null }>('/api/business/accounting-lock')
+  return response.lock || null
+}
+
+export async function saveAccountingLock(input: { lockedThroughDate: string | null; note: string }) {
+  const response = await apiRequest<{ lock: AccountingLock | null }>('/api/business/accounting-lock', {
+    method: 'PUT',
+    body: JSON.stringify({
+      locked_through_date: input.lockedThroughDate,
+      note: input.lockedThroughDate ? input.note.trim() : '',
+    }),
+  })
+  return response.lock || null
 }
 
 export async function loadPrivacySettings() {

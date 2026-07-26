@@ -24,12 +24,15 @@ import type { PageProps, ThemeMode } from '../App'
 import AppShell from '../components/AppShell'
 import {
   exportAccountData,
+  loadAccountingLock,
   loadBusinessProfile,
   loadPrivacySettings,
   refreshCurrentUser,
+  saveAccountingLock,
   saveBusinessProfile,
   savePrivacySettings,
   saveProfile,
+  type AccountingLock,
   type BusinessProfile,
   type PrivacySettings,
 } from '../lib/settingsApi'
@@ -232,13 +235,115 @@ function BusinessSettings({
         <SelectField label="Accounting method" value={profile.accounting_method || ''} options={['', 'cash', 'accrual']} onChange={(value) => updateBusiness('accounting_method', value)} />
         {profile.region === 'US' ? <SelectField label="Material participation" value={profile.material_participation ? 'yes' : 'no'} options={['yes', 'no']} onChange={(value) => updateBusiness('material_participation', value === 'yes')} /> : null}
       </div>
-      <SettingsRow icon={LockKeyhole} title="Accounting period lock" description="Period lock setup remains protected in the legacy accounting controls.">
-        <button className="secondary-button" type="button" disabled>Protected</button>
-      </SettingsRow>
-      <SettingsRow icon={Building2} title="Businesses on this account" description="Add, switch, or remove businesses from Subscription and the top business switcher.">
-        <button className="secondary-button" type="button" disabled>Top bar</button>
-      </SettingsRow>
+      <AccountingLockControls />
     </SettingsPanel>
+  )
+}
+
+function AccountingLockControls() {
+  const [lock, setLock] = useState<AccountingLock | null>(null)
+  const [lockedThroughDate, setLockedThroughDate] = useState('')
+  const [note, setNote] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    loadAccountingLock()
+      .then((nextLock) => {
+        if (!active) return
+        setLock(nextLock)
+        setLockedThroughDate(nextLock?.lockedThroughDate || '')
+        setNote(nextLock?.note || '')
+      })
+      .catch((loadError) => {
+        if (active) {
+          setError(loadError instanceof Error ? loadError.message : 'Unable to load accounting lock.')
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  async function saveLock() {
+    setMessage('')
+    setError('')
+    if (lockedThroughDate && !window.confirm('Lock accounting period? Transactions on or before this date cannot be edited or deleted.')) {
+      return
+    }
+
+    setSaving(true)
+    try {
+      const nextLock = await saveAccountingLock({ lockedThroughDate: lockedThroughDate || null, note })
+      setLock(nextLock)
+      setLockedThroughDate(nextLock?.lockedThroughDate || '')
+      setNote(nextLock?.note || '')
+      setMessage(lockedThroughDate ? 'Accounting lock saved.' : 'Accounting lock cleared.')
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save accounting lock.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function clearLock() {
+    setMessage('')
+    setError('')
+    setSaving(true)
+    try {
+      const nextLock = await saveAccountingLock({ lockedThroughDate: null, note: '' })
+      setLock(nextLock)
+      setLockedThroughDate('')
+      setNote('')
+      setMessage('Accounting lock cleared.')
+    } catch (clearError) {
+      setError(clearError instanceof Error ? clearError.message : 'Unable to clear accounting lock.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="settings-lock-panel">
+      <div className="settings-row">
+        <div className="settings-row-icon">
+          <LockKeyhole size={19} />
+        </div>
+        <div>
+          <strong>Accounting period lock</strong>
+          <p>{loading ? 'Checking locked period...' : lock?.lockedThroughDate ? `Transactions are locked through ${formatSettingsDate(lock.lockedThroughDate)}.` : 'No accounting period lock is active.'}</p>
+        </div>
+        <div className="settings-row-action">
+          <span className={`status-pill ${lock?.lockedThroughDate ? 'status-needs-review' : 'status-cleared'}`}>
+            {lock?.lockedThroughDate ? 'Locked' : 'Unlocked'}
+          </span>
+        </div>
+      </div>
+      <div className="settings-form-grid">
+        <Field label="Locked through" type="date" value={lockedThroughDate} onChange={setLockedThroughDate} />
+        <Field label="Closing note" value={note} onChange={setNote} placeholder="Optional note for this close" />
+      </div>
+      {message ? <p className="auth-success" role="status">{message}</p> : null}
+      {error ? <p className="auth-error" role="alert">{error}</p> : null}
+      <div className="filter-actions">
+        <button className="primary-button" type="button" disabled={saving || loading} onClick={() => void saveLock()}>
+          {saving ? 'Saving...' : 'Save lock'}
+        </button>
+        <button className="secondary-button" type="button" disabled={saving || loading || !lock?.lockedThroughDate} onClick={() => void clearLock()}>
+          Clear lock
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -411,6 +516,14 @@ function Toggle({ enabled = false, label, onClick }: { enabled?: boolean; label:
       {label}
     </button>
   )
+}
+
+function formatSettingsDate(date: string) {
+  const parsed = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return date
+  }
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default Settings

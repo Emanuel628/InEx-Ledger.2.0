@@ -1064,6 +1064,16 @@ textarea:focus-visible {
   justify-content: flex-end;
 }
 
+.settings-lock-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.status-cleared {
+  background: #e4f7ec;
+  color: var(--green);
+}
+
 .settings-toggle {
   min-width: 72px;
   min-height: 36px;

@@ -57,6 +57,7 @@ function ResetPassword(props: PageProps) {
         </label>
         {error ? <p className="auth-error" role="alert">{error}</p> : null}
         <button className="primary-button" type="submit" disabled={submitting}>{submitting ? 'Updating...' : 'Update password'}</button>
+        <button className="secondary-button" type="button" onClick={() => props.onNavigate('Settings')}>Back to Settings</button>
       </form>
     </AuthShell>
   )

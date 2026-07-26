@@ -149,13 +149,17 @@ export async function requestEmailChange(input: { newEmail: string; password: st
     body: JSON.stringify({
       newEmail: input.newEmail,
       currentPassword: input.password,
+      verificationMode: 'mfa_code',
     }),
   })
   return { ok: true, message: response.message, verificationCode: undefined as string | undefined }
 }
 
 export async function confirmEmailChange(code: string) {
-  window.location.assign(`/api/auth/confirm-email-change?token=${encodeURIComponent(code)}`)
+  await authRequest('/api/auth/confirm-email-change', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  })
   return { user: null }
 }
 

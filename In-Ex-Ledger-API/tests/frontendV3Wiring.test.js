@@ -130,3 +130,27 @@ test("v3 archived message rows expose an action menu instead of only opening the
   assert.match(source, /thread\.archived \? 'Unarchive' : 'Archive'/);
   assert.match(source, /setActionMenuId\(\(id\) => \(id === thread\.id \? null : thread\.id\)\)/);
 });
+
+test("v3 change email uses MFA-style verification instead of inline confirm controls", () => {
+  const changeEmailSource = fs.readFileSync(path.join(frontendRoot, "pages", "ChangeEmail.tsx"), "utf8");
+  const mfaSource = fs.readFileSync(path.join(frontendRoot, "pages", "MfaChallenge.tsx"), "utf8");
+  const authSource = fs.readFileSync(path.join(frontendRoot, "lib", "authApi.ts"), "utf8");
+
+  assert.doesNotMatch(changeEmailSource, /Verification code/);
+  assert.doesNotMatch(changeEmailSource, /Confirm email change/);
+  assert.match(changeEmailSource, /inex-mfa-context/);
+  assert.match(authSource, /verificationMode: 'mfa_code'/);
+  assert.match(authSource, /\/api\/auth\/confirm-email-change/);
+  assert.match(mfaSource, /Verify email change/);
+});
+
+test("v3 business settings expose the live accounting lock and hide the old business-account row", () => {
+  const settingsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Settings.tsx"), "utf8");
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "settingsApi.ts"), "utf8");
+
+  assert.match(settingsSource, /AccountingLockControls/);
+  assert.match(settingsSource, /Save lock/);
+  assert.match(settingsSource, /Clear lock/);
+  assert.doesNotMatch(settingsSource, /Businesses on this account/);
+  assert.match(apiSource, /\/api\/business\/accounting-lock/);
+});

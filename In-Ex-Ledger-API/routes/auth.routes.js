@@ -246,8 +246,8 @@ async function consumeRecoveryEmailToken(token) {
   return result.rows[0] || null;
 }
 
-async function createEmailChangeToken(userId, email) {
-  const token = crypto.randomBytes(32).toString("hex");
+async function createEmailChangeToken(userId, email, options = {}) {
+  const token = options.token || crypto.randomBytes(32).toString("hex");
   const tokenHash = hashValue(token);
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
@@ -275,6 +275,26 @@ async function consumeEmailChangeToken(token) {
         AND expires_at > NOW()
       RETURNING user_id, new_email`,
     [tokenHash, rawToken]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function consumeEmailChangeTokenForUser(token, userId) {
+  const rawToken = String(token || "").trim();
+  if (!rawToken || !userId) {
+    return null;
+  }
+
+  const tokenHash = hashValue(rawToken);
+  await pool.query("DELETE FROM email_change_requests WHERE expires_at <= NOW()");
+  const result = await pool.query(
+    `DELETE FROM email_change_requests
+      WHERE user_id = $2
+        AND (token_hash = $1 OR token::text = $3)
+        AND expires_at > NOW()
+      RETURNING user_id, new_email`,
+    [tokenHash, userId, rawToken]
   );
 
   return result.rows[0] || null;
@@ -2285,6 +2305,7 @@ router.post("/recovery-email/request", requireAuth, requireCsrfProtection, authL
 router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, requireMfaIfEnabled, async (req, res) => {
   const { newEmail, currentPassword } = req.body ?? {};
   const email = normalizeEmail(newEmail);
+  const wantsCodeFlow = req.body?.verificationMode === "mfa_code";
 
   if (!email || !currentPassword) {
     return res.status(400).json({ error: "newEmail and currentPassword are required" });
@@ -2306,20 +2327,91 @@ router.post("/request-email-change", requireAuth, requireCsrfProtection, authLim
       return res.status(409).json({ error: "Email already in use" });
     }
 
-    const { token } = await createEmailChangeToken(req.user.id, email);
-
-    const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
     const lang = await getPreferredLanguageForUser(req.user.id);
-    const emailContent = buildEmailChangeEmail(lang, confirmLink);
+    let emailContent;
+
+    if (wantsCodeFlow) {
+      const code = generateMfaEmailCode();
+      await createEmailChangeToken(req.user.id, email, { token: code });
+      const expires = `${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes`;
+      emailContent = {
+        subject: "Confirm your email change",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+            <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+              <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
+              <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Confirm your email change</h1>
+            </div>
+            <div style="padding: 28px;">
+              <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">Use this code to finish changing your account email.</p>
+              <div style="font-size: 32px; letter-spacing: 0.28em; font-weight: 800; color: #0f172a; margin: 18px 0;">${code}</div>
+              <p style="margin: 0; color: #64748b; font-size: 13px;">This code expires in ${expires}. If you did not request this, change your password and contact support.</p>
+            </div>
+          </div>
+        `,
+        text: `Use this code to finish changing your InEx Ledger account email: ${code}\n\nThis code expires in ${expires}. If you did not request this, change your password and contact support.`
+      };
+    } else {
+      const { token } = await createEmailChangeToken(req.user.id, email);
+      const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
+      emailContent = buildEmailChangeEmail(lang, confirmLink);
+    }
     // Send to the CURRENT address so only the real account owner can approve
     // the change. Sending to the new address would let an attacker who stole
     // a session redirect the account to their own email.
     await sendAppEmail({ to: user.email, ...emailContent });
 
-    res.json({ message: "A confirmation link has been sent to your current email address." });
+    res.json({
+      message: wantsCodeFlow
+        ? "A verification code has been sent to your current email address."
+        : "A confirmation link has been sent to your current email address.",
+      verification_mode: wantsCodeFlow ? "mfa_code" : "link"
+    });
   } catch (err) {
     logError("Request email change error:", err);
     res.status(500).json({ error: "Failed to initiate email change." });
+  }
+});
+
+router.post("/confirm-email-change", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
+  const code = String(req.body?.code || "").trim();
+  if (!/^\d{6}$/.test(code)) {
+    return res.status(400).json({ error: "A valid 6-digit code is required." });
+  }
+
+  try {
+    const result = await consumeEmailChangeTokenForUser(code, req.user.id);
+    if (!result?.user_id || !result?.new_email) {
+      return res.status(400).json({ error: "Invalid or expired code." });
+    }
+
+    const { user_id, new_email } = result;
+    const currentUserResult = await pool.query("SELECT email FROM users WHERE id = $1 LIMIT 1", [user_id]);
+    const oldEmail = normalizeEmail(currentUserResult.rows[0]?.email);
+    await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
+    await revokeAllRefreshTokensForUser(user_id);
+    await revokeTrustedMfaDevicesForUser(user_id);
+    clearRefreshCookie(res);
+    clearAccessCookie(res);
+    clearMfaTrustCookie(res);
+    await recordAuditEvent(pool, {
+      userId: user_id,
+      action: AUDIT_ACTIONS.EMAIL_CHANGE_COMPLETE,
+      metadata: {
+        old_email_mask: maskEmail(oldEmail),
+        new_email_mask: maskEmail(new_email)
+      }
+    });
+    await sendEmailChangedConfirmationEmails({
+      userId: user_id,
+      oldEmail,
+      newEmail: new_email
+    });
+
+    res.json({ success: true, message: "Email updated. Please sign in with your new address." });
+  } catch (err) {
+    logError("Confirm email change code error:", err);
+    res.status(500).json({ error: "Email change failed." });
   }
 });
 
