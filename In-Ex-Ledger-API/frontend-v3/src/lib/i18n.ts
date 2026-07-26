@@ -5,7 +5,7 @@ export type TranslationKey = keyof typeof translations.en
 
 const STORAGE_KEY = 'lb_language'
 
-const translations = {
+export const translations = {
   en: {
     'app.loading.title': 'Loading InEx Ledger',
     'app.loading.body': 'Checking your session...',
