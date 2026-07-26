@@ -89,6 +89,15 @@ const publicPages = new Set<AppPage>([
   'ResetPassword',
 ])
 
+const legacyAuthRoutes: Partial<Record<AppPage, string>> = {
+  Login: '/login?next=/app-v3/',
+  Register: '/register',
+  ForgotPassword: '/forgot-password',
+  ResetPassword: '/reset-password',
+  VerifyEmail: '/verify-email',
+  MfaChallenge: '/login?next=/app-v3/',
+}
+
 function App() {
   const [currentPage, setCurrentPage] = useState<AppPage>('Landing')
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
@@ -132,8 +141,14 @@ function App() {
   }, [])
 
   const navigate = (page: AppPage) => {
+    const legacyAuthRoute = legacyAuthRoutes[page]
+    if (legacyAuthRoute) {
+      window.location.assign(legacyAuthRoute)
+      return
+    }
+
     if (!authUser && !publicPages.has(page)) {
-      setCurrentPage('Login')
+      window.location.assign('/login?next=/app-v3/')
       return
     }
 
