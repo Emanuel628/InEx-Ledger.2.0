@@ -16,91 +16,62 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useSessionDismissed from '../hooks/useSessionDismissed'
+import {
+  blankMileageDraft,
+  deleteMileageEntry,
+  draftFromEntry,
+  loadMileagePageData,
+  saveMileageDraft,
+  type MileageDraft,
+  type MileageEntry,
+  type MileageKind,
+  type MileageSummary,
+} from '../lib/mileageApi'
 
-type MileageKind = 'Trip' | 'Expense' | 'Maintenance'
-
-type MileageEntry = {
-  id: number
-  kind: MileageKind
-  date: string
-  title: string
-  subtitle: string
-  distance?: number
-  amount?: number
-  tone: string
+const emptySummary: MileageSummary = {
+  tripCount: 0,
+  totalMiles: 0,
+  vehicleExpenseTotal: 0,
+  maintenanceTotal: 0,
 }
-
-const mileageEntries: MileageEntry[] = [
-  {
-    id: 1,
-    kind: 'Trip',
-    date: 'May 31',
-    title: 'Client meeting',
-    subtitle: 'Downtown office',
-    distance: 18.4,
-    tone: 'blue',
-  },
-  {
-    id: 2,
-    kind: 'Expense',
-    date: 'May 29',
-    title: 'Fuel',
-    subtitle: 'Shell',
-    amount: 68.45,
-    tone: 'yellow',
-  },
-  {
-    id: 3,
-    kind: 'Maintenance',
-    date: 'May 24',
-    title: 'Oil change',
-    subtitle: 'City Garage',
-    amount: 92,
-    tone: 'green',
-  },
-  {
-    id: 4,
-    kind: 'Trip',
-    date: 'May 20',
-    title: 'Supply run',
-    subtitle: 'Office Depot',
-    distance: 11.2,
-    tone: 'violet',
-  },
-  {
-    id: 5,
-    kind: 'Expense',
-    date: 'May 18',
-    title: 'Parking',
-    subtitle: 'Convention center',
-    amount: 22,
-    tone: 'red',
-  },
-  {
-    id: 6,
-    kind: 'Trip',
-    date: 'May 12',
-    title: 'Job site visit',
-    subtitle: 'North Austin',
-    distance: 31.6,
-    tone: 'coral',
-  },
-]
 
 function Mileage(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [entryMode, setEntryMode] = useState<MileageKind>('Trip')
+  const [editingEntry, setEditingEntry] = useState<MileageEntry | null>(null)
   const [expandedPanel, setExpandedPanel] = useState<string | null>('rate')
-  const totalTrips = mileageEntries.filter((entry) => entry.kind === 'Trip')
-  const totalDistance = totalTrips.reduce((sum, entry) => sum + (entry.distance || 0), 0)
-  const vehicleExpenses = mileageEntries
-    .filter((entry) => entry.kind === 'Expense')
-    .reduce((sum, entry) => sum + (entry.amount || 0), 0)
-  const maintenance = mileageEntries
-    .filter((entry) => entry.kind === 'Maintenance')
-    .reduce((sum, entry) => sum + (entry.amount || 0), 0)
+  const [mileageEntries, setMileageEntries] = useState<MileageEntry[]>([])
+  const [summary, setSummary] = useState<MileageSummary>(emptySummary)
+  const [loadingData, setLoadingData] = useState(true)
+  const [dataError, setDataError] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [monthFilter, setMonthFilter] = useState('All')
+  const [typeFilter, setTypeFilter] = useState<'All' | MileageKind>('All')
+  const [pageSize, setPageSize] = useState(20)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
+  const [noticeVisible, dismissNotice] = useSessionDismissed('mileage-settings')
 
-  const planningEstimate = useMemo(() => totalDistance * 0.67, [totalDistance])
+  async function refreshPageData() {
+    setLoadingData(true)
+    setDataError('')
+    try {
+      const pageData = await loadMileagePageData()
+      setMileageEntries(pageData.entries)
+      setSummary(pageData.summary)
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to load mileage.')
+      setMileageEntries([])
+      setSummary(emptySummary)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  useEffect(() => {
+    void refreshPageData()
+  }, [])
 
   useEffect(() => {
     document.body.classList.toggle('modal-is-open', drawerOpen)
@@ -108,11 +79,85 @@ function Mileage(props: PageProps) {
     return () => document.body.classList.remove('modal-is-open')
   }, [drawerOpen])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [monthFilter, pageSize, searchTerm, typeFilter])
+
+  const filteredRows = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return mileageEntries.filter((entry) => {
+      const matchesMonth = monthFilter === 'All' || entry.dateIso.startsWith(monthFilter)
+      const matchesType = typeFilter === 'All' || entry.kind === typeFilter
+      const matchesSearch = !normalizedSearch || [
+        entry.date,
+        entry.title,
+        entry.subtitle,
+        entry.kind,
+        entry.notes || '',
+        String(entry.distance || ''),
+        String(entry.amount || ''),
+      ].some((value) => value.toLowerCase().includes(normalizedSearch))
+
+      return matchesMonth && matchesType && matchesSearch
+    })
+  }, [mileageEntries, monthFilter, searchTerm, typeFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const pageStart = (safeCurrentPage - 1) * pageSize
+  const visibleRows = filteredRows.slice(pageStart, pageStart + pageSize)
+  const monthOptions = useMemo(() => {
+    const values = uniqueValues(mileageEntries.map((entry) => entry.dateIso.slice(0, 7)).filter(Boolean))
+    return values.sort((first, second) => second.localeCompare(first))
+  }, [mileageEntries])
+
+  function openDrawer(kind: MileageKind, entry: MileageEntry | null = null) {
+    setEntryMode(kind)
+    setEditingEntry(entry)
+    setDrawerOpen(true)
+    setActionMenuId(null)
+  }
+
+  function closeDrawer() {
+    setDrawerOpen(false)
+    setEditingEntry(null)
+  }
+
+  function handleSave(draft: MileageDraft) {
+    return saveMileageDraft(draft, editingEntry)
+      .then(() => {
+        closeDrawer()
+        return refreshPageData()
+      })
+      .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to save mileage activity.'))
+  }
+
+  function handleDelete(entry: MileageEntry) {
+    if (!window.confirm(`Delete ${entry.title}?`)) {
+      return
+    }
+    deleteMileageEntry(entry)
+      .then(refreshPageData)
+      .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to delete mileage activity.'))
+      .finally(() => setActionMenuId(null))
+  }
+
+  const emptyMessage = loadingData ? 'Loading mileage activity...' : 'No mileage activity found.'
+
   return (
     <AppShell
       {...props}
       searchPlaceholder="Search trips, vehicle expenses, maintenance"
-      overlay={drawerOpen ? <MileageDrawer entryMode={entryMode} setEntryMode={setEntryMode} onClose={() => setDrawerOpen(false)} /> : null}
+      overlay={drawerOpen ? (
+        <MileageDrawer
+          entryMode={entryMode}
+          setEntryMode={setEntryMode}
+          editingEntry={editingEntry}
+          onClose={closeDrawer}
+          onSave={handleSave}
+        />
+      ) : null}
     >
       <main className="transactions-page mileage-page">
         <section className="page-heading">
@@ -121,18 +166,44 @@ function Mileage(props: PageProps) {
             <h1>Mileage</h1>
             <p>Track business trips, vehicle expenses, and maintenance in one timeline.</p>
           </div>
-          <button className="primary-button" type="button" onClick={() => setDrawerOpen(true)}>
+          <button className="primary-button" type="button" onClick={() => openDrawer('Trip')}>
             <Plus size={18} />
             Add activity
           </button>
         </section>
 
         <section className="summary-strip" aria-label="Mileage summary">
-          <SummaryItem label="Trips" value={String(totalTrips.length)} tone="net" icon={Car} />
-          <SummaryItem label="Distance" value={`${totalDistance.toFixed(1)} mi`} tone="income" icon={Calendar} />
-          <SummaryItem label="Vehicle costs" value={formatMoney(vehicleExpenses)} tone="expense" icon={Fuel} />
-          <SummaryItem label="Maintenance" value={formatMoney(maintenance)} tone="review" icon={Wrench} />
+          <SummaryItem label="Trips" value={String(summary.tripCount)} tone="net" icon={Car} />
+          <SummaryItem label="Distance" value={`${summary.totalMiles.toFixed(1)} mi`} tone="income" icon={Calendar} />
+          <SummaryItem label="Vehicle costs" value={formatMoney(summary.vehicleExpenseTotal)} tone="expense" icon={Fuel} />
+          <SummaryItem label="Maintenance" value={formatMoney(summary.maintenanceTotal)} tone="review" icon={Wrench} />
         </section>
+
+        {noticeVisible ? (
+          <section className="top-alert" aria-label="Mileage settings note">
+            <Settings2 size={18} />
+            <div>
+              <strong>Mileage settings live here.</strong>
+              <span>Use this area for rate and unit settings before exports.</span>
+            </div>
+            <button className="top-alert-close" type="button" aria-label="Dismiss alert" onClick={dismissNotice}>
+              <X size={16} />
+            </button>
+          </section>
+        ) : null}
+
+        {dataError ? (
+          <section className="top-alert" role="alert">
+            <Settings2 size={18} />
+            <div>
+              <strong>{dataError}</strong>
+              <span>Refresh the page or try the action again.</span>
+            </div>
+            <button className="top-alert-close" type="button" aria-label="Dismiss data warning" onClick={() => setDataError('')}>
+              <X size={16} />
+            </button>
+          </section>
+        ) : null}
 
         <section className="mileage-focus-grid">
           <article className="export-card mileage-quick-log">
@@ -157,33 +228,30 @@ function Mileage(props: PageProps) {
               ))}
             </div>
 
-            <QuickEntryForm entryMode={entryMode} />
+            <QuickEntryForm entryMode={entryMode} onSave={(draft) => saveMileageDraft(draft, null).then(refreshPageData)} />
           </article>
 
           <article className="export-card mileage-planning-card">
             <div className="export-card-header">
               <div>
-                <p className="eyebrow">Planning only</p>
-                <h2>Mileage rate preview</h2>
+                <p className="eyebrow">Readiness</p>
+                <h2>Vehicle record check</h2>
               </div>
               <Car size={20} />
             </div>
             <div className="planning-estimate">
-              <span>Standard mileage planning estimate</span>
-              <strong>{formatMoney(planningEstimate)}</strong>
-              <p>
-                This is not tax advice or a guaranteed deduction. It uses the visible trip distance and a configurable
-                rate for planning before export.
-              </p>
+              <span>Ready for export</span>
+              <strong>{mileageEntries.length ? `${mileageEntries.length} records` : 'No records yet'}</strong>
+              <p>Trips, vehicle costs, and maintenance stay separated so exports can use the right source records.</p>
             </div>
             <div className="export-total-box">
               <div>
-                <span>Working unit</span>
+                <span>Distance unit</span>
                 <strong>Miles</strong>
               </div>
               <div>
-                <span>Example rate</span>
-                <strong>$0.67 / mi</strong>
+                <span>Cost records</span>
+                <strong>{mileageEntries.filter((entry) => entry.kind !== 'Trip').length}</strong>
               </div>
             </div>
           </article>
@@ -193,18 +261,33 @@ function Mileage(props: PageProps) {
           <div className="table-toolbar">
             <label className="field search-field">
               <Search size={18} />
-              <input type="search" placeholder="Search purpose, vendor, destination, or notes" />
+              <input
+                type="search"
+                placeholder="Search purpose, vendor, destination, or notes"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
             </label>
 
             <div className="filter-actions">
-              <button className="secondary-button" type="button">
+              <label className="select-button">
                 <Calendar size={17} />
-                Date range
-              </button>
-              <button className="secondary-button" type="button">
+                <select value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}>
+                  <option value="All">All dates</option>
+                  {monthOptions.map((month) => (
+                    <option key={month} value={month}>{formatMonth(month)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="select-button">
                 <Car size={17} />
-                Type: All
-              </button>
+                <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'All' | MileageKind)}>
+                  <option value="All">Type: All</option>
+                  <option value="Trip">Trips</option>
+                  <option value="Expense">Expenses</option>
+                  <option value="Maintenance">Maintenance</option>
+                </select>
+              </label>
             </div>
           </div>
 
@@ -220,7 +303,7 @@ function Mileage(props: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {mileageEntries.map((entry) => (
+                {visibleRows.length ? visibleRows.map((entry) => (
                   <tr key={entry.id}>
                     <td data-label="Date">{entry.date}</td>
                     <td data-label="Type">
@@ -239,30 +322,60 @@ function Mileage(props: PageProps) {
                       {entry.distance ? `${entry.distance.toFixed(1)} mi` : formatMoney(entry.amount || 0)}
                     </td>
                     <td data-label="Actions" className="action-col receipt-actions">
-                      <button className="row-action" type="button" aria-label={`Edit ${entry.title}`}>
+                      <button className="row-action" type="button" aria-label={`Edit ${entry.title}`} onClick={() => openDrawer(entry.kind, entry)}>
                         <Edit3 size={17} />
                       </button>
-                      <button className="row-action" type="button" aria-label={`Delete ${entry.title}`}>
+                      <button className="row-action" type="button" aria-label={`Delete ${entry.title}`} onClick={() => handleDelete(entry)}>
                         <Trash2 size={17} />
                       </button>
-                      <button className="row-action" type="button" aria-label={`More actions for ${entry.title}`}>
-                        <MoreHorizontal size={18} />
-                      </button>
+                      <div className="row-menu-wrap">
+                        <button
+                          className="row-action"
+                          type="button"
+                          aria-expanded={actionMenuId === entry.id}
+                          aria-label={`More actions for ${entry.title}`}
+                          onClick={() => setActionMenuId(actionMenuId === entry.id ? null : entry.id)}
+                        >
+                          <MoreHorizontal size={18} />
+                        </button>
+                        {actionMenuId === entry.id ? (
+                          <div className="row-menu" role="menu">
+                            <button type="button" onClick={() => openDrawer(entry.kind, entry)}>Edit activity</button>
+                            <button type="button" onClick={() => handleDelete(entry)}>Delete activity</button>
+                          </div>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={5}>
+                      <div className="empty-table-state">{emptyMessage}</div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
           <div className="table-footer">
-            <span>Showing 6 of 24 activities</span>
+            <span>Showing {visibleRows.length ? pageStart + 1 : 0}-{pageStart + visibleRows.length} of {filteredRows.length} activities</span>
             <div className="pagination" aria-label="Mileage pages">
-              <button type="button">1</button>
-              <button className="is-active" type="button">2</button>
-              <button type="button">3</button>
+              <button type="button" onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))} disabled={safeCurrentPage === 1}>
+                Previous
+              </button>
+              <button className="is-active" type="button">{safeCurrentPage}</button>
+              <button type="button" onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))} disabled={safeCurrentPage === totalPages}>
+                Next
+              </button>
             </div>
-            <button className="secondary-button per-page-button" type="button">20 per page</button>
+            <label className="select-button per-page-button">
+              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+                <option value={50}>50 per page</option>
+              </select>
+            </label>
           </div>
         </section>
 
@@ -270,12 +383,12 @@ function Mileage(props: PageProps) {
           <ProgressivePanel
             id="rate"
             title="Mileage rate and unit settings"
-            summary="Miles, planning rate"
+            summary="Miles"
             expandedPanel={expandedPanel}
             onToggle={setExpandedPanel}
           >
-            The old app supported miles/kilometers behavior from settings. This page keeps that workflow, but deduction
-            language stays clearly labeled as planning-only.
+            Mileage records are stored as trips and vehicle costs. Tax-specific calculations should happen during export,
+            after the user confirms the active tax year and export package.
           </ProgressivePanel>
         </section>
       </main>
@@ -283,50 +396,72 @@ function Mileage(props: PageProps) {
   )
 }
 
-function QuickEntryForm({ entryMode }: { entryMode: MileageKind }) {
+function QuickEntryForm({ entryMode, onSave }: { entryMode: MileageKind; onSave: (draft: MileageDraft) => Promise<unknown> }) {
+  const [draft, setDraft] = useState(() => blankMileageDraft(entryMode))
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setDraft(blankMileageDraft(entryMode))
+    setError('')
+  }, [entryMode])
+
+  function updateDraft(field: keyof MileageDraft, value: string) {
+    setDraft((current) => ({ ...current, [field]: value, kind: entryMode }))
+  }
+
+  function submitForm(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    onSave({ ...draft, kind: entryMode })
+      .then(() => setDraft(blankMileageDraft(entryMode)))
+      .catch((saveError) => setError(saveError instanceof Error ? saveError.message : 'Unable to save activity.'))
+  }
+
   if (entryMode === 'Trip') {
     return (
-      <form className="mileage-inline-form" onSubmit={(event) => event.preventDefault()}>
+      <form className="mileage-inline-form" onSubmit={submitForm}>
         <label>
           Date
-          <input type="date" />
+          <input type="date" value={draft.date} onChange={(event) => updateDraft('date', event.target.value)} />
         </label>
         <label>
           Purpose
-          <input placeholder="Client meeting" />
+          <input value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} placeholder="Client meeting" />
         </label>
         <label>
           Destination
-          <input placeholder="Office, job site, supplier" />
+          <input value={draft.destination} onChange={(event) => updateDraft('destination', event.target.value)} placeholder="Office, job site, supplier" />
         </label>
         <label>
           Miles
-          <input type="number" min="0.1" step="0.1" placeholder="0.0" />
+          <input type="number" min="0.1" step="0.1" value={draft.distance} onChange={(event) => updateDraft('distance', event.target.value)} placeholder="0.0" />
         </label>
-        <button className="primary-button" type="button">Add trip</button>
+        {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+        <button className="primary-button" type="submit">Add trip</button>
       </form>
     )
   }
 
   return (
-    <form className="mileage-inline-form" onSubmit={(event) => event.preventDefault()}>
+    <form className="mileage-inline-form" onSubmit={submitForm}>
       <label>
         Date
-        <input type="date" />
+        <input type="date" value={draft.date} onChange={(event) => updateDraft('date', event.target.value)} />
       </label>
       <label>
         {entryMode} title
-        <input placeholder={entryMode === 'Maintenance' ? 'Oil change' : 'Fuel, parking, tolls'} />
+        <input value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} placeholder={entryMode === 'Maintenance' ? 'Oil change' : 'Fuel, parking, tolls'} />
       </label>
       <label>
         Vendor
-        <input placeholder="Shell, City Garage" />
+        <input value={draft.vendor} onChange={(event) => updateDraft('vendor', event.target.value)} placeholder="Shell, City Garage" />
       </label>
       <label>
         Amount
-        <input type="number" min="0.01" step="0.01" placeholder="$0.00" />
+        <input type="number" min="0.01" step="0.01" value={draft.amount} onChange={(event) => updateDraft('amount', event.target.value)} placeholder="0.00" />
       </label>
-      <button className="primary-button" type="button">Add {entryMode.toLowerCase()}</button>
+      {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+      <button className="primary-button" type="submit">Add {entryMode.toLowerCase()}</button>
     </form>
   )
 }
@@ -334,18 +469,41 @@ function QuickEntryForm({ entryMode }: { entryMode: MileageKind }) {
 function MileageDrawer({
   entryMode,
   setEntryMode,
+  editingEntry,
   onClose,
+  onSave,
 }: {
   entryMode: MileageKind
   setEntryMode: (mode: MileageKind) => void
+  editingEntry: MileageEntry | null
   onClose: () => void
+  onSave: (draft: MileageDraft) => Promise<unknown>
 }) {
+  const [draft, setDraft] = useState<MileageDraft>(() => editingEntry ? draftFromEntry(editingEntry) : blankMileageDraft(entryMode))
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setDraft(editingEntry ? draftFromEntry(editingEntry) : blankMileageDraft(entryMode))
+    setError('')
+  }, [editingEntry, entryMode])
+
+  function updateDraft(field: keyof MileageDraft, value: string) {
+    setDraft((current) => ({ ...current, [field]: value, kind: entryMode }))
+  }
+
+  function submitForm(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    onSave({ ...draft, kind: entryMode })
+      .catch((saveError) => setError(saveError instanceof Error ? saveError.message : 'Unable to save activity.'))
+  }
+
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside className="transaction-drawer" role="dialog" aria-modal="true" aria-label="Add activity" onMouseDown={(event) => event.stopPropagation()}>
+      <aside className="transaction-drawer" role="dialog" aria-modal="true" aria-label={editingEntry ? 'Edit activity' : 'Add activity'} onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer-header">
           <div>
-            <h2>Add activity</h2>
+            <h2>{editingEntry ? 'Edit activity' : 'Add activity'}</h2>
             <p>Record a trip, expense, or maintenance item.</p>
           </div>
           <button className="icon-button" type="button" aria-label="Close drawer" onClick={onClose}>
@@ -359,67 +517,75 @@ function MileageDrawer({
               className={entryMode === mode ? 'is-selected' : ''}
               key={mode}
               type="button"
-              onClick={() => setEntryMode(mode)}
+              onClick={() => {
+                setEntryMode(mode)
+                if (!editingEntry) {
+                  setDraft(blankMileageDraft(mode))
+                }
+              }}
+              disabled={editingEntry ? editingEntry.kind !== mode : false}
             >
               {mode}
             </button>
           ))}
         </div>
 
-        <form className="drawer-form" onSubmit={(event) => event.preventDefault()}>
+        <form className="drawer-form" onSubmit={submitForm}>
           {entryMode === 'Trip' ? (
             <>
               <label>
                 Date
-                <input type="date" />
+                <input type="date" value={draft.date} onChange={(event) => updateDraft('date', event.target.value)} />
               </label>
               <label>
                 Purpose
-                <input placeholder="Client meeting" />
+                <input value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} placeholder="Client meeting" />
               </label>
               <label>
                 Destination
-                <input placeholder="Office, job site, supplier" />
+                <input value={draft.destination} onChange={(event) => updateDraft('destination', event.target.value)} placeholder="Office, job site, supplier" />
               </label>
               <label>
                 Miles
-                <input type="number" min="0.1" step="0.1" placeholder="0.0" />
+                <input type="number" min="0.1" step="0.1" value={draft.distance} onChange={(event) => updateDraft('distance', event.target.value)} placeholder="0.0" />
               </label>
             </>
           ) : (
             <>
               <label>
                 Date
-                <input type="date" />
+                <input type="date" value={draft.date} onChange={(event) => updateDraft('date', event.target.value)} />
               </label>
               <label>
                 {entryMode} title
-                <input placeholder={entryMode === 'Maintenance' ? 'Oil change' : 'Fuel, parking, tolls'} />
+                <input value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} placeholder={entryMode === 'Maintenance' ? 'Oil change' : 'Fuel, parking, tolls'} />
               </label>
               <label>
                 Vendor
-                <input placeholder="Shell, City Garage" />
+                <input value={draft.vendor} onChange={(event) => updateDraft('vendor', event.target.value)} placeholder="Shell, City Garage" />
               </label>
               <label>
                 Amount
-                <input type="number" min="0.01" step="0.01" placeholder="$0.00" />
+                <input type="number" min="0.01" step="0.01" value={draft.amount} onChange={(event) => updateDraft('amount', event.target.value)} placeholder="0.00" />
               </label>
               <label>
                 Notes
-                <textarea placeholder="Optional service or purchase note" />
+                <textarea value={draft.notes} onChange={(event) => updateDraft('notes', event.target.value)} placeholder="Optional service or purchase note" />
               </label>
             </>
           )}
-        </form>
 
-        <div className="drawer-actions">
-          <button className="secondary-button" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="primary-button" type="button">
-            Save activity
-          </button>
-        </div>
+          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+
+          <div className="drawer-actions">
+            <button className="secondary-button" type="button" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="primary-button" type="submit">
+              Save activity
+            </button>
+          </div>
+        </form>
       </aside>
     </div>
   )
@@ -478,6 +644,18 @@ function getEntryIcon(kind: MileageKind) {
   if (kind === 'Trip') return 'T'
   if (kind === 'Maintenance') return 'M'
   return 'E'
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values))
+}
+
+function formatMonth(value: string) {
+  const parsed = new Date(`${value}-01T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+  return parsed.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
 function formatMoney(value: number) {
