@@ -36,6 +36,27 @@ const retiredAppHtmlPages = [
   "upgrade"
 ];
 
+const retiredAppAssets = [
+  "accounts",
+  "analytics",
+  "categories",
+  "change-email",
+  "exports",
+  "help",
+  "invoices",
+  "messages",
+  "mileage",
+  "onboarding",
+  "receipts",
+  "sessions",
+  "settings",
+  "settings-mobile",
+  "subscription",
+  "transactions",
+  "trial-setup",
+  "upgrade"
+];
+
 test("Phase 2 retired app HTML is archived outside active public/html", () => {
   for (const page of retiredAppHtmlPages) {
     assert.equal(fs.existsSync(path.join(publicHtmlDir, `${page}.html`)), false, `${page}.html should not be active legacy HTML`);
@@ -54,4 +75,23 @@ test("Phase 2 retired app HTML URLs redirect to v3 canonical routes", async () =
 
   await request(app).get("/settings-mobile").expect(301).expect("Location", "/settings");
   await request(app).get("/html/settings-mobile.html").expect(301).expect("Location", "/settings");
+});
+
+test("Phase 8 active HTML does not reference retired core app JS or CSS", () => {
+  const activeHtmlFiles = fs.readdirSync(publicHtmlDir)
+    .filter((name) => name.endsWith(".html"))
+    .map((name) => path.join(publicHtmlDir, name));
+  const offenders = [];
+
+  for (const file of activeHtmlFiles) {
+    const source = fs.readFileSync(file, "utf8");
+    for (const assetName of retiredAppAssets) {
+      const assetPattern = new RegExp(`/(?:js|css/pages)/${assetName}\\.(?:js|css)(?:[?"#]|$)`);
+      if (assetPattern.test(source)) {
+        offenders.push(`${path.relative(apiRoot, file)} references retired ${assetName} asset`);
+      }
+    }
+  }
+
+  assert.deepEqual(offenders, []);
 });
