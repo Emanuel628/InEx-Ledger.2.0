@@ -98,6 +98,58 @@ const legacyAuthRoutes: Partial<Record<AppPage, string>> = {
   MfaChallenge: '/login?next=/app-v3/',
 }
 
+const pageSlugByPage: Partial<Record<AppPage, string>> = {
+  Transactions: 'transactions',
+  Accounts: 'accounts',
+  Categories: 'categories',
+  Receipts: 'receipts',
+  Mileage: 'mileage',
+  Exports: 'exports',
+  Invoices: 'invoices',
+  Analytics: 'analytics',
+  Messages: 'messages',
+  Settings: 'settings',
+  Billing: 'billing',
+  Subscription: 'subscription',
+  Sessions: 'sessions',
+  ChangeEmail: 'change-email',
+  Onboarding: 'onboarding',
+  Help: 'help',
+  Upgrade: 'upgrade',
+}
+
+const pageBySlug = new Map(
+  Object.entries(pageSlugByPage).map(([page, slug]) => [slug, page as AppPage]),
+)
+
+function getInitialPageFromPath(): AppPage | null {
+  const normalized = window.location.pathname
+    .toLowerCase()
+    .replace(/\/+$/, '')
+    .replace(/^\/app-v3\/?/, '/')
+    .replace(/^\/+/, '')
+
+  if (!normalized || normalized === 'app-v3') {
+    return null
+  }
+
+  return pageBySlug.get(normalized) || null
+}
+
+function getPathForPage(page: AppPage) {
+  const slug = pageSlugByPage[page]
+  return slug ? `/${slug}` : null
+}
+
+function chooseAuthenticatedPage(user: AuthUser) {
+  if (!user.currentBusinessId) {
+    return user.emailVerified ? 'Onboarding' : 'VerifyEmail'
+  }
+
+  const requestedPage = getInitialPageFromPath()
+  return requestedPage || 'Transactions'
+}
+
 function App() {
   const [currentPage, setCurrentPage] = useState<AppPage>('Landing')
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
@@ -120,7 +172,7 @@ function App() {
         }
         setAuthUser(user)
         if (user) {
-          setCurrentPage(user.currentBusinessId ? 'Transactions' : user.emailVerified ? 'Onboarding' : 'VerifyEmail')
+          setCurrentPage(chooseAuthenticatedPage(user))
         }
       })
       .catch(() => {
@@ -153,6 +205,10 @@ function App() {
     }
 
     setCurrentPage(page)
+    const path = getPathForPage(page)
+    if (path && window.location.pathname !== path) {
+      window.history.pushState({}, '', path)
+    }
   }
 
   const handleAuthChange = (user: AuthUser | null) => {
@@ -162,7 +218,7 @@ function App() {
       return
     }
 
-    setCurrentPage(user.currentBusinessId ? 'Transactions' : user.emailVerified ? 'Onboarding' : 'VerifyEmail')
+    setCurrentPage(chooseAuthenticatedPage(user))
   }
 
   const handleLogout = async () => {

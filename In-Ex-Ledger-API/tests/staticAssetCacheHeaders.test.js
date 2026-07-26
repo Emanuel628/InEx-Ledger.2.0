@@ -50,6 +50,14 @@ test("private app pages send noindex headers", async () => {
   assert.strictEqual(response.headers["x-robots-tag"], "noindex, nofollow");
 });
 
+test("core app routes serve the v3 frontend shell", async () => {
+  const response = await request(app).get("/transactions").expect(200);
+
+  assert.match(response.text, /\/app-v3\/assets\//);
+  assert.strictEqual(response.headers["x-robots-tag"], "noindex, nofollow");
+  assertNoStore(response);
+});
+
 test("v3 frontend route is isolated and noindexed", async () => {
   const response = await request(app).get("/app-v3/transactions").expect(200);
 

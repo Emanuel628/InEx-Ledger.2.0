@@ -85,6 +85,25 @@ const INDEXABLE_PUBLIC_PAGES = new Set([
   "invoice-replies-bookkeeping",
   "estimated-tax-reminders"
 ]);
+const V3_APP_PAGES = new Set([
+  "transactions",
+  "accounts",
+  "categories",
+  "receipts",
+  "mileage",
+  "exports",
+  "invoices",
+  "analytics",
+  "messages",
+  "settings",
+  "billing",
+  "subscription",
+  "sessions",
+  "change-email",
+  "onboarding",
+  "help",
+  "upgrade"
+]);
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
   "/api/billing/webhook",
@@ -226,6 +245,15 @@ function sendCanonicalPage(pageName, req, res) {
   res.sendFile(filePath);
 }
 
+function sendFrontendV3App(_req, res, next) {
+  const indexPath = path.join(frontendV3Dir, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    return next();
+  }
+  setStaticAssetCacheHeaders(res, indexPath);
+  return res.sendFile(indexPath);
+}
+
 /* =========================================================
    CORS & SECURITY CONFIGURATION
    ========================================================= */
@@ -353,6 +381,20 @@ for (const pageName of htmlPageNames) {
     continue;
   }
 
+  if (V3_APP_PAGES.has(pageName)) {
+    app.get(canonicalPath, sendFrontendV3App);
+    app.get(`/html/${pageName}`, (req, res) => {
+      res.redirect(301, canonicalPath);
+    });
+    app.get(`/html/${pageName}.html`, (req, res) => {
+      res.redirect(301, canonicalPath);
+    });
+    app.get(`/${pageName}.html`, (req, res) => {
+      res.redirect(301, canonicalPath);
+    });
+    continue;
+  }
+
   app.get(canonicalPath, (req, res) => {
     sendCanonicalPage(pageName, req, res);
   });
@@ -380,14 +422,7 @@ app.use(express.static(publicDir, {
 app.get('/app-v3', (req, res) => {
   res.redirect(302, '/app-v3/');
 });
-app.get('/app-v3/*', (req, res, next) => {
-  const indexPath = path.join(frontendV3Dir, 'index.html');
-  if (!fs.existsSync(indexPath)) {
-    return next();
-  }
-  setStaticAssetCacheHeaders(res, indexPath);
-  return res.sendFile(indexPath);
-});
+app.get('/app-v3/*', sendFrontendV3App);
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', (req, res, next) => {
