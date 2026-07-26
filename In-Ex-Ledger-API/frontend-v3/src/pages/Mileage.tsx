@@ -28,6 +28,7 @@ import {
   type MileageKind,
   type MileageSummary,
 } from '../lib/mileageApi'
+import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
 
 const emptySummary: MileageSummary = {
   tripCount: 0,
@@ -42,6 +43,7 @@ function Mileage(props: PageProps) {
   const [editingEntry, setEditingEntry] = useState<MileageEntry | null>(null)
   const [mileageEntries, setMileageEntries] = useState<MileageEntry[]>([])
   const [summary, setSummary] = useState<MileageSummary>(emptySummary)
+  const [accountingLock, setAccountingLock] = useState<AccountingLock | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -57,9 +59,13 @@ function Mileage(props: PageProps) {
     setLoadingData(true)
     setDataError('')
     try {
-      const pageData = await loadMileagePageData()
+      const [pageData, lockState] = await Promise.all([
+        loadMileagePageData(),
+        loadAccountingLock().catch(() => null),
+      ])
       setMileageEntries(pageData.entries)
       setSummary(pageData.summary)
+      setAccountingLock(lockState)
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load mileage.')
       setMileageEntries([])
@@ -113,6 +119,10 @@ function Mileage(props: PageProps) {
   }, [mileageEntries])
 
   function openDrawer(kind: MileageKind, entry: MileageEntry | null = null) {
+    if (entry && isMileageLocked(entry, accountingLock)) {
+      setDataError(`This mileage activity is locked through ${formatMonthDate(accountingLock?.lockedThroughDate || '')}.`)
+      return
+    }
     setEntryMode(kind)
     setEditingEntry(entry)
     setDrawerOpen(true)
@@ -134,6 +144,11 @@ function Mileage(props: PageProps) {
   }
 
   function handleDelete(entry: MileageEntry) {
+    if (isMileageLocked(entry, accountingLock)) {
+      setDataError(`This mileage activity is locked through ${formatMonthDate(accountingLock?.lockedThroughDate || '')}.`)
+      setActionMenuId(null)
+      return
+    }
     if (!window.confirm(`Delete ${entry.title}?`)) {
       return
     }
@@ -303,8 +318,10 @@ function Mileage(props: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.length ? visibleRows.map((entry) => (
-                  <tr key={entry.id}>
+                {visibleRows.length ? visibleRows.map((entry) => {
+                  const rowLocked = isMileageLocked(entry, accountingLock)
+                  return (
+                  <tr className={rowLocked ? 'is-locked-period' : ''} key={entry.id}>
                     <td data-label="Date">{entry.date}</td>
                     <td data-label="Type">
                       <KindPill kind={entry.kind} />
@@ -322,10 +339,10 @@ function Mileage(props: PageProps) {
                       {entry.distance ? `${entry.distance.toFixed(1)} mi` : formatMoney(entry.amount || 0)}
                     </td>
                     <td data-label="Actions" className="action-col receipt-actions">
-                      <button className="row-action" type="button" aria-label={`Edit ${entry.title}`} onClick={() => openDrawer(entry.kind, entry)}>
+                      <button className="row-action" type="button" aria-label={`Edit ${entry.title}`} disabled={rowLocked} onClick={() => openDrawer(entry.kind, entry)}>
                         <Edit3 size={17} />
                       </button>
-                      <button className="row-action" type="button" aria-label={`Delete ${entry.title}`} onClick={() => handleDelete(entry)}>
+                      <button className="row-action" type="button" aria-label={`Delete ${entry.title}`} disabled={rowLocked} onClick={() => handleDelete(entry)}>
                         <Trash2 size={17} />
                       </button>
                       <div className="row-menu-wrap">
@@ -340,14 +357,16 @@ function Mileage(props: PageProps) {
                         </button>
                         {actionMenuId === entry.id ? (
                           <div className="row-menu" role="menu">
-                            <button type="button" onClick={() => openDrawer(entry.kind, entry)}>Edit activity</button>
-                            <button type="button" onClick={() => handleDelete(entry)}>Delete activity</button>
+                            {rowLocked ? <p className="row-action-menu-note">Locked through {formatMonthDate(accountingLock?.lockedThroughDate || '')}</p> : null}
+                            <button type="button" disabled={rowLocked} onClick={() => openDrawer(entry.kind, entry)}>Edit activity</button>
+                            <button type="button" disabled={rowLocked} onClick={() => handleDelete(entry)}>Delete activity</button>
                           </div>
                         ) : null}
                       </div>
                     </td>
                   </tr>
-                )) : (
+                  )
+                }) : (
                   <tr>
                     <td colSpan={5}>
                       <div className="empty-table-state">{emptyMessage}</div>
@@ -622,6 +641,24 @@ function formatMoney(value: number) {
     currency: getActiveCurrency(),
     maximumFractionDigits: 0,
   })
+}
+
+function isMileageLocked(entry: MileageEntry, lock: AccountingLock | null) {
+  const entryDate = normalizeDateOnly(entry.dateIso)
+  const lockedThrough = normalizeDateOnly(lock?.lockedThroughDate)
+  return Boolean(entryDate && lockedThrough && entryDate <= lockedThrough)
+}
+
+function normalizeDateOnly(value?: string | null) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value).slice(0, 10) : ''
+}
+
+function formatMonthDate(value: string) {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return value || 'the locked period'
+  }
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function getActiveCurrency() {

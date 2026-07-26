@@ -8,6 +8,7 @@ export type ReceiptRecord = {
   uploadedAt: string
   date: string
   linkedTransactionId: string | null
+  linkedTransactionDate: string | null
   linkedTransaction: string
   linkState: ReceiptLinkState
   tone: string
@@ -109,6 +110,7 @@ function mapReceipt(row: LegacyReceipt): ReceiptRecord {
     uploadedAt,
     date: formatShortDate(uploadedAt),
     linkedTransactionId,
+    linkedTransactionDate: row.transaction_date ? String(row.transaction_date).slice(0, 10) : null,
     linkedTransaction,
     linkState: linkedTransactionId ? 'Linked' : 'Unlinked',
     tone: linkedTransactionId ? 'green' : 'yellow',

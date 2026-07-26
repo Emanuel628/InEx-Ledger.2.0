@@ -8,12 +8,12 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}) {
     response = await fetchWithAuth(url, init)
   }
 
-  const data = await readJson<T & { error?: string }>(response)
+  const data = await readJson<T & { error?: string; code?: string; details?: unknown }>(response)
   if (!response.ok) {
     if (response.status === 401) {
       redirectToLogin()
     }
-    throw new Error(data.error || 'Request failed.')
+    throw new ApiRequestError(data.error || 'Request failed.', response.status, data.code, data.details)
   }
 
   return data
@@ -30,14 +30,28 @@ export async function apiBlobRequest(url: string, init: RequestInit = {}) {
   }
 
   if (!response.ok) {
-    const data = await readJson<{ error?: string }>(response)
+    const data = await readJson<{ error?: string; code?: string; details?: unknown }>(response)
     if (response.status === 401) {
       redirectToLogin()
     }
-    throw new Error(data.error || 'Request failed.')
+    throw new ApiRequestError(data.error || 'Request failed.', response.status, data.code, data.details)
   }
 
   return response.blob()
+}
+
+export class ApiRequestError extends Error {
+  status: number
+  code?: string
+  details?: unknown
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+    this.code = code
+    this.details = details
+  }
 }
 
 async function fetchWithAuth(url: string, init: RequestInit = {}) {

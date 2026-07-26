@@ -100,6 +100,14 @@ export async function resumeSubscription(billingInterval?: BillingInterval) {
   return data.subscription
 }
 
+export async function updateAdditionalBusinesses(additionalBusinesses: number) {
+  const data = await apiRequest<{ subscription: BillingSubscription }>('/api/billing/additional-businesses', {
+    method: 'PATCH',
+    body: JSON.stringify({ additionalBusinesses }),
+  })
+  return data.subscription
+}
+
 export function formatSubscriptionMoney(amount: number, currency = 'usd') {
   try {
     return new Intl.NumberFormat(currency.toLowerCase() === 'cad' ? 'en-CA' : 'en-US', {

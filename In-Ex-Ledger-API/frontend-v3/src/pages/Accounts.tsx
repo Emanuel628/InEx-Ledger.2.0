@@ -19,6 +19,7 @@ import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
   deleteAccount,
   loadAccounts,
+  requestPlaidLinkToken,
   saveAccountDraft,
   type AccountDraft,
   type AccountRecord,
@@ -84,6 +85,7 @@ function Accounts(props: PageProps) {
       overlay={drawerOpen ? (
         <AccountDrawer
           account={editingAccount}
+          onPlaidConnect={() => requestPlaidLinkToken()}
           onClose={() => {
             setDrawerOpen(false)
             setEditingAccount(null)
@@ -309,15 +311,18 @@ const emptyDraft: AccountDraft = {
 
 function AccountDrawer({
   account,
+  onPlaidConnect,
   onClose,
   onSave,
 }: {
   account: AccountRecord | null
+  onPlaidConnect: () => Promise<unknown>
   onClose: () => void
   onSave: (draft: AccountDraft) => void
 }) {
   const [draft, setDraft] = useState<AccountDraft>(() => account ? { name: account.name, type: account.type } : emptyDraft)
   const [error, setError] = useState('')
+  const [plaidWorking, setPlaidWorking] = useState(false)
   const isEditing = Boolean(account)
 
   function updateDraft<K extends keyof AccountDraft>(key: K, value: AccountDraft[K]) {
@@ -331,6 +336,19 @@ function AccountDrawer({
       return
     }
     onSave(draft)
+  }
+
+  async function connectPlaid() {
+    setPlaidWorking(true)
+    setError('')
+    try {
+      await onPlaidConnect()
+      setError('Plaid is configured, but the Plaid Link launcher is not installed in this v3 shell yet.')
+    } catch (plaidError) {
+      setError(plaidError instanceof Error ? plaidError.message : 'Plaid is not available on this deployment.')
+    } finally {
+      setPlaidWorking(false)
+    }
   }
 
   return (
@@ -354,11 +372,11 @@ function AccountDrawer({
               <small>Enter account details yourself</small>
             </span>
           </button>
-          <button className="account-option" type="button">
+          <button className="account-option" type="button" disabled={plaidWorking} onClick={() => void connectPlaid()}>
             <Link size={19} />
             <span>
               <strong>Connect with Plaid</strong>
-              <small>Optional bank connector</small>
+              <small>{plaidWorking ? 'Checking deployment' : 'Optional bank connector'}</small>
             </span>
           </button>
         </div>

@@ -11,6 +11,7 @@ import {
   openBillingPortal,
   resumeSubscription,
   startCheckout,
+  updateAdditionalBusinesses,
   type BillingInterval,
   type BillingOverview,
   type BillingPricing,
@@ -39,6 +40,7 @@ function Subscription(props: PageProps) {
   const [activeBusinessId, setActiveBusinessId] = useState<string | null>(props.authUser?.currentBusinessId || null)
   const [modal, setModal] = useState<SubscriptionModal>(null)
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessRecord | null>(null)
+  const [additionalBusinessDraft, setAdditionalBusinessDraft] = useState('0')
 
   const businesses: SubscriptionBusiness[] = businessRows.length
     ? businessRows.map((business) => ({
@@ -60,6 +62,7 @@ function Subscription(props: PageProps) {
       ])
       setOverview(nextOverview)
       setPricing(nextPricing)
+      setAdditionalBusinessDraft(String(Number(nextOverview.subscription?.additionalBusinesses || 0)))
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load subscription.')
       setOverview(null)
@@ -179,6 +182,27 @@ function Subscription(props: PageProps) {
     }
   }
 
+  async function handleAdditionalBusinessUpdate() {
+    const nextValue = Number(additionalBusinessDraft)
+    if (!Number.isInteger(nextValue) || nextValue < 0 || nextValue > 100) {
+      setDataError('Additional business slots must be a whole number from 0 to 100.')
+      return
+    }
+    setWorking(true)
+    setDataError('')
+    try {
+      const updated = await updateAdditionalBusinesses(nextValue)
+      setOverview((current) => current ? { ...current, subscription: updated } : current)
+      setAdditionalBusinessDraft(String(Number(updated.additionalBusinesses || nextValue)))
+      await refreshBusinesses()
+      await refreshUser()
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to update additional business slots.')
+    } finally {
+      setWorking(false)
+    }
+  }
+
   return (
     <AppShell {...props} searchPlaceholder="Search plans, businesses, billing">
       <main className="transactions-page subscription-page-v3">
@@ -256,6 +280,22 @@ function Subscription(props: PageProps) {
             <span>Businesses allowed</span>
             <strong>{capacity.max}</strong>
             <p>{capacity.additional ? `${capacity.additional} additional business slot${capacity.additional === 1 ? '' : 's'} attached.` : 'One business is included with the current plan.'}</p>
+            <div className="subscription-addon-control">
+              <label>
+                Extra slots
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={additionalBusinessDraft}
+                  onChange={(event) => setAdditionalBusinessDraft(event.target.value)}
+                />
+              </label>
+              <button className="secondary-button compact-button" type="button" disabled={working || loadingData} onClick={() => void handleAdditionalBusinessUpdate()}>
+                Save slots
+              </button>
+            </div>
           </article>
           <article className="subscription-simple-card">
             <div className="billing-card-icon">

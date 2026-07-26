@@ -109,6 +109,10 @@ test("v3 API client refreshes an expired access token before failing authenticat
 test("v3 API client preserves multipart bodies and retries stale CSRF once", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "lib", "apiClient.ts"), "utf8");
 
+  assert.match(source, /class ApiRequestError extends Error/);
+  assert.match(source, /code\?: string/);
+  assert.match(source, /details\?: unknown/);
+  assert.match(source, /new ApiRequestError\(data\.error \|\| 'Request failed\.', response\.status, data\.code, data\.details\)/);
   assert.match(source, /init\.body instanceof FormData/);
   assert.match(source, /init\.body && !isFormData/);
   assert.match(source, /response\.status === 403 && await isCsrfFailure\(response\)/);
@@ -325,10 +329,15 @@ test("v3 transactions expose legacy undo delete and a clickable per-page select 
 
 test("v3 accounts remove the bottom Plaid connector panel while keeping add-account options", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "pages", "Accounts.tsx"), "utf8");
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "accountsApi.ts"), "utf8");
 
   assert.doesNotMatch(source, /title="Plaid connector"/);
   assert.doesNotMatch(source, /Available later/);
   assert.match(source, /Connect with Plaid/);
+  assert.match(source, /requestPlaidLinkToken/);
+  assert.match(source, /onPlaidConnect/);
+  assert.match(source, /Plaid is configured, but the Plaid Link launcher is not installed/);
+  assert.match(apiSource, /\/api\/plaid\/link-token/);
 });
 
 test("v3 accounts use API account transaction counts instead of a capped transactions scan", () => {
@@ -441,8 +450,35 @@ test("v3 transactions disable protected actions for locked accounting periods", 
   assert.match(cssSource, /\.transaction-lock-note/);
 });
 
+test("v3 mileage disables edit and delete for locked accounting periods", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Mileage.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(pageSource, /loadAccountingLock/);
+  assert.match(pageSource, /function isMileageLocked/);
+  assert.match(pageSource, /rowLocked/);
+  assert.match(pageSource, /disabled=\{rowLocked\}/);
+  assert.match(pageSource, /Locked through \{formatMonthDate/);
+  assert.match(pageSource, /This mileage activity is locked through/);
+  assert.match(cssSource, /\.row-menu button:disabled/);
+});
+
+test("v3 receipts disable relink and delete for receipts tied to locked transactions", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Receipts.tsx"), "utf8");
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "receiptsApi.ts"), "utf8");
+
+  assert.match(apiSource, /linkedTransactionDate/);
+  assert.match(apiSource, /row\.transaction_date \? String\(row\.transaction_date\)\.slice\(0, 10\) : null/);
+  assert.match(pageSource, /loadAccountingLock/);
+  assert.match(pageSource, /function isReceiptLocked/);
+  assert.match(pageSource, /Linked transaction locked through/);
+  assert.match(pageSource, /disabled=\{rowLocked\}/);
+  assert.match(pageSource, /This receipt is linked to a transaction locked through/);
+});
+
 test("v3 subscription avoids checkout conflicts for existing Stripe subscriptions", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "pages", "Subscription.tsx"), "utf8");
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "billingApi.ts"), "utf8");
 
   assert.match(source, /openBillingPortal/);
   assert.match(source, /shouldManageExistingSubscription/);
@@ -451,6 +487,11 @@ test("v3 subscription avoids checkout conflicts for existing Stripe subscription
   assert.match(source, /Open Stripe billing/);
   assert.match(source, /readPreferredBillingInterval/);
   assert.match(source, /sessionStorage\.setItem\('inex-preferred-billing-interval', nextInterval\)/);
+  assert.match(source, /handleAdditionalBusinessUpdate/);
+  assert.match(source, /updateAdditionalBusinesses\(nextValue\)/);
+  assert.match(source, /Extra slots/);
+  assert.match(apiSource, /\/api\/billing\/additional-businesses/);
+  assert.match(apiSource, /method: 'PATCH'/);
   assert.doesNotMatch(source, /setBillingInterval\(serverInterval\)/);
 });
 

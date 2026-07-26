@@ -24,11 +24,13 @@ import {
   type ReceiptRecord,
   type TransactionLinkOption,
 } from '../lib/receiptsApi'
+import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
 
 function Receipts(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [receiptRows, setReceiptRows] = useState<ReceiptRecord[]>([])
   const [transactionOptions, setTransactionOptions] = useState<TransactionLinkOption[]>([])
+  const [accountingLock, setAccountingLock] = useState<AccountingLock | null>(null)
   const [linkingReceipt, setLinkingReceipt] = useState<ReceiptRecord | null>(null)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -55,9 +57,13 @@ function Receipts(props: PageProps) {
   async function refreshReceipts() {
     setDataError('')
     try {
-      const pageData = await loadReceiptPageData()
+      const [pageData, lockState] = await Promise.all([
+        loadReceiptPageData(),
+        loadAccountingLock().catch(() => null),
+      ])
       setReceiptRows(pageData.receipts)
       setTransactionOptions(pageData.transactions)
+      setAccountingLock(lockState)
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load receipts.')
       setReceiptRows([])
@@ -100,6 +106,11 @@ function Receipts(props: PageProps) {
               onSearchTransactions={searchReceiptTransactionOptions}
               onClose={() => setLinkingReceipt(null)}
               onLink={(transactionId) => {
+                if (isReceiptLocked(linkingReceipt, accountingLock)) {
+                  setDataError(`This receipt is linked to a transaction locked through ${formatReceiptLockDate(accountingLock?.lockedThroughDate || '')}.`)
+                  setLinkingReceipt(null)
+                  return
+                }
                 void attachReceipt(linkingReceipt.id, transactionId)
                   .then(() => refreshReceipts())
                   .then(() => {
@@ -191,8 +202,10 @@ function Receipts(props: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {filteredReceipts.map((receipt) => (
-                  <tr key={receipt.id}>
+                {filteredReceipts.map((receipt) => {
+                  const rowLocked = isReceiptLocked(receipt, accountingLock)
+                  return (
+                  <tr className={rowLocked ? 'is-locked-period' : ''} key={receipt.id}>
                     <td data-label="Receipt">
                       <div className="merchant-cell">
                         <span className={`merchant-icon merchant-${receipt.tone}`}>
@@ -227,8 +240,10 @@ function Receipts(props: PageProps) {
                       </button>
                       {actionMenuId === receipt.id ? (
                         <div className="row-action-menu">
+                          {rowLocked ? <p className="row-action-menu-note">Linked transaction locked through {formatReceiptLockDate(accountingLock?.lockedThroughDate || '')}</p> : null}
                           <button
                             type="button"
+                            disabled={rowLocked}
                             onClick={() => {
                               setLinkingReceipt(receipt)
                             }}
@@ -238,7 +253,13 @@ function Receipts(props: PageProps) {
                           <button
                             className="is-danger"
                             type="button"
+                            disabled={rowLocked}
                             onClick={() => {
+                              if (rowLocked) {
+                                setDataError(`This receipt is linked to a transaction locked through ${formatReceiptLockDate(accountingLock?.lockedThroughDate || '')}.`)
+                                setActionMenuId(null)
+                                return
+                              }
                               void deleteReceipt(receipt.id)
                                 .then(() => {
                                   setReceiptRows((rows) => rows.filter((row) => row.id !== receipt.id))
@@ -253,7 +274,8 @@ function Receipts(props: PageProps) {
                       ) : null}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
                 {filteredReceipts.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="empty-table-cell">No receipts match these filters.</td>
@@ -450,6 +472,24 @@ function ReceiptUploadDrawer({
       </aside>
     </div>
   )
+}
+
+function isReceiptLocked(receipt: ReceiptRecord, lock: AccountingLock | null) {
+  const receiptDate = normalizeDateOnly(receipt.linkedTransactionDate)
+  const lockedThrough = normalizeDateOnly(lock?.lockedThroughDate)
+  return Boolean(receiptDate && lockedThrough && receiptDate <= lockedThrough)
+}
+
+function normalizeDateOnly(value?: string | null) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value).slice(0, 10) : ''
+}
+
+function formatReceiptLockDate(value: string) {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return value || 'the locked period'
+  }
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default Receipts

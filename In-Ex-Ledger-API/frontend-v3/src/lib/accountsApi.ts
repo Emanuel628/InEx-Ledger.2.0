@@ -52,6 +52,13 @@ export async function deleteAccount(accountId: string) {
   await apiRequest(`/api/accounts/${accountId}`, { method: 'DELETE' })
 }
 
+export async function requestPlaidLinkToken() {
+  return apiRequest<{ link_token?: string; expiration?: string }>('/api/plaid/link-token', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
 function mapAccount(row: LegacyAccount, transactionCount = Number(row.transaction_count || 0)): AccountRecord {
   const type = mapTypeFromLegacy(row.type)
   return {

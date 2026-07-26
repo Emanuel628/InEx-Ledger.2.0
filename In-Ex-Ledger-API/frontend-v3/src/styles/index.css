@@ -1868,6 +1868,37 @@ tbody tr:last-child td {
   opacity: 0.45;
 }
 
+.row-action:disabled,
+.row-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.subscription-addon-control {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.subscription-addon-control label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.subscription-addon-control input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
 .row-action-menu .is-danger {
   color: var(--red);
 }
