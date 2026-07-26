@@ -57,8 +57,6 @@ const LEGACY_HTML_REDIRECTS = new Map([
   ['/region-settings.html', '/settings#settings-preferences'],
   ['/html/security.html', '/settings#settings-security'],
   ['/security.html', '/settings#settings-security'],
-  ['/html/sessions.html', '/sessions'],
-  ['/sessions.html', '/sessions'],
   ['/html/mfa.html', '/settings#settings-security'],
   ['/mfa.html', '/settings#settings-security'],
   ['/business-settings-cpa', '/settings'],
@@ -395,6 +393,33 @@ app.use((req, res, next) => {
   next();
 });
 
+for (const pageName of V3_APP_PAGES) {
+  const canonicalPath = getCanonicalPagePath(pageName);
+  app.get(canonicalPath, sendFrontendV3App);
+  app.get(`/html/${pageName}`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+  app.get(`/html/${pageName}.html`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+  app.get(`/${pageName}.html`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+}
+
+app.get('/settings-mobile', (req, res) => {
+  res.redirect(301, '/settings');
+});
+app.get('/html/settings-mobile', (req, res) => {
+  res.redirect(301, '/settings');
+});
+app.get('/html/settings-mobile.html', (req, res) => {
+  res.redirect(301, '/settings');
+});
+app.get('/settings-mobile.html', (req, res) => {
+  res.redirect(301, '/settings');
+});
+
 for (const pageName of htmlPageNames) {
   if (!ENABLE_V2_BUSINESS && V2_HTML_PAGES.has(pageName)) {
     continue;
@@ -414,16 +439,6 @@ for (const pageName of htmlPageNames) {
   }
 
   if (V3_APP_PAGES.has(pageName)) {
-    app.get(canonicalPath, sendFrontendV3App);
-    app.get(`/html/${pageName}`, (req, res) => {
-      res.redirect(301, canonicalPath);
-    });
-    app.get(`/html/${pageName}.html`, (req, res) => {
-      res.redirect(301, canonicalPath);
-    });
-    app.get(`/${pageName}.html`, (req, res) => {
-      res.redirect(301, canonicalPath);
-    });
     continue;
   }
 
@@ -439,14 +454,6 @@ for (const pageName of htmlPageNames) {
   app.get(`/${pageName}.html`, (req, res) => {
     res.redirect(301, canonicalPath);
   });
-}
-
-for (const pageName of V3_APP_PAGES) {
-  if (htmlPageNames.includes(pageName)) {
-    continue;
-  }
-  const canonicalPath = getCanonicalPagePath(pageName);
-  app.get(canonicalPath, sendFrontendV3App);
 }
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/email/inbound', express.raw({ type: '*/*', limit: '256kb' }));

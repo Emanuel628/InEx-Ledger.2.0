@@ -15,6 +15,6 @@ test("login page no longer uses inline focus handlers", () => {
 });
 
 test("transactions page no longer uses inline click handlers", () => {
-  const html = readHtml("public/html/transactions.html");
+  const html = readHtml("legacy/public-html/app-core/transactions.html");
   assert.doesNotMatch(html, /\sonclick=/i);
 });

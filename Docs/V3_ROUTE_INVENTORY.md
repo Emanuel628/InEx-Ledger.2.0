@@ -1,7 +1,8 @@
 # V3 Route Inventory
 
 Phase 0 status: complete.
-Phase 1 (canonical bare URLs): implemented on branch `fix/canonical-bare-routes` — client `pushState` and `login?next=` use `/transactions`-style paths; `/app-v3` and `/app-v3/<page>` 301 to bare paths; assets remain under `/app-v3/assets`.
+Phase 1 (canonical bare URLs): complete. Client `pushState` and `login?next=` use `/transactions`-style paths; `/app-v3` and `/app-v3/<page>` 301 to bare paths; assets remain under `/app-v3/assets`.
+Phase 2 (one active app UI): complete. Migrated app-core legacy HTML files moved from active `public/html` into `In-Ex-Ledger-API/legacy/public-html/app-core`; old `.html` URLs redirect to canonical v3 routes.
 
 This file is the freeze and map artifact for the move to one product, one UI, and one URL. It is intentionally operational: if a route is not listed here, do not migrate, delete, or add parallel behavior until this inventory is updated and verified.
 
@@ -24,27 +25,27 @@ This file is the freeze and map artifact for the move to one product, one UI, an
 
 | Path | Served today | v3 page | Legacy HTML | API wired | Keep as legacy |
 | --- | --- | --- | --- | --- | --- |
-| `/transactions` | SPA | yes | `transactions.html` exists | yes | no |
-| `/accounts` | SPA | yes | `accounts.html` exists | yes | no |
-| `/categories` | SPA | yes | `categories.html` exists | yes | no |
-| `/receipts` | SPA | yes | `receipts.html` exists | yes | no |
-| `/mileage` | SPA | yes | `mileage.html` exists | yes | no |
-| `/exports` | SPA | yes | `exports.html` exists | yes | no |
-| `/invoices` | SPA | yes | `invoices.html` exists | yes | no |
-| `/analytics` | SPA | yes | `analytics.html` exists | yes | no |
-| `/messages` | SPA | yes | `messages.html` exists | yes | no |
-| `/settings` | SPA | yes | `settings.html`, `settings-mobile.html` exist | yes | no |
+| `/transactions` | SPA | yes | `transactions.html` archived | yes | no |
+| `/accounts` | SPA | yes | `accounts.html` archived | yes | no |
+| `/categories` | SPA | yes | `categories.html` archived | yes | no |
+| `/receipts` | SPA | yes | `receipts.html` archived | yes | no |
+| `/mileage` | SPA | yes | `mileage.html` archived | yes | no |
+| `/exports` | SPA | yes | `exports.html` archived | yes | no |
+| `/invoices` | SPA | yes | `invoices.html` archived | yes | no |
+| `/analytics` | SPA | yes | `analytics.html` archived | yes | no |
+| `/messages` | SPA | yes | `messages.html` archived | yes | no |
+| `/settings` | SPA | yes | `settings.html`, `settings-mobile.html` archived | yes | no |
 | `/billing` | SPA | yes | no active `billing.html` | yes | no |
-| `/subscription` | SPA | yes | `subscription.html` exists | yes | no |
-| `/sessions` | SPA | yes | `sessions.html` exists | yes | no |
-| `/change-email` | SPA | yes | `change-email.html` exists | yes | no |
-| `/onboarding` | SPA | yes | `onboarding.html` exists | yes | no |
-| `/help` | SPA | yes | `help.html` exists | partial/help content | no |
-| `/upgrade` | SPA | yes | `upgrade.html` exists | yes | no |
-| `/trial-setup` | SPA (v3 page set) | yes | `trial-setup.html` exists | partial | temporary legacy file only |
+| `/subscription` | SPA | yes | `subscription.html` archived | yes | no |
+| `/sessions` | SPA | yes | `sessions.html` archived | yes | no |
+| `/change-email` | SPA | yes | `change-email.html` archived | yes | no |
+| `/onboarding` | SPA | yes | `onboarding.html` archived | yes | no |
+| `/help` | SPA | yes | `help.html` archived | partial/help content | no |
+| `/upgrade` | SPA | yes | `upgrade.html` archived | yes | no |
+| `/trial-setup` | SPA | yes | `trial-setup.html` archived | partial | no |
 | `/review` | legacy HTML today | no active v3 page in sidebar | `review.html` exists | legacy | temporary legacy bridge |
 
-Deprecated: `/app-v3` → `/transactions`; `/app-v3/<slug>` → `/<slug>` (301).
+Deprecated: `/app-v3` -> `/transactions`; `/app-v3/<slug>` -> `/<slug>` (301).
 
 ## Auth Bridge Matrix
 
@@ -94,6 +95,22 @@ These pages are intentionally not Pro-tier v3 parity yet. They should remain loc
 - Auth routes are identified as a temporary bridge.
 - Marketing and SEO routes are identified as safe legacy.
 - Business-tier routes are identified as intentionally gated.
-- Legacy HTML files that still overlap with v3 app-core routes are visible and queued for Phase 2 quarantine/removal.
+- Legacy HTML files that overlap with v3 app-core routes are visible and queued for Phase 2 archive/removal.
 - Stop rules are documented.
 - `tests/routeInventory.test.js` verifies this inventory covers all server-declared v3 app pages.
+
+## Phase 1 Completeness Review
+
+- Bare app routes are canonical.
+- `/app-v3` page hosts redirect to canonical bare routes.
+- Built assets remain under `/app-v3/assets`.
+- `login?next=` uses bare app routes.
+
+## Phase 2 Completeness Review
+
+- Migrated app-core HTML files are no longer active under `public/html`.
+- Archived copies are kept under `In-Ex-Ledger-API/legacy/public-html/app-core`.
+- Canonical app routes still serve the v3 shell.
+- Old `/html/<page>`, `/html/<page>.html`, and `/<page>.html` app URLs redirect to canonical v3 routes.
+- `settings-mobile.html` redirects to `/settings`.
+- `tests/v3LegacyHtmlRetirement.test.js` verifies the archive and redirects.
