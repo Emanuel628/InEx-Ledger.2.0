@@ -154,16 +154,11 @@ function getPathForPage(page: AppPage) {
     return '/'
   }
   const slug = pageSlugByPage[page]
-
   return slug ? `/${slug}` : '/transactions'
-=======
-  return slug ? `/${slug}` : '/'
-
 }
 
 function getCanonicalCurrentPath() {
   const requestedPage = getInitialPageFromPath()
-
   return requestedPage ? getPathForPage(requestedPage) : '/transactions'
 }
 
@@ -176,8 +171,6 @@ function normalizeLegacyAppV3Path() {
       window.history.replaceState({}, '', nextUrl)
     }
   }
-    return requestedPage ? getPathForPage(requestedPage) : '/'
-
 }
 
 function getLegacyAuthRoute(page: AppPage, next = getCanonicalCurrentPath()) {
@@ -224,12 +217,13 @@ function App() {
         }
         setAuthUser(user)
         if (user) {
-          setCurrentPage(chooseAuthenticatedPage(user))
-          const path = getPathForPage(chooseAuthenticatedPage(user))
-          if (window.location.pathname !== path && !window.location.pathname.startsWith('/app-v3/assets')) {
-            const requested = getInitialPageFromPath()
-            if (requested) {
-              window.history.replaceState({}, '', getPathForPage(requested))
+          const page = chooseAuthenticatedPage(user)
+          setCurrentPage(page)
+          const requested = getInitialPageFromPath()
+          if (requested) {
+            const path = getPathForPage(requested)
+            if (window.location.pathname !== path && !window.location.pathname.startsWith('/app-v3/assets')) {
+              window.history.replaceState({}, '', path)
             }
           }
         }
