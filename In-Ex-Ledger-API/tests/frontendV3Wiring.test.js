@@ -115,16 +115,26 @@ test("v3 API client preserves multipart bodies and retries stale CSRF once", () 
 test("v3 app routes use bare canonical paths and browser back drives page state", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
 
+  assert.doesNotMatch(source, /^(<<<<<<<|=======|>>>>>>>)/m);
   assert.match(source, /return slug \? `\/\$\{slug\}` : '\/transactions'/);
   assert.match(source, /if \(page === 'Landing'\)[\s\S]*return '\/'/);
   assert.doesNotMatch(source, /return slug \? `\/app-v3\/\$\{slug\}`/);
-  assert.doesNotMatch(source, /=======/);
-  assert.match(source, /getCanonicalCurrentPath/);
+  assert.match(source, /return requestedPage \? getPathForPage\(requestedPage\) : '\/transactions'/);
   assert.match(source, /normalizeLegacyAppV3Path/);
   assert.match(source, /login\?next=\$\{encodeURIComponent\(getPathForPage\(page\)\)\}/);
   assert.match(source, /app-v3-loading/);
   assert.match(source, /window\.addEventListener\('popstate', handlePopState\)/);
   assert.match(source, /setCurrentPage\(requestedPage \|\| \(authUser \? chooseAuthenticatedPage\(authUser\) : 'Landing'\)\)/);
+});
+
+test("v3 legacy app-v3 redirects have one server owner", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "server.js"), "utf8");
+
+  assert.doesNotMatch(source, /^(<<<<<<<|=======|>>>>>>>)/m);
+  assert.match(source, /function getLegacyV3RedirectPath/);
+  assert.match(source, /return '\/transactions'/);
+  assert.doesNotMatch(source, /app\.get\('\/app-v3'/);
+  assert.doesNotMatch(source, /app\.get\('\/app-v3\/\*'/);
 });
 
 test("v3 frontend dependencies are pinned", () => {
