@@ -1,32 +1,14 @@
 export async function apiRequest<T>(url: string, init: RequestInit = {}) {
-  const method = String(init.method || 'GET').toUpperCase()
-  const headers = new Headers(init.headers)
-  const isFormData = init.body instanceof FormData
-
-  if (!headers.has('Content-Type') && init.body && !isFormData) {
-    headers.set('Content-Type', 'application/json')
-  }
-
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    const csrfToken = await getCsrfToken()
-    if (csrfToken) {
-      headers.set('X-CSRF-Token', csrfToken)
-    }
-  }
-
-  let response: Response
-  try {
-    response = await fetch(url, {
-      credentials: 'include',
-      ...init,
-      headers,
-    })
-  } catch {
-    throw new Error('Unable to reach the server.')
+  let response = await fetchWithAuth(url, init)
+  if (response.status === 401 && await refreshAccessToken()) {
+    response = await fetchWithAuth(url, init)
   }
 
   const data = await readJson<T & { error?: string }>(response)
   if (!response.ok) {
+    if (response.status === 401) {
+      redirectToLogin()
+    }
     throw new Error(data.error || 'Request failed.')
   }
 
@@ -34,6 +16,23 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}) {
 }
 
 export async function apiBlobRequest(url: string, init: RequestInit = {}) {
+  let response = await fetchWithAuth(url, init)
+  if (response.status === 401 && await refreshAccessToken()) {
+    response = await fetchWithAuth(url, init)
+  }
+
+  if (!response.ok) {
+    const data = await readJson<{ error?: string }>(response)
+    if (response.status === 401) {
+      redirectToLogin()
+    }
+    throw new Error(data.error || 'Request failed.')
+  }
+
+  return response.blob()
+}
+
+async function fetchWithAuth(url: string, init: RequestInit = {}) {
   const method = String(init.method || 'GET').toUpperCase()
   const headers = new Headers(init.headers)
   const isFormData = init.body instanceof FormData
@@ -49,9 +48,8 @@ export async function apiBlobRequest(url: string, init: RequestInit = {}) {
     }
   }
 
-  let response: Response
   try {
-    response = await fetch(url, {
+    return await fetch(url, {
       credentials: 'include',
       ...init,
       headers,
@@ -59,13 +57,27 @@ export async function apiBlobRequest(url: string, init: RequestInit = {}) {
   } catch {
     throw new Error('Unable to reach the server.')
   }
+}
 
-  if (!response.ok) {
-    const data = await readJson<{ error?: string }>(response)
-    throw new Error(data.error || 'Request failed.')
+let pendingRefresh: Promise<boolean> | null = null
+
+async function refreshAccessToken() {
+  if (pendingRefresh) {
+    return pendingRefresh
   }
 
-  return response.blob()
+  pendingRefresh = (async () => {
+    try {
+      const response = await fetchWithAuth('/api/auth/refresh', { method: 'POST' })
+      return response.ok
+    } catch {
+      return false
+    } finally {
+      pendingRefresh = null
+    }
+  })()
+
+  return pendingRefresh
 }
 
 async function getCsrfToken() {
@@ -82,6 +94,11 @@ async function getCsrfToken() {
 
   token = readCookie('csrf_token')
   return token || ''
+}
+
+function redirectToLogin() {
+  const next = encodeURIComponent(`${window.location.pathname}${window.location.search}`)
+  window.location.assign(`/login?reason=expired&next=${next}`)
 }
 
 function readCookie(name: string) {

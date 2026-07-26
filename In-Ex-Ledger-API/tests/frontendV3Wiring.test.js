@@ -92,3 +92,11 @@ test("v3 public pages are mapped for direct URL routing", () => {
     assert.match(appSource, new RegExp(`${page}: '${slug}'`));
   }
 });
+
+test("v3 API client refreshes an expired access token before failing authenticated requests", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "lib", "apiClient.ts"), "utf8");
+
+  assert.match(source, /response\.status === 401 && await refreshAccessToken\(\)/);
+  assert.match(source, /\/api\/auth\/refresh/);
+  assert.match(source, /credentials: 'include'/);
+});
