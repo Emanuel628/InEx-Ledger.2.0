@@ -6,8 +6,6 @@ export type AccountRecord = {
   id: string
   name: string
   type: 'Checking' | 'Savings' | 'Credit Card' | 'Cash' | 'Loan' | 'Other'
-  institution: string
-  lastFour: string
   transactionCount: number
   status: AccountStatus
   tone: string
@@ -26,8 +24,18 @@ type LegacyAccount = {
 }
 
 export async function loadAccounts() {
-  const response = await apiRequest<{ data: LegacyAccount[] }>('/api/accounts?limit=500&offset=0')
-  return response.data.map(mapAccount)
+  const [accounts, transactions] = await Promise.all([
+    apiRequest<{ data: LegacyAccount[] }>('/api/accounts?limit=500&offset=0'),
+    apiRequest<{ data: Array<{ account_id?: string | null }> }>('/api/transactions?limit=500&offset=0'),
+  ])
+  const transactionCounts = transactions.data.reduce((counts, transaction) => {
+    if (transaction.account_id) {
+      counts.set(transaction.account_id, (counts.get(transaction.account_id) || 0) + 1)
+    }
+    return counts
+  }, new Map<string, number>())
+
+  return accounts.data.map((account) => mapAccount(account, transactionCounts.get(account.id) || 0))
 }
 
 export async function saveAccountDraft(draft: AccountDraft, account: AccountRecord | null) {
@@ -47,22 +55,20 @@ export async function saveAccountDraft(draft: AccountDraft, account: AccountReco
     ? await apiRequest<LegacyAccount>(`/api/accounts/${account.id}`, { method: 'PUT', body })
     : await apiRequest<LegacyAccount>('/api/accounts', { method: 'POST', body })
 
-  return mapAccount(saved)
+  return mapAccount(saved, account?.transactionCount || 0)
 }
 
 export async function deleteAccount(accountId: string) {
   await apiRequest(`/api/accounts/${accountId}`, { method: 'DELETE' })
 }
 
-function mapAccount(row: LegacyAccount): AccountRecord {
+function mapAccount(row: LegacyAccount, transactionCount = Number(row.transaction_count || 0)): AccountRecord {
   const type = mapTypeFromLegacy(row.type)
   return {
     id: row.id,
     name: row.name,
     type,
-    institution: type === 'Cash' ? 'Manual' : 'Not set',
-    lastFour: 'Not set',
-    transactionCount: Number(row.transaction_count || 0),
+    transactionCount,
     status: 'Active',
     tone: toneForType(type),
   }

@@ -90,8 +90,12 @@ export async function saveTransactionDraft(
   categories: CategoryOption[],
 ) {
   const kind = draft.kind === 'Income' ? 'income' : 'expense'
-  const account = accounts.find((item) => item.name === draft.account)
-  const category = categories.find((item) => item.name === draft.category && item.kind === kind)
+  const account = transaction && transaction.account === draft.account
+    ? { id: transaction.accountId, name: transaction.account }
+    : accounts.find((item) => item.name === draft.account)
+  const category = transaction && transaction.category === draft.category
+    ? { id: transaction.categoryId, name: transaction.category, kind }
+    : categories.find((item) => item.name === draft.category && item.kind === kind)
     || categories.find((item) => item.name === draft.category)
   const amount = Number(draft.amount.replace(/[$,]/g, ''))
 

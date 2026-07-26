@@ -278,9 +278,14 @@ function Transactions(props: PageProps) {
               transaction={selectedTransaction}
               onClose={() => setSelectedTransaction(null)}
               onUpdate={(updated) => {
-                setTransactionRows((rows) => rows.map((row) => (row.id === updated.id ? updated : row)))
-                setSelectedTransaction(updated)
+                void saveTransactionDraft(transactionToDraft(updated), updated, accountOptions, categoryOptions)
+                  .then((savedTransaction) => {
+                    setTransactionRows((rows) => rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row)))
+                    setSelectedTransaction(savedTransaction)
+                  })
+                  .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to update transaction.'))
               }}
+              onAttachReceipt={() => setDataError('Receipt attachment belongs on the Receipts page until file upload is wired into this drawer.')}
               onDelete={() => {
                 void deleteTransaction(selectedTransaction.id)
                   .then(() => {
@@ -520,9 +525,7 @@ function Transactions(props: PageProps) {
                             <button
                               type="button"
                               onClick={() => {
-                                setTransactionRows((rows) => rows.map((row) => (
-                                  row.id === transaction.id ? { ...row, receipt: 'Attached', status: 'Cleared' } : row
-                                )))
+                                setDataError('Receipt attachment belongs on the Receipts page until file upload is wired into this drawer.')
                                 setActionMenuId(null)
                               }}
                             >
@@ -594,7 +597,7 @@ function Transactions(props: PageProps) {
             <ProgressivePanel
               id="review"
               title="Review queue"
-              summary="3 items"
+              summary={`${reviewCount} ${reviewCount === 1 ? 'item' : 'items'}`}
               expandedPanel={expandedPanel}
               onToggle={setExpandedPanel}
             >
@@ -603,7 +606,7 @@ function Transactions(props: PageProps) {
             <ProgressivePanel
               id="tax"
               title="Tax set-aside helper"
-              summary="$7,329 estimated"
+              summary={netTotal > 0 ? `${formatMoney(netTotal * 0.25)} estimated` : '$0 estimated'}
               expandedPanel={expandedPanel}
               onToggle={setExpandedPanel}
             >
@@ -612,7 +615,7 @@ function Transactions(props: PageProps) {
             <ProgressivePanel
               id="recurring"
               title="Recurring templates"
-              summary="4 active"
+              summary="Not connected yet"
               expandedPanel={expandedPanel}
               onToggle={setExpandedPanel}
             >
@@ -782,9 +785,9 @@ function TransactionDrawer({
           <details>
             <summary>Receipt, tax treatment, and notes</summary>
             <div className="advanced-fields">
-              <button className="secondary-button" type="button">
+              <button className="secondary-button" type="button" disabled>
                 <Upload size={17} />
-                Attach receipt
+                Receipt upload is handled on Receipts
               </button>
               <textarea
                 placeholder="Internal note"
@@ -813,11 +816,13 @@ function TransactionDetailsModal({
   transaction,
   onClose,
   onUpdate,
+  onAttachReceipt,
   onDelete,
 }: {
   transaction: Transaction
   onClose: () => void
   onUpdate: (transaction: Transaction) => void
+  onAttachReceipt: () => void
   onDelete: () => void
 }) {
   return (
@@ -852,7 +857,7 @@ function TransactionDetailsModal({
               <CheckCircle2 size={17} />
               Mark cleared
             </button>
-            <button className="secondary-button" type="button" onClick={() => onUpdate({ ...transaction, receipt: 'Attached', status: 'Cleared' })}>
+            <button className="secondary-button" type="button" onClick={onAttachReceipt}>
               <ReceiptText size={17} />
               Attach receipt
             </button>
@@ -968,7 +973,7 @@ function transactionToDraft(transaction: Transaction): TransactionDraft {
     date: transaction.dateIso,
     category: transaction.category,
     account: transaction.account,
-    note: '',
+    note: transaction.note,
   }
 }
 

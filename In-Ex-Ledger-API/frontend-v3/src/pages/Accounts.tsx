@@ -30,8 +30,6 @@ const accounts: AccountRecord[] = [
     id: 'mock-1',
     name: 'Business Checking',
     type: 'Checking',
-    institution: 'Chase',
-    lastFour: '1234',
     transactionCount: 42,
     status: 'Active',
     tone: 'blue',
@@ -40,8 +38,6 @@ const accounts: AccountRecord[] = [
     id: 'mock-2',
     name: 'Operating Savings',
     type: 'Savings',
-    institution: 'Bank of America',
-    lastFour: '5678',
     transactionCount: 8,
     status: 'Active',
     tone: 'green',
@@ -50,8 +46,6 @@ const accounts: AccountRecord[] = [
     id: 'mock-3',
     name: 'Business Credit Card',
     type: 'Credit Card',
-    institution: 'American Express',
-    lastFour: '1001',
     transactionCount: 29,
     status: 'Active',
     tone: 'violet',
@@ -60,8 +54,6 @@ const accounts: AccountRecord[] = [
     id: 'mock-4',
     name: 'Cash on hand',
     type: 'Cash',
-    institution: 'Manual',
-    lastFour: 'none',
     transactionCount: 3,
     status: 'Needs details',
     tone: 'yellow',
@@ -70,8 +62,6 @@ const accounts: AccountRecord[] = [
     id: 'mock-5',
     name: 'Equipment loan',
     type: 'Loan',
-    institution: 'Wells Fargo',
-    lastFour: '9876',
     transactionCount: 6,
     status: 'Active',
     tone: 'coral',
@@ -84,21 +74,25 @@ function Accounts(props: PageProps) {
   const [accountRows, setAccountRows] = useState<AccountRecord[]>(accounts)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [typeFilter, setTypeFilter] = useState<AccountRecord['type'] | 'All'>('All')
+  const [statusFilter, setStatusFilter] = useState<AccountStatus | 'All'>('Active')
   const [dataError, setDataError] = useState('')
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('accounts-details')
   const filteredAccounts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
-    if (!normalizedSearch) {
-      return accountRows
-    }
-    return accountRows.filter((account) => [
-      account.name,
-      account.type,
-      account.institution,
-      account.status,
-    ].some((value) => value.toLowerCase().includes(normalizedSearch)))
-  }, [accountRows, searchTerm])
+    return accountRows.filter((account) => {
+      const matchesSearch = !normalizedSearch || [
+        account.name,
+        account.type,
+        account.status,
+      ].some((value) => value.toLowerCase().includes(normalizedSearch))
+
+      return matchesSearch
+        && (typeFilter === 'All' || account.type === typeFilter)
+        && (statusFilter === 'All' || account.status === statusFilter)
+    })
+  }, [accountRows, searchTerm, statusFilter, typeFilter])
   const activeCount = accountRows.filter((account) => account.status === 'Active').length
   const bankCount = accountRows.filter((account) => ['Checking', 'Savings'].includes(account.type)).length
   const creditCardCount = accountRows.filter((account) => account.type === 'Credit Card').length
@@ -128,7 +122,7 @@ function Accounts(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search accounts, institutions, transaction links"
+      searchPlaceholder="Search accounts, types, transaction links"
       overlay={drawerOpen ? (
         <AccountDrawer
           account={editingAccount}
@@ -177,7 +171,7 @@ function Accounts(props: PageProps) {
               <ToggleLeft size={17} />
               <div>
                 <strong>{needsDetailsCount} {needsDetailsCount === 1 ? 'account needs' : 'accounts need'} details</strong>
-                <span>Add missing institution or last-four details before exports.</span>
+                <span>Review account details before using them in transactions.</span>
               </div>
               <button type="button" onClick={() => setSearchTerm('Needs details')}>Review</button>
               <button className="top-alert-close" type="button" aria-label="Dismiss alert" onClick={dismissNotice}>
@@ -214,14 +208,27 @@ function Accounts(props: PageProps) {
               </label>
 
               <div className="filter-actions">
-                <button className="secondary-button" type="button">
+                <label className="secondary-button month-filter-button">
                   <Landmark size={17} />
-                  Type: All
-                </button>
-                <button className="secondary-button" type="button">
+                  <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as AccountRecord['type'] | 'All')}>
+                    <option value="All">Type: All</option>
+                    <option value="Checking">Checking</option>
+                    <option value="Savings">Savings</option>
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Loan">Loan</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+                <label className="secondary-button month-filter-button">
                   <Wallet size={17} />
-                  Status: Active
-                </button>
+                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as AccountStatus | 'All')}>
+                    <option value="All">Status: All</option>
+                    <option value="Active">Active</option>
+                    <option value="Needs details">Needs details</option>
+                    <option value="Archived">Archived</option>
+                  </select>
+                </label>
               </div>
             </div>
 
@@ -231,8 +238,6 @@ function Accounts(props: PageProps) {
                   <tr>
                     <th>Account</th>
                     <th>Type</th>
-                    <th>Institution</th>
-                    <th>Last 4</th>
                     <th>Transactions</th>
                     <th>Status</th>
                     <th className="action-col">Actions</th>
@@ -253,8 +258,6 @@ function Accounts(props: PageProps) {
                           <span>{account.type}</span>
                         </div>
                       </td>
-                      <td data-label="Institution">{account.institution}</td>
-                      <td data-label="Last 4">{account.lastFour}</td>
                       <td data-label="Transactions">{account.transactionCount} linked</td>
                       <td data-label="Status">
                         <StatusPill status={account.status} />
@@ -302,7 +305,7 @@ function Accounts(props: PageProps) {
                   ))}
                   {filteredAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="empty-table-cell">No accounts match this search.</td>
+                      <td colSpan={5} className="empty-table-cell">No accounts match this search.</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -319,15 +322,6 @@ function Accounts(props: PageProps) {
               onToggle={setExpandedPanel}
             >
               Keep manual accounts today, then connect banks later when Plaid is ready.
-            </ProgressivePanel>
-            <ProgressivePanel
-              id="archived"
-              title="Archived accounts"
-              summary="2 hidden"
-              expandedPanel={expandedPanel}
-              onToggle={setExpandedPanel}
-            >
-              Old accounts stay out of daily transaction work but remain available for history and exports.
             </ProgressivePanel>
           </section>
         </main>
@@ -471,20 +465,6 @@ function AccountDrawer({
               <option>Other</option>
             </select>
           </label>
-          <label>
-            Institution
-            <input placeholder="Bank, card provider, or Manual" />
-          </label>
-          <label>
-            Last 4 digits
-            <input inputMode="numeric" maxLength={4} placeholder="1234" />
-          </label>
-          <details>
-            <summary>Notes</summary>
-            <div className="advanced-fields">
-              <textarea aria-label="Account notes" placeholder="Internal note" />
-            </div>
-          </details>
           {error ? <p className="drawer-error" role="alert">{error}</p> : null}
         </form>
 
