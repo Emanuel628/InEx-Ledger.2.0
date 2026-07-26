@@ -46,3 +46,7 @@ npm run test:all
 npm run log_scan
 npm run verify:redacted-storage
 ```
+
+## Frontend V3
+
+The migrated React UI builds from `In-Ex-Ledger-API/frontend-v3` into `In-Ex-Ledger-API/public/app-v3` and is served at canonical `/app-v3` routes. It uses the existing 2.0 backend/auth/session/CSRF APIs. Legacy HTML pages remain in place until each migrated page is verified, redirected, and retired in a separate cleanup pass.

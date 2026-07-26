@@ -107,6 +107,8 @@ test("v3 API client preserves multipart bodies and retries stale CSRF once", () 
   assert.match(source, /init\.body instanceof FormData/);
   assert.match(source, /init\.body && !isFormData/);
   assert.match(source, /response\.status === 403 && await isCsrfFailure\(response\)/);
+  assert.match(source, /await refreshCsrfToken\(\)/);
+  assert.match(source, /fetch\('\/api\/me'/);
   assert.match(source, /CSRF token missing or invalid\./);
 });
 
@@ -114,8 +116,21 @@ test("v3 app routes stay under app-v3 and browser back drives page state", () =>
   const source = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
 
   assert.match(source, /return slug \? `\/app-v3\/\$\{slug\}` : '\/app-v3'/);
+  assert.match(source, /getCanonicalCurrentPath/);
+  assert.match(source, /login\?next=\$\{encodeURIComponent\(getPathForPage\(page\)\)\}/);
+  assert.match(source, /app-v3-loading/);
   assert.match(source, /window\.addEventListener\('popstate', handlePopState\)/);
   assert.match(source, /setCurrentPage\(requestedPage \|\| \(authUser \? chooseAuthenticatedPage\(authUser\) : 'Landing'\)\)/);
+});
+
+test("v3 frontend dependencies are pinned", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "frontend-v3", "package.json"), "utf8"));
+  for (const section of ["dependencies", "devDependencies"]) {
+    for (const [name, version] of Object.entries(pkg[section] || {})) {
+      assert.notEqual(version, "latest", `${name} should be pinned`);
+      assert.match(String(version), /^\d+\.\d+\.\d+/, `${name} should use an exact semver version`);
+    }
+  }
 });
 
 test("v3 header notifications use real unread message counts without noisy local filler", () => {
@@ -189,8 +204,13 @@ test("v3 transactions render review reasons safely and wire filter date range pl
   assert.match(pageSource, /function reviewText\(value: unknown\)/);
   assert.match(pageSource, /reviewText\(record\.summary\)/);
   assert.doesNotMatch(pageSource, /\{reviewItem\.supportSummary \|\| reviewItem\.reviewNotes \|\| reviewItem\.categoryReason\}/);
-  assert.match(pageSource, /transaction\.dateIso >= startDateFilter/);
-  assert.match(pageSource, /transaction\.dateIso <= endDateFilter/);
+  assert.match(apiSource, /start_date/);
+  assert.match(apiSource, /end_date/);
+  assert.match(apiSource, /account_name/);
+  assert.match(apiSource, /category_name/);
+  assert.match(pageSource, /loadTransactionPageData\(\{/);
+  assert.match(pageSource, /limit: pageSize/);
+  assert.match(pageSource, /offset: \(currentPage - 1\) \* pageSize/);
   assert.match(pageSource, /onStartDateChange={setStartDateFilter}/);
   assert.match(pageSource, /onEndDateChange={setEndDateFilter}/);
   assert.match(pageSource, /Manage categories<\/button>/);

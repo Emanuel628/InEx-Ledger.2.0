@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -57,6 +57,8 @@ function Transactions(props: PageProps) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [transactionRows, setTransactionRows] = useState<Transaction[]>([])
+  const [transactionTotal, setTransactionTotal] = useState(0)
+  const [transactionSummary, setTransactionSummary] = useState({ incomeTotal: 0, expenseTotal: 0, transactionCount: 0 })
   const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
   const [taxProfile, setTaxProfile] = useState<BusinessTaxProfile | null>(null)
@@ -83,12 +85,23 @@ function Transactions(props: PageProps) {
   const [noticeVisible, dismissNotice] = useSessionDismissed('transactions-review')
   useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
 
-  async function refreshPageData() {
+  const refreshPageData = useCallback(async () => {
     setLoadingData(true)
     setDataError('')
     try {
-      const pageData = await loadTransactionPageData()
+      const pageData = await loadTransactionPageData({
+        limit: pageSize,
+        offset: (currentPage - 1) * pageSize,
+        search: searchTerm,
+        categoryName: categoryFilter,
+        accountName: accountFilter,
+        status: statusFilter,
+        startDate: startDateFilter,
+        endDate: endDateFilter,
+      })
       setTransactionRows(pageData.transactions)
+      setTransactionTotal(pageData.total)
+      setTransactionSummary(pageData.summary)
       setAccountOptions(pageData.accounts)
       setCategoryOptions(pageData.categories)
       setTaxProfile(pageData.taxProfile)
@@ -98,6 +111,8 @@ function Transactions(props: PageProps) {
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load transactions.')
       setTransactionRows([])
+      setTransactionTotal(0)
+      setTransactionSummary({ incomeTotal: 0, expenseTotal: 0, transactionCount: 0 })
       setAccountOptions([])
       setCategoryOptions([])
       setReviewQueue({ queue: [] })
@@ -105,40 +120,18 @@ function Transactions(props: PageProps) {
     } finally {
       setLoadingData(false)
     }
-  }
+  }, [accountFilter, categoryFilter, currentPage, endDateFilter, pageSize, searchTerm, startDateFilter, statusFilter])
 
-  const filteredRows = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase()
-
-    return transactionRows.filter((transaction) => {
-      const matchesCategory = categoryFilter === 'All' || transaction.category === categoryFilter
-      const matchesStatus = statusFilter === 'All'
-        || transaction.status === statusFilter
-        || (statusFilter === 'Needs attention' && (transaction.status !== 'Cleared' || transaction.receipt === 'Missing'))
-      const matchesAccount = accountFilter === 'All' || transaction.account === accountFilter
-      const matchesStartDate = !startDateFilter || transaction.dateIso >= startDateFilter
-      const matchesEndDate = !endDateFilter || transaction.dateIso <= endDateFilter
-      const matchesSearch = !normalizedSearch || [
-        transaction.description,
-        transaction.category,
-        transaction.account,
-        transaction.receipt,
-        transaction.status,
-        String(transaction.amount),
-      ].some((value) => value.toLowerCase().includes(normalizedSearch))
-
-      return matchesCategory && matchesStatus && matchesAccount && matchesStartDate && matchesEndDate && matchesSearch
-    })
-  }, [accountFilter, categoryFilter, endDateFilter, searchTerm, startDateFilter, statusFilter, transactionRows])
-
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
+  const filteredRows = transactionRows
+  const totalRows = transactionTotal || transactionSummary.transactionCount || filteredRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const pageStart = (safeCurrentPage - 1) * pageSize
-  const visibleRows = filteredRows.slice(pageStart, pageStart + pageSize)
-  const categories = uniqueValues(transactionRows.map((transaction) => transaction.category))
-  const accounts = uniqueValues(transactionRows.map((transaction) => transaction.account))
-  const incomeTotal = transactionRows.filter((row) => row.amount > 0).reduce((total, row) => total + row.amount, 0)
-  const expenseTotal = Math.abs(transactionRows.filter((row) => row.amount < 0).reduce((total, row) => total + row.amount, 0))
+  const visibleRows = filteredRows
+  const categories = uniqueValues(categoryOptions.map((category) => category.name))
+  const accounts = uniqueValues(accountOptions.map((account) => account.name))
+  const incomeTotal = transactionSummary.incomeTotal
+  const expenseTotal = transactionSummary.expenseTotal
   const netTotal = incomeTotal - expenseTotal
   const estimatedTax = Math.max(0, netTotal) * (taxProfile?.rate ?? 0.24)
   const reviewCount = reviewQueue.summary?.total ?? transactionRows.filter((row) => row.status !== 'Cleared' || row.receipt === 'Missing').length
@@ -157,7 +150,7 @@ function Transactions(props: PageProps) {
 
   useEffect(() => {
     void refreshPageData()
-  }, [])
+  }, [refreshPageData])
 
   async function restoreDeletedTransaction() {
     setDataError('')
@@ -555,7 +548,7 @@ function Transactions(props: PageProps) {
 
             <div className="table-footer">
               <span>
-                Showing {filteredRows.length ? pageStart + 1 : 0} to {Math.min(pageStart + pageSize, filteredRows.length)} of {filteredRows.length} transactions
+                Showing {totalRows ? pageStart + 1 : 0} to {Math.min(pageStart + visibleRows.length, totalRows)} of {totalRows} transactions
                 {undoMessage ? ` - ${undoMessage}` : ''}
               </span>
               <div className="pagination" aria-label="Pagination">

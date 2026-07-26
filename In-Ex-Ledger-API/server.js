@@ -337,6 +337,9 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
+    if (req.path === '/app-v3/') {
+      return res.redirect(301, '/app-v3');
+    }
     if (req.path === '/app-v3' || req.path.startsWith('/app-v3/')) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       return next();

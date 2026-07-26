@@ -153,6 +153,10 @@ type LegacyCategoryOption = {
 
 type ListResponse = {
   data: LegacyTransaction[]
+  total?: number
+  limit?: number
+  offset?: number
+  has_more?: boolean
   summary?: {
     income_total?: number
     expense_total?: number
@@ -192,9 +196,21 @@ export type CsvImportResult = {
   errors?: { reason?: string }[]
 }
 
-export async function loadTransactionPageData() {
+export type TransactionPageFilters = {
+  limit: number
+  offset: number
+  search?: string
+  categoryName?: string
+  accountName?: string
+  status?: string
+  startDate?: string
+  endDate?: string
+}
+
+export async function loadTransactionPageData(filters: TransactionPageFilters = { limit: 20, offset: 0 }) {
+  const transactionUrl = buildTransactionListUrl(filters)
   const [transactions, accounts, categories, business, reviewQueue, recurringTemplates] = await Promise.all([
-    apiRequest<ListResponse>('/api/transactions?limit=500&offset=0'),
+    apiRequest<ListResponse>(transactionUrl),
     apiRequest<{ data: AccountOption[] }>('/api/accounts?limit=500&offset=0'),
     apiRequest<{ data: LegacyCategoryOption[] }>('/api/categories?limit=500&offset=0&include_inactive=true'),
     apiRequest<LegacyBusiness>('/api/business').catch(() => null),
@@ -212,7 +228,31 @@ export async function loadTransactionPageData() {
     taxProfile: resolveEstimatedTaxProfile(business),
     reviewQueue,
     recurringTemplates: recurringTemplates.map(mapRecurringTemplate),
+    total: Number(transactions.total ?? transactions.summary?.transaction_count ?? transactions.data.length),
+    summary: {
+      incomeTotal: Number(transactions.summary?.income_total || 0),
+      expenseTotal: Number(transactions.summary?.expense_total || 0),
+      transactionCount: Number(transactions.summary?.transaction_count ?? transactions.total ?? transactions.data.length),
+    },
+    hasMore: transactions.has_more === true,
   }
+}
+
+function buildTransactionListUrl(filters: TransactionPageFilters) {
+  const params = new URLSearchParams()
+  params.set('limit', String(filters.limit || 20))
+  params.set('offset', String(Math.max(filters.offset || 0, 0)))
+  if (filters.search?.trim()) params.set('search', filters.search.trim())
+  if (filters.categoryName && filters.categoryName !== 'All') params.set('category_name', filters.categoryName)
+  if (filters.accountName && filters.accountName !== 'All') params.set('account_name', filters.accountName)
+  if (filters.startDate) params.set('start_date', filters.startDate)
+  if (filters.endDate) params.set('end_date', filters.endDate)
+  if (filters.status === 'Needs attention') params.set('review', 'any')
+  if (filters.status === 'Needs review') params.set('review_status', 'needs_review')
+  if (filters.status === 'Missing receipt') params.set('review', 'rs')
+  if (filters.status === 'Cleared') params.set('v3_status', 'cleared')
+  if (filters.status === 'Draft') params.set('v3_status', 'draft')
+  return `/api/transactions?${params.toString()}`
 }
 
 export async function saveTransactionDraft(

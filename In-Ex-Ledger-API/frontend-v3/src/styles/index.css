@@ -68,6 +68,30 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+.app-v3-loading {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.app-v3-loading > div {
+  display: grid;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+}
+
+.app-v3-loading strong {
+  font-size: 20px;
+}
+
+.app-v3-loading span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .ledger-shell {
   min-height: 100vh;
   display: grid;

@@ -1,6 +1,7 @@
 export async function apiRequest<T>(url: string, init: RequestInit = {}) {
   let response = await fetchWithAuth(url, init)
   if (response.status === 403 && await isCsrfFailure(response)) {
+    await refreshCsrfToken()
     response = await fetchWithAuth(url, init)
   }
   if (response.status === 401 && await refreshAccessToken()) {
@@ -21,6 +22,7 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}) {
 export async function apiBlobRequest(url: string, init: RequestInit = {}) {
   let response = await fetchWithAuth(url, init)
   if (response.status === 403 && await isCsrfFailure(response)) {
+    await refreshCsrfToken()
     response = await fetchWithAuth(url, init)
   }
   if (response.status === 401 && await refreshAccessToken()) {
@@ -114,6 +116,17 @@ async function getCsrfToken() {
 
   token = readCookie('csrf_token')
   return token || ''
+}
+
+async function refreshCsrfToken() {
+  try {
+    await fetch('/api/me', {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+  } catch {
+    // The retry will surface the original request failure if CSRF cannot refresh.
+  }
 }
 
 function redirectToLogin() {

@@ -95,13 +95,13 @@ const publicPages = new Set<AppPage>([
   'ResetPassword',
 ])
 
-const legacyAuthRoutes: Partial<Record<AppPage, string>> = {
-  Login: '/login?next=/app-v3/',
+const legacyAuthRoutes: Partial<Record<AppPage, string | ((next: string) => string)>> = {
+  Login: (next) => `/login?next=${encodeURIComponent(next)}`,
   Register: '/register',
   ForgotPassword: '/forgot-password',
   ResetPassword: '/reset-password',
   VerifyEmail: '/verify-email',
-  MfaChallenge: '/login?next=/app-v3/',
+  MfaChallenge: (next) => `/login?next=${encodeURIComponent(next)}`,
 }
 
 const pageSlugByPage: Partial<Record<AppPage, string>> = {
@@ -152,6 +152,16 @@ function getPathForPage(page: AppPage) {
   return slug ? `/app-v3/${slug}` : '/app-v3'
 }
 
+function getCanonicalCurrentPath() {
+  const requestedPage = getInitialPageFromPath()
+  return requestedPage ? getPathForPage(requestedPage) : '/app-v3'
+}
+
+function getLegacyAuthRoute(page: AppPage, next = getCanonicalCurrentPath()) {
+  const route = legacyAuthRoutes[page]
+  return typeof route === 'function' ? route(next) : route
+}
+
 function chooseAuthenticatedPage(user: AuthUser) {
   if (!user.currentBusinessId) {
     return user.emailVerified ? 'Onboarding' : 'VerifyEmail'
@@ -194,6 +204,10 @@ function App() {
         if (active) {
           setAuthUser(null)
           const requestedPage = getInitialPageFromPath()
+          if (requestedPage && !publicPages.has(requestedPage)) {
+            window.location.assign(`/login?next=${encodeURIComponent(getPathForPage(requestedPage))}`)
+            return
+          }
           setCurrentPage(requestedPage && publicPages.has(requestedPage) ? requestedPage : 'Landing')
         }
       })
@@ -225,12 +239,12 @@ function App() {
   const navigate = (page: AppPage) => {
     const legacyAuthRoute = legacyAuthRoutes[page]
     if (legacyAuthRoute) {
-      window.location.assign(legacyAuthRoute)
+      window.location.assign(getLegacyAuthRoute(page) || '/login')
       return
     }
 
     if (!authUser && !publicPages.has(page)) {
-      window.location.assign('/login?next=/app-v3/')
+      window.location.assign(`/login?next=${encodeURIComponent(getPathForPage(page))}`)
       return
     }
 
@@ -267,6 +281,17 @@ function App() {
     setSidebarCollapsed,
     theme,
     setTheme,
+  }
+
+  if (authLoading) {
+    return (
+      <div className="app-v3-loading" data-theme={theme} role="status" aria-live="polite">
+        <div>
+          <strong>Loading InEx Ledger</strong>
+          <span>Checking your session...</span>
+        </div>
+      </div>
+    )
   }
 
   if (currentPage === 'Accounts') {
