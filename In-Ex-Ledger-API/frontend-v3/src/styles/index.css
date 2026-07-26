@@ -1302,6 +1302,19 @@ textarea:focus-visible {
   color: var(--amber);
 }
 
+.tone-tax::before {
+  background: var(--teal);
+}
+
+.tone-tax strong {
+  color: var(--teal);
+}
+
+.tone-tax .summary-icon {
+  background: #dff8f5;
+  color: var(--teal);
+}
+
 .table-panel {
   overflow: hidden;
 }
@@ -1736,6 +1749,117 @@ tbody tr:last-child td {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.progressive-panel-body {
+  padding: 0 16px 16px;
+}
+
+.progressive-panel-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.review-queue-list,
+.recurring-template-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recurring-template-empty,
+.recurring-template-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.review-queue-item,
+.recurring-template-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.review-queue-item strong,
+.recurring-template-item strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.review-queue-item span,
+.review-queue-item small,
+.recurring-template-item span,
+.recurring-template-item small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.review-queue-item .secondary-button,
+.recurring-template-actions .secondary-button {
+  min-height: 36px;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+
+.recurring-template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  accent-color: var(--blue);
+}
+
+.transaction-review-detail {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(200, 121, 0, 0.22);
+  border-radius: 14px;
+  background: #fffaf0;
+}
+
+.transaction-review-detail h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.transaction-review-detail ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+}
+
+.transaction-review-detail p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .drawer-backdrop {

@@ -190,7 +190,7 @@
   color: var(--ink);
 }
 
-.ledger-shell[data-theme="dark"] :is(.top-alert, .pdf-warning, .pdf-warning-box) {
+.ledger-shell[data-theme="dark"] :is(.top-alert, .pdf-warning, .pdf-warning-box, .transaction-review-detail) {
   border-color: rgba(244, 182, 75, 0.44);
   background:
     linear-gradient(135deg, rgba(244, 182, 75, 0.16), rgba(15, 27, 45, 0.96)),
@@ -203,7 +203,7 @@
   color: #ffd166;
 }
 
-.ledger-shell[data-theme="dark"] :is(.top-alert strong, .top-alert span, .pdf-warning-box strong, .pdf-warning-box span) {
+.ledger-shell[data-theme="dark"] :is(.top-alert strong, .top-alert span, .pdf-warning-box strong, .pdf-warning-box span, .transaction-review-detail h3, .transaction-review-detail li) {
   color: var(--ink);
 }
 

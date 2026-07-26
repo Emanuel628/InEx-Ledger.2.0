@@ -123,6 +123,23 @@ test("v3 transactions CSV import requires legacy account and date range fields",
   assert.doesNotMatch(pageSource, /monthFilter/);
 });
 
+test("v3 transactions restores tax estimate, review fixes, receipt upload, recurring templates, and category handoff", () => {
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+
+  assert.match(apiSource, /\/api\/business/);
+  assert.match(apiSource, /\/api\/review\/queue/);
+  assert.match(apiSource, /\/api\/recurring/);
+  assert.match(apiSource, /resolveEstimatedTaxProfile/);
+  assert.match(pageSource, /Estimated tax/);
+  assert.match(pageSource, /uploadReceipt\(file, transaction\.id\)/);
+  assert.match(pageSource, /ReviewQueuePanel/);
+  assert.match(pageSource, /RecurringTemplatesPanel/);
+  assert.match(pageSource, /Manage categories\.\.\./);
+  assert.doesNotMatch(pageSource, /Tax set-aside helper/);
+  assert.doesNotMatch(pageSource, /Not connected yet/);
+});
+
 test("v3 archived message rows expose an action menu instead of only opening the thread", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "pages", "Messages.tsx"), "utf8");
 
