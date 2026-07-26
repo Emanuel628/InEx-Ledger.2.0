@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  Calendar,
   CheckCircle2,
   ChevronDown,
   FileText,
@@ -10,6 +9,7 @@ import {
   Plus,
   Search,
   Send,
+  SlidersHorizontal,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -42,7 +42,11 @@ function Invoices(props: PageProps) {
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
-  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  useOutsideActionMenu(Boolean(actionMenuId || filtersOpen), () => {
+    setActionMenuId(null)
+    setFiltersOpen(false)
+  })
 
   async function refreshInvoices() {
     setLoadingData(true)
@@ -200,26 +204,35 @@ function Invoices(props: PageProps) {
             </label>
 
             <div className="filter-actions">
-              <label className="select-button">
-                <FileText size={17} />
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'All' | InvoiceStatus)}>
-                  <option value="All">Status: All</option>
-                  <option value="Draft">Draft</option>
-                  <option value="Sent">Sent</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Overdue">Overdue</option>
-                  <option value="Void">Void</option>
-                </select>
-              </label>
-              <label className="select-button">
-                <Calendar size={17} />
-                <select value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}>
-                  <option value="All">All dates</option>
-                  {monthOptions.map((month) => (
-                    <option key={month} value={month}>{formatMonth(month)}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="filter-popover-wrap">
+                <button className="icon-button filter-icon-button" type="button" aria-label="Invoice filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((value) => !value)}>
+                  <SlidersHorizontal size={18} />
+                </button>
+                {filtersOpen ? (
+                  <div className="filter-popover" role="dialog" aria-label="Invoice filters">
+                    <label>
+                      Status
+                      <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'All' | InvoiceStatus)}>
+                        <option value="All">All statuses</option>
+                        <option value="Draft">Draft</option>
+                        <option value="Sent">Sent</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="Void">Void</option>
+                      </select>
+                    </label>
+                    <label>
+                      Date range
+                      <select value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}>
+                        <option value="All">All dates</option>
+                        {monthOptions.map((month) => (
+                          <option key={month} value={month}>{formatMonth(month)}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -255,9 +268,6 @@ function Invoices(props: PageProps) {
                       {formatMoney(invoice.amount, invoice.currency)}
                     </td>
                     <td data-label="Action" className="action-col receipt-actions">
-                      <button className="secondary-button invoice-view-button" type="button" onClick={() => openDrawer(invoice)}>
-                        View
-                      </button>
                       <div className="row-menu-wrap">
                         <button
                           className="row-action"
@@ -269,12 +279,12 @@ function Invoices(props: PageProps) {
                           <MoreHorizontal size={18} />
                         </button>
                         {actionMenuId === invoice.id ? (
-                          <div className="row-menu" role="menu">
-                            <button type="button" onClick={() => openDrawer(invoice)}>Edit invoice</button>
+                          <div className="row-action-menu invoice-action-menu" role="menu">
+                            <button type="button" onClick={() => openDrawer(invoice)}>View / edit</button>
                             <button type="button" onClick={() => handleSend(invoice)}>Send invoice</button>
                             <button type="button" onClick={() => handleStatus(invoice, 'paid')}>Mark paid</button>
                             <button type="button" onClick={() => handleStatus(invoice, 'void')}>Void invoice</button>
-                            <button type="button" onClick={() => handleDelete(invoice)}>Delete invoice</button>
+                            <button className="is-danger" type="button" onClick={() => handleDelete(invoice)}>Delete invoice</button>
                           </div>
                         ) : null}
                       </div>
@@ -312,7 +322,7 @@ function Invoices(props: PageProps) {
           </div>
         </section>
 
-        <section className="progressive-panels" aria-label="Invoice tools">
+        <section className="progressive-panels invoice-tools-panel" aria-label="Invoice tools">
           <ProgressivePanel
             id="tools"
             title="Email and payment tools"

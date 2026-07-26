@@ -77,6 +77,7 @@ function AppShell({
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const topbarMenusRef = useRef<HTMLDivElement | null>(null)
+  const usesKilometers = isCanadaBusiness(authUser?.business?.region || authUser?.business?.type, authUser?.business?.currency)
   const goToPage = (page: AppPage) => {
     onNavigate(page)
     setMobileNavOpen(false)
@@ -185,7 +186,7 @@ function AppShell({
               }}
             >
               <Icon size={19} />
-              <span>{t(i18nKey)}</span>
+              <span>{label === 'Mileage' && usesKilometers ? 'Kilometers' : t(i18nKey)}</span>
             </button>
           ))}
         </nav>
@@ -449,6 +450,10 @@ function buildNotifications(counts: { total?: number; messages?: number; support
 
 function LogoMark() {
   return <img src="/brand/inex-mark-onnavy.svg" alt="" aria-hidden="true" />
+}
+
+function isCanadaBusiness(region?: string | null, currency?: string | null) {
+  return String(region || '').toUpperCase() === 'CA' || String(currency || '').toUpperCase() === 'CAD'
 }
 
 export default AppShell

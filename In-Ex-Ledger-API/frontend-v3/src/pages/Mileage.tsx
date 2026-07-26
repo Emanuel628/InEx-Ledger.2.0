@@ -8,6 +8,7 @@ import {
   Plus,
   Search,
   Settings2,
+  SlidersHorizontal,
   Trash2,
   Wrench,
   X,
@@ -49,11 +50,18 @@ function Mileage(props: PageProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [monthFilter, setMonthFilter] = useState('All')
   const [typeFilter, setTypeFilter] = useState<'All' | MileageKind>('All')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [pageSize, setPageSize] = useState(20)
   const [currentPage, setCurrentPage] = useState(1)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('mileage-settings')
-  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
+  useOutsideActionMenu(Boolean(actionMenuId || filtersOpen), () => {
+    setActionMenuId(null)
+    setFiltersOpen(false)
+  })
+  const usesKilometers = isCanadaBusiness(props.authUser?.business?.region || props.authUser?.business?.type, props.authUser?.business?.currency)
+  const unitLabel = usesKilometers ? 'Kilometers' : 'Miles'
+  const unitShort = usesKilometers ? 'km' : 'mi'
 
   async function refreshPageData() {
     setLoadingData(true)
@@ -168,6 +176,7 @@ function Mileage(props: PageProps) {
         <MileageDrawer
           entryMode={entryMode}
           setEntryMode={setEntryMode}
+          unitLabel={unitLabel}
           editingEntry={editingEntry}
           onClose={closeDrawer}
           onSave={handleSave}
@@ -178,7 +187,7 @@ function Mileage(props: PageProps) {
         <section className="page-heading">
           <div>
             <p className="eyebrow">Vehicle log</p>
-            <h1>Mileage</h1>
+            <h1>{usesKilometers ? 'Kilometers' : 'Mileage'}</h1>
             <p>Track business trips, vehicle expenses, and maintenance in one timeline.</p>
           </div>
           <button className="primary-button" type="button" onClick={() => openDrawer('Trip')}>
@@ -187,9 +196,9 @@ function Mileage(props: PageProps) {
           </button>
         </section>
 
-        <section className="summary-strip" aria-label="Mileage summary">
+        <section className="summary-strip" aria-label={`${usesKilometers ? 'Kilometers' : 'Mileage'} summary`}>
           <SummaryItem label="Trips" value={String(summary.tripCount)} tone="net" icon={Car} />
-          <SummaryItem label="Distance" value={`${summary.totalMiles.toFixed(1)} mi`} tone="income" icon={Calendar} />
+          <SummaryItem label="Distance" value={`${summary.totalMiles.toFixed(1)} ${unitShort}`} tone="income" icon={Calendar} />
           <SummaryItem label="Vehicle costs" value={formatMoney(summary.vehicleExpenseTotal)} tone="expense" icon={Fuel} />
           <SummaryItem label="Maintenance" value={formatMoney(summary.maintenanceTotal)} tone="review" icon={Wrench} />
         </section>
@@ -221,7 +230,7 @@ function Mileage(props: PageProps) {
         ) : null}
 
         <section className="mileage-focus-grid">
-          <article className="export-card mileage-quick-log">
+          <article className="export-card mileage-quick-log decorative-card decorative-card-blue">
             <div className="export-card-header">
               <div>
                 <p className="eyebrow">Quick entry</p>
@@ -243,10 +252,10 @@ function Mileage(props: PageProps) {
               ))}
             </div>
 
-            <QuickEntryForm entryMode={entryMode} onSave={(draft) => saveMileageDraft(draft, null).then(refreshPageData)} />
+            <QuickEntryForm entryMode={entryMode} unitLabel={unitLabel} onSave={(draft) => saveMileageDraft(draft, null).then(refreshPageData)} />
           </article>
 
-          <article className="export-card mileage-planning-card">
+          <article className="export-card mileage-planning-card decorative-card decorative-card-green">
             <div className="export-card-header">
               <div>
                 <p className="eyebrow">Readiness</p>
@@ -262,7 +271,7 @@ function Mileage(props: PageProps) {
             <div className="export-total-box">
               <div>
                 <span>Distance unit</span>
-                <strong>Miles</strong>
+                <strong>{unitLabel}</strong>
               </div>
               <div>
                 <span>Cost records</span>
@@ -285,24 +294,33 @@ function Mileage(props: PageProps) {
             </label>
 
             <div className="filter-actions">
-              <label className="select-button">
-                <Calendar size={17} />
-                <select value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}>
-                  <option value="All">All dates</option>
-                  {monthOptions.map((month) => (
-                    <option key={month} value={month}>{formatMonth(month)}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="select-button">
-                <Car size={17} />
-                <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'All' | MileageKind)}>
-                  <option value="All">Type: All</option>
-                  <option value="Trip">Trips</option>
-                  <option value="Expense">Expenses</option>
-                  <option value="Maintenance">Maintenance</option>
-                </select>
-              </label>
+              <div className="filter-popover-wrap">
+                <button className="icon-button filter-icon-button" type="button" aria-label="Mileage filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((value) => !value)}>
+                  <SlidersHorizontal size={18} />
+                </button>
+                {filtersOpen ? (
+                  <div className="filter-popover" role="dialog" aria-label="Mileage filters">
+                    <label>
+                      Date range
+                      <select value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}>
+                        <option value="All">All dates</option>
+                        {monthOptions.map((month) => (
+                          <option key={month} value={month}>{formatMonth(month)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Type
+                      <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'All' | MileageKind)}>
+                        <option value="All">All types</option>
+                        <option value="Trip">Trips</option>
+                        <option value="Expense">Expenses</option>
+                        <option value="Maintenance">Maintenance</option>
+                      </select>
+                    </label>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -336,7 +354,7 @@ function Mileage(props: PageProps) {
                       </div>
                     </td>
                     <td data-label="Distance / Amount" className="align-right amount">
-                      {entry.distance ? `${entry.distance.toFixed(1)} mi` : formatMoney(entry.amount || 0)}
+                      {entry.distance ? `${entry.distance.toFixed(1)} ${unitShort}` : formatMoney(entry.amount || 0)}
                     </td>
                     <td data-label="Actions" className="action-col receipt-actions">
                       <button className="row-action" type="button" aria-label={`Edit ${entry.title}`} disabled={rowLocked} onClick={() => openDrawer(entry.kind, entry)}>
@@ -402,7 +420,15 @@ function Mileage(props: PageProps) {
   )
 }
 
-function QuickEntryForm({ entryMode, onSave }: { entryMode: MileageKind; onSave: (draft: MileageDraft) => Promise<unknown> }) {
+function QuickEntryForm({
+  entryMode,
+  unitLabel,
+  onSave,
+}: {
+  entryMode: MileageKind
+  unitLabel: string
+  onSave: (draft: MileageDraft) => Promise<unknown>
+}) {
   const [draft, setDraft] = useState(() => blankMileageDraft(entryMode))
   const [error, setError] = useState('')
 
@@ -439,7 +465,7 @@ function QuickEntryForm({ entryMode, onSave }: { entryMode: MileageKind; onSave:
           <input value={draft.destination} onChange={(event) => updateDraft('destination', event.target.value)} placeholder="Office, job site, supplier" />
         </label>
         <label>
-          Miles
+          {unitLabel}
           <input type="number" min="0.1" step="0.1" value={draft.distance} onChange={(event) => updateDraft('distance', event.target.value)} placeholder="0.0" />
         </label>
         {error ? <p className="drawer-error" role="alert">{error}</p> : null}
@@ -475,12 +501,14 @@ function QuickEntryForm({ entryMode, onSave }: { entryMode: MileageKind; onSave:
 function MileageDrawer({
   entryMode,
   setEntryMode,
+  unitLabel,
   editingEntry,
   onClose,
   onSave,
 }: {
   entryMode: MileageKind
   setEntryMode: (mode: MileageKind) => void
+  unitLabel: string
   editingEntry: MileageEntry | null
   onClose: () => void
   onSave: (draft: MileageDraft) => Promise<unknown>
@@ -552,7 +580,7 @@ function MileageDrawer({
                 <input value={draft.destination} onChange={(event) => updateDraft('destination', event.target.value)} placeholder="Office, job site, supplier" />
               </label>
               <label>
-                Miles
+                {unitLabel}
                 <input type="number" min="0.1" step="0.1" value={draft.distance} onChange={(event) => updateDraft('distance', event.target.value)} placeholder="0.0" />
               </label>
             </>
@@ -667,6 +695,10 @@ function getActiveCurrency() {
 
 function getMoneyLocale() {
   return getActiveCurrency() === 'CAD' ? 'en-CA' : 'en-US'
+}
+
+function isCanadaBusiness(region?: string | null, currency?: string | null) {
+  return String(region || '').toUpperCase() === 'CA' || String(currency || '').toUpperCase() === 'CAD'
 }
 
 export default Mileage

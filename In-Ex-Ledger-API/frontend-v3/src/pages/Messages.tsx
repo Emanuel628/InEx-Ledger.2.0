@@ -50,11 +50,11 @@ const laneIcons: Record<LaneLabel, LucideIcon> = {
 function Messages(props: PageProps) {
   const [selectedThread, setSelectedThread] = useState<MessageRecord | null>(null)
   const [threadMessages, setThreadMessages] = useState<MessageRecord[]>([])
-  const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeType, setComposeType] = useState<'general' | 'support'>('general')
   const [lanesCollapsed, setLanesCollapsed] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [activeLane, setActiveLane] = useState<LaneLabel>('Inbox')
   const [inbox, setInbox] = useState<MessageRecord[]>([])
   const [sent, setSent] = useState<MessageRecord[]>([])
@@ -66,7 +66,10 @@ function Messages(props: PageProps) {
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
-  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
+  useOutsideActionMenu(Boolean(actionMenuId || filtersOpen), () => {
+    setActionMenuId(null)
+    setFiltersOpen(false)
+  })
 
   async function refreshMessages() {
     setLoadingData(true)
@@ -310,26 +313,32 @@ function Messages(props: PageProps) {
                 <Search size={18} />
                 <input type="search" placeholder="Search or refine" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
               </label>
-              <label className="select-button">
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'All' | 'Unread')}>
-                  <option value="All">All messages</option>
-                  <option value="Unread">Unread only</option>
-                </select>
-                <ChevronDown size={16} />
-              </label>
-              <label className="select-button">
-                <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'All' | MessageType)}>
-                  <option value="All">All types</option>
-                  <option value="Invoice reply">Invoice replies</option>
-                  <option value="Support">Support</option>
-                  <option value="Account notice">Notices</option>
-                  <option value="General">General</option>
-                </select>
-                <ChevronDown size={16} />
-              </label>
-              <button className="icon-button" type="button" aria-label="Message filters">
-                <SlidersHorizontal size={18} />
-              </button>
+              <div className="filter-popover-wrap">
+                <button className="icon-button filter-icon-button" type="button" aria-label="Message filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((value) => !value)}>
+                  <SlidersHorizontal size={18} />
+                </button>
+                {filtersOpen ? (
+                  <div className="filter-popover message-filter-popover" role="dialog" aria-label="Message filters">
+                    <label>
+                      Status
+                      <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'All' | 'Unread')}>
+                        <option value="All">All messages</option>
+                        <option value="Unread">Unread only</option>
+                      </select>
+                    </label>
+                    <label>
+                      Type
+                      <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'All' | MessageType)}>
+                        <option value="All">All types</option>
+                        <option value="Invoice reply">Invoice replies</option>
+                        <option value="Support">Support</option>
+                        <option value="Account notice">Notices</option>
+                        <option value="General">General</option>
+                      </select>
+                    </label>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="message-rows">
@@ -415,17 +424,6 @@ function Messages(props: PageProps) {
           </section>
         </section>
 
-        <section className="progressive-panels" aria-label="Message settings">
-          <ProgressivePanel
-            id="settings"
-            title="Rules and templates"
-            summary="Snippets, follow-ups, routing"
-            expandedPanel={expandedPanel}
-            onToggle={setExpandedPanel}
-          >
-            Keep reply snippets, follow-up timing, invoice-reply routing, and support defaults tucked away until needed.
-          </ProgressivePanel>
-        </section>
       </main>
     </AppShell>
   )
@@ -659,35 +657,6 @@ function MessageBubble({
         <span>{time}</span>
       </div>
       <p>{children}</p>
-    </article>
-  )
-}
-
-function ProgressivePanel({
-  id,
-  title,
-  summary,
-  expandedPanel,
-  onToggle,
-  children,
-}: {
-  id: string
-  title: string
-  summary: string
-  expandedPanel: string | null
-  onToggle: (id: string | null) => void
-  children: string
-}) {
-  const isExpanded = expandedPanel === id
-
-  return (
-    <article className="progressive-panel">
-      <button type="button" onClick={() => onToggle(isExpanded ? null : id)} aria-expanded={isExpanded}>
-        <span>{title}</span>
-        <strong>{summary}</strong>
-        <ChevronDown size={17} />
-      </button>
-      {isExpanded ? <p>{children}</p> : null}
     </article>
   )
 }

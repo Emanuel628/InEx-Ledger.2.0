@@ -7,7 +7,7 @@ function useOutsideActionMenu(isOpen: boolean, onClose: () => void) {
     const closeOnOutsidePointer = (event: PointerEvent) => {
       const target = event.target
       if (!(target instanceof Element)) return
-      if (target.closest('.row-action, .row-action-menu')) return
+      if (target.closest('.row-action, .row-action-menu, .filter-popover-wrap')) return
       onClose()
     }
 

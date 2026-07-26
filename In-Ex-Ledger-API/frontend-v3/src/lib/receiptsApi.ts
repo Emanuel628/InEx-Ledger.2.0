@@ -46,19 +46,24 @@ type LegacyTransaction = {
 export async function loadReceiptPageData() {
   const [receipts, transactions] = await Promise.all([
     apiRequest<LegacyReceipt[]>('/api/receipts'),
-    searchReceiptTransactionOptions(),
+    searchReceiptTransactionOptions('', true),
   ])
+  const transactionsById = new Map(transactions.map((transaction) => [transaction.id, transaction.label]))
 
   return {
-    receipts: receipts.map(mapReceipt),
+    receipts: receipts.map((receipt) => mapReceipt(receipt, transactionsById)),
     transactions,
   }
 }
 
-export async function searchReceiptTransactionOptions(search = '') {
+export async function searchReceiptTransactionOptions(search = '', includeAll = false) {
   const params = new URLSearchParams()
-  params.set('limit', '50')
-  params.set('offset', '0')
+  if (includeAll) {
+    params.set('all', 'true')
+  } else {
+    params.set('limit', '50')
+    params.set('offset', '0')
+  }
   if (search.trim()) {
     params.set('search', search.trim())
   }
@@ -92,11 +97,11 @@ export async function deleteReceipt(receiptId: string) {
   await apiRequest(`/api/receipts/${receiptId}`, { method: 'DELETE' })
 }
 
-function mapReceipt(row: LegacyReceipt): ReceiptRecord {
+function mapReceipt(row: LegacyReceipt, transactionsById: Map<string, string>): ReceiptRecord {
   const linkedTransactionId = row.transaction_id || null
   const uploadedAt = row.uploaded_at || row.created_at || ''
   const linkedTransaction = linkedTransactionId
-    ? mapTransactionOption({
+    ? transactionsById.get(linkedTransactionId) || mapTransactionOption({
       id: linkedTransactionId,
       description: row.transaction_description,
       amount: row.transaction_amount || 0,

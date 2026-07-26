@@ -1617,6 +1617,56 @@ textarea:focus-visible {
   justify-content: flex-end;
 }
 
+.filter-popover-wrap,
+.row-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.filter-icon-button {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.filter-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 25;
+  width: min(280px, calc(100vw - 40px));
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.filter-popover label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.filter-popover select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+}
+
 .month-filter-button,
 .per-page-button {
   display: inline-flex;
@@ -1911,6 +1961,13 @@ tbody tr:last-child td {
   color: var(--red);
 }
 
+.invoice-action-menu {
+  top: calc(100% + 6px);
+  right: 0;
+  width: 176px;
+  text-align: left;
+}
+
 .row-action-menu-note,
 .transaction-lock-note {
   margin: 0;
@@ -2190,6 +2247,24 @@ tbody tr:last-child td {
   justify-content: flex-end;
   overflow: hidden;
   background: rgba(7, 29, 58, 0.32);
+}
+
+.center-modal {
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(720px, calc(100dvh - 32px));
+  align-self: center;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 28px 70px rgba(7, 29, 58, 0.28);
+}
+
+.center-modal .drawer-header {
+  padding: 22px;
 }
 
 .transaction-drawer {
@@ -3013,9 +3088,44 @@ tbody tr:last-child td {
 
 .mileage-quick-log,
 .mileage-planning-card {
+  position: relative;
   display: grid;
   gap: 16px;
   padding: 20px;
+  overflow: hidden;
+}
+
+.decorative-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+}
+
+.decorative-card::after {
+  content: "";
+  position: absolute;
+  right: -42px;
+  top: -42px;
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  background: rgba(23, 92, 255, 0.08);
+  pointer-events: none;
+}
+
+.decorative-card-green::before {
+  background: linear-gradient(90deg, var(--green), var(--teal));
+}
+
+.decorative-card-green::after {
+  background: rgba(7, 140, 88, 0.1);
+}
+
+.decorative-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .mileage-mode-toggle {
@@ -3198,6 +3308,19 @@ tbody tr:last-child td {
   font-weight: 900;
 }
 
+.invoice-tools-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.invoice-tools-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--blue), var(--green));
+}
+
 .messages-page {
   width: min(1420px, 100%);
   padding-top: 34px;
@@ -3340,6 +3463,40 @@ tbody tr:last-child td {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.analytics-modal {
+  gap: 0;
+}
+
+.analytics-modal-table {
+  display: grid;
+  gap: 8px;
+  padding: 0 22px 22px;
+  overflow-y: auto;
+}
+
+.analytics-modal-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto auto auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.analytics-modal-row strong {
+  color: var(--ink);
+}
+
+.analytics-modal-row em {
+  font-style: normal;
+  font-weight: 900;
 }
 
 .analytics-primary-grid,
@@ -3612,7 +3769,7 @@ tbody tr:last-child td {
 
 .message-list-toolbar {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) auto auto auto;
+  grid-template-columns: minmax(320px, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 16px;

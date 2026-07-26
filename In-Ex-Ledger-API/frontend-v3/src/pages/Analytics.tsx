@@ -8,6 +8,7 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import type { PageProps } from '../App'
@@ -39,6 +40,8 @@ function Analytics(props: PageProps) {
   const [categoryMode, setCategoryMode] = useState<'Income' | 'Expenses'>('Income')
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
+  const [periodModalOpen, setPeriodModalOpen] = useState(false)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   useEffect(() => {
     setLoadingData(true)
@@ -55,7 +58,16 @@ function Analytics(props: PageProps) {
   const categoryRows = categoryMode === 'Income' ? analytics.topIncome : analytics.topExpenses
 
   return (
-    <AppShell {...props} searchPlaceholder="Search analytics, categories, reports">
+    <AppShell
+      {...props}
+      searchPlaceholder="Search analytics, categories, reports"
+      overlay={
+        <>
+          {periodModalOpen ? <AnalyticsPeriodModal analytics={analytics} onClose={() => setPeriodModalOpen(false)} /> : null}
+          {exportModalOpen ? <AnalyticsExportModal analytics={analytics} onClose={() => setExportModalOpen(false)} /> : null}
+        </>
+      }
+    >
       <main className="transactions-page analytics-page">
         <section className="page-heading">
           <div>
@@ -64,12 +76,12 @@ function Analytics(props: PageProps) {
             <p>Understand performance, trends, and cash movement without digging through reports.</p>
           </div>
           <div className="analytics-heading-actions">
-            <button className="secondary-button" type="button">
+            <button className="secondary-button" type="button" onClick={() => setPeriodModalOpen(true)}>
               <Calendar size={18} />
               Last 12 months
               <ChevronDown size={16} />
             </button>
-            <button className="secondary-button" type="button">
+            <button className="secondary-button" type="button" onClick={() => setExportModalOpen(true)}>
               <Download size={18} />
               Export insight
             </button>
@@ -276,6 +288,99 @@ function ProgressivePanel({
       {isExpanded ? <p>{children}</p> : null}
     </article>
   )
+}
+
+function AnalyticsPeriodModal({ analytics, onClose }: { analytics: AnalyticsSummary; onClose: () => void }) {
+  const rows = analytics.months.map((month, index) => ({
+    month,
+    income: analytics.incomePoints[index] || 0,
+    expenses: analytics.expensePoints[index] || 0,
+    net: (analytics.incomePoints[index] || 0) - (analytics.expensePoints[index] || 0),
+  }))
+
+  return (
+    <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="center-modal analytics-modal" role="dialog" aria-modal="true" aria-labelledby="analyticsPeriodTitle" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="drawer-header">
+          <div>
+            <p className="eyebrow">Analytics range</p>
+            <h2 id="analyticsPeriodTitle">Last 12 months</h2>
+            <p>Monthly income, expenses, and net from the same data powering the chart.</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close analytics range" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="analytics-modal-table">
+          {rows.length ? rows.map((row) => (
+            <div className="analytics-modal-row" key={row.month}>
+              <strong>{row.month}</strong>
+              <span>{formatMoney(row.income)} income</span>
+              <span>{formatMoney(row.expenses)} expenses</span>
+              <em className={row.net >= 0 ? 'income' : 'expense'}>{formatMoney(row.net)} net</em>
+            </div>
+          )) : <div className="empty-table-state">No monthly analytics available yet.</div>}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function AnalyticsExportModal({ analytics, onClose }: { analytics: AnalyticsSummary; onClose: () => void }) {
+  const rows = analytics.months.map((month, index) => ({
+    month,
+    income: analytics.incomePoints[index] || 0,
+    expenses: analytics.expensePoints[index] || 0,
+    net: (analytics.incomePoints[index] || 0) - (analytics.expensePoints[index] || 0),
+  }))
+
+  function downloadCsv() {
+    const csv = [
+      ['Month', 'Income', 'Expenses', 'Net'].join(','),
+      ...rows.map((row) => [row.month, row.income, row.expenses, row.net].map(csvCell).join(',')),
+    ].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'inex-ledger-analytics-insights.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="center-modal analytics-modal" role="dialog" aria-modal="true" aria-labelledby="analyticsExportTitle" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="drawer-header">
+          <div>
+            <p className="eyebrow">Export</p>
+            <h2 id="analyticsExportTitle">Export insights</h2>
+            <p>Download the current analytics summary as a CSV for review or sharing.</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close export insights" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <section className="invoice-total-preview">
+          <div><span>Income</span><strong>{formatMoney(analytics.income)}</strong></div>
+          <div><span>Expenses</span><strong>{formatMoney(analytics.expenses)}</strong></div>
+          <div><span>Net</span><strong>{formatMoney(analytics.net)}</strong></div>
+        </section>
+        <div className="drawer-actions">
+          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+          <button className="primary-button" type="button" onClick={downloadCsv}>
+            <Download size={18} />
+            Download CSV
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function csvCell(value: string | number) {
+  const text = String(value)
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 function formatMoney(value: number) {
