@@ -279,11 +279,19 @@ function ProgressivePanel({
 }
 
 function formatMoney(value: number) {
-  return value.toLocaleString('en-US', {
+  return value.toLocaleString(getMoneyLocale(), {
     style: 'currency',
-    currency: 'USD',
+    currency: getActiveCurrency(),
     maximumFractionDigits: 0,
   })
+}
+
+function getActiveCurrency() {
+  return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
+}
+
+function getMoneyLocale() {
+  return getActiveCurrency() === 'CAD' ? 'en-CA' : 'en-US'
 }
 
 export default Analytics

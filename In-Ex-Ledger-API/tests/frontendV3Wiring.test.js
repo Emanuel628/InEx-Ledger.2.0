@@ -186,6 +186,21 @@ test("v3 header business switcher and search are wired instead of decorative", (
   assert.match(cssSource, /\.topbar-menus/);
 });
 
+test("v3 money formatters use the active business currency on app pages", () => {
+  for (const page of ["Transactions.tsx", "Analytics.tsx", "Mileage.tsx", "Invoices.tsx"]) {
+    const source = fs.readFileSync(path.join(frontendRoot, "pages", page), "utf8");
+    assert.match(source, /window\.__LUNA_ME__\?\.business\?\.currency/);
+  }
+
+  const invoicesApiSource = fs.readFileSync(path.join(frontendRoot, "lib", "invoicesApi.ts"), "utf8");
+  const invoicesSource = fs.readFileSync(path.join(frontendRoot, "pages", "Invoices.tsx"), "utf8");
+
+  assert.match(invoicesApiSource, /blankInvoiceDraft\(currency = 'USD'\)/);
+  assert.match(invoicesApiSource, /currency\.toUpperCase\(\) === 'CAD' \? 'CAD' : 'USD'/);
+  assert.match(invoicesSource, /blankInvoiceDraft\(currency\)/);
+  assert.doesNotMatch(invoicesSource, /function formatMoney\(value: number, currency = 'USD'\)/);
+});
+
 test("v3 settings normalizes business profile fields before saving", () => {
   const settingsApiSource = fs.readFileSync(path.join(frontendRoot, "lib", "settingsApi.ts"), "utf8");
   const settingsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Settings.tsx"), "utf8");

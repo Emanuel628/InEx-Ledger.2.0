@@ -1517,12 +1517,17 @@ function TransactionFiltersModal({
 }
 
 function formatMoney(value: number) {
-  const formatted = Math.abs(value).toLocaleString('en-US', {
+  const currency = getActiveCurrency()
+  const formatted = Math.abs(value).toLocaleString(currency === 'CAD' ? 'en-CA' : 'en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency,
   })
 
   return value < 0 ? `-${formatted}` : formatted
+}
+
+function getActiveCurrency() {
+  return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
 }
 
 function reviewLabelsFor(transaction: Transaction) {

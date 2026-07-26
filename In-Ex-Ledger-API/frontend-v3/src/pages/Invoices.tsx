@@ -157,7 +157,7 @@ function Invoices(props: PageProps) {
     <AppShell
       {...props}
       searchPlaceholder="Search invoices, clients, invoice titles"
-      overlay={drawerOpen ? <InvoiceDrawer invoice={editingInvoice} onClose={closeDrawer} onSave={handleSave} /> : null}
+      overlay={drawerOpen ? <InvoiceDrawer invoice={editingInvoice} currency={getActiveCurrency()} onClose={closeDrawer} onSave={handleSave} /> : null}
     >
       <main className="transactions-page invoices-page">
         <section className="page-heading">
@@ -331,23 +331,25 @@ function Invoices(props: PageProps) {
 
 function InvoiceDrawer({
   invoice,
+  currency,
   onClose,
   onSave,
 }: {
   invoice: InvoiceRecord | null
+  currency: string
   onClose: () => void
   onSave: (draft: InvoiceDraft, sendAfterSave: boolean) => Promise<unknown>
 }) {
-  const [draft, setDraft] = useState<InvoiceDraft>(() => invoice ? draftFromInvoice(invoice) : blankInvoiceDraft())
+  const [draft, setDraft] = useState<InvoiceDraft>(() => invoice ? draftFromInvoice(invoice) : blankInvoiceDraft(currency))
   const [error, setError] = useState('')
   const subtotal = Number(draft.quantity || 0) * Number(draft.unitPrice || 0)
   const tax = subtotal * (Number(draft.taxRatePercent || 0) / 100)
   const total = subtotal + tax
 
   useEffect(() => {
-    setDraft(invoice ? draftFromInvoice(invoice) : blankInvoiceDraft())
+    setDraft(invoice ? draftFromInvoice(invoice) : blankInvoiceDraft(currency))
     setError('')
-  }, [invoice])
+  }, [currency, invoice])
 
   function updateDraft(field: keyof InvoiceDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }))
@@ -528,11 +530,16 @@ function formatMonth(value: string) {
   return parsed.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
-function formatMoney(value: number, currency = 'USD') {
-  return value.toLocaleString('en-US', {
+function formatMoney(value: number, currency = getActiveCurrency()) {
+  const normalizedCurrency = currency.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
+  return value.toLocaleString(normalizedCurrency === 'CAD' ? 'en-CA' : 'en-US', {
     style: 'currency',
-    currency,
+    currency: normalizedCurrency,
   })
+}
+
+function getActiveCurrency() {
+  return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
 }
 
 export default Invoices

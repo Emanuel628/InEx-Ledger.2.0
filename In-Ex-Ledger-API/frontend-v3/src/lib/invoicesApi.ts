@@ -129,14 +129,14 @@ export async function deleteInvoice(invoiceId: string) {
   await apiRequest(`/api/invoices-v1/${invoiceId}`, { method: 'DELETE' })
 }
 
-export function blankInvoiceDraft(): InvoiceDraft {
+export function blankInvoiceDraft(currency = 'USD'): InvoiceDraft {
   return {
     title: '',
     clientName: '',
     clientEmail: '',
     issueDate: new Date().toISOString().slice(0, 10),
     dueDate: '',
-    currency: 'USD',
+    currency: currency.toUpperCase() === 'CAD' ? 'CAD' : 'USD',
     taxRatePercent: '0',
     quantity: '1',
     unitPrice: '',
