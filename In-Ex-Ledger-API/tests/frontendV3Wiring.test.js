@@ -225,6 +225,8 @@ test("v3 transactions render review reasons safely and wire filter date range pl
   assert.match(pageSource, /loadTransactionPageData\(\{/);
   assert.match(pageSource, /limit: pageSize/);
   assert.match(pageSource, /offset: \(currentPage - 1\) \* pageSize/);
+  assert.match(pageSource, /getPaginationPages\(safeCurrentPage, totalPages\)/);
+  assert.doesNotMatch(pageSource, /Array\.from\(\{ length: totalPages \}, \(_, index\) => index \+ 1\)\.slice\(0, 5\)/);
   assert.match(pageSource, /onStartDateChange={setStartDateFilter}/);
   assert.match(pageSource, /onEndDateChange={setEndDateFilter}/);
   assert.match(pageSource, /Manage categories<\/button>/);

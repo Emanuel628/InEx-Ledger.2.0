@@ -128,6 +128,7 @@ function Transactions(props: PageProps) {
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const pageStart = (safeCurrentPage - 1) * pageSize
   const visibleRows = filteredRows
+  const paginationPages = getPaginationPages(safeCurrentPage, totalPages)
   const categories = uniqueValues(categoryOptions.map((category) => category.name))
   const accounts = uniqueValues(accountOptions.map((account) => account.name))
   const incomeTotal = transactionSummary.incomeTotal
@@ -555,17 +556,20 @@ function Transactions(props: PageProps) {
                 <button type="button" aria-label="Previous page" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
                   <ChevronLeft size={16} />
                 </button>
-                {Array.from({ length: totalPages }, (_, index) => index + 1).slice(0, 5).map((page) => (
-                  <button
-                    className={page === safeCurrentPage ? 'is-active' : ''}
-                    type="button"
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </button>
+                {paginationPages.map((page, index) => (
+                  page === 'ellipsis' ? (
+                    <span key={`ellipsis-${index}`}>...</span>
+                  ) : (
+                    <button
+                      className={page === safeCurrentPage ? 'is-active' : ''}
+                      type="button"
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  )
                 ))}
-                {totalPages > 5 ? <span>...</span> : null}
                 <button type="button" aria-label="Next page" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
                   <ChevronRight size={16} />
                 </button>
@@ -1651,6 +1655,25 @@ function templateToRecurringDraft(template: RecurringTemplate | null): Recurring
 
 function uniqueValues(values: string[]) {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b))
+}
+
+function getPaginationPages(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1])
+  const sortedPages = Array.from(pages)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b)
+
+  return sortedPages.flatMap((page, index) => {
+    const previousPage = sortedPages[index - 1]
+    if (previousPage && page - previousPage > 1) {
+      return ['ellipsis' as const, page]
+    }
+    return [page]
+  })
 }
 
 export default Transactions
