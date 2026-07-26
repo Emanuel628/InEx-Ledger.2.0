@@ -5,9 +5,24 @@ const {
   findBillingAnchorBusinessIdForUser,
   getSubscriptionSnapshotForBusiness
 } = require("../services/subscriptionService.js");
+const { getTrustedClientIp } = require("../services/requestIpService.js");
+const { logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireSupportSecret);
+
+// This router is gated only by a single shared secret (see requireSupportSecret)
+// rather than a per-agent identity, so every access is logged here to leave a
+// trail of who/what was looked up if that secret is ever leaked or misused.
+// logInfo sanitizes context automatically, so any email in the URL is masked.
+router.use((req, res, next) => {
+  logInfo("Internal support access", {
+    method: req.method,
+    url: req.originalUrl,
+    ip: getTrustedClientIp(req)
+  });
+  next();
+});
 
 function buildPlanSnapshot(subscription) {
   return {

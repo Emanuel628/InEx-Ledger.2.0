@@ -240,6 +240,50 @@ function buildPasswordResetEmail(lang, resetLink) {
 }
 
 /* =========================================================
+   Duplicate registration attempt notice
+   ========================================================= */
+const DUPLICATE_SIGNUP_NOTICE = {
+  en: {
+    subject: "Someone tried to create an account with your email",
+    eyebrow: "InEx Ledger security",
+    heading: "You already have an account",
+    body: "Someone just tried to sign up for InEx Ledger using this email address. You already have an account, so no new account was created.",
+    loginLabel: "Sign in",
+    resetLabel: "Reset your password",
+    ignore: "If this was you, sign in below. If you don't recognize this attempt, you can reset your password as a precaution.",
+    text: ({ loginLink, resetLink }) =>
+      `Someone tried to create an account with your email\n\nSomeone just tried to sign up for InEx Ledger using this email address. You already have an account, so no new account was created.\n\nSign in: ${loginLink}\nReset your password: ${resetLink}\n\nIf this was you, sign in above. If you don't recognize this attempt, reset your password as a precaution.`
+  },
+  fr: {
+    subject: "Quelqu'un a tenté de créer un compte avec votre courriel",
+    eyebrow: "Sécurité InEx Ledger",
+    heading: "Vous avez déjà un compte",
+    body: "Quelqu'un vient d'essayer de s'inscrire à InEx Ledger avec cette adresse courriel. Vous avez déjà un compte, donc aucun nouveau compte n'a été créé.",
+    loginLabel: "Se connecter",
+    resetLabel: "Réinitialiser votre mot de passe",
+    ignore: "Si c'était vous, connectez-vous ci-dessous. Si vous ne reconnaissez pas cette tentative, réinitialisez votre mot de passe par précaution.",
+    text: ({ loginLink, resetLink }) =>
+      `Quelqu'un a tenté de créer un compte avec votre courriel\n\nQuelqu'un vient d'essayer de s'inscrire à InEx Ledger avec cette adresse courriel. Vous avez déjà un compte, donc aucun nouveau compte n'a été créé.\n\nSe connecter : ${loginLink}\nRéinitialiser votre mot de passe : ${resetLink}\n\nSi c'était vous, connectez-vous ci-dessus. Si vous ne reconnaissez pas cette tentative, réinitialisez votre mot de passe par précaution.`
+  }
+};
+
+function buildDuplicateSignupNoticeEmail(lang, options = {}) {
+  const l = normalizeEmailLang(lang);
+  const s = DUPLICATE_SIGNUP_NOTICE[l];
+  const loginLink = sanitizeHttpUrl(options.loginLink);
+  const resetLink = sanitizeHttpUrl(options.resetLink);
+  const html = wrapEmailHtml(
+    `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
+     <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
+    `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
+     ${loginLink ? ctaButton(loginLink, s.loginLabel) : ""}
+     ${resetLink ? `<p style="margin: 0 0 10px;"><a href="${escapeHtml(resetLink)}" style="color: #1d4ed8; font-size: 13px;">${escapeHtml(s.resetLabel)}</a></p>` : ""}
+     <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">${s.ignore}</p>`
+  );
+  return { subject: s.subject, html, text: s.text({ loginLink, resetLink }) };
+}
+
+/* =========================================================
    New sign-in alert email
    ========================================================= */
 const NEW_SIGNIN_ALERT = {
@@ -1379,6 +1423,7 @@ module.exports = {
   buildVerificationEmail,
   buildPasswordResetEmail,
   buildPasswordChangedEmail,
+  buildDuplicateSignupNoticeEmail,
   buildNewSignInAlertEmail,
   buildEmailChangeEmail,
   buildEmailChangedConfirmationEmail,
