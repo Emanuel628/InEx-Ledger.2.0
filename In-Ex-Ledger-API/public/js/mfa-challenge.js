@@ -21,6 +21,13 @@ function getPendingMfaNext() {
   if (!next || !next.startsWith("/") || next.startsWith("//") || /[\r\n]/.test(next)) {
     return "/transactions";
   }
+  if (next === "/app-v3") {
+    return "/transactions";
+  }
+  if (next.startsWith("/app-v3/")) {
+    const barePath = next.slice("/app-v3".length) || "/transactions";
+    return barePath === "/" ? "/transactions" : barePath;
+  }
   return next;
 }
 

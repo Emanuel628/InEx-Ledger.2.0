@@ -3,6 +3,7 @@
 Phase 0 status: complete.
 Phase 1 (canonical bare URLs): complete. Client `pushState` and `login?next=` use `/transactions`-style paths; `/app-v3` and `/app-v3/<page>` 301 to bare paths; assets remain under `/app-v3/assets`.
 Phase 2 (one active app UI): complete. Migrated app-core legacy HTML files moved from active `public/html` into `In-Ex-Ledger-API/legacy/public-html/app-core`; old `.html` URLs redirect to canonical v3 routes.
+Phase 3 (one auth door, Strategy A): complete. Auth remains legacy for now; login, MFA, expired-session, idle, and auth-guard redirects preserve canonical v3 `next` paths.
 
 This file is the freeze and map artifact for the move to one product, one UI, and one URL. It is intentionally operational: if a route is not listed here, do not migrate, delete, or add parallel behavior until this inventory is updated and verified.
 
@@ -114,3 +115,11 @@ These pages are intentionally not Pro-tier v3 parity yet. They should remain loc
 - Old `/html/<page>`, `/html/<page>.html`, and `/<page>.html` app URLs redirect to canonical v3 routes.
 - `settings-mobile.html` redirects to `/settings`.
 - `tests/v3LegacyHtmlRetirement.test.js` verifies the archive and redirects.
+
+## Phase 3 Completeness Review
+
+- Auth pages remain intentionally legacy for Strategy A.
+- Stale `/app-v3` `next` values canonicalize to bare paths before login or MFA return.
+- Expired, idle, network, and unauthenticated guard redirects include `next`.
+- API-triggered 401 redirects use `/login?reason=expired&next=<canonical>`.
+- `tests/authBridgeRedirects.test.js` verifies the legacy auth bridge.
