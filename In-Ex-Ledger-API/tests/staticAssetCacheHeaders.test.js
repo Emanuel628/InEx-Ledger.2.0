@@ -60,16 +60,19 @@ test("core app routes serve the v3 frontend shell", async () => {
   }
 });
 
-test("v3 frontend route is isolated and noindexed", async () => {
-  const response = await request(app).get("/app-v3/transactions").expect(200);
+test("deprecated /app-v3 page URLs redirect to bare canonical paths", async () => {
+  const root = await request(app).get("/app-v3").expect(301);
+  assert.strictEqual(root.headers.location, "/transactions");
 
-  assert.match(response.text, /\/app-v3\/assets\//);
-  assert.strictEqual(response.headers["x-robots-tag"], "noindex, nofollow");
-  assertNoStore(response);
+  const nested = await request(app).get("/app-v3/transactions").expect(301);
+  assert.strictEqual(nested.headers.location, "/transactions");
+
+  const settings = await request(app).get("/app-v3/settings?tab=security").expect(301);
+  assert.strictEqual(settings.headers.location, "/settings?tab=security");
 });
 
 test("v3 frontend static assets are served from the side-by-side build", async () => {
-  const index = await request(app).get("/app-v3/transactions").expect(200);
+  const index = await request(app).get("/transactions").expect(200);
   const assetPath = index.text.match(/\/app-v3\/assets\/[^"]+\.js/)?.[0];
   assert.ok(assetPath, "expected v3 JavaScript asset path in index");
 
