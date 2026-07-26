@@ -102,7 +102,8 @@ const V3_APP_PAGES = new Set([
   "change-email",
   "onboarding",
   "help",
-  "upgrade"
+  "upgrade",
+  "trial-setup"
 ]);
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
@@ -254,6 +255,27 @@ function sendFrontendV3App(_req, res, next) {
   return res.sendFile(indexPath);
 }
 
+/** Map deprecated /app-v3 page URLs to bare canonical paths. Assets stay under /app-v3/assets. */
+function redirectAppV3PageToCanonical(req, res, next) {
+  const requestPath = String(req.path || '');
+  if (requestPath === '/app-v3' || requestPath === '/app-v3/') {
+    return res.redirect(301, '/transactions');
+  }
+  if (!requestPath.startsWith('/app-v3/')) {
+    return next();
+  }
+  if (requestPath.startsWith('/app-v3/assets/')) {
+    return next();
+  }
+  const rest = requestPath.slice('/app-v3/'.length).replace(/\/+$/, '');
+  if (!rest) {
+    return res.redirect(301, '/transactions');
+  }
+  const target = `/${rest}`;
+  const suffix = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  return res.redirect(301, `${target}${suffix}`);
+}
+
 /* =========================================================
    CORS & SECURITY CONFIGURATION
    ========================================================= */
@@ -337,12 +359,8 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
-    if (req.path === '/app-v3/') {
-      return res.redirect(301, '/app-v3');
-    }
     if (req.path === '/app-v3' || req.path.startsWith('/app-v3/')) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-      return next();
     }
 
     const pageName = resolveRequestedPageName(req.path);
@@ -430,8 +448,9 @@ app.use(express.static(publicDir, {
   index: false,
   setHeaders: setStaticAssetCacheHeaders
 }));
-app.get('/app-v3', sendFrontendV3App);
-app.get('/app-v3/*', sendFrontendV3App);
+// Deprecated dual URLs: page hosts under /app-v3 redirect to bare paths. Assets stay static above.
+app.get('/app-v3', redirectAppV3PageToCanonical);
+app.get('/app-v3/*', redirectAppV3PageToCanonical);
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', (req, res, next) => {
