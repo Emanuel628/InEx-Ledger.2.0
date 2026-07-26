@@ -136,6 +136,9 @@ function redirectToLogin() {
 
 function getCurrentCanonicalPath() {
   const path = normalizeCanonicalPath(window.location.pathname || '/transactions')
+  if (isAuthPath(path)) {
+    return '/transactions'
+  }
   return `${path}${window.location.search || ''}${window.location.hash || ''}`
 }
 
@@ -148,6 +151,10 @@ function normalizeCanonicalPath(path: string) {
     return barePath === '/' ? '/transactions' : barePath
   }
   return path || '/transactions'
+}
+
+function isAuthPath(path: string) {
+  return ['/login', '/register', '/forgot-password', '/reset-password', '/mfa-challenge', '/verify-email'].includes(path)
 }
 
 function readCookie(name: string) {

@@ -102,6 +102,8 @@ test("v3 API client refreshes an expired access token before failing authenticat
   assert.match(source, /getCurrentCanonicalPath\(\)/);
   assert.match(source, /window\.location\.hash/);
   assert.match(source, /path\.startsWith\('\/app-v3\/'\)/);
+  assert.match(source, /isAuthPath\(path\)/);
+  assert.match(source, /return '\/transactions'/);
 });
 
 test("v3 API client preserves multipart bodies and retries stale CSRF once", () => {
@@ -335,6 +337,10 @@ test("v3 receipts use red unlinked pills and a transaction picker instead of lin
   assert.match(pageSource, /Search transactions/);
   assert.match(pageSource, /Link transaction/);
   assert.match(pageSource, /onSearchTransactions={searchReceiptTransactionOptions}/);
+  assert.match(pageSource, /useRef\(0\)/);
+  assert.match(pageSource, /window\.setTimeout\(\(\) =>/);
+  assert.match(pageSource, /}, 275\)/);
+  assert.match(pageSource, /searchSequenceRef\.current === sequence/);
   assert.match(apiSource, /export async function searchReceiptTransactionOptions/);
   assert.match(apiSource, /params\.set\('limit', '50'\)/);
   assert.doesNotMatch(apiSource, /\/api\/transactions\?limit=500&offset=0/);

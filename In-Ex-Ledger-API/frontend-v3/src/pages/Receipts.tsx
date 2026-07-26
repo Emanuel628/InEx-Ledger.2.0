@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Eye,
@@ -302,24 +302,29 @@ function ReceiptLinkModal({
   const [searchTerm, setSearchTerm] = useState('')
   const [visibleTransactions, setVisibleTransactions] = useState(transactions)
   const [searchError, setSearchError] = useState('')
+  const searchSequenceRef = useRef(0)
 
   useEffect(() => {
-    let canceled = false
-    onSearchTransactions(searchTerm)
-      .then((results) => {
-        if (!canceled) {
-          setVisibleTransactions(results)
-          setSearchError('')
-        }
-      })
-      .catch((error) => {
-        if (!canceled) {
-          setVisibleTransactions([])
-          setSearchError(error instanceof Error ? error.message : 'Unable to search transactions.')
-        }
-      })
+    const sequence = searchSequenceRef.current + 1
+    searchSequenceRef.current = sequence
+    const timeoutId = window.setTimeout(() => {
+      onSearchTransactions(searchTerm)
+        .then((results) => {
+          if (searchSequenceRef.current === sequence) {
+            setVisibleTransactions(results)
+            setSearchError('')
+          }
+        })
+        .catch((error) => {
+          if (searchSequenceRef.current === sequence) {
+            setVisibleTransactions([])
+            setSearchError(error instanceof Error ? error.message : 'Unable to search transactions.')
+          }
+        })
+    }, 275)
+
     return () => {
-      canceled = true
+      window.clearTimeout(timeoutId)
     }
   }, [onSearchTransactions, searchTerm])
 
