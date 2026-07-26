@@ -140,6 +140,26 @@ test("v3 transactions restores tax estimate, review fixes, receipt upload, recur
   assert.doesNotMatch(pageSource, /Not connected yet/);
 });
 
+test("v3 transactions render review reasons safely and wire filter date range plus category handoff", () => {
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(apiSource, /categoryReason\?: unknown/);
+  assert.match(pageSource, /function reviewText\(value: unknown\)/);
+  assert.match(pageSource, /reviewText\(record\.summary\)/);
+  assert.doesNotMatch(pageSource, /\{reviewItem\.supportSummary \|\| reviewItem\.reviewNotes \|\| reviewItem\.categoryReason\}/);
+  assert.match(pageSource, /transaction\.dateIso >= startDateFilter/);
+  assert.match(pageSource, /transaction\.dateIso <= endDateFilter/);
+  assert.match(pageSource, /onStartDateChange={setStartDateFilter}/);
+  assert.match(pageSource, /onEndDateChange={setEndDateFilter}/);
+  assert.match(pageSource, /Manage categories<\/button>/);
+  assert.match(pageSource, /transaction-edit-review/);
+  assert.match(pageSource, /field-needs-review/);
+  assert.match(cssSource, /\.transaction-edit-review/);
+  assert.match(cssSource, /\.drawer-form :is\(label, details\)\.field-needs-review/);
+});
+
 test("v3 transactions expose legacy undo delete and a clickable per-page select affordance", () => {
   const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
@@ -192,6 +212,16 @@ test("v3 receipts use red unlinked pills and a transaction picker instead of lin
   assert.doesNotMatch(pageSource, /Link to latest/);
   assert.doesNotMatch(pageSource, /attachReceipt\(receipt\.id, null\)/);
   assert.match(cssSource, /\.receipt-link-unlinked,[\s\S]*var\(--red\)/);
+});
+
+test("v3 mileage and exports remove nonessential bottom/card sections", () => {
+  const mileageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Mileage.tsx"), "utf8");
+  const exportsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Exports.tsx"), "utf8");
+
+  assert.doesNotMatch(mileageSource, /Mileage rate and unit settings/);
+  assert.doesNotMatch(mileageSource, /ProgressivePanel/);
+  assert.doesNotMatch(exportsSource, /sensitive-export-card/);
+  assert.doesNotMatch(exportsSource, /Protected export details/);
 });
 
 test("v3 archived message rows expose an action menu instead of only opening the thread", () => {

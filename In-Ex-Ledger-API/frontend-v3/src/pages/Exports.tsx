@@ -320,59 +320,6 @@ function Exports(props: PageProps) {
           </form>
         </section>
 
-        <section className="export-card sensitive-export-card">
-          <div className="export-card-header">
-            <div>
-              <p className="eyebrow">Sensitive data</p>
-              <h2>Protected export details</h2>
-            </div>
-            <LockKeyhole size={21} />
-          </div>
-
-          <label className="checkbox-line">
-            <input type="checkbox" checked={includeTaxId} onChange={(event) => setIncludeTaxId(event.target.checked)} />
-            <span>Include tax ID, business ID, or SSN on this PDF only</span>
-          </label>
-
-          {includeTaxId ? (
-            <div className="sensitive-entry">
-              <p>This identifier is encrypted in the browser and sent only for this PDF export.</p>
-              <label>
-                Sensitive identifier
-                <div className="secure-input-row">
-                  <input
-                    type={showSensitiveId ? 'text' : 'password'}
-                    value={taxId}
-                    placeholder="EIN, business ID, or SSN for this export"
-                    autoComplete="off"
-                    onChange={(event) => setTaxId(event.target.value)}
-                  />
-                  <button type="button" onClick={() => setShowSensitiveId((value) => !value)}>
-                    {showSensitiveId ? <EyeOff size={17} /> : <Eye size={17} />}
-                    {showSensitiveId ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-              </label>
-
-              <label className="checkbox-line">
-                <input type="checkbox" checked={certified} onChange={(event) => setCertified(event.target.checked)} />
-                <span>
-                  I certify I am authorized to provide this identifier and understand it is used only for this export.
-                </span>
-              </label>
-            </div>
-          ) : null}
-
-          {includeTaxId && certified ? (
-            <div className="protected-export-actions">
-              <button className="primary-button" type="button" onClick={() => setPdfModalOpen(true)}>
-                <FileText size={18} />
-                Generate PDF
-              </button>
-            </div>
-          ) : null}
-        </section>
-
         <section className="table-panel">
           <div className="table-toolbar">
             <label className="field search-field">

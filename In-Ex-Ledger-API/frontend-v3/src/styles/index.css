@@ -1864,6 +1864,28 @@ tbody tr:last-child td {
   font-size: 14px;
 }
 
+.transaction-edit-review {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(200, 121, 0, 0.24);
+  border-radius: 14px;
+  background: #fffaf0;
+  color: var(--ink);
+}
+
+.transaction-edit-review strong {
+  font-size: 13px;
+}
+
+.transaction-edit-review ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .receipt-link-modal {
   width: min(620px, calc(100vw - 32px));
 }
@@ -2032,6 +2054,41 @@ tbody tr:last-child td {
   color: var(--ink);
   font-size: 13px;
   font-weight: 800;
+}
+
+.field-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.inline-link-button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.inline-link-button:hover {
+  text-decoration: underline;
+}
+
+.drawer-form :is(label, details).field-needs-review {
+  padding: 12px;
+  border: 1px solid rgba(200, 121, 0, 0.26);
+  border-radius: 14px;
+  background: #fffaf0;
+}
+
+.drawer-form :is(label, details).field-needs-review :is(input, select, textarea) {
+  border-color: rgba(200, 121, 0, 0.44);
+  box-shadow: 0 0 0 3px rgba(244, 182, 75, 0.18);
 }
 
 .receipt-dropzone {
@@ -2317,8 +2374,7 @@ tbody tr:last-child td {
 }
 
 .export-form-panel,
-.export-summary-panel,
-.sensitive-export-card {
+.export-summary-panel {
   display: grid;
   gap: 16px;
   padding: 20px;
@@ -2476,11 +2532,6 @@ tbody tr:last-child td {
   flex: 0 0 16px;
   margin-top: 1px;
   accent-color: var(--blue);
-}
-
-.sensitive-export-card {
-  border-color: rgba(23, 92, 255, 0.18);
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
 }
 
 .sensitive-entry {

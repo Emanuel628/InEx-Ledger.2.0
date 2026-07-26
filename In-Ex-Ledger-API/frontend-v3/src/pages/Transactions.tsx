@@ -71,6 +71,8 @@ function Transactions(props: PageProps) {
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [accountFilter, setAccountFilter] = useState('All')
+  const [startDateFilter, setStartDateFilter] = useState('')
+  const [endDateFilter, setEndDateFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
   const [currentPage, setCurrentPage] = useState(1)
   const [undoCount, setUndoCount] = useState(0)
@@ -111,6 +113,8 @@ function Transactions(props: PageProps) {
         || transaction.status === statusFilter
         || (statusFilter === 'Needs attention' && (transaction.status !== 'Cleared' || transaction.receipt === 'Missing'))
       const matchesAccount = accountFilter === 'All' || transaction.account === accountFilter
+      const matchesStartDate = !startDateFilter || transaction.dateIso >= startDateFilter
+      const matchesEndDate = !endDateFilter || transaction.dateIso <= endDateFilter
       const matchesSearch = !normalizedSearch || [
         transaction.description,
         transaction.category,
@@ -120,9 +124,9 @@ function Transactions(props: PageProps) {
         String(transaction.amount),
       ].some((value) => value.toLowerCase().includes(normalizedSearch))
 
-      return matchesCategory && matchesStatus && matchesAccount && matchesSearch
+      return matchesCategory && matchesStatus && matchesAccount && matchesStartDate && matchesEndDate && matchesSearch
     })
-  }, [accountFilter, categoryFilter, searchTerm, statusFilter, transactionRows])
+  }, [accountFilter, categoryFilter, endDateFilter, searchTerm, startDateFilter, statusFilter, transactionRows])
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -138,7 +142,7 @@ function Transactions(props: PageProps) {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [accountFilter, categoryFilter, pageSize, searchTerm, statusFilter])
+  }, [accountFilter, categoryFilter, endDateFilter, pageSize, searchTerm, startDateFilter, statusFilter])
 
   useEffect(() => {
     void refreshPageData()
@@ -276,14 +280,20 @@ function Transactions(props: PageProps) {
               categoryFilter={categoryFilter}
               statusFilter={statusFilter}
               accountFilter={accountFilter}
+              startDateFilter={startDateFilter}
+              endDateFilter={endDateFilter}
               onCategoryChange={setCategoryFilter}
               onStatusChange={setStatusFilter}
               onAccountChange={setAccountFilter}
+              onStartDateChange={setStartDateFilter}
+              onEndDateChange={setEndDateFilter}
               onClear={() => {
                 setSearchTerm('')
                 setCategoryFilter('All')
                 setStatusFilter('All')
                 setAccountFilter('All')
+                setStartDateFilter('')
+                setEndDateFilter('')
               }}
               onClose={() => setFiltersOpen(false)}
             />
@@ -898,7 +908,7 @@ function ReviewQueuePanel({
             <div>
               <strong>{item.description}</strong>
               <span>{labels.slice(0, 2).join(', ')}</span>
-              {item.categoryReason ? <small>{item.categoryReason}</small> : null}
+              {reviewText(item.categoryReason) ? <small>{reviewText(item.categoryReason)}</small> : null}
             </div>
             <button
               className="secondary-button"
@@ -1146,6 +1156,14 @@ function TransactionDrawer({
   const [error, setError] = useState('')
   const isIncome = draft.kind === 'Income'
   const isEditing = Boolean(transaction)
+  const reviewLabels = transaction ? reviewLabelsFor(transaction) : []
+  const needsAmountReview = hasReviewFor(reviewLabels, [/amount/i, /total/i])
+  const needsDescriptionReview = hasReviewFor(reviewLabels, [/description/i, /merchant/i, /payer/i, /vendor/i, /memo/i])
+  const needsDateReview = hasReviewFor(reviewLabels, [/date/i])
+  const needsCategoryReview = hasReviewFor(reviewLabels, [/category/i, /tax/i, /mapping/i, /deduct/i])
+  const needsAccountReview = hasReviewFor(reviewLabels, [/account/i, /bank/i, /card/i])
+  const needsReceiptReview = hasReviewFor(reviewLabels, [/receipt/i, /support/i, /document/i, /proof/i])
+  const needsNotesReview = hasReviewFor(reviewLabels, [/note/i, /business purpose/i, /allocation/i, /review/i])
 
   function updateDraft<K extends keyof TransactionDraft>(key: K, value: TransactionDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
@@ -1181,7 +1199,15 @@ function TransactionDrawer({
         </div>
 
         <form className="drawer-form" onSubmit={(event) => event.preventDefault()}>
-          <label>
+          {reviewLabels.length ? (
+            <div className="transaction-edit-review" role="note">
+              <strong>Needs review</strong>
+              <ul>
+                {reviewLabels.slice(0, 5).map((label) => <li key={label}>{label}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          <label className={needsAmountReview ? 'field-needs-review' : undefined}>
             Amount
             <input
               inputMode="decimal"
@@ -1190,7 +1216,7 @@ function TransactionDrawer({
               onChange={(event) => updateDraft('amount', event.target.value)}
             />
           </label>
-          <label>
+          <label className={needsDescriptionReview ? 'field-needs-review' : undefined}>
             Description
             <input
               placeholder="Merchant or payer"
@@ -1198,12 +1224,15 @@ function TransactionDrawer({
               onChange={(event) => updateDraft('description', event.target.value)}
             />
           </label>
-          <label>
+          <label className={needsDateReview ? 'field-needs-review' : undefined}>
             Date
             <input type="date" value={draft.date} onChange={(event) => updateDraft('date', event.target.value)} />
           </label>
-          <label>
-            Category
+          <label className={needsCategoryReview ? 'field-needs-review' : undefined}>
+            <span className="field-title-row">
+              Category
+              <button className="inline-link-button" type="button" onClick={onManageCategories}>Manage categories</button>
+            </span>
             <select
               value={draft.category}
               onChange={(event) => {
@@ -1221,14 +1250,14 @@ function TransactionDrawer({
               <option value="__manage_categories__">Manage categories...</option>
             </select>
           </label>
-          <label>
+          <label className={needsAccountReview ? 'field-needs-review' : undefined}>
             Account
             <select value={draft.account} onChange={(event) => updateDraft('account', event.target.value)}>
               <option value="">Select account</option>
               {accounts.map((account) => <option value={account.name} key={account.id}>{account.name}</option>)}
             </select>
           </label>
-          <details>
+          <details className={needsReceiptReview || needsNotesReview ? 'field-needs-review' : undefined}>
             <summary>Receipt, tax treatment, and notes</summary>
             <div className="advanced-fields">
               {transaction ? (
@@ -1284,8 +1313,11 @@ function TransactionDetailsModal({
 }) {
   const reviewItem = transaction.reviewIssues[0]
   const reviewLabels = reviewItem?.issueLabels?.length
-    ? reviewItem.issueLabels
-    : reviewItem?.issueEntries?.map((entry) => entry.label || entry.issueCode || 'Review needed') || []
+    ? reviewItem.issueLabels.map(reviewText).filter(Boolean)
+    : reviewItem?.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode) || 'Review needed') || []
+  const reviewSummary = reviewText(reviewItem?.supportSummary)
+    || reviewText(reviewItem?.reviewNotes)
+    || reviewText(reviewItem?.categoryReason)
 
   return (
     <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -1322,8 +1354,8 @@ function TransactionDetailsModal({
                   <li key={label}>{label}</li>
                 ))}
               </ul>
-              {reviewItem.supportSummary || reviewItem.reviewNotes || reviewItem.categoryReason ? (
-                <p>{reviewItem.supportSummary || reviewItem.reviewNotes || reviewItem.categoryReason}</p>
+              {reviewSummary ? (
+                <p>{reviewSummary}</p>
               ) : null}
               <div className="transaction-detail-actions">
                 <button className="secondary-button" type="button" onClick={onEdit}>Edit details</button>
@@ -1362,9 +1394,13 @@ function TransactionFiltersModal({
   categoryFilter,
   statusFilter,
   accountFilter,
+  startDateFilter,
+  endDateFilter,
   onCategoryChange,
   onStatusChange,
   onAccountChange,
+  onStartDateChange,
+  onEndDateChange,
   onClear,
   onClose,
 }: {
@@ -1373,9 +1409,13 @@ function TransactionFiltersModal({
   categoryFilter: string
   statusFilter: string
   accountFilter: string
+  startDateFilter: string
+  endDateFilter: string
   onCategoryChange: (value: string) => void
   onStatusChange: (value: string) => void
   onAccountChange: (value: string) => void
+  onStartDateChange: (value: string) => void
+  onEndDateChange: (value: string) => void
   onClear: () => void
   onClose: () => void
 }) {
@@ -1424,6 +1464,16 @@ function TransactionFiltersModal({
               {accounts.map((account) => <option value={account} key={account}>{account}</option>)}
             </select>
           </label>
+          <div className="form-grid-2">
+            <label>
+              Start date
+              <input type="date" value={startDateFilter} onChange={(event) => onStartDateChange(event.target.value)} />
+            </label>
+            <label>
+              End date
+              <input type="date" value={endDateFilter} onChange={(event) => onEndDateChange(event.target.value)} />
+            </label>
+          </div>
         </form>
 
         <div className="drawer-actions">
@@ -1446,6 +1496,36 @@ function formatMoney(value: number) {
   })
 
   return value < 0 ? `-${formatted}` : formatted
+}
+
+function reviewLabelsFor(transaction: Transaction) {
+  return transaction.reviewIssues.flatMap((issue) => {
+    const directLabels = issue.issueLabels?.map(reviewText).filter(Boolean) || []
+    const entryLabels = issue.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode)).filter(Boolean) || []
+    const summaries = [issue.supportSummary, issue.reviewNotes, issue.categoryReason].map(reviewText).filter(Boolean)
+
+    return [...directLabels, ...entryLabels, ...summaries]
+  })
+}
+
+function reviewText(value: unknown): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) return value.map(reviewText).filter(Boolean).join(', ')
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return reviewText(record.summary)
+      || [reviewText(record.reasonLabel), reviewText(record.confidenceLabel)].filter(Boolean).join(' - ')
+      || reviewText(record.label)
+      || reviewText(record.code)
+      || ''
+  }
+  return ''
+}
+
+function hasReviewFor(labels: string[], patterns: RegExp[]) {
+  return labels.some((label) => patterns.some((pattern) => pattern.test(label)))
 }
 
 function formatCadence(value: string) {

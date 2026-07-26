@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Calendar,
   Car,
-  ChevronDown,
   Edit3,
   Fuel,
   MoreHorizontal,
@@ -41,7 +40,6 @@ function Mileage(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [entryMode, setEntryMode] = useState<MileageKind>('Trip')
   const [editingEntry, setEditingEntry] = useState<MileageEntry | null>(null)
-  const [expandedPanel, setExpandedPanel] = useState<string | null>('rate')
   const [mileageEntries, setMileageEntries] = useState<MileageEntry[]>([])
   const [summary, setSummary] = useState<MileageSummary>(emptySummary)
   const [loadingData, setLoadingData] = useState(true)
@@ -380,19 +378,6 @@ function Mileage(props: PageProps) {
             </label>
           </div>
         </section>
-
-        <section className="progressive-panels" aria-label="Mileage settings">
-          <ProgressivePanel
-            id="rate"
-            title="Mileage rate and unit settings"
-            summary="Miles"
-            expandedPanel={expandedPanel}
-            onToggle={setExpandedPanel}
-          >
-            Mileage records are stored as trips and vehicle costs. Tax-specific calculations should happen during export,
-            after the user confirms the active tax year and export package.
-          </ProgressivePanel>
-        </section>
       </main>
     </AppShell>
   )
@@ -611,35 +596,6 @@ function KindPill({ kind }: { kind: MileageKind }) {
   const className = kind === 'Trip' ? 'type-income' : kind === 'Maintenance' ? 'status-needs-review' : 'type-expense'
 
   return <span className={`type-pill ${className}`}>{kind}</span>
-}
-
-function ProgressivePanel({
-  id,
-  title,
-  summary,
-  expandedPanel,
-  onToggle,
-  children,
-}: {
-  id: string
-  title: string
-  summary: string
-  expandedPanel: string | null
-  onToggle: (id: string | null) => void
-  children: string
-}) {
-  const isExpanded = expandedPanel === id
-
-  return (
-    <article className="progressive-panel">
-      <button type="button" onClick={() => onToggle(isExpanded ? null : id)} aria-expanded={isExpanded}>
-        <span>{title}</span>
-        <strong>{summary}</strong>
-        <ChevronDown size={17} />
-      </button>
-      {isExpanded ? <p>{children}</p> : null}
-    </article>
-  )
 }
 
 function getEntryIcon(kind: MileageKind) {

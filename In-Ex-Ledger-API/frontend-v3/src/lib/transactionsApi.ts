@@ -70,9 +70,9 @@ export type ReviewQueueItem = {
     supportType?: string
     href?: string
   } | null
-  categoryReason?: string
-  supportSummary?: string
-  reviewNotes?: string
+  categoryReason?: unknown
+  supportSummary?: unknown
+  reviewNotes?: unknown
   receiptAttached?: boolean
 }
 
