@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  Calendar,
-  ChevronDown,
   Eye,
   FileText,
   Link2,
@@ -15,87 +13,128 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import useSessionDismissed from '../hooks/useSessionDismissed'
-
-type ReceiptLinkState = 'Linked' | 'Unlinked' | 'Needs info'
-
-type ReceiptRecord = {
-  id: number
-  fileName: string
-  merchant: string
-  date: string
-  amount: number
-  linkedTransaction: string
-  linkState: ReceiptLinkState
-  tone: string
-}
+import {
+  attachReceipt,
+  deleteReceipt,
+  loadReceiptPageData,
+  uploadReceipt,
+  type ReceiptLinkState,
+  type ReceiptRecord,
+  type TransactionLinkOption,
+} from '../lib/receiptsApi'
 
 const receipts: ReceiptRecord[] = [
   {
-    id: 1,
+    id: 'mock-1',
     fileName: 'Adobe_050124.pdf',
-    merchant: 'Adobe',
+    uploadedAt: '2024-05-01',
     date: 'May 1',
-    amount: 52.99,
+    linkedTransactionId: 'mock-tx-1',
     linkedTransaction: 'Software',
     linkState: 'Linked',
     tone: 'red',
+    isViewable: true,
+    url: '/api/receipts/mock-1',
   },
   {
-    id: 2,
+    id: 'mock-2',
     fileName: 'Shell_050224.jpg',
-    merchant: 'Shell',
+    uploadedAt: '2024-05-02',
     date: 'May 2',
-    amount: 45.67,
+    linkedTransactionId: null,
     linkedTransaction: 'Fuel',
     linkState: 'Unlinked',
     tone: 'yellow',
+    isViewable: true,
+    url: '/api/receipts/mock-2',
   },
   {
-    id: 3,
+    id: 'mock-3',
     fileName: 'Client_Lunch_050324.pdf',
-    merchant: 'Client lunch',
+    uploadedAt: '2024-05-03',
     date: 'May 3',
-    amount: 78.45,
+    linkedTransactionId: null,
     linkedTransaction: 'Meals',
-    linkState: 'Needs info',
+    linkState: 'Unlinked',
     tone: 'coral',
+    isViewable: true,
+    url: '/api/receipts/mock-3',
   },
   {
-    id: 4,
+    id: 'mock-4',
     fileName: 'GoogleWorkspace_050724.pdf',
-    merchant: 'Google Workspace',
+    uploadedAt: '2024-05-07',
     date: 'May 7',
-    amount: 14.4,
+    linkedTransactionId: 'mock-tx-2',
     linkedTransaction: 'Software',
     linkState: 'Linked',
     tone: 'blue',
+    isViewable: true,
+    url: '/api/receipts/mock-4',
   },
   {
-    id: 5,
+    id: 'mock-5',
     fileName: 'OfficeDepot_051024.jpg',
-    merchant: 'Office Depot',
+    uploadedAt: '2024-05-10',
     date: 'May 10',
-    amount: 23.18,
+    linkedTransactionId: null,
     linkedTransaction: 'Office Supplies',
     linkState: 'Unlinked',
     tone: 'green',
+    isViewable: true,
+    url: '/api/receipts/mock-5',
   },
   {
-    id: 6,
+    id: 'mock-6',
     fileName: 'United_051524.pdf',
-    merchant: 'United Airlines',
+    uploadedAt: '2024-05-15',
     date: 'May 15',
-    amount: 412.36,
+    linkedTransactionId: 'mock-tx-3',
     linkedTransaction: 'Travel',
     linkState: 'Linked',
     tone: 'violet',
+    isViewable: true,
+    url: '/api/receipts/mock-6',
   },
 ]
 
 function Receipts(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
+  const [receiptRows, setReceiptRows] = useState<ReceiptRecord[]>(receipts)
+  const [transactionOptions, setTransactionOptions] = useState<TransactionLinkOption[]>([])
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [linkFilter, setLinkFilter] = useState<ReceiptLinkState | 'All'>('All')
+  const [dataError, setDataError] = useState('')
   const [noticeVisible, dismissNotice] = useSessionDismissed('receipts-review')
+  const filteredReceipts = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    return receiptRows.filter((receipt) => {
+      const matchesSearch = !normalizedSearch || [
+        receipt.fileName,
+        receipt.date,
+        receipt.linkedTransaction,
+        receipt.linkState,
+      ].some((value) => value.toLowerCase().includes(normalizedSearch))
+
+      return matchesSearch && (linkFilter === 'All' || receipt.linkState === linkFilter)
+    })
+  }, [linkFilter, receiptRows, searchTerm])
+  const linkedCount = receiptRows.filter((receipt) => receipt.linkState === 'Linked').length
+  const unlinkedCount = receiptRows.filter((receipt) => receipt.linkState === 'Unlinked').length
+
+  async function refreshReceipts() {
+    setDataError('')
+    try {
+      const pageData = await loadReceiptPageData()
+      setReceiptRows(pageData.receipts)
+      setTransactionOptions(pageData.transactions)
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to load receipts.')
+      setReceiptRows(receipts)
+      setTransactionOptions([])
+    }
+  }
 
   useEffect(() => {
     document.body.classList.toggle('modal-is-open', drawerOpen)
@@ -103,11 +142,26 @@ function Receipts(props: PageProps) {
     return () => document.body.classList.remove('modal-is-open')
   }, [drawerOpen])
 
+  useEffect(() => {
+    void refreshReceipts()
+  }, [])
+
   return (
     <AppShell
       {...props}
       searchPlaceholder="Search receipts, merchants, linked transactions"
-      overlay={drawerOpen ? <ReceiptUploadDrawer onClose={() => setDrawerOpen(false)} /> : null}
+      overlay={drawerOpen ? (
+        <ReceiptUploadDrawer
+          transactions={transactionOptions}
+          onClose={() => setDrawerOpen(false)}
+          onSave={(file, transactionId) => {
+            void uploadReceipt(file, transactionId)
+              .then(() => refreshReceipts())
+              .then(() => setDrawerOpen(false))
+              .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to upload receipt.'))
+          }}
+        />
+      ) : null}
     >
       <main className="transactions-page receipts-page">
         <section className="page-heading">
@@ -122,43 +176,56 @@ function Receipts(props: PageProps) {
           </button>
         </section>
 
-        {noticeVisible ? (
+        {noticeVisible && unlinkedCount > 0 ? (
           <section className="top-alert" aria-label="Receipts need review">
             <AlertTriangle size={17} />
             <div>
-              <strong>4 receipts need review</strong>
-              <span>Some receipts are unlinked or missing info.</span>
+              <strong>{unlinkedCount} {unlinkedCount === 1 ? 'receipt is' : 'receipts are'} unlinked</strong>
+              <span>Link receipt files to transactions before export.</span>
             </div>
-            <button type="button">Review</button>
+            <button type="button" onClick={() => setLinkFilter('Unlinked')}>Review</button>
             <button className="top-alert-close" type="button" aria-label="Dismiss alert" onClick={dismissNotice}>
               <X size={16} />
             </button>
           </section>
         ) : null}
 
+        {dataError ? (
+          <section className="top-alert" role="alert">
+            <AlertTriangle size={17} />
+            <div>
+              <strong>{dataError}</strong>
+              <span>Showing local preview receipts until live data is available.</span>
+            </div>
+            <button className="top-alert-close" type="button" aria-label="Dismiss data warning" onClick={() => setDataError('')}>
+              <X size={16} />
+            </button>
+          </section>
+        ) : null}
+
         <section className="summary-strip" aria-label="Receipt summary">
-          <SummaryItem label="Uploaded" value="24" tone="net" icon={UploadCloud} />
-          <SummaryItem label="Linked" value="18" tone="income" icon={Link2} />
-          <SummaryItem label="Unlinked" value="4" tone="expense" icon={FileText} />
-          <SummaryItem label="Needs info" value="2" tone="review" icon={AlertTriangle} />
+          <SummaryItem label="Uploaded" value={String(receiptRows.length)} tone="net" icon={UploadCloud} />
+          <SummaryItem label="Linked" value={String(linkedCount)} tone="income" icon={Link2} />
+          <SummaryItem label="Unlinked" value={String(unlinkedCount)} tone="expense" icon={FileText} />
+          <SummaryItem label="Viewable" value={String(receiptRows.filter((receipt) => receipt.isViewable).length)} tone="review" icon={Eye} />
         </section>
 
         <section className="table-panel">
           <div className="table-toolbar">
             <label className="field search-field">
               <Search size={18} />
-              <input type="search" placeholder="Search receipts" />
+              <input type="search" placeholder="Search receipts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
             </label>
 
             <div className="filter-actions">
-              <button className="secondary-button" type="button">
+              <label className="secondary-button month-filter-button">
                 <Link2 size={17} />
-                Link: All
-              </button>
-              <button className="secondary-button" type="button">
-                <Calendar size={17} />
-                May 2024
-              </button>
+                <select value={linkFilter} onChange={(event) => setLinkFilter(event.target.value as ReceiptLinkState | 'All')}>
+                  <option value="All">Link: All</option>
+                  <option value="Linked">Linked</option>
+                  <option value="Unlinked">Unlinked</option>
+                </select>
+              </label>
             </div>
           </div>
 
@@ -167,16 +234,14 @@ function Receipts(props: PageProps) {
               <thead>
                 <tr>
                   <th>Receipt</th>
-                  <th>Merchant</th>
                   <th>Date</th>
-                  <th className="align-right">Amount</th>
                   <th>Linked transaction</th>
                   <th>Link</th>
                   <th className="action-col">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {receipts.map((receipt) => (
+                {filteredReceipts.map((receipt) => (
                   <tr key={receipt.id}>
                     <td data-label="Receipt">
                       <div className="merchant-cell">
@@ -186,40 +251,85 @@ function Receipts(props: PageProps) {
                         <strong>{receipt.fileName}</strong>
                       </div>
                     </td>
-                    <td data-label="Merchant">{receipt.merchant}</td>
                     <td data-label="Date">{receipt.date}</td>
-                    <td data-label="Amount" className="align-right amount">
-                      {formatMoney(receipt.amount)}
-                    </td>
                     <td data-label="Linked transaction">{receipt.linkedTransaction}</td>
                     <td data-label="Link">
                       <LinkPill state={receipt.linkState} />
                     </td>
                     <td data-label="Actions" className="action-col receipt-actions">
-                      <button className="row-action" type="button" aria-label={`Preview ${receipt.fileName}`}>
+                      <button
+                        className="row-action"
+                        type="button"
+                        aria-label={`Preview ${receipt.fileName}`}
+                        disabled={!receipt.isViewable || receipt.id.startsWith('mock-')}
+                        onClick={() => window.open(receipt.url, '_blank', 'noopener,noreferrer')}
+                      >
                         <Eye size={18} />
                       </button>
-                      <button className="row-action" type="button" aria-label={`Actions for ${receipt.fileName}`}>
+                      <button
+                        className="row-action"
+                        type="button"
+                        aria-label={`Actions for ${receipt.fileName}`}
+                        aria-expanded={actionMenuId === receipt.id}
+                        onClick={() => setActionMenuId((id) => (id === receipt.id ? null : receipt.id))}
+                      >
                         <MoreHorizontal size={18} />
                       </button>
+                      {actionMenuId === receipt.id ? (
+                        <div className="row-action-menu">
+                          <button
+                            type="button"
+                            disabled={transactionOptions.length === 0 || receipt.id.startsWith('mock-')}
+                            onClick={() => {
+                              const nextTransactionId = transactionOptions[0]?.id || null
+                              void attachReceipt(receipt.id, nextTransactionId)
+                                .then(() => refreshReceipts())
+                                .then(() => setActionMenuId(null))
+                                .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to link receipt.'))
+                            }}
+                          >
+                            Link to latest
+                          </button>
+                          <button
+                            type="button"
+                            disabled={receipt.id.startsWith('mock-')}
+                            onClick={() => {
+                              void attachReceipt(receipt.id, null)
+                                .then(() => refreshReceipts())
+                                .then(() => setActionMenuId(null))
+                                .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to unlink receipt.'))
+                            }}
+                          >
+                            Unlink
+                          </button>
+                          <button
+                            className="is-danger"
+                            type="button"
+                            disabled={receipt.id.startsWith('mock-')}
+                            onClick={() => {
+                              void deleteReceipt(receipt.id)
+                                .then(() => {
+                                  setReceiptRows((rows) => rows.filter((row) => row.id !== receipt.id))
+                                  setActionMenuId(null)
+                                })
+                                .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to delete receipt.'))
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
+                {filteredReceipts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="empty-table-cell">No receipts match these filters.</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
-        </section>
-
-        <section className="progressive-panels" aria-label="Additional receipt tools">
-          <ProgressivePanel
-            id="archived"
-            title="Archived receipts"
-            summary="12 hidden"
-            expandedPanel={expandedPanel}
-            onToggle={setExpandedPanel}
-          >
-            Archived receipts stay available for audit history without crowding current review work.
-          </ProgressivePanel>
         </section>
       </main>
     </AppShell>
@@ -244,36 +354,35 @@ function LinkPill({ state }: { state: ReceiptLinkState }) {
   return <span className={`status-pill receipt-link-${state.toLowerCase().replace(/\s+/g, '-')}`}>{state}</span>
 }
 
-function ProgressivePanel({
-  id,
-  title,
-  summary,
-  expandedPanel,
-  onToggle,
-  children,
+function ReceiptUploadDrawer({
+  transactions,
+  onClose,
+  onSave,
 }: {
-  id: string
-  title: string
-  summary: string
-  expandedPanel: string | null
-  onToggle: (id: string | null) => void
-  children: string
+  transactions: TransactionLinkOption[]
+  onClose: () => void
+  onSave: (file: File, transactionId: string) => void
 }) {
-  const isExpanded = expandedPanel === id
+  const [file, setFile] = useState<File | null>(null)
+  const [transactionId, setTransactionId] = useState('')
+  const [error, setError] = useState('')
 
-  return (
-    <article className="progressive-panel">
-      <button type="button" onClick={() => onToggle(isExpanded ? null : id)} aria-expanded={isExpanded}>
-        <span>{title}</span>
-        <strong>{summary}</strong>
-        <ChevronDown size={17} />
-      </button>
-      {isExpanded ? <p>{children}</p> : null}
-    </article>
-  )
-}
+  function chooseFile(nextFile: File | undefined) {
+    if (!nextFile) {
+      return
+    }
+    setFile(nextFile)
+    setError('')
+  }
 
-function ReceiptUploadDrawer({ onClose }: { onClose: () => void }) {
+  function submitReceipt() {
+    if (!file) {
+      setError('Choose a receipt file.')
+      return
+    }
+    onSave(file, transactionId)
+  }
+
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
       <aside className="transaction-drawer" role="dialog" aria-modal="true" aria-label="Upload receipt" onMouseDown={(event) => event.stopPropagation()}>
@@ -288,61 +397,42 @@ function ReceiptUploadDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         <form className="drawer-form" onSubmit={(event) => event.preventDefault()}>
-          <label className="receipt-dropzone">
+          <label
+            className="receipt-dropzone"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault()
+              chooseFile(event.dataTransfer.files[0])
+            }}
+          >
             <UploadCloud size={26} />
             <strong>Drag and drop receipt</strong>
-            <span>PDF, PNG, or JPG up to 10MB</span>
-            <input type="file" accept=".pdf,.png,.jpg,.jpeg" />
-          </label>
-          <label>
-            Merchant
-            <input placeholder="Merchant name" />
-          </label>
-          <label>
-            Receipt date
-            <input type="date" />
-          </label>
-          <label>
-            Amount
-            <input placeholder="$0.00" />
+            <span>{file ? file.name : 'PDF, PNG, JPG, WEBP, HEIC, or HEIF up to 10MB'}</span>
+            <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.heif" onChange={(event) => chooseFile(event.target.files?.[0])} />
           </label>
           <label>
             Link transaction
-            <select defaultValue="">
-              <option value="" disabled>
-                Select transaction
-              </option>
-              <option>Adobe Creative Cloud - $52.99</option>
-              <option>Shell - $68.45</option>
-              <option>Client lunch - $134.86</option>
+            <select value={transactionId} onChange={(event) => setTransactionId(event.target.value)}>
+              <option value="">No transaction yet</option>
+              {transactions.map((transaction) => (
+                <option value={transaction.id} key={transaction.id}>{transaction.label}</option>
+              ))}
             </select>
           </label>
-          <details>
-            <summary>Notes</summary>
-            <div className="advanced-fields">
-              <textarea aria-label="Receipt notes" placeholder="Internal note" />
-            </div>
-          </details>
+          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
         </form>
 
         <div className="drawer-actions">
           <button className="secondary-button" type="button" onClick={onClose}>
             Cancel
           </button>
-          <button className="primary-button" type="button">
+          <button className="primary-button" type="button" onClick={submitReceipt}>
             Save receipt
           </button>
         </div>
       </aside>
     </div>
   )
-}
-
-function formatMoney(value: number) {
-  return value.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  })
 }
 
 export default Receipts
