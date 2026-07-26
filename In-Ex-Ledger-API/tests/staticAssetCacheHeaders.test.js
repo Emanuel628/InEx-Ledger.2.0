@@ -60,6 +60,17 @@ test("core app routes serve the v3 frontend shell", async () => {
   }
 });
 
+
+test("deprecated /app-v3 page URLs redirect to bare canonical paths", async () => {
+  const root = await request(app).get("/app-v3").expect(301);
+  assert.strictEqual(root.headers.location, "/transactions");
+
+  const nested = await request(app).get("/app-v3/transactions").expect(301);
+  assert.strictEqual(nested.headers.location, "/transactions");
+
+  const settings = await request(app).get("/app-v3/settings?tab=security").expect(301);
+  assert.strictEqual(settings.headers.location, "/settings?tab=security");
+
 test("legacy app-v3 page routes redirect to canonical bare app routes", async () => {
   const response = await request(app)
     .get("/app-v3/transactions?type=income")
@@ -76,6 +87,7 @@ test("legacy app-v3 root redirects to canonical landing route", async () => {
   const trailingSlashResponse = await request(app).get("/app-v3/").expect(301);
 
   assert.strictEqual(trailingSlashResponse.headers.location, "/");
+
 });
 
 test("v3 frontend static assets are served from the side-by-side build", async () => {

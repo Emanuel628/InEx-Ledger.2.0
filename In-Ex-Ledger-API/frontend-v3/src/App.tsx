@@ -127,6 +127,7 @@ const pageSlugByPage: Partial<Record<AppPage, string>> = {
   Onboarding: 'onboarding',
   Help: 'help',
   Upgrade: 'upgrade',
+  TrialSetup: 'trial-setup',
 }
 
 const pageBySlug = new Map(
@@ -147,14 +148,36 @@ function getInitialPageFromPath(): AppPage | null {
   return pageBySlug.get(normalized) || null
 }
 
+/** Canonical product URLs are bare paths: /transactions, /settings, ... */
 function getPathForPage(page: AppPage) {
+  if (page === 'Landing') {
+    return '/'
+  }
   const slug = pageSlugByPage[page]
+
+  return slug ? `/${slug}` : '/transactions'
+=======
   return slug ? `/${slug}` : '/'
+
 }
 
 function getCanonicalCurrentPath() {
   const requestedPage = getInitialPageFromPath()
-  return requestedPage ? getPathForPage(requestedPage) : '/'
+
+  return requestedPage ? getPathForPage(requestedPage) : '/transactions'
+}
+
+function normalizeLegacyAppV3Path() {
+  const path = window.location.pathname
+  if (path === '/app-v3' || (path.startsWith('/app-v3/') && !path.startsWith('/app-v3/assets'))) {
+    const canonical = getCanonicalCurrentPath()
+    const nextUrl = `${canonical}${window.location.search}${window.location.hash}`
+    if (`${path}${window.location.search}${window.location.hash}` !== nextUrl) {
+      window.history.replaceState({}, '', nextUrl)
+    }
+  }
+    return requestedPage ? getPathForPage(requestedPage) : '/'
+
 }
 
 function getLegacyAuthRoute(page: AppPage, next = getCanonicalCurrentPath()) {
@@ -189,6 +212,10 @@ function App() {
   }, [authUser])
 
   useEffect(() => {
+    normalizeLegacyAppV3Path()
+  }, [])
+
+  useEffect(() => {
     let active = true
     getCurrentUser()
       .then(({ user }) => {
@@ -198,6 +225,13 @@ function App() {
         setAuthUser(user)
         if (user) {
           setCurrentPage(chooseAuthenticatedPage(user))
+          const path = getPathForPage(chooseAuthenticatedPage(user))
+          if (window.location.pathname !== path && !window.location.pathname.startsWith('/app-v3/assets')) {
+            const requested = getInitialPageFromPath()
+            if (requested) {
+              window.history.replaceState({}, '', getPathForPage(requested))
+            }
+          }
         }
       })
       .catch(() => {
