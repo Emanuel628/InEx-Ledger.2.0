@@ -137,6 +137,24 @@ function getCanonicalPagePath(pageName) {
   return pageName === 'landing' ? '/' : `/${pageName}`;
 }
 
+function getLegacyV3RedirectPath(req) {
+  const requestPath = String(req.path || '').toLowerCase().replace(/\/+$/, '');
+  if (requestPath === '/app-v3' || requestPath === '/app-v3/') {
+    return '/';
+  }
+
+  if (!requestPath.startsWith('/app-v3/') || requestPath.startsWith('/app-v3/assets/')) {
+    return null;
+  }
+
+  const requestedPageName = resolveRequestedPageName(requestPath.slice('/app-v3'.length));
+  if (!requestedPageName) {
+    return null;
+  }
+
+  return getCanonicalPagePath(requestedPageName);
+}
+
 function resolveCanonicalAppOrigin() {
   const configured = String(process.env.APP_BASE_URL || '').trim();
   if (!configured) {
@@ -337,9 +355,13 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
-    if (req.path === '/app-v3/') {
-      return res.redirect(301, '/app-v3');
+    const legacyV3RedirectPath = getLegacyV3RedirectPath(req);
+    if (legacyV3RedirectPath) {
+      const queryIndex = String(req.originalUrl || '').indexOf('?');
+      const query = queryIndex >= 0 ? String(req.originalUrl).slice(queryIndex) : '';
+      return res.redirect(301, `${legacyV3RedirectPath}${query}`);
     }
+
     if (req.path === '/app-v3' || req.path.startsWith('/app-v3/')) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       return next();
@@ -430,8 +452,16 @@ app.use(express.static(publicDir, {
   index: false,
   setHeaders: setStaticAssetCacheHeaders
 }));
-app.get('/app-v3', sendFrontendV3App);
-app.get('/app-v3/*', sendFrontendV3App);
+app.get('/app-v3', (req, res) => {
+  res.redirect(301, '/');
+});
+app.get('/app-v3/*', (req, res, next) => {
+  const redirectPath = getLegacyV3RedirectPath(req);
+  if (!redirectPath) {
+    return next();
+  }
+  res.redirect(301, redirectPath);
+});
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', (req, res, next) => {

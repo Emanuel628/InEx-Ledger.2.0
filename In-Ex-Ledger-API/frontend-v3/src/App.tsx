@@ -149,12 +149,12 @@ function getInitialPageFromPath(): AppPage | null {
 
 function getPathForPage(page: AppPage) {
   const slug = pageSlugByPage[page]
-  return slug ? `/app-v3/${slug}` : '/app-v3'
+  return slug ? `/${slug}` : '/'
 }
 
 function getCanonicalCurrentPath() {
   const requestedPage = getInitialPageFromPath()
-  return requestedPage ? getPathForPage(requestedPage) : '/app-v3'
+  return requestedPage ? getPathForPage(requestedPage) : '/'
 }
 
 function getLegacyAuthRoute(page: AppPage, next = getCanonicalCurrentPath()) {
