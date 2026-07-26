@@ -31,6 +31,7 @@ const app = express();
 app.disable('x-powered-by');
 const publicDir = path.join(__dirname, 'public');
 const htmlDir = path.join(publicDir, 'html');
+const frontendV3Dir = path.join(publicDir, 'app-v3');
 let globalLimiter = null;
 const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
 const V2_HTML_PAGES = new Set([
@@ -308,6 +309,11 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
+    if (req.path === '/app-v3' || req.path.startsWith('/app-v3/')) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      return next();
+    }
+
     const pageName = resolveRequestedPageName(req.path);
     if (pageName && !INDEXABLE_PUBLIC_PAGES.has(pageName)) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -371,6 +377,17 @@ app.use(express.static(publicDir, {
   index: false,
   setHeaders: setStaticAssetCacheHeaders
 }));
+app.get('/app-v3', (req, res) => {
+  res.redirect(302, '/app-v3/');
+});
+app.get('/app-v3/*', (req, res, next) => {
+  const indexPath = path.join(frontendV3Dir, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    return next();
+  }
+  setStaticAssetCacheHeaders(res, indexPath);
+  return res.sendFile(indexPath);
+});
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', (req, res, next) => {

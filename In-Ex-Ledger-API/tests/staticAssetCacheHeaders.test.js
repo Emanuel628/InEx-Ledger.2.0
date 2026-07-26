@@ -50,6 +50,26 @@ test("private app pages send noindex headers", async () => {
   assert.strictEqual(response.headers["x-robots-tag"], "noindex, nofollow");
 });
 
+test("v3 frontend route is isolated and noindexed", async () => {
+  const response = await request(app).get("/app-v3/transactions").expect(200);
+
+  assert.match(response.text, /\/app-v3\/assets\//);
+  assert.strictEqual(response.headers["x-robots-tag"], "noindex, nofollow");
+  assertNoStore(response);
+});
+
+test("v3 frontend static assets are served from the side-by-side build", async () => {
+  const index = await request(app).get("/app-v3/transactions").expect(200);
+  const assetPath = index.text.match(/\/app-v3\/assets\/[^"]+\.js/)?.[0];
+  assert.ok(assetPath, "expected v3 JavaScript asset path in index");
+
+  const response = await request(app)
+    .get(assetPath)
+    .expect(200);
+
+  assert.match(response.headers["content-type"] || "", /javascript/i);
+});
+
 test("public legal pages remain indexable", async () => {
   const response = await request(app).get("/privacy").expect(200);
   assert.ok(!response.headers["x-robots-tag"]);
