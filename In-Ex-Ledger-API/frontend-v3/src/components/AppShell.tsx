@@ -35,10 +35,7 @@ const navItems = [
   { label: 'Messages', icon: MessageSquare },
 ] satisfies { label: AppPage; icon: LucideIcon }[]
 
-const initialNotifications = [
-  { id: 1, title: 'Transactions need review', body: '3 items are missing receipts or business-use details.', page: 'Transactions' },
-  { id: 2, title: 'Export package ready', body: 'Your latest protected export can be reviewed.', page: 'Exports' },
-] satisfies { id: number; title: string; body: string; page: AppPage }[]
+const initialNotifications: { id: number; title: string; body: string; page: AppPage }[] = []
 
 type AppShellProps = PageProps & {
   searchPlaceholder: string

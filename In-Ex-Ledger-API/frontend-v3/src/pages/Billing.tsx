@@ -2,11 +2,7 @@ import { CreditCard, Download, ExternalLink, FileText, ShieldCheck, type LucideI
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 
-const invoices = [
-  { id: 'Jul 2026', date: 'Jul 25, 2026', total: '$122.40', status: 'Paid', method: 'Visa ending 4242' },
-  { id: 'Jun 2026', date: 'Jun 25, 2026', total: '$12.00', status: 'Paid', method: 'Visa ending 4242' },
-  { id: 'May 2026', date: 'May 25, 2026', total: '$12.00', status: 'Paid', method: 'Visa ending 4242' },
-]
+const invoices: { id: string; date: string; total: string; status: string; method: string }[] = []
 
 function Billing(props: PageProps) {
   return (
@@ -34,8 +30,8 @@ function Billing(props: PageProps) {
             </div>
             <div>
               <p className="eyebrow">Current billing</p>
-              <h2>Pro yearly is active</h2>
-              <p>Next invoice is scheduled for July 25, 2027. Stripe handles payment methods, receipts, and invoice history.</p>
+              <h2>No billing history yet</h2>
+              <p>Stripe payment methods, receipts, and invoice history will appear after checkout is completed.</p>
             </div>
             <button className="secondary-button" type="button" onClick={() => props.onNavigate('Subscription')}>
               Manage plan
@@ -43,15 +39,15 @@ function Billing(props: PageProps) {
           </article>
 
           <article className="billing-side-card">
-            <span className="status-pill status-income">Healthy</span>
-            <strong>Payment method verified</strong>
-            <p>Visa ending 4242 is the default payment method.</p>
+            <span className="status-pill status-draft">Not connected</span>
+            <strong>No payment method yet</strong>
+            <p>A default payment method will appear here after Stripe checkout.</p>
           </article>
         </section>
 
         <section className="billing-action-grid">
           <BillingAction icon={ExternalLink} title="Stripe portal" description="Update cards, download official invoices, or cancel in Stripe." action="Open portal" />
-          <BillingAction icon={ShieldCheck} title="Billing owner" description="Sample Studio LLC owns the current Stripe relationship." action="Review owner" />
+          <BillingAction icon={ShieldCheck} title="Billing owner" description="The billing owner will be assigned when a business starts checkout." action="Review owner" />
           <BillingAction icon={FileText} title="Tax receipts" description="Keep subscription receipts separate from customer invoices." action="Download" />
         </section>
 
@@ -79,23 +75,34 @@ function Billing(props: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id}>
-                    <td data-label="Invoice">
-                      <strong>{invoice.id}</strong>
-                    </td>
-                    <td data-label="Date">{invoice.date}</td>
-                    <td data-label="Payment method">{invoice.method}</td>
-                    <td data-label="Status">
-                      <span className="status-pill status-income">{invoice.status}</span>
-                    </td>
-                    <td data-label="Total" className="align-right amount">{invoice.total}</td>
-                    <td data-label="Action" className="action-col receipt-actions">
-                      <button className="row-action" type="button">View</button>
-                      <button className="row-action" type="button">PDF</button>
+                {invoices.length ? (
+                  invoices.map((invoice) => (
+                    <tr key={invoice.id}>
+                      <td data-label="Invoice">
+                        <strong>{invoice.id}</strong>
+                      </td>
+                      <td data-label="Date">{invoice.date}</td>
+                      <td data-label="Payment method">{invoice.method}</td>
+                      <td data-label="Status">
+                        <span className="status-pill status-income">{invoice.status}</span>
+                      </td>
+                      <td data-label="Total" className="align-right amount">{invoice.total}</td>
+                      <td data-label="Action" className="action-col receipt-actions">
+                        <button className="row-action" type="button">View</button>
+                        <button className="row-action" type="button">PDF</button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="empty-table-state">
+                        <strong>No subscription invoices yet</strong>
+                        <span>Stripe receipts will appear after the first successful checkout.</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

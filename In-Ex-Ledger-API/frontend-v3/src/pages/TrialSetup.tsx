@@ -9,7 +9,7 @@ function TrialSetup(props: PageProps) {
       <form className="auth-form" onSubmit={(event) => event.preventDefault()}>
         <label>
           Business name
-          <input placeholder="Sample Studio LLC" />
+          <input placeholder="Business name" />
         </label>
         <label>
           Billing cadence

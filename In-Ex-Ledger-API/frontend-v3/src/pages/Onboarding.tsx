@@ -50,7 +50,7 @@ function Onboarding(props: PageProps) {
       }}>
         <label>
           Business name
-          <input placeholder="Sample Studio LLC" value={businessName} onChange={(event) => setBusinessName(event.target.value)} />
+          <input placeholder="Business name" value={businessName} onChange={(event) => setBusinessName(event.target.value)} />
         </label>
         <div className="auth-form-grid">
           <label>

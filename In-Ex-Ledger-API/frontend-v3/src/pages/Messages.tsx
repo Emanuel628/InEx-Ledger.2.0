@@ -35,87 +35,17 @@ type MessageThread = {
 }
 
 const lanes = [
-  { label: 'Inbox', count: 11, icon: Mail },
-  { label: 'Invoices', count: 4, icon: FileText },
-  { label: 'Support', count: 2, icon: Headphones },
-  { label: 'Notices', count: 18, icon: Archive },
-  { label: 'Archived', count: 112, icon: Archive },
+  { label: 'Inbox', count: 0, icon: Mail },
+  { label: 'Invoices', count: 0, icon: FileText },
+  { label: 'Support', count: 0, icon: Headphones },
+  { label: 'Notices', count: 0, icon: Archive },
+  { label: 'Archived', count: 0, icon: Archive },
 ] satisfies { label: string; count: number; icon: LucideIcon }[]
 
-const threads: MessageThread[] = [
-  {
-    id: 1,
-    sender: 'Alex Chen',
-    email: 'alex@acmecreative.com',
-    subject: 'Re: Website build invoice',
-    preview: 'Thanks for the details. Can you clarify the hosting line item?',
-    type: 'Invoice reply',
-    followUp: 'Due in 2d',
-    date: '1h ago',
-    unread: true,
-    tone: 'blue',
-  },
-  {
-    id: 2,
-    sender: 'Taylor Brooks',
-    email: 'billing@brightfield.co',
-    subject: 'Re: Branding project invoice',
-    preview: 'We will approve this today and send payment by EOD.',
-    type: 'Invoice reply',
-    followUp: 'Due today',
-    date: '4h ago',
-    unread: true,
-    tone: 'green',
-  },
-  {
-    id: 3,
-    sender: 'James Martin',
-    email: 'james@northwindlabs.com',
-    subject: 'Re: Q2 ad spend',
-    preview: 'Please resend with the updated line items.',
-    type: 'Invoice reply',
-    date: 'Yesterday',
-    unread: true,
-    tone: 'violet',
-  },
-  {
-    id: 4,
-    sender: 'FinServe Bank',
-    email: 'statements@finserve.com',
-    subject: 'Monthly account statement available',
-    preview: 'Your March 2026 statement is now ready to view.',
-    type: 'Account notice',
-    date: 'Yesterday',
-    unread: false,
-    tone: 'yellow',
-  },
-  {
-    id: 5,
-    sender: 'InEx Support',
-    email: 'support@inexledger.com',
-    subject: 'Re: Unable to export bank feed',
-    preview: 'Thanks for the logs. Our team is looking into this.',
-    type: 'Support',
-    followUp: 'Due in 3d',
-    date: '2d ago',
-    unread: false,
-    tone: 'red',
-  },
-  {
-    id: 6,
-    sender: 'Laura Mitchell',
-    email: 'laura@greenwayretail.com',
-    subject: 'Re: Content retainer',
-    preview: 'All good, please go ahead and process the payment.',
-    type: 'General',
-    date: '2d ago',
-    unread: true,
-    tone: 'coral',
-  },
-]
+const threads: MessageThread[] = []
 
 function Messages(props: PageProps) {
-  const [selectedThread, setSelectedThread] = useState(threads[0])
+  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null)
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [composeOpen, setComposeOpen] = useState(false)
@@ -134,7 +64,7 @@ function Messages(props: PageProps) {
       searchPlaceholder="Search messages, clients, invoices"
       overlay={
         <>
-          {detailOpen ? <MessageDetailModal thread={selectedThread} onClose={() => setDetailOpen(false)} /> : null}
+          {detailOpen && selectedThread ? <MessageDetailModal thread={selectedThread} onClose={() => setDetailOpen(false)} /> : null}
           {composeOpen ? (
             <ComposeModal
               mode={composeType}
@@ -218,31 +148,39 @@ function Messages(props: PageProps) {
             </div>
 
             <div className="message-rows">
-              {threads.map((thread) => (
-                <button
-                  className={`message-row-card ${selectedThread.id === thread.id ? 'is-selected' : ''}`}
-                  type="button"
-                  key={thread.id}
-                  onClick={() => {
-                    setSelectedThread(thread)
-                    setDetailOpen(true)
-                  }}
-                >
-                  <span className={`message-unread-dot ${thread.unread ? 'is-visible' : ''}`} />
-                  <span className={`merchant-icon merchant-${thread.tone}`}>{getInitials(thread.sender)}</span>
-                  <span className="message-row-main">
-                    <strong>{thread.sender}</strong>
-                    <span>{thread.subject}</span>
-                    <small>{thread.preview}</small>
-                  </span>
-                  <span className="message-row-meta">
-                    <TypePill type={thread.type} />
-                    {thread.followUp ? <span className="follow-up-chip">{thread.followUp}</span> : null}
-                  </span>
-                  <span className="message-row-date">{thread.date}</span>
-                  <MoreHorizontal size={18} />
-                </button>
-              ))}
+              {threads.length ? (
+                threads.map((thread) => (
+                  <button
+                    className={`message-row-card ${selectedThread?.id === thread.id ? 'is-selected' : ''}`}
+                    type="button"
+                    key={thread.id}
+                    onClick={() => {
+                      setSelectedThread(thread)
+                      setDetailOpen(true)
+                    }}
+                  >
+                    <span className={`message-unread-dot ${thread.unread ? 'is-visible' : ''}`} />
+                    <span className={`merchant-icon merchant-${thread.tone}`}>{getInitials(thread.sender)}</span>
+                    <span className="message-row-main">
+                      <strong>{thread.sender}</strong>
+                      <span>{thread.subject}</span>
+                      <small>{thread.preview}</small>
+                    </span>
+                    <span className="message-row-meta">
+                      <TypePill type={thread.type} />
+                      {thread.followUp ? <span className="follow-up-chip">{thread.followUp}</span> : null}
+                    </span>
+                    <span className="message-row-date">{thread.date}</span>
+                    <MoreHorizontal size={18} />
+                  </button>
+                ))
+              ) : (
+                <div className="empty-panel">
+                  <Mail size={28} />
+                  <strong>No messages yet</strong>
+                  <p>Invoice replies, support requests, and account notices will appear here.</p>
+                </div>
+              )}
             </div>
           </section>
         </section>

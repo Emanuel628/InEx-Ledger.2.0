@@ -35,7 +35,14 @@ test("v3 wired app pages do not ship mock business data fallbacks", () => {
     /Mejor Tech/i,
     /Acme Corporation/i,
     /Brightfield Studios/i,
-    /Northwind Labs/i
+    /Northwind Labs/i,
+    /Sample Studio/i,
+    /Alex Morgan/i,
+    /\bAlex\b/i,
+    /\bMorgan\b/i,
+    /Visa ending 4242/i,
+    /FinServe/i,
+    /May 2024/i
   ];
 
   const offenders = [];

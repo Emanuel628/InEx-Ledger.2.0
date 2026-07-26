@@ -3,12 +3,13 @@ import { Building2, Check, CreditCard, ExternalLink, Plus, ShieldAlert } from 'l
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 
-const businesses = [
-  { name: 'Sample Studio LLC', role: 'Billing owner', status: 'Active' },
-]
+type SubscriptionBusiness = { name: string; role: string; status: string }
 
 function Subscription(props: PageProps) {
   const [interval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  const businesses: SubscriptionBusiness[] = props.authUser?.business?.name
+    ? [{ name: props.authUser.business.name, role: 'Workspace owner', status: 'Active' }]
+    : []
   const price = interval === 'monthly' ? '$12/mo' : '$122.40/yr'
   const note = interval === 'monthly' ? 'Billed monthly. Cancel or change later in Stripe.' : '$10.20/mo equivalent, billed yearly.'
 
@@ -29,9 +30,9 @@ function Subscription(props: PageProps) {
 
         <section className="subscription-plan-panel">
           <div className="subscription-plan-copy">
-            <span className="status-pill status-income">Current plan</span>
-            <h2>Pro access</h2>
-            <p>1 business included, invoices and protected exports enabled, receipt and mileage workflows unlocked.</p>
+            <span className="status-pill status-draft">Current plan</span>
+            <h2>Basic access</h2>
+            <p>Start checkout when you are ready to unlock invoices, protected exports, receipt workflows, and mileage tools.</p>
           </div>
           <div className="subscription-renew-card">
             <div className="subscription-interval-toggle" role="group" aria-label="Billing interval">
@@ -69,8 +70,8 @@ function Subscription(props: PageProps) {
               <Check size={21} />
             </div>
             <span>Status</span>
-            <strong>Active</strong>
-            <p>Renewal is on for the selected Stripe subscription.</p>
+            <strong>Free tier</strong>
+            <p>No paid renewal is currently attached to this workspace.</p>
           </article>
           <article className="subscription-simple-card">
             <div className="billing-card-icon">
@@ -94,17 +95,24 @@ function Subscription(props: PageProps) {
             </button>
           </div>
           <div className="subscription-business-list">
-            {businesses.map((business) => (
-              <article className="subscription-business-row" key={business.name}>
-                <div className="merchant-logo merchant-blue">{business.name.charAt(0)}</div>
-                <div>
-                  <strong>{business.name}</strong>
-                  <p>{business.role}</p>
-                </div>
-                <span className="status-pill status-income">{business.status}</span>
-                <button className="secondary-button compact-button" type="button">Manage</button>
-              </article>
-            ))}
+            {businesses.length ? (
+              businesses.map((business) => (
+                <article className="subscription-business-row" key={business.name}>
+                  <div className="merchant-logo merchant-blue">{business.name.charAt(0)}</div>
+                  <div>
+                    <strong>{business.name}</strong>
+                    <p>{business.role}</p>
+                  </div>
+                  <span className="status-pill status-income">{business.status}</span>
+                  <button className="secondary-button compact-button" type="button">Manage</button>
+                </article>
+              ))
+            ) : (
+              <div className="empty-table-state">
+                <strong>No business attached yet</strong>
+                <span>Create a business before starting checkout or adding workspace capacity.</span>
+              </div>
+            )}
           </div>
         </section>
 

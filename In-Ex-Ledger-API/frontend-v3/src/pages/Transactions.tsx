@@ -50,7 +50,7 @@ function Transactions(props: PageProps) {
   const [dataError, setDataError] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [monthFilter, setMonthFilter] = useState('2024-05')
+  const [monthFilter, setMonthFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [accountFilter, setAccountFilter] = useState('All')
@@ -254,7 +254,7 @@ function Transactions(props: PageProps) {
               <AlertTriangle size={17} />
               <div>
                 <strong>{dataError}</strong>
-                <span>{loadingData ? 'Loading current records.' : 'Showing local preview rows until live data is available.'}</span>
+                <span>{loadingData ? 'Loading current records.' : 'The table will stay empty until live data is available.'}</span>
               </div>
               <button className="top-alert-close" type="button" aria-label="Dismiss data warning" onClick={() => setDataError('')}>
                 <X size={16} />
@@ -286,9 +286,6 @@ function Transactions(props: PageProps) {
                   <Calendar size={17} />
                   <select value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}>
                     <option value="All">All months</option>
-                    <option value="2024-05">May 2024</option>
-                    <option value="2024-04">April 2024</option>
-                    <option value="2024-03">March 2024</option>
                   </select>
                 </label>
                 <button className="secondary-button" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(true)}>

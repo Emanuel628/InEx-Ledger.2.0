@@ -69,8 +69,8 @@ function Settings(props: PageProps) {
           </aside>
 
           <div className="settings-content">
-            {activeSection === 'Account' ? <AccountSettings onNavigate={props.onNavigate} /> : null}
-            {activeSection === 'Business' ? <BusinessSettings /> : null}
+            {activeSection === 'Account' ? <AccountSettings authUser={props.authUser} onNavigate={props.onNavigate} /> : null}
+            {activeSection === 'Business' ? <BusinessSettings authUser={props.authUser} /> : null}
             {activeSection === 'Billing' ? <BillingSettings onNavigate={props.onNavigate} /> : null}
             {activeSection === 'Security' ? <SecuritySettings onNavigate={props.onNavigate} /> : null}
             {activeSection === 'Preferences' ? <PreferenceSettings theme={props.theme} setTheme={props.setTheme} /> : null}
@@ -82,7 +82,7 @@ function Settings(props: PageProps) {
   )
 }
 
-function AccountSettings({ onNavigate }: { onNavigate: PageProps['onNavigate'] }) {
+function AccountSettings({ authUser, onNavigate }: { authUser: PageProps['authUser']; onNavigate: PageProps['onNavigate'] }) {
   return (
     <SettingsPanel
       eyebrow="Account"
@@ -90,13 +90,13 @@ function AccountSettings({ onNavigate }: { onNavigate: PageProps['onNavigate'] }
       description="Keep the account owner details clean. Email and password changes should stay deliberate."
     >
       <div className="settings-form-grid">
-        <Field label="Full name" value="Alex Morgan" />
-        <Field label="Account email" value="alex@example.com" type="email" />
+        <Field label="Full name" value={[authUser?.firstName, authUser?.lastName].filter(Boolean).join(' ')} placeholder="Not set" />
+        <Field label="Account email" value={authUser?.email || ''} placeholder="Not set" type="email" />
       </div>
       <SettingsRow icon={Mail} title="Change email" description="Require confirmation before the new address becomes active.">
         <button className="secondary-button" type="button" onClick={() => onNavigate('ChangeEmail')}>Update email</button>
       </SettingsRow>
-      <SettingsRow icon={KeyRound} title="Password" description="Last changed 3 months ago.">
+      <SettingsRow icon={KeyRound} title="Password" description="Change the password attached to this account.">
         <button className="secondary-button" type="button">Change password</button>
       </SettingsRow>
       <SettingsRow icon={HelpCircle} title="Help and support" description="Open help topics or start a support request from the message center.">
@@ -106,7 +106,7 @@ function AccountSettings({ onNavigate }: { onNavigate: PageProps['onNavigate'] }
   )
 }
 
-function BusinessSettings() {
+function BusinessSettings({ authUser }: { authUser: PageProps['authUser'] }) {
   return (
     <SettingsPanel
       eyebrow="Business"
@@ -114,10 +114,10 @@ function BusinessSettings() {
       description="These details drive tax categories, exports, invoices, and business switching."
     >
       <div className="settings-form-grid">
-        <Field label="Business name" value="Sample Studio LLC" />
-        <Field label="Contact name" value="Alex Morgan" />
-        <SelectField label="Business type" value="Single-member LLC" options={['Sole proprietor', 'Single-member LLC', 'LLC', 'Corporation', 'Partnership']} />
-        <Field label="Fiscal year start" value="2026-01-01" type="date" />
+        <Field label="Business name" value={authUser?.business?.name || ''} placeholder="Not set" />
+        <Field label="Contact name" value={[authUser?.firstName, authUser?.lastName].filter(Boolean).join(' ')} placeholder="Not set" />
+        <SelectField label="Business type" value="" options={['Sole proprietor', 'Single-member LLC', 'LLC', 'Corporation', 'Partnership']} />
+        <Field label="Fiscal year start" value="" type="date" />
         <Field label="Operating name" placeholder="Optional DBA" />
         <Field label="Business activity code" placeholder="6-digit NAICS code" />
         <SelectField label="Accounting method" value="Cash" options={['Cash', 'Accrual']} />
@@ -141,10 +141,10 @@ function BillingSettings({ onNavigate }: { onNavigate: PageProps['onNavigate'] }
       description="Keep subscription actions visible, but send payment methods and invoices through Stripe."
     >
       <div className="settings-status-card">
-        <span className="status-pill status-income">Pro yearly</span>
+        <span className="status-pill status-draft">Free tier</span>
         <div>
-          <strong>Renews July 25, 2027</strong>
-          <p>1 business included. Extra business slots and invoices are managed in billing.</p>
+          <strong>No paid subscription attached</strong>
+          <p>Checkout, extra business slots, and invoices are managed in billing.</p>
         </div>
       </div>
       <SettingsRow icon={CreditCard} title="Stripe billing portal" description="Payment methods, invoices, cancellation, and reactivation belong in the billing portal.">

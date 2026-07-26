@@ -39,11 +39,11 @@ function Register(props: PageProps) {
         <div className="auth-form-grid">
           <label>
             First name
-            <input autoComplete="given-name" placeholder="Alex" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+            <input autoComplete="given-name" placeholder="First name" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
           </label>
           <label>
             Last name
-            <input autoComplete="family-name" placeholder="Morgan" value={lastName} onChange={(event) => setLastName(event.target.value)} />
+            <input autoComplete="family-name" placeholder="Last name" value={lastName} onChange={(event) => setLastName(event.target.value)} />
           </label>
         </div>
         <label>
