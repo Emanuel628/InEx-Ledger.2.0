@@ -23,6 +23,48 @@ async function openTransactions(page) {
 }
 
 test.describe('v3 app interactions', () => {
+  test('transaction create edit delete and undo flow works through v3 UI', async ({ page }) => {
+    const stamp = Date.now()
+    const accountName = `E2E Checking ${stamp}`
+    const description = `E2E Expense ${stamp}`
+    const updatedDescription = `E2E Expense Updated ${stamp}`
+
+    await page.goto('/accounts')
+    await expect(page.getByRole('heading', { name: 'Accounts' })).toBeVisible()
+    await page.getByRole('button', { name: 'Add account' }).click()
+    await expect(page.getByRole('dialog', { name: 'Add account' })).toBeVisible()
+    await page.getByLabel('Account name').fill(accountName)
+    await page.getByLabel('Account type').selectOption('Checking')
+    await page.getByRole('button', { name: 'Save account' }).click()
+    await expect(page.getByText(accountName)).toBeVisible()
+
+    await openTransactions(page)
+    await page.getByRole('button', { name: 'Add transaction' }).click()
+    await expect(page.getByRole('dialog', { name: 'Add transaction' })).toBeVisible()
+    const transactionDrawer = page.getByRole('dialog', { name: 'Add transaction' })
+    await page.getByRole('button', { name: 'Expense' }).click()
+    await page.getByLabel('Amount').fill('42.15')
+    await page.getByLabel('Description').fill(description)
+    await page.getByLabel('Date').fill('2026-07-26')
+    await transactionDrawer.locator('label').filter({ hasText: 'Category' }).locator('select').selectOption({ index: 1 })
+    await transactionDrawer.locator('label').filter({ hasText: 'Account' }).locator('select').selectOption({ label: accountName })
+    await page.getByRole('button', { name: 'Save transaction' }).click()
+    await expect(page.getByText(description)).toBeVisible()
+
+    await page.getByRole('button', { name: `Actions for ${description}` }).click()
+    await page.getByRole('button', { name: 'Edit' }).click()
+    await expect(page.getByRole('dialog', { name: 'Edit transaction' })).toBeVisible()
+    await page.getByLabel('Description').fill(updatedDescription)
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByText(updatedDescription)).toBeVisible()
+
+    await page.getByRole('button', { name: `Actions for ${updatedDescription}` }).click()
+    await page.getByRole('button', { name: 'Delete' }).click()
+    await expect(page.getByText(updatedDescription)).toBeHidden()
+    await page.getByRole('button', { name: 'Undo delete' }).click()
+    await expect(page.getByText(updatedDescription)).toBeVisible()
+  })
+
   test('topbar dropdowns close when clicking outside', async ({ page }) => {
     await openTransactions(page)
 
