@@ -1,6 +1,7 @@
 # V3 Route Inventory
 
 Phase 0 status: complete.
+Phase 1 (canonical bare URLs): implemented on branch `fix/canonical-bare-routes` — client `pushState` and `login?next=` use `/transactions`-style paths; `/app-v3` and `/app-v3/<page>` 301 to bare paths; assets remain under `/app-v3/assets`.
 
 This file is the freeze and map artifact for the move to one product, one UI, and one URL. It is intentionally operational: if a route is not listed here, do not migrate, delete, or add parallel behavior until this inventory is updated and verified.
 
@@ -8,7 +9,7 @@ This file is the freeze and map artifact for the move to one product, one UI, an
 
 - Do not add new product features to active `public/html` or `public/js` app pages.
 - Do not add a v3 page or v3 API helper without a wiring test assertion.
-- Do not make `/app-v3/*` a second canonical product URL.
+- Do not make `/app-v3/*` a second canonical product URL (page hosts only; assets may live under `/app-v3/assets`).
 - Do not delete legacy HTML just because v3 exists. First prove parity, redirect, then delete or archive in a separate phase.
 - Every change should reduce dual truth or explicitly document why it is temporary.
 
@@ -40,8 +41,10 @@ This file is the freeze and map artifact for the move to one product, one UI, an
 | `/onboarding` | SPA | yes | `onboarding.html` exists | yes | no |
 | `/help` | SPA | yes | `help.html` exists | partial/help content | no |
 | `/upgrade` | SPA | yes | `upgrade.html` exists | yes | no |
-| `/trial-setup` | legacy route today | v3 page exists but not in server v3 page set yet | `trial-setup.html` exists | partial | temporary legacy bridge |
+| `/trial-setup` | SPA (v3 page set) | yes | `trial-setup.html` exists | partial | temporary legacy file only |
 | `/review` | legacy HTML today | no active v3 page in sidebar | `review.html` exists | legacy | temporary legacy bridge |
+
+Deprecated: `/app-v3` → `/transactions`; `/app-v3/<slug>` → `/<slug>` (301).
 
 ## Auth Bridge Matrix
 
