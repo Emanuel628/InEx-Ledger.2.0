@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import {
   archiveMessage,
   deleteMessage,
@@ -62,8 +63,10 @@ function Messages(props: PageProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'All' | 'Unread'>('All')
   const [typeFilter, setTypeFilter] = useState<'All' | MessageType>('All')
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
+  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
 
   async function refreshMessages() {
     setLoadingData(true)
@@ -338,26 +341,68 @@ function Messages(props: PageProps) {
                 </div>
               ) : visibleThreads.length ? (
                 visibleThreads.map((thread) => (
-                  <button
+                  <article
                     className={`message-row-card ${selectedThread?.id === thread.id ? 'is-selected' : ''}`}
-                    type="button"
                     key={thread.id}
-                    onClick={() => void openThread(thread)}
                   >
                     <span className={`message-unread-dot ${thread.unread ? 'is-visible' : ''}`} />
                     <span className={`merchant-icon merchant-${thread.tone}`}>{getInitials(thread.sender)}</span>
-                    <span className="message-row-main">
+                    <button className="message-row-open" type="button" onClick={() => void openThread(thread)}>
+                      <span className="message-row-main">
                       <strong>{thread.sender}</strong>
                       <span>{thread.subject}</span>
                       <small>{thread.preview || 'No preview available'}</small>
-                    </span>
+                      </span>
+                    </button>
                     <span className="message-row-meta">
                       <TypePill type={thread.type} />
                       {thread.threadCount > 1 ? <span className="follow-up-chip">{thread.threadCount} messages</span> : null}
                     </span>
                     <span className="message-row-date">{thread.date}</span>
-                    <MoreHorizontal size={18} />
-                  </button>
+                    <span className="message-row-actions">
+                      <button
+                        className="row-action"
+                        type="button"
+                        aria-label={`Actions for ${thread.subject}`}
+                        aria-expanded={actionMenuId === thread.id}
+                        onClick={() => setActionMenuId((id) => (id === thread.id ? null : thread.id))}
+                      >
+                        <MoreHorizontal size={18} />
+                      </button>
+                      {actionMenuId === thread.id ? (
+                        <div className="row-action-menu message-action-menu">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionMenuId(null)
+                              void openThread(thread)
+                            }}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionMenuId(null)
+                              void handleArchive(thread)
+                            }}
+                          >
+                            {thread.archived ? 'Unarchive' : 'Archive'}
+                          </button>
+                          <button
+                            className="is-danger"
+                            type="button"
+                            onClick={() => {
+                              setActionMenuId(null)
+                              void handleDelete(thread)
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </span>
+                  </article>
                 ))
               ) : (
                 <div className="empty-panel">

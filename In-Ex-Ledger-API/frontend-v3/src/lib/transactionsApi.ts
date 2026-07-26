@@ -65,6 +65,15 @@ type ListResponse = {
   }
 }
 
+export type CsvImportResult = {
+  imported?: number
+  skipped?: number
+  out_of_range?: number
+  truncated?: boolean
+  truncated_at?: number
+  errors?: { reason?: string }[]
+}
+
 export async function loadTransactionPageData() {
   const [transactions, accounts, categories] = await Promise.all([
     apiRequest<ListResponse>('/api/transactions?limit=500&offset=0'),
@@ -134,10 +143,23 @@ export async function deleteTransaction(transactionId: string) {
   })
 }
 
-export async function importTransactionsCsv(file: File) {
+export async function importTransactionsCsv(input: {
+  file: File
+  accountId: string
+  startDate?: string
+  endDate?: string
+}) {
   const form = new FormData()
-  form.append('file', file)
-  await apiRequest('/api/transactions/import/csv', {
+  form.append('file', input.file)
+  form.append('account_id', input.accountId)
+  if (input.startDate) {
+    form.append('start_date', input.startDate)
+  }
+  if (input.endDate) {
+    form.append('end_date', input.endDate)
+  }
+
+  return apiRequest<CsvImportResult>('/api/transactions/import/csv', {
     method: 'POST',
     body: form,
   })

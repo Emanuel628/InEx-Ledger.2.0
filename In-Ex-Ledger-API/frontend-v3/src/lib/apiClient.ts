@@ -1,5 +1,8 @@
 export async function apiRequest<T>(url: string, init: RequestInit = {}) {
   let response = await fetchWithAuth(url, init)
+  if (response.status === 403 && await isCsrfFailure(response)) {
+    response = await fetchWithAuth(url, init)
+  }
   if (response.status === 401 && await refreshAccessToken()) {
     response = await fetchWithAuth(url, init)
   }
@@ -17,6 +20,9 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}) {
 
 export async function apiBlobRequest(url: string, init: RequestInit = {}) {
   let response = await fetchWithAuth(url, init)
+  if (response.status === 403 && await isCsrfFailure(response)) {
+    response = await fetchWithAuth(url, init)
+  }
   if (response.status === 401 && await refreshAccessToken()) {
     response = await fetchWithAuth(url, init)
   }
@@ -68,7 +74,16 @@ async function refreshAccessToken() {
 
   pendingRefresh = (async () => {
     try {
-      const response = await fetchWithAuth('/api/auth/refresh', { method: 'POST' })
+      const headers = new Headers()
+      const csrfToken = readCookie('csrf_token')
+      if (csrfToken) {
+        headers.set('X-CSRF-Token', csrfToken)
+      }
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+      })
       return response.ok
     } catch {
       return false
@@ -78,6 +93,11 @@ async function refreshAccessToken() {
   })()
 
   return pendingRefresh
+}
+
+async function isCsrfFailure(response: Response) {
+  const data = await readJson<{ error?: string }>(response.clone())
+  return data.error === 'CSRF token missing or invalid.'
 }
 
 async function getCsrfToken() {

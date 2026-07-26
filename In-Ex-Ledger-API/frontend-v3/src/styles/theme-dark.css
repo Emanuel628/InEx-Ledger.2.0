@@ -55,6 +55,8 @@
   .notification-menu,
   .row-action-menu,
   .summary-strip,
+  .csv-file-drop,
+  .csv-stat,
   .table-panel,
   .progressive-panel,
   .settings-section-nav,
@@ -148,7 +150,8 @@
   .user-dropdown button:hover,
   .row-action-menu button:hover,
   .notification-item,
-  .transaction-detail-list div
+  .transaction-detail-list div,
+  .message-row-open:hover
 ) {
   background: var(--surface-soft);
   color: var(--ink);

@@ -1994,6 +1994,87 @@ tbody tr:last-child td {
   overflow-y: auto;
 }
 
+.csv-import-modal {
+  width: min(620px, 100%);
+}
+
+.csv-import-form,
+.csv-import-result {
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.csv-file-drop {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 22px;
+  border: 1px dashed #bdcae0;
+  border-radius: var(--radius);
+  background: #f8fbff;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.csv-file-drop strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.csv-file-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.csv-import-success {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.csv-stat {
+  display: grid;
+  gap: 5px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.csv-stat-num {
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.csv-import-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+}
+
+.csv-error-list {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0 0;
+  padding-left: 20px;
+  color: var(--red);
+}
+
 .transaction-detail-amount {
   font-size: 34px;
   font-weight: 950;
@@ -3073,6 +3154,26 @@ tbody tr:last-child td {
   text-align: left;
 }
 
+.message-row-open {
+  min-width: 0;
+  display: grid;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.message-row-actions {
+  position: relative;
+}
+
+.message-action-menu {
+  top: calc(100% + 6px);
+  right: 0;
+  text-align: left;
+}
+
 .message-row-card:last-child {
   border-bottom: 0;
 }
@@ -3827,6 +3928,11 @@ tbody tr:last-child td {
 
   .receipt-actions .row-action + .row-action {
     margin-left: 0;
+  }
+
+  .form-grid-2,
+  .csv-import-success {
+    grid-template-columns: 1fr;
   }
 
   .pagination {

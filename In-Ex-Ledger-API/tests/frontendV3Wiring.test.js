@@ -100,3 +100,33 @@ test("v3 API client refreshes an expired access token before failing authenticat
   assert.match(source, /\/api\/auth\/refresh/);
   assert.match(source, /credentials: 'include'/);
 });
+
+test("v3 API client preserves multipart bodies and retries stale CSRF once", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "lib", "apiClient.ts"), "utf8");
+
+  assert.match(source, /init\.body instanceof FormData/);
+  assert.match(source, /init\.body && !isFormData/);
+  assert.match(source, /response\.status === 403 && await isCsrfFailure\(response\)/);
+  assert.match(source, /CSRF token missing or invalid\./);
+});
+
+test("v3 transactions CSV import requires legacy account and date range fields", () => {
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+
+  assert.match(apiSource, /form\.append\('account_id', input\.accountId\)/);
+  assert.match(apiSource, /form\.append\('start_date', input\.startDate\)/);
+  assert.match(apiSource, /form\.append\('end_date', input\.endDate\)/);
+  assert.match(pageSource, /Destination account/);
+  assert.match(pageSource, /Start date/);
+  assert.match(pageSource, /End date/);
+  assert.doesNotMatch(pageSource, /monthFilter/);
+});
+
+test("v3 archived message rows expose an action menu instead of only opening the thread", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "pages", "Messages.tsx"), "utf8");
+
+  assert.match(source, /message-action-menu/);
+  assert.match(source, /thread\.archived \? 'Unarchive' : 'Archive'/);
+  assert.match(source, /setActionMenuId\(\(id\) => \(id === thread\.id \? null : thread\.id\)\)/);
+});

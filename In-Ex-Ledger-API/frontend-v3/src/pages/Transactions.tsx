@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -34,6 +33,7 @@ import {
   type AccountOption,
   type CategoryOption,
   type Transaction,
+  type CsvImportResult,
   type TransactionDraft,
   type TransactionStatus,
 } from '../lib/transactionsApi'
@@ -50,14 +50,13 @@ function Transactions(props: PageProps) {
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [monthFilter, setMonthFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [accountFilter, setAccountFilter] = useState('All')
   const [pageSize, setPageSize] = useState(20)
   const [currentPage, setCurrentPage] = useState(1)
-  const csvInputRef = useRef<HTMLInputElement | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('transactions-review')
   useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
 
@@ -83,7 +82,6 @@ function Transactions(props: PageProps) {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
     return transactionRows.filter((transaction) => {
-      const matchesMonth = monthFilter === 'All' || transaction.dateIso.startsWith(monthFilter)
       const matchesCategory = categoryFilter === 'All' || transaction.category === categoryFilter
       const matchesStatus = statusFilter === 'All'
         || transaction.status === statusFilter
@@ -98,9 +96,9 @@ function Transactions(props: PageProps) {
         String(transaction.amount),
       ].some((value) => value.toLowerCase().includes(normalizedSearch))
 
-      return matchesMonth && matchesCategory && matchesStatus && matchesAccount && matchesSearch
+      return matchesCategory && matchesStatus && matchesAccount && matchesSearch
     })
-  }, [accountFilter, categoryFilter, monthFilter, searchTerm, statusFilter, transactionRows])
+  }, [accountFilter, categoryFilter, searchTerm, statusFilter, transactionRows])
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -115,17 +113,17 @@ function Transactions(props: PageProps) {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [accountFilter, categoryFilter, monthFilter, pageSize, searchTerm, statusFilter])
+  }, [accountFilter, categoryFilter, pageSize, searchTerm, statusFilter])
 
   useEffect(() => {
     void refreshPageData()
   }, [])
 
   useEffect(() => {
-    document.body.classList.toggle('modal-is-open', drawerOpen || Boolean(selectedTransaction) || filtersOpen)
+    document.body.classList.toggle('modal-is-open', drawerOpen || Boolean(selectedTransaction) || filtersOpen || csvImportOpen)
 
     return () => document.body.classList.remove('modal-is-open')
-  }, [drawerOpen, filtersOpen, selectedTransaction])
+  }, [csvImportOpen, drawerOpen, filtersOpen, selectedTransaction])
 
   return (
     <AppShell
@@ -147,9 +145,6 @@ function Transactions(props: PageProps) {
                         ? rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row))
                         : [savedTransaction, ...rows]
                     ))
-                    if (!editingTransaction && monthFilter !== 'All' && !savedTransaction.dateIso.startsWith(monthFilter)) {
-                      setMonthFilter('All')
-                    }
                     setEditingTransaction(null)
                     setDrawerOpen(false)
                   })
@@ -197,12 +192,22 @@ function Transactions(props: PageProps) {
               onAccountChange={setAccountFilter}
               onClear={() => {
                 setSearchTerm('')
-                setMonthFilter('All')
                 setCategoryFilter('All')
                 setStatusFilter('All')
                 setAccountFilter('All')
               }}
               onClose={() => setFiltersOpen(false)}
+            />
+          ) : null}
+          {csvImportOpen ? (
+            <CsvImportModal
+              accounts={accountOptions}
+              onClose={() => setCsvImportOpen(false)}
+              onImport={(input) => importTransactionsCsv(input)}
+              onImported={async (result) => {
+                await refreshPageData()
+                return result
+              }}
             />
           ) : null}
         </>
@@ -239,7 +244,6 @@ function Transactions(props: PageProps) {
                 type="button"
                 onClick={() => {
                   setFiltersOpen(true)
-                  setMonthFilter('All')
                   setStatusFilter('Needs attention')
                 }}
               >
@@ -284,38 +288,14 @@ function Transactions(props: PageProps) {
               </label>
 
               <div className="filter-actions">
-                <label className="secondary-button month-filter-button">
-                  <Calendar size={17} />
-                  <select value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}>
-                    <option value="All">All months</option>
-                  </select>
-                </label>
                 <button className="secondary-button" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(true)}>
                   <Filter size={17} />
                   More filters
                 </button>
-                <button className="secondary-button" type="button" onClick={() => csvInputRef.current?.click()}>
+                <button className="secondary-button" type="button" onClick={() => setCsvImportOpen(true)}>
                   <Upload size={17} />
                   Import CSV
                 </button>
-                <input
-                  ref={csvInputRef}
-                  className="visually-hidden"
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    if (file) {
-                      void importTransactionsCsv(file)
-                        .then(() => {
-                          setMonthFilter('All')
-                          return refreshPageData()
-                        })
-                        .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to import CSV.'))
-                    }
-                    event.target.value = ''
-                  }}
-                />
               </div>
             </div>
 
@@ -510,6 +490,131 @@ function Transactions(props: PageProps) {
           </section>
         </main>
     </AppShell>
+  )
+}
+
+function CsvImportModal({
+  accounts,
+  onClose,
+  onImport,
+  onImported,
+}: {
+  accounts: AccountOption[]
+  onClose: () => void
+  onImport: (input: { file: File; accountId: string; startDate?: string; endDate?: string }) => Promise<CsvImportResult>
+  onImported: (result: CsvImportResult) => Promise<CsvImportResult>
+}) {
+  const [accountId, setAccountId] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<CsvImportResult | null>(null)
+  const [importing, setImporting] = useState(false)
+
+  async function startImport() {
+    setError('')
+    if (!accountId) {
+      setError('Please select a destination account.')
+      return
+    }
+    if (!file) {
+      setError('Please select a CSV file.')
+      return
+    }
+    if (startDate && endDate && startDate > endDate) {
+      setError('Start date must be on or before end date.')
+      return
+    }
+
+    setImporting(true)
+    try {
+      const nextResult = await onImport({ file, accountId, startDate, endDate })
+      setResult(await onImported(nextResult))
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : 'Import failed.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="transaction-detail-modal csv-import-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="csvImportTitle"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="drawer-header">
+          <div>
+            <h2 id="csvImportTitle">Import CSV</h2>
+            <p>Choose where the imported rows belong before adding them to the ledger.</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close CSV import" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {result ? (
+          <div className="csv-import-result">
+            <div className="csv-import-success">
+              <div className="csv-stat"><span className="csv-stat-num">{result.imported || 0}</span> imported</div>
+              <div className="csv-stat"><span className="csv-stat-num">{result.skipped || 0}</span> skipped</div>
+              {Number(result.out_of_range || 0) > 0 ? (
+                <div className="csv-stat"><span className="csv-stat-num">{result.out_of_range}</span> outside date range</div>
+              ) : null}
+            </div>
+            {result.truncated ? <p className="csv-import-note">Only the first {result.truncated_at} rows were processed.</p> : null}
+            {result.errors?.length ? (
+              <ul className="csv-error-list">
+                {result.errors.slice(0, 10).map((item, index) => <li key={`${item.reason || 'error'}-${index}`}>{item.reason || 'Row skipped.'}</li>)}
+              </ul>
+            ) : null}
+            <p className="csv-import-note">Imported transactions are flagged Needs Review. Check categories before reporting.</p>
+          </div>
+        ) : (
+          <form className="drawer-form csv-import-form" onSubmit={(event) => event.preventDefault()}>
+            <label>
+              Destination account
+              <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+                <option value="">Select account</option>
+                {accounts.map((account) => <option value={account.id} key={account.id}>{account.name}</option>)}
+              </select>
+            </label>
+            <div className="form-grid-2">
+              <label>
+                Start date
+                <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+              </label>
+              <label>
+                End date
+                <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+              </label>
+            </div>
+            <label className="csv-file-drop">
+              <Upload size={22} />
+              <strong>{file ? file.name : 'Choose CSV file'}</strong>
+              <span>CSV files from your bank or card account</span>
+              <input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+            </label>
+            {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+          </form>
+        )}
+
+        <div className="drawer-actions">
+          <button className="secondary-button" type="button" onClick={onClose}>
+            {result ? 'Done' : 'Cancel'}
+          </button>
+          {result ? null : (
+            <button className="primary-button" type="button" disabled={importing} onClick={() => void startImport()}>
+              {importing ? 'Importing...' : 'Import'}
+            </button>
+          )}
+        </div>
+      </section>
+    </div>
   )
 }
 
