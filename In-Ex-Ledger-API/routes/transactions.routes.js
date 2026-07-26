@@ -1843,6 +1843,18 @@ function derivePseudoMerchant(description) {
   return cleaned.split(" ").filter(Boolean).slice(0, 3).join(" ");
 }
 
+function collectCsvTextFields(row, fields) {
+  const seen = new Set();
+  const values = [];
+  for (const field of fields) {
+    if (!field || seen.has(field)) continue;
+    seen.add(field);
+    const value = String(row[field] || "").trim();
+    if (value) values.push(value);
+  }
+  return values;
+}
+
 function extractRowData(row, cols) {
   let amount = null;
   let type = null;
@@ -1868,13 +1880,17 @@ function extractRowData(row, cols) {
     }
   }
 
-  const description = String(
-    row[cols.descCol] ||
-    row["transaction_description_1"] ||
-    row["description_1"] ||
-    row["details"] ||
-    ""
-  ).trim().slice(0, 500);
+  const description = collectCsvTextFields(row, [
+    cols.descCol,
+    "transaction_description_1",
+    "transaction_description_2",
+    "description_1",
+    "description_2",
+    "details",
+    "memo",
+    "narrative",
+    "particulars"
+  ]).join(" ").trim().slice(0, 500);
   const merchantName = (String(
     row[cols.merchantCol] ||
     row["merchant_name"] ||

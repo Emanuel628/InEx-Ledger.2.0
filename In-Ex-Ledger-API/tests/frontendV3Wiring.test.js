@@ -553,6 +553,8 @@ test("v3 collapsed sidebar keeps the header visible", () => {
   assert.match(cssSource, /\.sidebar-is-collapsed \.app-topbar[\s\S]*display: flex/);
   assert.match(cssSource, /\.sidebar-is-collapsed \.app-topbar[\s\S]*visibility: visible/);
   assert.match(cssSource, /\.app-topbar[\s\S]*z-index: 40/);
+  assert.match(cssSource, /grid-template-columns: minmax\(0, max-content\) minmax\(0, 1fr\) auto/);
+  assert.match(cssSource, /\.topbar-actions\s*\{[\s\S]*min-width: max-content/);
 });
 
 test("v3 logout resets next login to transactions instead of the prior app page", () => {
@@ -572,6 +574,14 @@ test("v3 page polish removes redundant controls and decorations", () => {
   assert.doesNotMatch(mileage, /mileage-planning-card decorative-card/);
   assert.doesNotMatch(invoices, /invoice-tools-panel/);
   assert.doesNotMatch(invoices, /Email and payment tools/);
+});
+
+test("v3 Help page reflects the current app workflows", () => {
+  const help = fs.readFileSync(path.join(frontendRoot, "pages", "Help.tsx"), "utf8");
+
+  assert.match(help, /CSV imports and auto-mapping/);
+  assert.match(help, /Mileage or kilometers/);
+  assert.match(help, /Email changes use a six-digit email verification flow/);
 });
 
 test("phase 7 guardrails installs frontend v3 dependencies before i18n runtime checks", () => {

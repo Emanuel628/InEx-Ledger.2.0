@@ -848,14 +848,18 @@ textarea:focus-visible {
 .topbar-menus {
   min-width: 0;
   flex: 1;
-  display: flex;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
 }
 
 .business-switcher {
+  grid-column: 1;
   position: relative;
   min-width: 0;
+  max-width: min(320px, 34vw);
 }
 
 .business-dropdown {
@@ -905,12 +909,14 @@ textarea:focus-visible {
 }
 
 .topbar-search {
+  grid-column: 2;
   width: min(540px, 42vw);
   min-height: 42px;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 auto;
+  justify-self: center;
+  margin: 0;
   padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -928,8 +934,11 @@ textarea:focus-visible {
 }
 
 .topbar-actions {
+  grid-column: 3;
   position: relative;
   margin-left: auto;
+  min-width: max-content;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4349,6 +4358,7 @@ tbody tr:last-child td {
   }
 
   .topbar-menus {
+    display: flex;
     justify-content: flex-end;
     gap: 8px;
   }

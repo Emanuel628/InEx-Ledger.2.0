@@ -1,52 +1,94 @@
 import { useMemo, useState } from 'react'
-import { BookOpen, ChevronDown, Download, LifeBuoy, Mail, Receipt, Search, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { BookOpen, Car, ChevronDown, CreditCard, Download, FileText, FolderTree, Landmark, Mail, Receipt, Search, Settings, ShieldCheck, Tags, type LucideIcon } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 
-type HelpCategory = 'All' | 'Account' | 'Billing' | 'Records' | 'Exports'
+type HelpCategory = 'All' | 'Setup' | 'Records' | 'Tax' | 'Billing' | 'Support'
 
 const helpItems = [
   {
-    title: 'Getting started',
-    body: 'Set up a business, add the first account, confirm categories, and record one real transaction.',
-    detail: 'Start with Transactions if you already have records ready. Start with Categories if you want to clean up tax lines first.',
+    title: 'Start with accounts',
+    body: 'Create each bank, credit card, cash, or manual account before importing or adding transactions.',
+    detail: 'Accounts are user-managed right now. Plaid is not live in this version, so add the account shell yourself and choose the correct currency from the business region.',
+    icon: Landmark,
+    category: 'Setup',
+  },
+  {
+    title: 'Transactions dashboard',
+    body: 'Use Transactions as the main dashboard for income, expenses, estimated tax, review work, receipts, imports, and recurring templates.',
+    detail: 'Add or edit transactions from the drawer, attach receipts, use More filters for date/category/account/status filtering, import CSV files, and use Undo after deleting a transaction.',
     icon: BookOpen,
-    category: 'Account',
+    category: 'Records',
   },
   {
-    title: 'Billing and subscription',
-    body: 'Review plan status, choose monthly or yearly checkout, open Stripe, and confirm renewal state.',
-    detail: 'Use Subscription for plan cadence and workspace capacity. Use Billing for Stripe portal, payment methods, and subscription invoices.',
-    icon: LifeBuoy,
-    category: 'Billing',
+    title: 'CSV imports and auto-mapping',
+    body: 'Import bank CSV files from Transactions after choosing account, date range, and duplicate handling.',
+    detail: 'The importer reads common bank columns, combines split description fields, checks duplicates, applies mapping rules/history/merchant rules, and leaves uncertain rows as Imported Income or Imported Expense for review.',
+    icon: FileText,
+    category: 'Records',
   },
   {
-    title: 'Message support',
-    body: 'Send a support request and keep replies attached to the account record.',
-    detail: 'Use Messages for support requests, general messages, invoice replies, sent mail, and archived threads.',
-    icon: Mail,
-    category: 'Account',
+    title: 'Categories and tax lines',
+    body: 'Categories control how transactions flow into US Schedule C or Canada T2125/GST-HST reporting.',
+    detail: 'Keep active categories mapped to the correct tax line. Archived or inactive categories should not be used for new transactions. If a category has zero activity it is marked inactive until used.',
+    icon: Tags,
+    category: 'Tax',
   },
   {
     title: 'Receipts',
-    body: 'Upload receipt files and link them to transactions when proof is required.',
-    detail: 'A receipt can stay unlinked until the matching transaction exists. Link it before export review.',
+    body: 'Upload receipt files and link them to the matching transaction when proof is required.',
+    detail: 'A receipt can stay unlinked until the matching transaction exists. Use the link picker to choose a transaction; do not assume the latest transaction is always correct.',
     icon: Receipt,
     category: 'Records',
   },
   {
+    title: 'Mileage or kilometers',
+    body: 'Track business vehicle trips and vehicle expenses from the Mileage page.',
+    detail: 'US businesses see Mileage. Canadian businesses see Kilometers. Vehicle entries feed tax-ready records and respect accounting period locks.',
+    icon: Car,
+    category: 'Tax',
+  },
+  {
     title: 'Export safeguards',
-    body: 'Generate CSV or PDF packages only after the required export checks are complete.',
-    detail: 'Protected PDF exports require explicit Tax ID handling and certification. CSV exports remain available for spreadsheet review.',
+    body: 'Generate CSV or PDF packages from Exports after review checks are complete.',
+    detail: 'PDF packages require explicit sensitive-data handling and certification. CSV exports are available for spreadsheet/accountant review and export history tracks generated packages.',
     icon: ShieldCheck,
-    category: 'Exports',
+    category: 'Tax',
+  },
+  {
+    title: 'Invoices',
+    body: 'Create invoices, send them, mark them paid, void them, or delete them from the invoice action menu.',
+    detail: 'Invoice titles come from the New Invoice sheet. Invoice actions are in the row menu instead of separate table buttons.',
+    icon: FolderTree,
+    category: 'Records',
+  },
+  {
+    title: 'Messages and support',
+    body: 'Use Messages for support requests, general emails, invoice replies, sent mail, and archived threads.',
+    detail: 'Compose supports multiple recipients and CC. Request Support keeps the support category selector and does not include CC.',
+    icon: Mail,
+    category: 'Support',
+  },
+  {
+    title: 'Billing and subscription',
+    body: 'Use Subscription for plan status, monthly or yearly checkout, workspace capacity, added businesses, cancellation, and Stripe billing.',
+    detail: 'Use Billing for payment methods, invoices, and Stripe portal access. Canceled or expired paid access should fall back to free-tier access instead of blocking the app.',
+    icon: CreditCard,
+    category: 'Billing',
+  },
+  {
+    title: 'Settings and security',
+    body: 'Manage business profile, preferences, language, theme, MFA, sessions, data export, and account danger-zone actions from Settings.',
+    detail: 'Email changes use a six-digit email verification flow. Accounting period locks live in Business Profile and protect locked transaction, receipt, and mileage edits.',
+    icon: Settings,
+    category: 'Setup',
   },
   {
     title: 'Data export',
     body: 'Download account data from Settings when you need a full account package.',
     detail: 'Use Settings > Data for account-level JSON or CSV export. Use Exports for tax/workpaper packages.',
     icon: Download,
-    category: 'Exports',
+    category: 'Tax',
   },
 ] satisfies { title: string; body: string; detail: string; icon: LucideIcon; category: Exclude<HelpCategory, 'All'> }[]
 
@@ -66,13 +108,13 @@ function Help(props: PageProps) {
   }, [category, searchTerm])
 
   return (
-    <AppShell {...props} searchPlaceholder="Search help, billing, support">
+    <AppShell {...props} searchPlaceholder="Search help, records, billing">
       <main className="transactions-page help-page">
         <section className="page-heading">
           <div>
             <p className="eyebrow">Support</p>
             <h1>Help</h1>
-            <p>Find the next action quickly. Support and knowledge base tools stay simple.</p>
+            <p>Current guidance for the v3 app, organized around the pages you use every day.</p>
           </div>
           <button className="primary-button" type="button" onClick={() => props.onNavigate('Messages')}>
             <Mail size={18} />
@@ -86,7 +128,7 @@ function Help(props: PageProps) {
             <input type="search" placeholder="Search help topics" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
           </div>
           <div className="filter-actions">
-            {(['All', 'Account', 'Billing', 'Records', 'Exports'] as HelpCategory[]).map((option) => (
+            {(['All', 'Setup', 'Records', 'Tax', 'Billing', 'Support'] as HelpCategory[]).map((option) => (
               <button className={`secondary-button ${category === option ? 'is-active-filter' : ''}`} type="button" key={option} onClick={() => setCategory(option)}>
                 {option}
               </button>

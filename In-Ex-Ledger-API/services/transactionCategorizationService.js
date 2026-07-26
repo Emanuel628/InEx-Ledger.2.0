@@ -221,6 +221,159 @@ const CATEGORY_RULES = [
   }
 ];
 
+const CATEGORY_RULE_EXPANSIONS = [
+  {
+    usCategory: "Service Income",
+    caCategory: "Service Income",
+    keywords: [
+      "professional service income", "service income", "client fee", "e-transfer",
+      "interac e-transfer", "interac etransfer", "zelle", "venmo", "settlement deposit"
+    ]
+  },
+  {
+    usCategory: "Sales Revenue",
+    caCategory: "Sales Revenue",
+    keywords: ["shopify payments", "payment processor deposit", "square", "sq "]
+  },
+  {
+    usCategory: "Advertising & Marketing",
+    caCategory: "Advertising",
+    keywords: [
+      "twitter ads", "x ads", "pinterest ads", "snapchat ads", "youtube ads",
+      "constant contact", "hootsuite", "buffer", "sprout social", "semrush", "ahrefs"
+    ]
+  },
+  {
+    usCategory: "Software & Subscriptions",
+    caCategory: "Software & Subscriptions",
+    keywords: [
+      "microsoft 365", "microsoft office", "amazon web services", "azure", "heroku",
+      "google one", "hubspot", "salesforce", "quickbooks", "xero", "freshbooks",
+      "wave apps", "wix", "squarespace", "godaddy", "namecheap", "membership renewal",
+      "annual subscription", "monthly subscription"
+    ]
+  },
+  {
+    usCategory: "Phone & Internet",
+    caCategory: "Phone & Internet",
+    keywords: [
+      "virgin mobile", "freedom mobile", "eastlink", "centurylink", "frontier comm",
+      "windstream", "mint mobile", "visible wireless", "cellular service",
+      "business internet", "business phone"
+    ]
+  },
+  {
+    usCategory: "Insurance",
+    caCategory: "Insurance",
+    keywords: [
+      "nationwide ins", "aetna", "blue cross", "cigna", "united health", "sun life",
+      "manulife", "canada life", "desjardins ins", "td insurance", "rbc insurance",
+      "bmo insurance"
+    ]
+  },
+  {
+    usCategory: "Office Supplies",
+    caCategory: "Office Supplies",
+    keywords: [
+      "office supply", "supplies restock", "office paper", "grand & toy",
+      "bureau en gros", "reliable office supplies"
+    ]
+  },
+  {
+    usCategory: "Meals",
+    caCategory: "Meals & Entertainment",
+    keywords: [
+      "team lunch", "team dinner", "working lunch", "working dinner", "networking lunch",
+      "breakfast meeting", "dinner meeting", "tim horton", "a&w restaurant", "harvey's",
+      "boston pizza", "pizza pizza", "cactus club", "white spot", "swiss chalet", "the keg"
+    ]
+  },
+  {
+    usCategory: "Travel",
+    caCategory: "Travel",
+    keywords: [
+      "southwest air", "spirit air", "jetblue", "frontier airlines", "alaska airlines",
+      "porter airlines", "flair airlines", "sunwing", "holiday inn", "hampton inn",
+      "doubletree", "residence inn", "best western", "motel 6", "super 8", "comfort inn",
+      "hotels.com", "priceline", "travelocity", "amtrak", "via rail", "greyhound bus",
+      "lyft", "yellow cab", "taxicab", "rideshare", "airport parking"
+    ]
+  },
+  {
+    usCategory: "Car & Truck Expenses",
+    caCategory: "Motor Vehicle",
+    keywords: [
+      "bp gas", "exxon", "mobil gas", "sunoco", "marathon gas", "speedway gas",
+      "circle k gas", "wawa gas", "pilot flying", "loves travel stop", "petrocan",
+      "husky gas", "ultramar", "irving oil", "kwik trip", "advance auto",
+      "o'reilly auto", "oreilly auto", "midas", "meineke", "firestone", "goodyear",
+      "pep boys", "car wash"
+    ]
+  },
+  {
+    usCategory: "Legal & Professional",
+    caCategory: "Legal & Accounting Fees",
+    keywords: [
+      "legal and accounting", "legal & accounting", "year-end bookkeeping",
+      "quarterly bookkeeping", "monthly bookkeeping", "attorney fees", "lawyer",
+      "cpa firm"
+    ]
+  },
+  {
+    usCategory: "Contract Labor",
+    caCategory: "Legal & Accounting Fees",
+    keywords: ["fiverr"]
+  },
+  {
+    usCategory: "Bank Fees",
+    caCategory: "Interest & Bank Charges",
+    keywords: [
+      "bank service fee", "banking fee", "account service fee", "monthly banking",
+      "bank maintenance", "account maintenance fee", "service charge", "wire transfer fee",
+      "foreign transaction", "returned item", "account fee", "stop payment", "insufficient funds"
+    ]
+  },
+  {
+    usCategory: "Rent",
+    caCategory: "Rent",
+    keywords: ["apartment rent"]
+  },
+  {
+    usCategory: "Utilities",
+    caCategory: "Utilities",
+    keywords: ["union gas", "pge", "con edison", "national grid", "garbage collect"]
+  },
+  {
+    usCategory: "Sales Tax",
+    caCategory: "Business Tax & Licenses",
+    keywords: [
+      "irs", "cra", "revenue canada", "revenu canada", "government fee",
+      "vehicle registration", "tax payment", "government of canada", "dmv"
+    ]
+  }
+];
+
+CATEGORY_RULE_EXPANSIONS.forEach((expansion) => {
+  const rule = CATEGORY_RULES.find((candidate) =>
+    candidate.usCategory === expansion.usCategory &&
+    candidate.caCategory === expansion.caCategory
+  );
+  if (rule) {
+    rule.keywords.push(...expansion.keywords);
+  }
+});
+
+CATEGORY_RULES.push({
+  kind: "expense",
+  usCategory: "Supplies",
+  caCategory: "Delivery & Freight",
+  keywords: [
+    "fedex", "ups store", "ups shipping", "usps", "dhl", "canada post",
+    "purolator", "canpar", "loomis express", "postage", "courier service"
+  ],
+  providerHints: ["shipping", "postage", "delivery"]
+});
+
 function normalizeMappingText(value) {
   return String(value || "")
     .toLowerCase()
