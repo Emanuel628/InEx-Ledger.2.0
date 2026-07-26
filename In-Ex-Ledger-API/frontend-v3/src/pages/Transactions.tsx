@@ -9,6 +9,7 @@ import {
   Coffee,
   Filter,
   Fuel,
+  Info,
   MoreHorizontal,
   Package,
   Plus,
@@ -372,6 +373,14 @@ function Transactions(props: PageProps) {
             <SummaryItem label="Net" value={formatMoney(netTotal)} tone="net" icon={CircleDollarSign} />
             <SummaryItem label="Income" value={formatMoney(incomeTotal)} tone="income" icon={TrendingUp} />
             <SummaryItem label="Expenses" value={formatMoney(expenseTotal)} tone="expense" icon={TrendingDown} />
+          </section>
+
+          <section className="tax-profile-note" aria-label="Estimated tax profile">
+            <Info size={17} />
+            <div>
+              <strong>{taxProfile?.label || 'Estimated tax'}</strong>
+              <span>{taxProfile?.note || 'Draft estimate for review before export.'}</span>
+            </div>
           </section>
 
           <section className="table-panel">
@@ -898,9 +907,11 @@ function ReviewQueuePanel({
   return (
     <div className="review-queue-list">
       {items.map((item) => {
-        const labels = item.issueLabels.length
-          ? item.issueLabels
-          : item.issueEntries.map((entry) => entry.label || entry.issueCode || 'Review needed')
+        const labels = normalizeReviewLabels(
+          item.issueLabels.length
+            ? item.issueLabels
+            : item.issueEntries.map((entry) => entry.label || entry.issueCode || 'Review needed'),
+        )
         const actionLabel = item.quickAction?.label || 'Review'
 
         return (
@@ -908,7 +919,7 @@ function ReviewQueuePanel({
             <div>
               <strong>{item.description}</strong>
               <span>{labels.slice(0, 2).join(', ')}</span>
-              {reviewText(item.categoryReason) ? <small>{reviewText(item.categoryReason)}</small> : null}
+              {reviewText(item.categoryReason) ? <small>Mapping: {reviewText(item.categoryReason)}</small> : null}
             </div>
             <button
               className="secondary-button"
@@ -1312,9 +1323,9 @@ function TransactionDetailsModal({
   onDelete: () => void
 }) {
   const reviewItem = transaction.reviewIssues[0]
-  const reviewLabels = reviewItem?.issueLabels?.length
+  const reviewLabels = normalizeReviewLabels(reviewItem?.issueLabels?.length
     ? reviewItem.issueLabels.map(reviewText).filter(Boolean)
-    : reviewItem?.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode) || 'Review needed') || []
+    : reviewItem?.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode) || 'Review needed') || [])
   const reviewSummary = reviewText(reviewItem?.supportSummary)
     || reviewText(reviewItem?.reviewNotes)
     || reviewText(reviewItem?.categoryReason)
@@ -1499,13 +1510,26 @@ function formatMoney(value: number) {
 }
 
 function reviewLabelsFor(transaction: Transaction) {
-  return transaction.reviewIssues.flatMap((issue) => {
+  return normalizeReviewLabels(transaction.reviewIssues.flatMap((issue) => {
     const directLabels = issue.issueLabels?.map(reviewText).filter(Boolean) || []
     const entryLabels = issue.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode)).filter(Boolean) || []
-    const summaries = [issue.supportSummary, issue.reviewNotes, issue.categoryReason].map(reviewText).filter(Boolean)
+    const summaries = [issue.supportSummary, issue.reviewNotes].map(reviewText).filter(Boolean)
 
     return [...directLabels, ...entryLabels, ...summaries]
-  })
+  }))
+}
+
+function normalizeReviewLabels(labels: string[]) {
+  const seen = new Set<string>()
+  return labels
+    .map((label) => reviewText(label).trim())
+    .filter((label) => {
+      if (!label || /^mapped$/i.test(label)) return false
+      const key = label.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
 }
 
 function reviewText(value: unknown): string {

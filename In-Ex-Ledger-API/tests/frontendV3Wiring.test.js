@@ -200,6 +200,33 @@ test("v3 transactions render review reasons safely and wire filter date range pl
   assert.match(cssSource, /\.drawer-form :is\(label, details\)\.field-needs-review/);
 });
 
+test("v3 transactions use Categories page source for dropdowns and clean review labels", () => {
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(apiSource, /\/api\/categories\?limit=500&offset=0&include_inactive=true/);
+  assert.match(apiSource, /function mapCategoryOption/);
+  assert.match(apiSource, /category\.is_active !== false/);
+  assert.match(pageSource, /function normalizeReviewLabels/);
+  assert.match(pageSource, /\^mapped\$/i);
+  assert.match(pageSource, /Mapping: \{reviewText\(item\.categoryReason\)\}/);
+  assert.match(pageSource, /tax-profile-note/);
+  assert.match(cssSource, /\.tax-profile-note/);
+});
+
+test("v3 transactions use legacy estimated tax percentages including Canada province rates", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
+
+  assert.match(source, /AB: 0\.29/);
+  assert.match(source, /BC: 0\.26/);
+  assert.match(source, /ON: 0\.27/);
+  assert.match(source, /QC: 0\.34/);
+  assert.match(source, /return rates\[province\] \|\| 0\.28/);
+  assert.match(source, /combined income tax \+ CPP rate/);
+  assert.doesNotMatch(source, /QC: 0\.14975/);
+});
+
 test("v3 transactions expose legacy undo delete and a clickable per-page select affordance", () => {
   const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
@@ -304,4 +331,22 @@ test("v3 subscription avoids checkout conflicts for existing Stripe subscription
   assert.match(source, /needsBillingPortal/);
   assert.match(source, /await openBillingPortal\(\)/);
   assert.match(source, /Open Stripe billing/);
+});
+
+test("v3 collapsed sidebar keeps the header visible", () => {
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(cssSource, /\.sidebar-is-collapsed \.app-topbar[\s\S]*display: flex/);
+  assert.match(cssSource, /\.sidebar-is-collapsed \.app-topbar[\s\S]*visibility: visible/);
+  assert.match(cssSource, /\.app-topbar[\s\S]*z-index: 40/);
+});
+
+test("legacy auth defaults avoid rapid v3 session expiry and refresh throttling", () => {
+  const authRoutes = fs.readFileSync(path.join(repoRoot, "routes", "auth.routes.js"), "utf8");
+  const authMiddleware = fs.readFileSync(path.join(repoRoot, "middleware", "auth.middleware.js"), "utf8");
+  const rateLimitTiers = fs.readFileSync(path.join(repoRoot, "middleware", "rateLimitTiers.js"), "utf8");
+
+  assert.match(authRoutes, /ACCESS_TOKEN_EXPIRY_SECONDS\) \|\| 60 \* 60/);
+  assert.match(authMiddleware, /JWT_EXPIRY_SECONDS\) \|\| 60 \* 60/);
+  assert.match(rateLimitTiers, /max: 120[\s\S]*keyPrefix: "rl:refresh"/);
 });

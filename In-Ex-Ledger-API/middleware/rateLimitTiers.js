@@ -94,7 +94,7 @@ function createBusinessDeleteLimiter() {
 function createTokenRefreshLimiter() {
   return createRouteLimiter({
     windowMs: 60 * 1000,
-    max: 20,
+    max: 120,
     keyPrefix: "rl:refresh",
     keyStrategy: "ip",
     message: "Too many token refresh requests, please try again later."

@@ -210,10 +210,15 @@ textarea:focus-visible {
   overflow-x: hidden;
 }
 
+.sidebar-is-collapsed .app-workspace {
+  min-width: 0;
+  display: block;
+}
+
 .app-topbar {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 40;
   min-height: 72px;
   display: flex;
   align-items: center;
@@ -222,6 +227,12 @@ textarea:focus-visible {
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(18px);
+}
+
+.sidebar-is-collapsed .app-topbar {
+  display: flex;
+  visibility: visible;
+  opacity: 1;
 }
 
 .icon-button,
@@ -1213,6 +1224,38 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
+}
+
+.tax-profile-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 92, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(23, 92, 255, 0.06);
+  color: var(--ink);
+}
+
+.tax-profile-note svg {
+  flex: 0 0 auto;
+  color: var(--blue);
+}
+
+.tax-profile-note strong,
+.tax-profile-note span {
+  display: block;
+}
+
+.tax-profile-note strong {
+  font-size: 13px;
+}
+
+.tax-profile-note span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .summary-item {

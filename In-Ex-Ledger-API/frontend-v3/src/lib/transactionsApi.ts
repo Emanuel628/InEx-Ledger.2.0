@@ -41,6 +41,7 @@ export type CategoryOption = {
   id: string
   name: string
   kind: 'income' | 'expense'
+  isActive: boolean
 }
 
 export type BusinessTaxProfile = {
@@ -135,6 +136,14 @@ type LegacyTransaction = {
   review_notes?: string | null
 }
 
+type LegacyCategoryOption = {
+  id: string
+  name: string
+  kind?: 'income' | 'expense' | null
+  type?: 'income' | 'expense' | 'Income' | 'Expense' | null
+  is_active?: boolean
+}
+
 type ListResponse = {
   data: LegacyTransaction[]
   summary?: {
@@ -180,7 +189,7 @@ export async function loadTransactionPageData() {
   const [transactions, accounts, categories, business, reviewQueue, recurringTemplates] = await Promise.all([
     apiRequest<ListResponse>('/api/transactions?limit=500&offset=0'),
     apiRequest<{ data: AccountOption[] }>('/api/accounts?limit=500&offset=0'),
-    apiRequest<{ data: CategoryOption[] }>('/api/categories?limit=500&offset=0'),
+    apiRequest<{ data: LegacyCategoryOption[] }>('/api/categories?limit=500&offset=0&include_inactive=true'),
     apiRequest<LegacyBusiness>('/api/business').catch(() => null),
     apiRequest<ReviewQueueResponse>('/api/review/queue').catch(() => ({ queue: [] })),
     apiRequest<LegacyRecurringTemplate[]>('/api/recurring').catch(() => []),
@@ -192,11 +201,7 @@ export async function loadTransactionPageData() {
   return {
     transactions: transactions.data.map((transaction) => mapTransaction(transaction, reviewItemsByTransaction)),
     accounts: accounts.data.map((account) => ({ id: account.id, name: account.name })),
-    categories: categories.data.map((category) => ({
-      id: category.id,
-      name: category.name,
-      kind: category.kind,
-    })),
+    categories: categories.data.map(mapCategoryOption).filter((category) => category.isActive),
     taxProfile: resolveEstimatedTaxProfile(business),
     reviewQueue,
     recurringTemplates: recurringTemplates.map(mapRecurringTemplate),
@@ -214,7 +219,7 @@ export async function saveTransactionDraft(
     ? { id: transaction.accountId, name: transaction.account }
     : accounts.find((item) => item.name === draft.account)
   const category = transaction && transaction.category === draft.category
-    ? { id: transaction.categoryId, name: transaction.category, kind }
+    ? { id: transaction.categoryId, name: transaction.category, kind, isActive: true }
     : categories.find((item) => item.name === draft.category && item.kind === kind)
     || categories.find((item) => item.name === draft.category)
   const amount = Number(draft.amount.replace(/[$,]/g, ''))
@@ -403,36 +408,51 @@ function mapRecurringTemplate(row: LegacyRecurringTemplate): RecurringTemplate {
   }
 }
 
+function mapCategoryOption(category: LegacyCategoryOption): CategoryOption {
+  const rawKind = String(category.kind || category.type || '').toLowerCase()
+  return {
+    id: category.id,
+    name: category.name,
+    kind: rawKind === 'income' ? 'income' : 'expense',
+    isActive: category.is_active !== false,
+  }
+}
+
 function resolveEstimatedTaxProfile(business: LegacyBusiness | null): BusinessTaxProfile {
   const region = String(business?.region || business?.country || 'US').toUpperCase() === 'CA' ? 'CA' : 'US'
   const province = String(business?.province || '').toUpperCase()
-  const rate = region === 'CA' ? estimatedCanadianRate(province) : 0.24
+  const rate = region === 'CA' ? estimatedCanadianRate(province) : 0.28
   const label = region === 'CA'
-    ? `${province || 'Canada'} estimated tax`
+    ? `${province || 'Canada'} tax estimate`
     : 'US Schedule C estimate'
   const note = region === 'CA'
-    ? 'Draft T2125 tracking estimate based on your business profile.'
-    : 'Draft Schedule C estimate based on net profit using a 24% buffer.'
+    ? `Draft T2125 estimate using the legacy combined income tax + CPP rate for ${province || 'Canada'}: ${formatPercent(rate, province)}. This is not GST/HST.`
+    : `Draft Schedule C estimate based on net profit using the legacy ${formatPercent(rate)} buffer.`
   return { region, province, rate, label, note }
 }
 
 function estimatedCanadianRate(province: string) {
   const rates: Record<string, number> = {
-    AB: 0.05,
-    BC: 0.12,
-    MB: 0.12,
-    NB: 0.15,
-    NL: 0.15,
-    NS: 0.15,
-    NT: 0.05,
-    NU: 0.05,
-    ON: 0.13,
-    PE: 0.15,
-    QC: 0.14975,
-    SK: 0.11,
-    YT: 0.05,
+    AB: 0.29,
+    BC: 0.26,
+    MB: 0.31,
+    NB: 0.30,
+    NL: 0.29,
+    NS: 0.33,
+    NT: 0.26,
+    NU: 0.26,
+    ON: 0.27,
+    PE: 0.31,
+    QC: 0.34,
+    SK: 0.31,
+    YT: 0.28,
   }
-  return rates[province] || 0.05
+  return rates[province] || 0.28
+}
+
+function formatPercent(rate: number, province = '') {
+  const decimals = province === 'QC' ? 3 : 0
+  return `${(rate * 100).toFixed(decimals)}%`
 }
 
 function mapStatus(row: LegacyTransaction, receiptCount: number): TransactionStatus {

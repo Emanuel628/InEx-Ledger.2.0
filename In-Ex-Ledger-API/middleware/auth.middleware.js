@@ -3,7 +3,7 @@ const { ACCESS_TOKEN_COOKIE } = require("../utils/authUtils.js");
 const { logWarn } = require("../utils/logger.js");
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const DEFAULT_JWT_EXPIRY_SECONDS = Number(process.env.JWT_EXPIRY_SECONDS) || 15 * 60;
+const DEFAULT_JWT_EXPIRY_SECONDS = Number(process.env.JWT_EXPIRY_SECONDS) || 60 * 60;
 
 if (!JWT_SECRET) {
   throw new Error(
