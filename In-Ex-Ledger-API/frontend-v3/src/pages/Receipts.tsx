@@ -23,84 +23,9 @@ import {
   type TransactionLinkOption,
 } from '../lib/receiptsApi'
 
-const receipts: ReceiptRecord[] = [
-  {
-    id: 'mock-1',
-    fileName: 'Adobe_050124.pdf',
-    uploadedAt: '2024-05-01',
-    date: 'May 1',
-    linkedTransactionId: 'mock-tx-1',
-    linkedTransaction: 'Software',
-    linkState: 'Linked',
-    tone: 'red',
-    isViewable: true,
-    url: '/api/receipts/mock-1',
-  },
-  {
-    id: 'mock-2',
-    fileName: 'Shell_050224.jpg',
-    uploadedAt: '2024-05-02',
-    date: 'May 2',
-    linkedTransactionId: null,
-    linkedTransaction: 'Fuel',
-    linkState: 'Unlinked',
-    tone: 'yellow',
-    isViewable: true,
-    url: '/api/receipts/mock-2',
-  },
-  {
-    id: 'mock-3',
-    fileName: 'Client_Lunch_050324.pdf',
-    uploadedAt: '2024-05-03',
-    date: 'May 3',
-    linkedTransactionId: null,
-    linkedTransaction: 'Meals',
-    linkState: 'Unlinked',
-    tone: 'coral',
-    isViewable: true,
-    url: '/api/receipts/mock-3',
-  },
-  {
-    id: 'mock-4',
-    fileName: 'GoogleWorkspace_050724.pdf',
-    uploadedAt: '2024-05-07',
-    date: 'May 7',
-    linkedTransactionId: 'mock-tx-2',
-    linkedTransaction: 'Software',
-    linkState: 'Linked',
-    tone: 'blue',
-    isViewable: true,
-    url: '/api/receipts/mock-4',
-  },
-  {
-    id: 'mock-5',
-    fileName: 'OfficeDepot_051024.jpg',
-    uploadedAt: '2024-05-10',
-    date: 'May 10',
-    linkedTransactionId: null,
-    linkedTransaction: 'Office Supplies',
-    linkState: 'Unlinked',
-    tone: 'green',
-    isViewable: true,
-    url: '/api/receipts/mock-5',
-  },
-  {
-    id: 'mock-6',
-    fileName: 'United_051524.pdf',
-    uploadedAt: '2024-05-15',
-    date: 'May 15',
-    linkedTransactionId: 'mock-tx-3',
-    linkedTransaction: 'Travel',
-    linkState: 'Linked',
-    tone: 'violet',
-    isViewable: true,
-    url: '/api/receipts/mock-6',
-  },
-]
-
 function Receipts(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [receiptRows, setReceiptRows] = useState<ReceiptRecord[]>(receipts)
+  const [receiptRows, setReceiptRows] = useState<ReceiptRecord[]>([])
   const [transactionOptions, setTransactionOptions] = useState<TransactionLinkOption[]>([])
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -131,7 +56,7 @@ function Receipts(props: PageProps) {
       setTransactionOptions(pageData.transactions)
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load receipts.')
-      setReceiptRows(receipts)
+      setReceiptRows([])
       setTransactionOptions([])
     }
   }
@@ -261,7 +186,7 @@ function Receipts(props: PageProps) {
                         className="row-action"
                         type="button"
                         aria-label={`Preview ${receipt.fileName}`}
-                        disabled={!receipt.isViewable || receipt.id.startsWith('mock-')}
+                        disabled={!receipt.isViewable}
                         onClick={() => window.open(receipt.url, '_blank', 'noopener,noreferrer')}
                       >
                         <Eye size={18} />
@@ -279,7 +204,7 @@ function Receipts(props: PageProps) {
                         <div className="row-action-menu">
                           <button
                             type="button"
-                            disabled={transactionOptions.length === 0 || receipt.id.startsWith('mock-')}
+                            disabled={transactionOptions.length === 0}
                             onClick={() => {
                               const nextTransactionId = transactionOptions[0]?.id || null
                               void attachReceipt(receipt.id, nextTransactionId)
@@ -292,7 +217,6 @@ function Receipts(props: PageProps) {
                           </button>
                           <button
                             type="button"
-                            disabled={receipt.id.startsWith('mock-')}
                             onClick={() => {
                               void attachReceipt(receipt.id, null)
                                 .then(() => refreshReceipts())
@@ -305,7 +229,6 @@ function Receipts(props: PageProps) {
                           <button
                             className="is-danger"
                             type="button"
-                            disabled={receipt.id.startsWith('mock-')}
                             onClick={() => {
                               void deleteReceipt(receipt.id)
                                 .then(() => {

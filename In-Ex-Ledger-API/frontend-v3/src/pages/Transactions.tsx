@@ -37,126 +37,13 @@ import {
   type TransactionStatus,
 } from '../lib/transactionsApi'
 
-const transactions: Transaction[] = [
-  {
-    id: 'mock-1',
-    accountId: 'mock-checking',
-    categoryId: 'mock-income',
-    dateIso: '2024-05-31',
-    date: 'May 31',
-    description: 'Stripe payout',
-    category: 'Income',
-    account: 'Checking',
-    receipt: 'Uploaded',
-    status: 'Cleared',
-    amount: 2450,
-    merchantTone: 'blue',
-    note: '',
-    cleared: true,
-  },
-  {
-    id: 'mock-2',
-    accountId: 'mock-card',
-    categoryId: 'mock-software',
-    dateIso: '2024-05-29',
-    date: 'May 29',
-    description: 'Adobe Creative Cloud',
-    category: 'Software',
-    account: 'Business Card',
-    receipt: 'Attached',
-    status: 'Cleared',
-    amount: -52.99,
-    merchantTone: 'red',
-    note: '',
-    cleared: true,
-  },
-  {
-    id: 'mock-3',
-    accountId: 'mock-card',
-    categoryId: 'mock-fuel',
-    dateIso: '2024-05-28',
-    date: 'May 28',
-    description: 'Shell',
-    category: 'Fuel',
-    account: 'Business Card',
-    receipt: 'Missing',
-    status: 'Missing receipt',
-    amount: -68.45,
-    merchantTone: 'yellow',
-    note: '',
-    cleared: false,
-  },
-  {
-    id: 'mock-4',
-    accountId: 'mock-checking',
-    categoryId: 'mock-meals',
-    dateIso: '2024-05-26',
-    date: 'May 26',
-    description: 'Client lunch',
-    category: 'Meals',
-    account: 'Checking',
-    receipt: 'Missing',
-    status: 'Needs review',
-    amount: -134.86,
-    merchantTone: 'coral',
-    note: '',
-    cleared: false,
-  },
-  {
-    id: 'mock-5',
-    accountId: 'mock-card',
-    categoryId: 'mock-software',
-    dateIso: '2024-05-24',
-    date: 'May 24',
-    description: 'Google Workspace',
-    category: 'Software',
-    account: 'Business Card',
-    receipt: 'Uploaded',
-    status: 'Cleared',
-    amount: -14.4,
-    merchantTone: 'violet',
-    note: '',
-    cleared: true,
-  },
-  {
-    id: 'mock-6',
-    accountId: 'mock-checking',
-    categoryId: 'mock-income',
-    dateIso: '2024-05-21',
-    date: 'May 21',
-    description: 'Consulting invoice',
-    category: 'Income',
-    account: 'Checking',
-    receipt: 'Uploaded',
-    status: 'Cleared',
-    amount: 1800,
-    merchantTone: 'green',
-    note: '',
-    cleared: true,
-  },
-]
-
-const fallbackAccounts: AccountOption[] = [
-  { id: 'mock-checking', name: 'Checking' },
-  { id: 'mock-card', name: 'Business Card' },
-  { id: 'mock-cash', name: 'Cash' },
-]
-
-const fallbackCategories: CategoryOption[] = [
-  { id: 'mock-income', name: 'Income', kind: 'income' },
-  { id: 'mock-software', name: 'Software', kind: 'expense' },
-  { id: 'mock-fuel', name: 'Fuel', kind: 'expense' },
-  { id: 'mock-meals', name: 'Meals', kind: 'expense' },
-  { id: 'mock-office', name: 'Office', kind: 'expense' },
-]
-
 function Transactions(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
-  const [transactionRows, setTransactionRows] = useState<Transaction[]>(transactions)
-  const [accountOptions, setAccountOptions] = useState<AccountOption[]>(fallbackAccounts)
-  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>(fallbackCategories)
+  const [transactionRows, setTransactionRows] = useState<Transaction[]>([])
+  const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [loadingData, setLoadingData] = useState(true)
@@ -178,13 +65,13 @@ function Transactions(props: PageProps) {
     try {
       const pageData = await loadTransactionPageData()
       setTransactionRows(pageData.transactions)
-      setAccountOptions(pageData.accounts.length ? pageData.accounts : fallbackAccounts)
-      setCategoryOptions(pageData.categories.length ? pageData.categories : fallbackCategories)
+      setAccountOptions(pageData.accounts)
+      setCategoryOptions(pageData.categories)
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load transactions.')
-      setTransactionRows(transactions)
-      setAccountOptions(fallbackAccounts)
-      setCategoryOptions(fallbackCategories)
+      setTransactionRows([])
+      setAccountOptions([])
+      setCategoryOptions([])
     } finally {
       setLoadingData(false)
     }

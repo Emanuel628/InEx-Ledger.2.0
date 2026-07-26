@@ -25,53 +25,10 @@ import {
   type AccountStatus,
 } from '../lib/accountsApi'
 
-const accounts: AccountRecord[] = [
-  {
-    id: 'mock-1',
-    name: 'Business Checking',
-    type: 'Checking',
-    transactionCount: 42,
-    status: 'Active',
-    tone: 'blue',
-  },
-  {
-    id: 'mock-2',
-    name: 'Operating Savings',
-    type: 'Savings',
-    transactionCount: 8,
-    status: 'Active',
-    tone: 'green',
-  },
-  {
-    id: 'mock-3',
-    name: 'Business Credit Card',
-    type: 'Credit Card',
-    transactionCount: 29,
-    status: 'Active',
-    tone: 'violet',
-  },
-  {
-    id: 'mock-4',
-    name: 'Cash on hand',
-    type: 'Cash',
-    transactionCount: 3,
-    status: 'Needs details',
-    tone: 'yellow',
-  },
-  {
-    id: 'mock-5',
-    name: 'Equipment loan',
-    type: 'Loan',
-    transactionCount: 6,
-    status: 'Active',
-    tone: 'coral',
-  },
-]
-
 function Accounts(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<AccountRecord | null>(null)
-  const [accountRows, setAccountRows] = useState<AccountRecord[]>(accounts)
+  const [accountRows, setAccountRows] = useState<AccountRecord[]>([])
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<AccountRecord['type'] | 'All'>('All')
@@ -105,7 +62,7 @@ function Accounts(props: PageProps) {
       setAccountRows(loadedAccounts.length ? loadedAccounts : [])
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load accounts.')
-      setAccountRows(accounts)
+      setAccountRows([])
     }
   }
 

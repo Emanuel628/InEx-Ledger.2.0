@@ -27,73 +27,10 @@ import {
   type TaxCategory,
 } from '../lib/categoriesApi'
 
-const categories: TaxCategory[] = [
-  {
-    id: 'mock-1',
-    name: 'Consulting Income',
-    type: 'Income',
-    taxLine: 'Schedule C - Gross receipts',
-    taxMapUs: 'gross_receipts_sales',
-    taxMapCa: '',
-    businessRegion: 'US',
-    transactions: 134,
-    status: 'Active',
-    tone: 'green',
-  },
-  {
-    id: 'mock-2',
-    name: 'Software',
-    type: 'Expense',
-    taxLine: 'Schedule C - Office expense',
-    taxMapUs: 'office_expense',
-    taxMapCa: '',
-    businessRegion: 'US',
-    transactions: 56,
-    status: 'Active',
-    tone: 'blue',
-  },
-  {
-    id: 'mock-3',
-    name: 'Meals',
-    type: 'Expense',
-    taxLine: 'Schedule C - Meals',
-    taxMapUs: 'meals',
-    taxMapCa: '',
-    businessRegion: 'US',
-    transactions: 42,
-    status: 'Active',
-    tone: 'coral',
-  },
-  {
-    id: 'mock-4',
-    name: 'Fuel',
-    type: 'Expense',
-    taxLine: 'Schedule C - Car and truck',
-    taxMapUs: 'car_truck',
-    taxMapCa: '',
-    businessRegion: 'US',
-    transactions: 78,
-    status: 'Active',
-    tone: 'yellow',
-  },
-  {
-    id: 'mock-5',
-    name: 'Office Supplies',
-    type: 'Expense',
-    taxLine: 'Schedule C - Supplies',
-    taxMapUs: 'supplies',
-    taxMapCa: '',
-    businessRegion: 'US',
-    transactions: 31,
-    status: 'Needs review',
-    tone: 'red',
-  },
-]
-
 function Categories(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<TaxCategory | null>(null)
-  const [categoryRows, setCategoryRows] = useState<TaxCategory[]>(categories)
+  const [categoryRows, setCategoryRows] = useState<TaxCategory[]>([])
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<CategoryType | 'All'>('All')
@@ -129,7 +66,7 @@ function Categories(props: PageProps) {
       setCategoryRows(loadedCategories.length ? loadedCategories : [])
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load categories.')
-      setCategoryRows(categories)
+      setCategoryRows([])
     }
   }
 
