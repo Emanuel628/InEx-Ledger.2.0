@@ -237,9 +237,14 @@ function buildReceiptListSql() {
       r.uploaded_at,
       r.uploaded_at AS created_at,
       r.file_hash,
+      t.description AS transaction_description,
+      t.amount AS transaction_amount,
+      t.type AS transaction_type,
+      t.date AS transaction_date,
       (r.file_bytes IS NOT NULL) AS has_file_bytes
     FROM receipts r
     JOIN businesses b ON b.id = r.business_id
+    LEFT JOIN transactions t ON t.id = r.transaction_id
     WHERE r.business_id = ANY($1::uuid[])
     ORDER BY b.name ASC, r.uploaded_at DESC NULLS LAST
     LIMIT 500

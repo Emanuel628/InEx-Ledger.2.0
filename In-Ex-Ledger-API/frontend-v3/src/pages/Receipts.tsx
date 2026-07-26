@@ -18,6 +18,7 @@ import {
   attachReceipt,
   deleteReceipt,
   loadReceiptPageData,
+  searchReceiptTransactionOptions,
   uploadReceipt,
   type ReceiptLinkState,
   type ReceiptRecord,
@@ -96,6 +97,7 @@ function Receipts(props: PageProps) {
             <ReceiptLinkModal
               receipt={linkingReceipt}
               transactions={transactionOptions}
+              onSearchTransactions={searchReceiptTransactionOptions}
               onClose={() => setLinkingReceipt(null)}
               onLink={(transactionId) => {
                 void attachReceipt(linkingReceipt.id, transactionId)
@@ -227,7 +229,6 @@ function Receipts(props: PageProps) {
                         <div className="row-action-menu">
                           <button
                             type="button"
-                            disabled={transactionOptions.length === 0}
                             onClick={() => {
                               setLinkingReceipt(receipt)
                             }}
@@ -288,19 +289,39 @@ function LinkPill({ state }: { state: ReceiptLinkState }) {
 function ReceiptLinkModal({
   receipt,
   transactions,
+  onSearchTransactions,
   onClose,
   onLink,
 }: {
   receipt: ReceiptRecord
   transactions: TransactionLinkOption[]
+  onSearchTransactions: (search: string) => Promise<TransactionLinkOption[]>
   onClose: () => void
   onLink: (transactionId: string) => void
 }) {
   const [searchTerm, setSearchTerm] = useState('')
-  const normalizedSearch = searchTerm.trim().toLowerCase()
-  const visibleTransactions = transactions.filter((transaction) => (
-    !normalizedSearch || transaction.label.toLowerCase().includes(normalizedSearch)
-  ))
+  const [visibleTransactions, setVisibleTransactions] = useState(transactions)
+  const [searchError, setSearchError] = useState('')
+
+  useEffect(() => {
+    let canceled = false
+    onSearchTransactions(searchTerm)
+      .then((results) => {
+        if (!canceled) {
+          setVisibleTransactions(results)
+          setSearchError('')
+        }
+      })
+      .catch((error) => {
+        if (!canceled) {
+          setVisibleTransactions([])
+          setSearchError(error instanceof Error ? error.message : 'Unable to search transactions.')
+        }
+      })
+    return () => {
+      canceled = true
+    }
+  }, [onSearchTransactions, searchTerm])
 
   return (
     <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -333,7 +354,7 @@ function ReceiptLinkModal({
             </button>
           ))}
           {visibleTransactions.length === 0 ? (
-            <p className="progressive-panel-note">No transactions match this search.</p>
+            <p className="progressive-panel-note">{searchError || 'No transactions match this search.'}</p>
           ) : null}
         </div>
 

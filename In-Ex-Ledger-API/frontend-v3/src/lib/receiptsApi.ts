@@ -26,6 +26,10 @@ type LegacyReceipt = {
   uploaded_at?: string | null
   created_at?: string | null
   transaction_id?: string | null
+  transaction_description?: string | null
+  transaction_amount?: number | string | null
+  transaction_type?: 'income' | 'expense' | null
+  transaction_date?: string | null
   is_viewable?: boolean
   url?: string
 }
@@ -41,15 +45,24 @@ type LegacyTransaction = {
 export async function loadReceiptPageData() {
   const [receipts, transactions] = await Promise.all([
     apiRequest<LegacyReceipt[]>('/api/receipts'),
-    apiRequest<{ data: LegacyTransaction[] }>('/api/transactions?limit=500&offset=0'),
+    searchReceiptTransactionOptions(),
   ])
-  const transactionOptions = transactions.data.map(mapTransactionOption)
-  const transactionLabels = new Map(transactionOptions.map((transaction) => [transaction.id, transaction.label]))
 
   return {
-    receipts: receipts.map((receipt) => mapReceipt(receipt, transactionLabels)),
-    transactions: transactionOptions,
+    receipts: receipts.map(mapReceipt),
+    transactions,
   }
+}
+
+export async function searchReceiptTransactionOptions(search = '') {
+  const params = new URLSearchParams()
+  params.set('limit', '50')
+  params.set('offset', '0')
+  if (search.trim()) {
+    params.set('search', search.trim())
+  }
+  const transactions = await apiRequest<{ data: LegacyTransaction[] }>(`/api/transactions?${params.toString()}`)
+  return transactions.data.map(mapTransactionOption)
 }
 
 export async function uploadReceipt(file: File, transactionId: string) {
@@ -78,16 +91,25 @@ export async function deleteReceipt(receiptId: string) {
   await apiRequest(`/api/receipts/${receiptId}`, { method: 'DELETE' })
 }
 
-function mapReceipt(row: LegacyReceipt, transactionLabels: Map<string, string>): ReceiptRecord {
+function mapReceipt(row: LegacyReceipt): ReceiptRecord {
   const linkedTransactionId = row.transaction_id || null
   const uploadedAt = row.uploaded_at || row.created_at || ''
+  const linkedTransaction = linkedTransactionId
+    ? mapTransactionOption({
+      id: linkedTransactionId,
+      description: row.transaction_description,
+      amount: row.transaction_amount || 0,
+      type: row.transaction_type || 'expense',
+      date: row.transaction_date || '',
+    }).label
+    : 'Not linked'
   return {
     id: row.id,
     fileName: row.filename || 'Receipt',
     uploadedAt,
     date: formatShortDate(uploadedAt),
     linkedTransactionId,
-    linkedTransaction: linkedTransactionId ? transactionLabels.get(linkedTransactionId) || 'Linked transaction' : 'Not linked',
+    linkedTransaction,
     linkState: linkedTransactionId ? 'Linked' : 'Unlinked',
     tone: linkedTransactionId ? 'green' : 'yellow',
     isViewable: row.is_viewable !== false,

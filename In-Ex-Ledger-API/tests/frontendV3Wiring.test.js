@@ -327,11 +327,18 @@ test("v3 categories use full tax mappings and red inactive archived states witho
 
 test("v3 receipts use red unlinked pills and a transaction picker instead of link-to-latest", () => {
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Receipts.tsx"), "utf8");
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "receiptsApi.ts"), "utf8");
+  const routeSource = fs.readFileSync(path.join(repoRoot, "routes", "receipts.routes.js"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
 
   assert.match(pageSource, /ReceiptLinkModal/);
   assert.match(pageSource, /Search transactions/);
   assert.match(pageSource, /Link transaction/);
+  assert.match(pageSource, /onSearchTransactions={searchReceiptTransactionOptions}/);
+  assert.match(apiSource, /export async function searchReceiptTransactionOptions/);
+  assert.match(apiSource, /params\.set\('limit', '50'\)/);
+  assert.doesNotMatch(apiSource, /\/api\/transactions\?limit=500&offset=0/);
+  assert.match(routeSource, /t\.description AS transaction_description/);
   assert.doesNotMatch(pageSource, /Link to latest/);
   assert.doesNotMatch(pageSource, /attachReceipt\(receipt\.id, null\)/);
   assert.match(cssSource, /\.receipt-link-unlinked,[\s\S]*var\(--red\)/);
