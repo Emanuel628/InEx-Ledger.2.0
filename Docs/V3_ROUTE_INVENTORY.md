@@ -4,7 +4,7 @@ Phase 0 status: complete.
 Phase 1 (canonical bare URLs): complete. Client `pushState` and `login?next=` use `/transactions`-style paths; `/app-v3` and `/app-v3/<page>` 301 to bare paths; assets remain under `/app-v3/assets`.
 Phase 2 (one active app UI): complete. Migrated app-core legacy HTML files moved from active `public/html` into `In-Ex-Ledger-API/legacy/public-html/app-core`; old `.html` URLs redirect to canonical v3 routes.
 Phase 3 (one auth door, Strategy A): complete. Auth remains legacy for now; login, MFA, expired-session, idle, and auth-guard redirects preserve canonical v3 `next` paths.
-Phase 4 (data plane correctness, Transactions first): complete for Transactions. The v3 Transactions page uses server-driven `limit`/`offset`, API filter query params, API summary totals, id-based saves, CSRF retry, and reachable high-page pagination.
+Phase 4 (data plane correctness): in progress. Transactions uses server-driven `limit`/`offset`, API filter query params, API summary totals, id-based saves, CSRF retry, and reachable high-page pagination. Accounts no longer scans a capped transaction window for counts.
 
 This file is the freeze and map artifact for the move to one product, one UI, and one URL. It is intentionally operational: if a route is not listed here, do not migrate, delete, or add parallel behavior until this inventory is updated and verified.
 
@@ -132,4 +132,5 @@ These pages are intentionally not Pro-tier v3 parity yet. They should remain loc
 - Transaction and recurring saves send account/category ids to the API.
 - CSV import keeps the legacy account and date range safeguards.
 - Pagination no longer renders only the first five pages; first, nearby, and last pages remain reachable for large ledgers.
+- Accounts list rows receive `transaction_count` from `/api/accounts`, instead of loading `/api/transactions?limit=500&offset=0` and reducing locally.
 - `tests/transactionsListFilters.test.js` and `tests/frontendV3Wiring.test.js` verify the route and UI contracts.

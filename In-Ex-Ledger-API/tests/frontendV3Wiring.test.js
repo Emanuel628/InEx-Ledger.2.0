@@ -283,6 +283,17 @@ test("v3 accounts remove the bottom Plaid connector panel while keeping add-acco
   assert.match(source, /Connect with Plaid/);
 });
 
+test("v3 accounts use API account transaction counts instead of a capped transactions scan", () => {
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "accountsApi.ts"), "utf8");
+  const routeSource = fs.readFileSync(path.join(repoRoot, "routes", "accounts.routes.js"), "utf8");
+
+  assert.match(routeSource, /COALESCE\(tx\.transaction_count, 0\)::int AS transaction_count/);
+  assert.match(routeSource, /LEFT JOIN LATERAL/);
+  assert.match(apiSource, /mapAccount\(account\)/);
+  assert.doesNotMatch(apiSource, /\/api\/transactions\?limit=500&offset=0/);
+  assert.doesNotMatch(apiSource, /transactions\.data\.reduce/);
+});
+
 test("v3 categories use full tax mappings and red inactive archived states without archived footer panel", () => {
   const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "categoriesApi.ts"), "utf8");
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Categories.tsx"), "utf8");

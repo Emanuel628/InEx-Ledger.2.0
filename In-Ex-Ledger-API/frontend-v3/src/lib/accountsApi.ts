@@ -24,18 +24,8 @@ type LegacyAccount = {
 }
 
 export async function loadAccounts() {
-  const [accounts, transactions] = await Promise.all([
-    apiRequest<{ data: LegacyAccount[] }>('/api/accounts?limit=500&offset=0'),
-    apiRequest<{ data: Array<{ account_id?: string | null }> }>('/api/transactions?limit=500&offset=0'),
-  ])
-  const transactionCounts = transactions.data.reduce((counts, transaction) => {
-    if (transaction.account_id) {
-      counts.set(transaction.account_id, (counts.get(transaction.account_id) || 0) + 1)
-    }
-    return counts
-  }, new Map<string, number>())
-
-  return accounts.data.map((account) => mapAccount(account, transactionCounts.get(account.id) || 0))
+  const accounts = await apiRequest<{ data: LegacyAccount[] }>('/api/accounts?limit=500&offset=0')
+  return accounts.data.map((account) => mapAccount(account))
 }
 
 export async function saveAccountDraft(draft: AccountDraft, account: AccountRecord | null) {
