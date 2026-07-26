@@ -1863,8 +1863,24 @@ tbody tr:last-child td {
   background: var(--surface-soft);
 }
 
+.row-action-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .row-action-menu .is-danger {
   color: var(--red);
+}
+
+.row-action-menu-note,
+.transaction-lock-note {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: rgba(244, 182, 75, 0.14);
+  color: #8a5a00;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .receipt-actions {

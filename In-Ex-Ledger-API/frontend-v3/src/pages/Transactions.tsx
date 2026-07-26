@@ -49,6 +49,7 @@ import {
   type TransactionStatus,
 } from '../lib/transactionsApi'
 import { uploadReceipt } from '../lib/receiptsApi'
+import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
 
 const TRANSACTION_PAGE_SIZE_KEY = 'inex-v3-transactions-page-size'
 
@@ -62,6 +63,7 @@ function Transactions(props: PageProps) {
   const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
   const [taxProfile, setTaxProfile] = useState<BusinessTaxProfile | null>(null)
+  const [accountingLock, setAccountingLock] = useState<AccountingLock | null>(null)
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueResponse>({ queue: [] })
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([])
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
@@ -89,22 +91,26 @@ function Transactions(props: PageProps) {
     setLoadingData(true)
     setDataError('')
     try {
-      const pageData = await loadTransactionPageData({
-        limit: pageSize,
-        offset: (currentPage - 1) * pageSize,
-        search: searchTerm,
-        categoryId: categoryFilter,
-        accountId: accountFilter,
-        status: statusFilter,
-        startDate: startDateFilter,
-        endDate: endDateFilter,
-      })
+      const [pageData, lockState] = await Promise.all([
+        loadTransactionPageData({
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+          search: searchTerm,
+          categoryId: categoryFilter,
+          accountId: accountFilter,
+          status: statusFilter,
+          startDate: startDateFilter,
+          endDate: endDateFilter,
+        }),
+        loadAccountingLock().catch(() => null),
+      ])
       setTransactionRows(pageData.transactions)
       setTransactionTotal(pageData.total)
       setTransactionSummary(pageData.summary)
       setAccountOptions(pageData.accounts)
       setCategoryOptions(pageData.categories)
       setTaxProfile(pageData.taxProfile)
+      setAccountingLock(lockState)
       setReviewQueue(pageData.reviewQueue)
       setRecurringTemplates(pageData.recurringTemplates)
       void loadTransactionUndoStatus().then(setUndoCount).catch(() => setUndoCount(0))
@@ -225,6 +231,10 @@ function Transactions(props: PageProps) {
               transaction={selectedTransaction}
               onClose={() => setSelectedTransaction(null)}
               onUpdate={(updated) => {
+                if (isTransactionLocked(updated, accountingLock)) {
+                  setDataError(`This transaction is locked through ${formatIsoDate(accountingLock?.lockedThroughDate || '')}.`)
+                  return
+                }
                 void saveTransactionDraft(transactionToDraft(updated), updated, accountOptions, categoryOptions)
                   .then((savedTransaction) => {
                     setTransactionRows((rows) => rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row)))
@@ -232,8 +242,18 @@ function Transactions(props: PageProps) {
                   })
                   .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to update transaction.'))
               }}
-              onAttachReceipt={() => setReceiptTransaction(selectedTransaction)}
+              onAttachReceipt={() => {
+                if (isTransactionLocked(selectedTransaction, accountingLock)) {
+                  setDataError(`This transaction is locked through ${formatIsoDate(accountingLock?.lockedThroughDate || '')}.`)
+                  return
+                }
+                setReceiptTransaction(selectedTransaction)
+              }}
               onEdit={() => {
+                if (isTransactionLocked(selectedTransaction, accountingLock)) {
+                  setDataError(`This transaction is locked through ${formatIsoDate(accountingLock?.lockedThroughDate || '')}.`)
+                  return
+                }
                 setEditingTransaction(selectedTransaction)
                 setSelectedTransaction(null)
                 setDrawerOpen(true)
@@ -243,6 +263,10 @@ function Transactions(props: PageProps) {
                 props.onNavigate('Categories')
               }}
               onDelete={() => {
+                if (isTransactionLocked(selectedTransaction, accountingLock)) {
+                  setDataError(`This transaction is locked through ${formatIsoDate(accountingLock?.lockedThroughDate || '')}.`)
+                  return
+                }
                 void deleteTransaction(selectedTransaction.id)
                   .then(() => {
                     setTransactionRows((rows) => rows.filter((row) => row.id !== selectedTransaction.id))
@@ -252,6 +276,8 @@ function Transactions(props: PageProps) {
                   })
                   .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to delete transaction.'))
               }}
+              isLocked={isTransactionLocked(selectedTransaction, accountingLock)}
+              lockedThroughDate={accountingLock?.lockedThroughDate || null}
             />
           ) : null}
           {receiptTransaction ? (
@@ -439,8 +465,10 @@ function Transactions(props: PageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleRows.map((transaction) => (
-                    <tr key={transaction.id}>
+                  {visibleRows.map((transaction) => {
+                    const rowLocked = isTransactionLocked(transaction, accountingLock)
+                    return (
+                    <tr className={rowLocked ? 'is-locked-period' : ''} key={transaction.id}>
                       <td data-label="Date">{transaction.date}</td>
                       <td data-label="Description">
                         <div className="merchant-cell">
@@ -476,8 +504,10 @@ function Transactions(props: PageProps) {
                         </button>
                         {actionMenuId === transaction.id ? (
                           <div className="row-action-menu">
+                            {rowLocked ? <p className="row-action-menu-note">Locked through {formatIsoDate(accountingLock?.lockedThroughDate || '')}</p> : null}
                             <button
                               type="button"
+                              disabled={rowLocked}
                               onClick={() => {
                                 setEditingTransaction(transaction)
                                 setDrawerOpen(true)
@@ -497,6 +527,7 @@ function Transactions(props: PageProps) {
                             </button>
                             <button
                               type="button"
+                              disabled={rowLocked}
                               onClick={() => {
                                 void saveTransactionDraft(
                                   transactionToDraft(transaction),
@@ -515,6 +546,7 @@ function Transactions(props: PageProps) {
                             </button>
                             <button
                               type="button"
+                              disabled={rowLocked}
                               onClick={() => {
                                 setReceiptTransaction(transaction)
                                 setActionMenuId(null)
@@ -525,6 +557,7 @@ function Transactions(props: PageProps) {
                             <button
                               className="is-danger"
                               type="button"
+                              disabled={rowLocked}
                               onClick={() => {
                                 void deleteTransaction(transaction.id)
                                   .then(() => {
@@ -542,7 +575,8 @@ function Transactions(props: PageProps) {
                         ) : null}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                   {visibleRows.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="empty-table-cell">No transactions match these filters.</td>
@@ -1323,6 +1357,8 @@ function TransactionDrawer({
 
 function TransactionDetailsModal({
   transaction,
+  isLocked,
+  lockedThroughDate,
   onClose,
   onUpdate,
   onAttachReceipt,
@@ -1331,6 +1367,8 @@ function TransactionDetailsModal({
   onDelete,
 }: {
   transaction: Transaction
+  isLocked: boolean
+  lockedThroughDate: string | null
   onClose: () => void
   onUpdate: (transaction: Transaction) => void
   onAttachReceipt: () => void
@@ -1365,6 +1403,11 @@ function TransactionDetailsModal({
           </button>
         </div>
         <div className="transaction-detail-body">
+          {isLocked ? (
+            <div className="transaction-lock-note" role="note">
+              Locked through {formatIsoDate(lockedThroughDate || '')}. Edits, receipt changes, cleared status, and deletion are disabled for this period.
+            </div>
+          ) : null}
           <div className={`transaction-detail-amount ${transaction.amount >= 0 ? 'is-positive' : 'is-negative'}`}>
             {formatMoney(transaction.amount)}
           </div>
@@ -1385,9 +1428,9 @@ function TransactionDetailsModal({
                 <p>{reviewSummary}</p>
               ) : null}
               <div className="transaction-detail-actions">
-                <button className="secondary-button" type="button" onClick={onEdit}>Edit details</button>
+                <button className="secondary-button" type="button" disabled={isLocked} onClick={onEdit}>Edit details</button>
                 {reviewLabels.some((label) => /receipt/i.test(label)) ? (
-                  <button className="secondary-button" type="button" onClick={onAttachReceipt}>Attach receipt</button>
+                  <button className="secondary-button" type="button" disabled={isLocked} onClick={onAttachReceipt}>Attach receipt</button>
                 ) : null}
                 {reviewLabels.some((label) => /category|tax mapping/i.test(label)) ? (
                   <button className="secondary-button" type="button" onClick={onManageCategories}>Open categories</button>
@@ -1396,18 +1439,18 @@ function TransactionDetailsModal({
             </section>
           ) : null}
           <div className="transaction-detail-actions">
-            <button className="secondary-button" type="button" onClick={onEdit}>
+            <button className="secondary-button" type="button" disabled={isLocked} onClick={onEdit}>
               Edit
             </button>
-            <button className="secondary-button" type="button" onClick={() => onUpdate({ ...transaction, cleared: true, status: 'Cleared' })}>
+            <button className="secondary-button" type="button" disabled={isLocked} onClick={() => onUpdate({ ...transaction, cleared: true, status: 'Cleared' })}>
               <CheckCircle2 size={17} />
               Mark cleared
             </button>
-            <button className="secondary-button" type="button" onClick={onAttachReceipt}>
+            <button className="secondary-button" type="button" disabled={isLocked} onClick={onAttachReceipt}>
               <ReceiptText size={17} />
               Attach receipt
             </button>
-            <button className="secondary-button danger-button" type="button" onClick={onDelete}>Delete</button>
+            <button className="secondary-button danger-button" type="button" disabled={isLocked} onClick={onDelete}>Delete</button>
           </div>
         </div>
       </section>
@@ -1524,6 +1567,16 @@ function formatMoney(value: number) {
   })
 
   return value < 0 ? `-${formatted}` : formatted
+}
+
+function isTransactionLocked(transaction: Transaction, lock: AccountingLock | null) {
+  const txDate = normalizeDateOnly(transaction.dateIso)
+  const lockedThrough = normalizeDateOnly(lock?.lockedThroughDate)
+  return Boolean(txDate && lockedThrough && txDate <= lockedThrough)
+}
+
+function normalizeDateOnly(value?: string | null) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value).slice(0, 10) : ''
 }
 
 function getActiveCurrency() {

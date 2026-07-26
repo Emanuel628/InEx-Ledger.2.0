@@ -425,6 +425,22 @@ test("v3 business settings expose the live accounting lock and hide the old busi
   assert.match(apiSource, /\/api\/business\/accounting-lock/);
 });
 
+test("v3 transactions disable protected actions for locked accounting periods", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(pageSource, /loadAccountingLock/);
+  assert.match(pageSource, /function isTransactionLocked/);
+  assert.match(pageSource, /rowLocked/);
+  assert.match(pageSource, /row-action-menu-note/);
+  assert.match(pageSource, /disabled=\{rowLocked\}/);
+  assert.match(pageSource, /transaction-lock-note/);
+  assert.match(pageSource, /disabled=\{isLocked\}/);
+  assert.match(pageSource, /Edits, receipt changes, cleared status, and deletion are disabled/);
+  assert.match(cssSource, /\.row-action-menu button:disabled/);
+  assert.match(cssSource, /\.transaction-lock-note/);
+});
+
 test("v3 subscription avoids checkout conflicts for existing Stripe subscriptions", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "pages", "Subscription.tsx"), "utf8");
 

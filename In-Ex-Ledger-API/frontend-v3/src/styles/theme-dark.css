@@ -207,6 +207,11 @@
   color: #ffd166;
 }
 
+.ledger-shell[data-theme="dark"] :is(.row-action-menu-note, .transaction-lock-note) {
+  background: rgba(244, 182, 75, 0.12);
+  color: #ffd58a;
+}
+
 .ledger-shell[data-theme="dark"] :is(.top-alert strong, .top-alert span, .pdf-warning-box strong, .pdf-warning-box span, .transaction-review-detail h3, .transaction-review-detail li, .transaction-edit-review strong, .transaction-edit-review li) {
   color: var(--ink);
 }
