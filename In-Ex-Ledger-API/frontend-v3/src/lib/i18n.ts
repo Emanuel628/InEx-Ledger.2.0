@@ -1,9 +1,13 @@
 import type { AuthUser } from './authApi'
+import { v3PhraseCatalog } from './i18nPhrases'
 
 export type AppLanguage = 'en' | 'es' | 'fr'
 export type TranslationKey = keyof typeof translations.en
 
 const STORAGE_KEY = 'lb_language'
+const TRANSLATABLE_ATTRS = ['aria-label', 'placeholder', 'title'] as const
+const originalTextNodes = new WeakMap<Text, string>()
+const originalAttrs = new WeakMap<Element, Partial<Record<(typeof TRANSLATABLE_ATTRS)[number], string>>>()
 
 export const translations = {
   en: {
@@ -163,4 +167,112 @@ export function translate(key: TranslationKey, language: AppLanguage) {
 
 export function formatCountLabel(count: number, oneKey: TranslationKey, manyKey: TranslationKey, language: AppLanguage) {
   return count === 1 ? translate(oneKey, language) : `${count} ${translate(manyKey, language)}`
+}
+
+export function translatePhrase(phrase: string, language: AppLanguage) {
+  const normalized = normalizePhrase(phrase)
+  if (!normalized) return phrase
+  return v3PhraseCatalog[language][normalized as keyof typeof v3PhraseCatalog.en]
+    || v3PhraseCatalog.en[normalized as keyof typeof v3PhraseCatalog.en]
+    || phrase
+}
+
+export function applyV3PhraseTranslations(root: ParentNode, language: AppLanguage) {
+  translateTextNodes(root, language)
+  translateAttributes(root, language)
+}
+
+export function observeV3PhraseTranslations(root: ParentNode, languageProvider: () => AppLanguage) {
+  applyV3PhraseTranslations(root, languageProvider())
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          translateTextNode(node as Text, languageProvider())
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          applyV3PhraseTranslations(node as Element, languageProvider())
+        }
+      }
+      if (mutation.type === 'attributes' && mutation.target instanceof Element) {
+        translateElementAttributes(mutation.target, languageProvider())
+      }
+    }
+  })
+  observer.observe(root, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: [...TRANSLATABLE_ATTRS],
+  })
+  return observer
+}
+
+function translateTextNodes(root: ParentNode, language: AppLanguage) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement
+      if (!parent || ['SCRIPT', 'STYLE', 'TEXTAREA', 'OPTION'].includes(parent.tagName)) {
+        return NodeFilter.FILTER_REJECT
+      }
+      return isCatalogPhrase(node.textContent || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+    },
+  })
+
+  let node = walker.nextNode()
+  while (node) {
+    translateTextNode(node as Text, language)
+    node = walker.nextNode()
+  }
+}
+
+function translateTextNode(node: Text, language: AppLanguage) {
+  const original = originalTextNodes.get(node) || normalizePhrase(node.textContent || '')
+  if (!original) return
+  originalTextNodes.set(node, original)
+  const translated = translatePhrase(original, language)
+  if (node.textContent !== translated) {
+    node.textContent = preserveEdgeWhitespace(node.textContent || '', translated)
+  }
+}
+
+function translateAttributes(root: ParentNode, language: AppLanguage) {
+  const elements = root instanceof Element ? [root, ...root.querySelectorAll('*')] : [...root.querySelectorAll('*')]
+  for (const element of elements) {
+    translateElementAttributes(element, language)
+  }
+}
+
+function translateElementAttributes(element: Element, language: AppLanguage) {
+  const stored = originalAttrs.get(element) || {}
+  let changed = false
+  for (const attr of TRANSLATABLE_ATTRS) {
+    const current = element.getAttribute(attr)
+    if (!current) continue
+    const original = stored[attr] || normalizePhrase(current)
+    if (!isCatalogPhrase(original)) continue
+    stored[attr] = original
+    changed = true
+    const translated = translatePhrase(original, language)
+    if (current !== translated) {
+      element.setAttribute(attr, translated)
+    }
+  }
+  if (changed) {
+    originalAttrs.set(element, stored)
+  }
+}
+
+function isCatalogPhrase(value: string) {
+  const normalized = normalizePhrase(value)
+  return Object.prototype.hasOwnProperty.call(v3PhraseCatalog.en, normalized)
+}
+
+function normalizePhrase(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function preserveEdgeWhitespace(original: string, translated: string) {
+  const leading = original.match(/^\s*/)?.[0] || ''
+  const trailing = original.match(/\s*$/)?.[0] || ''
+  return `${leading}${translated}${trailing}`
 }

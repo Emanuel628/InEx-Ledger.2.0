@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import Transactions from './pages/Transactions'
 import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
@@ -30,7 +30,7 @@ import Onboarding from './pages/Onboarding'
 import Help from './pages/Help'
 import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
-import { getStoredLanguage, getUserLanguage, setStoredLanguage, translate } from './lib/i18n'
+import { applyV3PhraseTranslations, getStoredLanguage, getUserLanguage, observeV3PhraseTranslations, setStoredLanguage, translate } from './lib/i18n'
 
 declare global {
   interface Window {
@@ -197,10 +197,29 @@ function App() {
     window.localStorage.getItem('inex-theme') === 'dark' ? 'dark' : 'light'
   ))
   const [language, setLanguage] = useState(getStoredLanguage)
+  const languageRef = useRef(language)
 
   useEffect(() => {
     window.localStorage.setItem('inex-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    languageRef.current = language
+    document.documentElement.lang = language
+  }, [language])
+
+  useEffect(() => {
+    const root = document.getElementById('root')
+    if (!root) return undefined
+    const observer = observeV3PhraseTranslations(root, () => languageRef.current)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const root = document.getElementById('root')
+    if (!root) return
+    window.requestAnimationFrame(() => applyV3PhraseTranslations(root, language))
+  }, [currentPage, language])
 
   useEffect(() => {
     const nextLanguage = getUserLanguage(authUser)

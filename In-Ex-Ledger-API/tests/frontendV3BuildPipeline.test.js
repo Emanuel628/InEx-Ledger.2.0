@@ -13,7 +13,8 @@ test("root build script builds the v3 SPA", () => {
   const pkg = JSON.parse(read("package.json"));
 
   assert.equal(pkg.scripts.build, "npm run build:frontend-v3");
-  assert.equal(pkg.scripts["build:frontend-v3"], "npm --prefix frontend-v3 run build");
+  assert.match(pkg.scripts["build:frontend-v3"], /scripts\/build-v3-phrase-catalog\.mjs/);
+  assert.match(pkg.scripts["build:frontend-v3"], /npm --prefix frontend-v3 run build/);
   assert.match(pkg.scripts["test:all"], /tests\/frontendV3BuildPipeline\.test\.js/);
 });
 
