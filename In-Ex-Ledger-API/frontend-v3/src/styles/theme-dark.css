@@ -80,7 +80,8 @@
   .transaction-type-toggle button,
   .export-presets button,
   .mileage-mode-toggle button,
-  .mileage-drawer-toggle button
+  .mileage-drawer-toggle button,
+  .receipt-link-option
 ) {
   border-color: var(--line);
   background: var(--surface);

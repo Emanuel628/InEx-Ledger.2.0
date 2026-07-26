@@ -28,6 +28,7 @@ function Receipts(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [receiptRows, setReceiptRows] = useState<ReceiptRecord[]>([])
   const [transactionOptions, setTransactionOptions] = useState<TransactionLinkOption[]>([])
+  const [linkingReceipt, setLinkingReceipt] = useState<ReceiptRecord | null>(null)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [linkFilter, setLinkFilter] = useState<ReceiptLinkState | 'All'>('All')
@@ -64,10 +65,10 @@ function Receipts(props: PageProps) {
   }
 
   useEffect(() => {
-    document.body.classList.toggle('modal-is-open', drawerOpen)
+    document.body.classList.toggle('modal-is-open', drawerOpen || Boolean(linkingReceipt))
 
     return () => document.body.classList.remove('modal-is-open')
-  }, [drawerOpen])
+  }, [drawerOpen, linkingReceipt])
 
   useEffect(() => {
     void refreshReceipts()
@@ -77,18 +78,38 @@ function Receipts(props: PageProps) {
     <AppShell
       {...props}
       searchPlaceholder="Search receipts, merchants, linked transactions"
-      overlay={drawerOpen ? (
-        <ReceiptUploadDrawer
-          transactions={transactionOptions}
-          onClose={() => setDrawerOpen(false)}
-          onSave={(file, transactionId) => {
-            void uploadReceipt(file, transactionId)
-              .then(() => refreshReceipts())
-              .then(() => setDrawerOpen(false))
-              .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to upload receipt.'))
-          }}
-        />
-      ) : null}
+      overlay={
+        <>
+          {drawerOpen ? (
+            <ReceiptUploadDrawer
+              transactions={transactionOptions}
+              onClose={() => setDrawerOpen(false)}
+              onSave={(file, transactionId) => {
+                void uploadReceipt(file, transactionId)
+                  .then(() => refreshReceipts())
+                  .then(() => setDrawerOpen(false))
+                  .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to upload receipt.'))
+              }}
+            />
+          ) : null}
+          {linkingReceipt ? (
+            <ReceiptLinkModal
+              receipt={linkingReceipt}
+              transactions={transactionOptions}
+              onClose={() => setLinkingReceipt(null)}
+              onLink={(transactionId) => {
+                void attachReceipt(linkingReceipt.id, transactionId)
+                  .then(() => refreshReceipts())
+                  .then(() => {
+                    setLinkingReceipt(null)
+                    setActionMenuId(null)
+                  })
+                  .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to link receipt.'))
+              }}
+            />
+          ) : null}
+        </>
+      }
     >
       <main className="transactions-page receipts-page">
         <section className="page-heading">
@@ -208,25 +229,10 @@ function Receipts(props: PageProps) {
                             type="button"
                             disabled={transactionOptions.length === 0}
                             onClick={() => {
-                              const nextTransactionId = transactionOptions[0]?.id || null
-                              void attachReceipt(receipt.id, nextTransactionId)
-                                .then(() => refreshReceipts())
-                                .then(() => setActionMenuId(null))
-                                .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to link receipt.'))
+                              setLinkingReceipt(receipt)
                             }}
                           >
-                            Link to latest
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void attachReceipt(receipt.id, null)
-                                .then(() => refreshReceipts())
-                                .then(() => setActionMenuId(null))
-                                .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to unlink receipt.'))
-                            }}
-                          >
-                            Unlink
+                            Link transaction
                           </button>
                           <button
                             className="is-danger"
@@ -277,6 +283,66 @@ function SummaryItem({ label, value, tone, icon: Icon }: { label: string; value:
 
 function LinkPill({ state }: { state: ReceiptLinkState }) {
   return <span className={`status-pill receipt-link-${state.toLowerCase().replace(/\s+/g, '-')}`}>{state}</span>
+}
+
+function ReceiptLinkModal({
+  receipt,
+  transactions,
+  onClose,
+  onLink,
+}: {
+  receipt: ReceiptRecord
+  transactions: TransactionLinkOption[]
+  onClose: () => void
+  onLink: (transactionId: string) => void
+}) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+  const visibleTransactions = transactions.filter((transaction) => (
+    !normalizedSearch || transaction.label.toLowerCase().includes(normalizedSearch)
+  ))
+
+  return (
+    <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="transaction-detail-modal receipt-link-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="receiptLinkTitle"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="drawer-header">
+          <div>
+            <h2 id="receiptLinkTitle">Link receipt</h2>
+            <p>{receipt.fileName}</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close receipt link" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <label className="field search-field">
+          <Search size={18} />
+          <input type="search" placeholder="Search transactions" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+        </label>
+
+        <div className="receipt-link-list">
+          {visibleTransactions.map((transaction) => (
+            <button className="receipt-link-option" type="button" key={transaction.id} onClick={() => onLink(transaction.id)}>
+              <span>{transaction.label}</span>
+            </button>
+          ))}
+          {visibleTransactions.length === 0 ? (
+            <p className="progressive-panel-note">No transactions match this search.</p>
+          ) : null}
+        </div>
+
+        <div className="drawer-actions">
+          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+        </div>
+      </section>
+    </div>
+  )
 }
 
 function ReceiptUploadDrawer({

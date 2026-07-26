@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ChevronDown,
   CreditCard,
   Landmark,
   Link,
@@ -35,7 +34,6 @@ function Accounts(props: PageProps) {
   const [typeFilter, setTypeFilter] = useState<AccountRecord['type'] | 'All'>('All')
   const [statusFilter, setStatusFilter] = useState<AccountStatus | 'All'>('Active')
   const [dataError, setDataError] = useState('')
-  const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('accounts-details')
   useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
   const filteredAccounts = useMemo(() => {
@@ -271,18 +269,6 @@ function Accounts(props: PageProps) {
               </table>
             </div>
           </section>
-
-          <section className="progressive-panels" aria-label="Additional account tools">
-            <ProgressivePanel
-              id="plaid"
-              title="Plaid connector"
-              summary="Available later"
-              expandedPanel={expandedPanel}
-              onToggle={setExpandedPanel}
-            >
-              Keep manual accounts today, then connect banks later when Plaid is ready.
-            </ProgressivePanel>
-          </section>
         </main>
     </AppShell>
   )
@@ -313,35 +299,6 @@ function AccountTypeIcon({ type }: { type: AccountRecord['type'] }) {
 
 function StatusPill({ status }: { status: AccountStatus }) {
   return <span className={`status-pill status-${status.toLowerCase().replace(/\s+/g, '-')}`}>{status}</span>
-}
-
-function ProgressivePanel({
-  id,
-  title,
-  summary,
-  expandedPanel,
-  onToggle,
-  children,
-}: {
-  id: string
-  title: string
-  summary: string
-  expandedPanel: string | null
-  onToggle: (id: string | null) => void
-  children: string
-}) {
-  const isExpanded = expandedPanel === id
-
-  return (
-    <article className="progressive-panel">
-      <button type="button" onClick={() => onToggle(isExpanded ? null : id)} aria-expanded={isExpanded}>
-        <span>{title}</span>
-        <strong>{summary}</strong>
-        <ChevronDown size={17} />
-      </button>
-      {isExpanded ? <p>{children}</p> : null}
-    </article>
-  )
 }
 
 const emptyDraft: AccountDraft = {

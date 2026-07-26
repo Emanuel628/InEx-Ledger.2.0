@@ -1417,6 +1417,11 @@ textarea:focus-visible {
   appearance: none;
 }
 
+.month-filter-button svg,
+.per-page-button svg {
+  pointer-events: none;
+}
+
 .table-scroll {
   overflow-x: auto;
 }
@@ -1579,12 +1584,9 @@ tbody tr:last-child td {
 }
 
 .receipt-link-unlinked,
-.receipt-link-needs-info {
-  background: #fff2d8;
-  color: #9a5b00;
-}
-
-.receipt-link-needs-info {
+.receipt-link-needs-info,
+.status-inactive,
+.status-archived {
   background: #fde8e8;
   color: var(--red);
 }
@@ -1860,6 +1862,34 @@ tbody tr:last-child td {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
+}
+
+.receipt-link-modal {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.receipt-link-list {
+  max-height: min(52vh, 460px);
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  overflow-y: auto;
+}
+
+.receipt-link-option {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  text-align: left;
+}
+
+.receipt-link-option:hover {
+  border-color: rgba(23, 92, 255, 0.34);
+  background: #f7faff;
 }
 
 .drawer-backdrop {

@@ -30,9 +30,11 @@ import {
   deleteRecurringTemplate,
   importTransactionsCsv,
   loadTransactionPageData,
+  loadTransactionUndoStatus,
   runRecurringTemplate,
   saveRecurringTemplateDraft,
   saveTransactionDraft,
+  undoDeletedTransaction,
   updateRecurringTemplateStatus,
   type AccountOption,
   type BusinessTaxProfile,
@@ -71,6 +73,8 @@ function Transactions(props: PageProps) {
   const [accountFilter, setAccountFilter] = useState('All')
   const [pageSize, setPageSize] = useState(20)
   const [currentPage, setCurrentPage] = useState(1)
+  const [undoCount, setUndoCount] = useState(0)
+  const [undoMessage, setUndoMessage] = useState('')
   const [noticeVisible, dismissNotice] = useSessionDismissed('transactions-review')
   useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
 
@@ -85,6 +89,7 @@ function Transactions(props: PageProps) {
       setTaxProfile(pageData.taxProfile)
       setReviewQueue(pageData.reviewQueue)
       setRecurringTemplates(pageData.recurringTemplates)
+      void loadTransactionUndoStatus().then(setUndoCount).catch(() => setUndoCount(0))
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load transactions.')
       setTransactionRows([])
@@ -138,6 +143,22 @@ function Transactions(props: PageProps) {
   useEffect(() => {
     void refreshPageData()
   }, [])
+
+  async function restoreDeletedTransaction() {
+    setDataError('')
+    try {
+      const result = await undoDeletedTransaction()
+      if (result.transaction) {
+        setTransactionRows((rows) => [result.transaction as Transaction, ...rows])
+      } else {
+        await refreshPageData()
+      }
+      setUndoCount(result.remainingUndoCount)
+      setUndoMessage(result.remainingUndoCount > 0 ? `${result.remainingUndoCount} undo ${result.remainingUndoCount === 1 ? 'is' : 'are'} still available.` : 'Transaction restored.')
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to restore transaction.')
+    }
+  }
 
   useEffect(() => {
     document.body.classList.toggle(
@@ -212,6 +233,8 @@ function Transactions(props: PageProps) {
                 void deleteTransaction(selectedTransaction.id)
                   .then(() => {
                     setTransactionRows((rows) => rows.filter((row) => row.id !== selectedTransaction.id))
+                    setUndoCount((count) => Math.max(1, count + 1))
+                    setUndoMessage('Transaction deleted.')
                     setSelectedTransaction(null)
                   })
                   .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to delete transaction.'))
@@ -354,6 +377,11 @@ function Transactions(props: PageProps) {
               </label>
 
               <div className="filter-actions">
+                {undoCount > 0 ? (
+                  <button className="secondary-button undo-delete-button" type="button" onClick={() => void restoreDeletedTransaction()}>
+                    Undo delete
+                  </button>
+                ) : null}
                 <button className="secondary-button" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(true)}>
                   <Filter size={17} />
                   More filters
@@ -470,6 +498,8 @@ function Transactions(props: PageProps) {
                                 void deleteTransaction(transaction.id)
                                   .then(() => {
                                     setTransactionRows((rows) => rows.filter((row) => row.id !== transaction.id))
+                                    setUndoCount((count) => Math.max(1, count + 1))
+                                    setUndoMessage('Transaction deleted.')
                                     setActionMenuId(null)
                                   })
                                   .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to delete transaction.'))
@@ -494,6 +524,7 @@ function Transactions(props: PageProps) {
             <div className="table-footer">
               <span>
                 Showing {filteredRows.length ? pageStart + 1 : 0} to {Math.min(pageStart + pageSize, filteredRows.length)} of {filteredRows.length} transactions
+                {undoMessage ? ` - ${undoMessage}` : ''}
               </span>
               <div className="pagination" aria-label="Pagination">
                 <button type="button" aria-label="Previous page" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>

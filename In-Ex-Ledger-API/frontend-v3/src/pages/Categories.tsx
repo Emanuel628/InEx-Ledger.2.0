@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  ChevronDown,
   MoreHorizontal,
   Plus,
   Search,
@@ -37,7 +36,6 @@ function Categories(props: PageProps) {
   const [typeFilter, setTypeFilter] = useState<CategoryType | 'All'>('All')
   const [statusFilter, setStatusFilter] = useState<CategoryStatus | 'All'>('All')
   const [dataError, setDataError] = useState('')
-  const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('categories-review')
   useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
   const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
@@ -185,6 +183,7 @@ function Categories(props: PageProps) {
                   <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as CategoryStatus | 'All')}>
                     <option value="All">Review: All</option>
                     <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
                     <option value="Needs review">Needs review</option>
                     <option value="Archived">Archived</option>
                   </select>
@@ -285,18 +284,6 @@ function Categories(props: PageProps) {
               </table>
             </div>
           </section>
-
-          <section className="progressive-panels" aria-label="Additional category tools">
-            <ProgressivePanel
-              id="archived"
-              title="Archived categories"
-              summary={`${categoryRows.filter((category) => category.status === 'Archived').length} hidden`}
-              expandedPanel={expandedPanel}
-              onToggle={setExpandedPanel}
-            >
-              Archived categories stay available for history without crowding daily categorization.
-            </ProgressivePanel>
-          </section>
         </main>
     </AppShell>
   )
@@ -322,35 +309,6 @@ function TypePill({ type }: { type: CategoryType }) {
 
 function StatusPill({ status }: { status: CategoryStatus }) {
   return <span className={`status-pill status-${status.toLowerCase().replace(/\s+/g, '-')}`}>{status}</span>
-}
-
-function ProgressivePanel({
-  id,
-  title,
-  summary,
-  expandedPanel,
-  onToggle,
-  children,
-}: {
-  id: string
-  title: string
-  summary: string
-  expandedPanel: string | null
-  onToggle: (id: string | null) => void
-  children: string
-}) {
-  const isExpanded = expandedPanel === id
-
-  return (
-    <article className="progressive-panel">
-      <button type="button" onClick={() => onToggle(isExpanded ? null : id)} aria-expanded={isExpanded}>
-        <span>{title}</span>
-        <strong>{summary}</strong>
-        <ChevronDown size={17} />
-      </button>
-      {isExpanded ? <p>{children}</p> : null}
-    </article>
-  )
 }
 
 const emptyDraft: CategoryDraft = {

@@ -254,6 +254,25 @@ export async function deleteTransaction(transactionId: string) {
   })
 }
 
+export async function undoDeletedTransaction() {
+  const response = await apiRequest<{
+    transaction?: LegacyTransaction
+    remaining_undo_count?: number
+  }>('/api/transactions/undo-delete', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return {
+    transaction: response.transaction ? mapTransaction(response.transaction) : null,
+    remainingUndoCount: Number(response.remaining_undo_count || 0),
+  }
+}
+
+export async function loadTransactionUndoStatus() {
+  const response = await apiRequest<{ remaining_undo_count?: number }>('/api/transactions/undo-delete-status')
+  return Number(response.remaining_undo_count || 0)
+}
+
 export async function importTransactionsCsv(input: {
   file: File
   accountId: string

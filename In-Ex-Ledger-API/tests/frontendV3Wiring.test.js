@@ -140,6 +140,60 @@ test("v3 transactions restores tax estimate, review fixes, receipt upload, recur
   assert.doesNotMatch(pageSource, /Not connected yet/);
 });
 
+test("v3 transactions expose legacy undo delete and a clickable per-page select affordance", () => {
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(apiSource, /\/api\/transactions\/undo-delete'/);
+  assert.match(apiSource, /\/api\/transactions\/undo-delete-status/);
+  assert.match(pageSource, /Undo delete/);
+  assert.match(pageSource, /undo-delete-button/);
+  assert.match(cssSource, /\.per-page-button svg[\s\S]*pointer-events: none/);
+});
+
+test("v3 accounts remove the bottom Plaid connector panel while keeping add-account options", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "pages", "Accounts.tsx"), "utf8");
+
+  assert.doesNotMatch(source, /title="Plaid connector"/);
+  assert.doesNotMatch(source, /Available later/);
+  assert.match(source, /Connect with Plaid/);
+});
+
+test("v3 categories use full tax mappings and red inactive archived states without archived footer panel", () => {
+  const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "categoriesApi.ts"), "utf8");
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Categories.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  for (const expected of [
+    "depreciation_section179",
+    "employee_benefit_programs",
+    "rent_lease_vehicles",
+    "t2125_8000",
+    "ca_9943"
+  ]) {
+    assert.match(apiSource, new RegExp(expected));
+  }
+  assert.match(apiSource, /tax_map_us: null/);
+  assert.match(apiSource, /taxLine: isActive \?[\s\S]*: 'Disconnected'/);
+  assert.match(apiSource, /'Inactive'/);
+  assert.match(pageSource, /<option value="Inactive">Inactive<\/option>/);
+  assert.doesNotMatch(pageSource, /Archived categories/);
+  assert.match(cssSource, /\.status-inactive,[\s\S]*\.status-archived[\s\S]*var\(--red\)/);
+});
+
+test("v3 receipts use red unlinked pills and a transaction picker instead of link-to-latest", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Receipts.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(pageSource, /ReceiptLinkModal/);
+  assert.match(pageSource, /Search transactions/);
+  assert.match(pageSource, /Link transaction/);
+  assert.doesNotMatch(pageSource, /Link to latest/);
+  assert.doesNotMatch(pageSource, /attachReceipt\(receipt\.id, null\)/);
+  assert.match(cssSource, /\.receipt-link-unlinked,[\s\S]*var\(--red\)/);
+});
+
 test("v3 archived message rows expose an action menu instead of only opening the thread", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "pages", "Messages.tsx"), "utf8");
 
