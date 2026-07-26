@@ -335,6 +335,20 @@ function parseStripeUnitAmount(price) {
   return numeric / 100;
 }
 
+function expectedStripeRecurringInterval(billingInterval) {
+  return normalizeBillingInterval(billingInterval) === "yearly" ? "year" : "month";
+}
+
+function assertStripePriceMatchesBillingInterval(price, billingInterval, label) {
+  const expectedInterval = expectedStripeRecurringInterval(billingInterval);
+  const actualInterval = String(price?.recurring?.interval || "").toLowerCase();
+  if (actualInterval !== expectedInterval) {
+    throw new BillingValidationError(
+      `${label} Stripe Price is configured for ${actualInterval || "a non-recurring interval"}, not ${expectedInterval}.`
+    );
+  }
+}
+
 async function fetchStripePrice(priceId) {
   return stripeGet(`/prices/${encodeURIComponent(priceId)}`);
 }
@@ -352,6 +366,11 @@ async function buildVerifiedPricingTable(currency) {
     fetchStripePrice(requireEnvValue(monthlyAddonEnv)),
     fetchStripePrice(requireEnvValue(yearlyAddonEnv))
   ]);
+
+  assertStripePriceMatchesBillingInterval(monthlyBasePrice, "monthly", "Monthly base");
+  assertStripePriceMatchesBillingInterval(monthlyAddonPrice, "monthly", "Monthly additional business");
+  assertStripePriceMatchesBillingInterval(yearlyBasePrice, "yearly", "Yearly base");
+  assertStripePriceMatchesBillingInterval(yearlyAddonPrice, "yearly", "Yearly additional business");
 
   return {
     monthly: {
@@ -502,6 +521,19 @@ async function findBlockingStripeSubscriptionForCustomer(stripeCustomerId) {
   );
   const subscriptions = Array.isArray(latest?.data) ? latest.data : [];
   return subscriptions.find((item) => hasBlockingStripeSubscription(item)) || null;
+}
+
+async function verifyStripePriceSelection(priceSelection) {
+  const intervalLabel = priceSelection.billingInterval === "yearly" ? "Yearly" : "Monthly";
+  const checks = [
+    [`${intervalLabel} base`, priceSelection.basePriceId],
+    priceSelection.addonPriceId ? [`${intervalLabel} additional business`, priceSelection.addonPriceId] : null
+  ].filter(Boolean);
+
+  const prices = await Promise.all(checks.map(([, priceId]) => fetchStripePrice(priceId)));
+  prices.forEach((price, index) => {
+    assertStripePriceMatchesBillingInterval(price, priceSelection.billingInterval, checks[index][0]);
+  });
 }
 
 function shouldVerifyStripeSubscriptionSnapshot(subscription) {
@@ -907,6 +939,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       currency: checkoutCurrency,
       additionalBusinesses
     });
+    await verifyStripePriceSelection(priceSelection);
 
     const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
     const blockingSubscription = await findBlockingStripeSubscriptionForCustomer(customerId);

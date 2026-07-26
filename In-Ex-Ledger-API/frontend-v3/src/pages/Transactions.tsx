@@ -93,8 +93,8 @@ function Transactions(props: PageProps) {
         limit: pageSize,
         offset: (currentPage - 1) * pageSize,
         search: searchTerm,
-        categoryName: categoryFilter,
-        accountName: accountFilter,
+        categoryId: categoryFilter,
+        accountId: accountFilter,
         status: statusFilter,
         startDate: startDateFilter,
         endDate: endDateFilter,
@@ -123,14 +123,14 @@ function Transactions(props: PageProps) {
   }, [accountFilter, categoryFilter, currentPage, endDateFilter, pageSize, searchTerm, startDateFilter, statusFilter])
 
   const filteredRows = transactionRows
-  const totalRows = transactionTotal || transactionSummary.transactionCount || filteredRows.length
+  const totalRows = transactionTotal || transactionSummary.transactionCount
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const pageStart = (safeCurrentPage - 1) * pageSize
   const visibleRows = filteredRows
   const paginationPages = getPaginationPages(safeCurrentPage, totalPages)
-  const categories = uniqueValues(categoryOptions.map((category) => category.name))
-  const accounts = uniqueValues(accountOptions.map((account) => account.name))
+  const categories = categoryOptions
+  const accounts = accountOptions
   const incomeTotal = transactionSummary.incomeTotal
   const expenseTotal = transactionSummary.expenseTotal
   const netTotal = incomeTotal - expenseTotal
@@ -139,15 +139,17 @@ function Transactions(props: PageProps) {
 
   function updatePageSize(value: number) {
     const normalized = [10, 20, 50].includes(value) ? value : 20
+    setCurrentPage(1)
     setPageSize(normalized)
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(TRANSACTION_PAGE_SIZE_KEY, String(normalized))
     }
   }
 
-  useEffect(() => {
+  function updateFilter(setter: (value: string) => void, value: string) {
     setCurrentPage(1)
-  }, [accountFilter, categoryFilter, endDateFilter, pageSize, searchTerm, startDateFilter, statusFilter])
+    setter(value)
+  }
 
   useEffect(() => {
     void refreshPageData()
@@ -287,12 +289,13 @@ function Transactions(props: PageProps) {
               accountFilter={accountFilter}
               startDateFilter={startDateFilter}
               endDateFilter={endDateFilter}
-              onCategoryChange={setCategoryFilter}
-              onStatusChange={setStatusFilter}
-              onAccountChange={setAccountFilter}
-              onStartDateChange={setStartDateFilter}
-              onEndDateChange={setEndDateFilter}
+              onCategoryChange={(value) => updateFilter(setCategoryFilter, value)}
+              onStatusChange={(value) => updateFilter(setStatusFilter, value)}
+              onAccountChange={(value) => updateFilter(setAccountFilter, value)}
+              onStartDateChange={(value) => updateFilter(setStartDateFilter, value)}
+              onEndDateChange={(value) => updateFilter(setEndDateFilter, value)}
               onClear={() => {
+                setCurrentPage(1)
                 setSearchTerm('')
                 setCategoryFilter('All')
                 setStatusFilter('All')
@@ -398,7 +401,7 @@ function Transactions(props: PageProps) {
                   type="search"
                   placeholder="Search transactions"
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) => updateFilter(setSearchTerm, event.target.value)}
                 />
               </label>
 
@@ -1426,8 +1429,8 @@ function TransactionFiltersModal({
   onClear,
   onClose,
 }: {
-  categories: string[]
-  accounts: string[]
+  categories: CategoryOption[]
+  accounts: AccountOption[]
   categoryFilter: string
   statusFilter: string
   accountFilter: string
@@ -1465,7 +1468,7 @@ function TransactionFiltersModal({
             Category
             <select value={categoryFilter} onChange={(event) => onCategoryChange(event.target.value)}>
               <option value="All">All categories</option>
-              {categories.map((category) => <option value={category} key={category}>{category}</option>)}
+              {categories.map((category) => <option value={category.id} key={category.id}>{category.displayLabel}</option>)}
             </select>
           </label>
           <label>
@@ -1483,7 +1486,7 @@ function TransactionFiltersModal({
             Account
             <select value={accountFilter} onChange={(event) => onAccountChange(event.target.value)}>
               <option value="All">All accounts</option>
-              {accounts.map((account) => <option value={account} key={account}>{account}</option>)}
+              {accounts.map((account) => <option value={account.id} key={account.id}>{account.name}</option>)}
             </select>
           </label>
           <div className="form-grid-2">
@@ -1651,10 +1654,6 @@ function templateToRecurringDraft(template: RecurringTemplate | null): Recurring
     clearedDefault: template?.clearedDefault ?? false,
     active: template?.active ?? true,
   }
-}
-
-function uniqueValues(values: string[]) {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b))
 }
 
 function getPaginationPages(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {

@@ -99,6 +99,9 @@ test("v3 API client refreshes an expired access token before failing authenticat
   assert.match(source, /response\.status === 401 && await refreshAccessToken\(\)/);
   assert.match(source, /\/api\/auth\/refresh/);
   assert.match(source, /credentials: 'include'/);
+  assert.match(source, /getCurrentCanonicalPath\(\)/);
+  assert.match(source, /window\.location\.hash/);
+  assert.match(source, /path\.startsWith\('\/app-v3\/'\)/);
 });
 
 test("v3 API client preserves multipart bodies and retries stale CSRF once", () => {
@@ -220,15 +223,21 @@ test("v3 transactions render review reasons safely and wire filter date range pl
   assert.doesNotMatch(pageSource, /\{reviewItem\.supportSummary \|\| reviewItem\.reviewNotes \|\| reviewItem\.categoryReason\}/);
   assert.match(apiSource, /start_date/);
   assert.match(apiSource, /end_date/);
-  assert.match(apiSource, /account_name/);
-  assert.match(apiSource, /category_name/);
+  assert.match(apiSource, /params\.set\('account_id', filters\.accountId\)/);
+  assert.match(apiSource, /params\.set\('category_id', filters\.categoryId\)/);
+  assert.doesNotMatch(apiSource, /params\.set\('account_name'/);
+  assert.doesNotMatch(apiSource, /params\.set\('category_name'/);
+  assert.doesNotMatch(apiSource, /transactions\.data\.length\)/);
   assert.match(pageSource, /loadTransactionPageData\(\{/);
   assert.match(pageSource, /limit: pageSize/);
   assert.match(pageSource, /offset: \(currentPage - 1\) \* pageSize/);
+  assert.match(pageSource, /categoryId: categoryFilter/);
+  assert.match(pageSource, /accountId: accountFilter/);
+  assert.match(pageSource, /function updateFilter/);
   assert.match(pageSource, /getPaginationPages\(safeCurrentPage, totalPages\)/);
   assert.doesNotMatch(pageSource, /Array\.from\(\{ length: totalPages \}, \(_, index\) => index \+ 1\)\.slice\(0, 5\)/);
-  assert.match(pageSource, /onStartDateChange={setStartDateFilter}/);
-  assert.match(pageSource, /onEndDateChange={setEndDateFilter}/);
+  assert.match(pageSource, /onStartDateChange=\{\(value\) => updateFilter\(setStartDateFilter, value\)\}/);
+  assert.match(pageSource, /onEndDateChange=\{\(value\) => updateFilter\(setEndDateFilter, value\)\}/);
   assert.match(pageSource, /Manage categories<\/button>/);
   assert.match(pageSource, /transaction-edit-review/);
   assert.match(pageSource, /field-needs-review/);
@@ -374,6 +383,9 @@ test("v3 subscription avoids checkout conflicts for existing Stripe subscription
   assert.match(source, /needsBillingPortal/);
   assert.match(source, /await openBillingPortal\(\)/);
   assert.match(source, /Open Stripe billing/);
+  assert.match(source, /readPreferredBillingInterval/);
+  assert.match(source, /sessionStorage\.setItem\('inex-preferred-billing-interval', nextInterval\)/);
+  assert.doesNotMatch(source, /setBillingInterval\(serverInterval\)/);
 });
 
 test("v3 collapsed sidebar keeps the header visible", () => {

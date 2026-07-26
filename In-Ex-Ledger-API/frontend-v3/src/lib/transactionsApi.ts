@@ -200,8 +200,8 @@ export type TransactionPageFilters = {
   limit: number
   offset: number
   search?: string
-  categoryName?: string
-  accountName?: string
+  categoryId?: string
+  accountId?: string
   status?: string
   startDate?: string
   endDate?: string
@@ -228,11 +228,11 @@ export async function loadTransactionPageData(filters: TransactionPageFilters = 
     taxProfile: resolveEstimatedTaxProfile(business),
     reviewQueue,
     recurringTemplates: recurringTemplates.map(mapRecurringTemplate),
-    total: Number(transactions.total ?? transactions.summary?.transaction_count ?? transactions.data.length),
+    total: Number(transactions.total ?? transactions.summary?.transaction_count ?? 0),
     summary: {
       incomeTotal: Number(transactions.summary?.income_total || 0),
       expenseTotal: Number(transactions.summary?.expense_total || 0),
-      transactionCount: Number(transactions.summary?.transaction_count ?? transactions.total ?? transactions.data.length),
+      transactionCount: Number(transactions.summary?.transaction_count ?? transactions.total ?? 0),
     },
     hasMore: transactions.has_more === true,
   }
@@ -243,8 +243,8 @@ function buildTransactionListUrl(filters: TransactionPageFilters) {
   params.set('limit', String(filters.limit || 20))
   params.set('offset', String(Math.max(filters.offset || 0, 0)))
   if (filters.search?.trim()) params.set('search', filters.search.trim())
-  if (filters.categoryName && filters.categoryName !== 'All') params.set('category_name', filters.categoryName)
-  if (filters.accountName && filters.accountName !== 'All') params.set('account_name', filters.accountName)
+  if (filters.categoryId && filters.categoryId !== 'All') params.set('category_id', filters.categoryId)
+  if (filters.accountId && filters.accountId !== 'All') params.set('account_id', filters.accountId)
   if (filters.startDate) params.set('start_date', filters.startDate)
   if (filters.endDate) params.set('end_date', filters.endDate)
   if (filters.status === 'Needs attention') params.set('review', 'any')

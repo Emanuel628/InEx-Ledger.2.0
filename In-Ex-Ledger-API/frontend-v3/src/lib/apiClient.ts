@@ -130,8 +130,24 @@ async function refreshCsrfToken() {
 }
 
 function redirectToLogin() {
-  const next = encodeURIComponent(`${window.location.pathname}${window.location.search}`)
+  const next = encodeURIComponent(getCurrentCanonicalPath())
   window.location.assign(`/login?reason=expired&next=${next}`)
+}
+
+function getCurrentCanonicalPath() {
+  const path = normalizeCanonicalPath(window.location.pathname || '/transactions')
+  return `${path}${window.location.search || ''}${window.location.hash || ''}`
+}
+
+function normalizeCanonicalPath(path: string) {
+  if (path === '/app-v3') {
+    return '/transactions'
+  }
+  if (path.startsWith('/app-v3/')) {
+    const barePath = path.slice('/app-v3'.length)
+    return barePath === '/' ? '/transactions' : barePath
+  }
+  return path || '/transactions'
 }
 
 function readCookie(name: string) {

@@ -14,7 +14,8 @@ function loadBillingRouter({
   subscriptionSnapshots = null,
   searchedStripeCustomerId = null,
   missingSubscriptionRow = false,
-  stripeSubscriptionResponse = null
+  stripeSubscriptionResponse = null,
+  priceOverrides = {}
 } = {}) {
   const state = {
     stripeRequests: [],
@@ -279,14 +280,15 @@ function loadBillingRouter({
     if (String(url).includes("/prices/")) {
       const priceId = String(url).split("/prices/")[1];
       const catalog = {
-        price_month_usd: { id: "price_month_usd", unit_amount: 1200 },
-        price_month_cad: { id: "price_month_cad", unit_amount: 1700 },
-        price_year_usd: { id: "price_year_usd", unit_amount: 12240 },
-        price_year_cad: { id: "price_year_cad", unit_amount: 17500 },
-        price_addon_month_usd: { id: "price_addon_month_usd", unit_amount: 500 },
-        price_addon_month_cad: { id: "price_addon_month_cad", unit_amount: 700 },
-        price_addon_year_usd: { id: "price_addon_year_usd", unit_amount: 5100 },
-        price_addon_year_cad: { id: "price_addon_year_cad", unit_amount: 7200 }
+        price_month_usd: { id: "price_month_usd", unit_amount: 1200, recurring: { interval: "month" } },
+        price_month_cad: { id: "price_month_cad", unit_amount: 1700, recurring: { interval: "month" } },
+        price_year_usd: { id: "price_year_usd", unit_amount: 12240, recurring: { interval: "year" } },
+        price_year_cad: { id: "price_year_cad", unit_amount: 17500, recurring: { interval: "year" } },
+        price_addon_month_usd: { id: "price_addon_month_usd", unit_amount: 500, recurring: { interval: "month" } },
+        price_addon_month_cad: { id: "price_addon_month_cad", unit_amount: 700, recurring: { interval: "month" } },
+        price_addon_year_usd: { id: "price_addon_year_usd", unit_amount: 5100, recurring: { interval: "year" } },
+        price_addon_year_cad: { id: "price_addon_year_cad", unit_amount: 7200, recurring: { interval: "year" } },
+        ...priceOverrides
       };
       const price = catalog[priceId];
       if (!price) {
@@ -458,6 +460,30 @@ test("billing checkout ignores client currency and uses verified region currency
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
     assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
     assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout rejects Stripe prices mapped to the wrong recurring interval", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    priceOverrides: {
+      price_month_usd: { id: "price_month_usd", unit_amount: 1200, recurring: { interval: "year" } }
+    }
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({ billingInterval: "monthly" });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error || "", /Monthly base Stripe Price is configured for year, not month/);
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+    assert.equal(checkoutRequest, undefined);
   } finally {
     fixture.cleanup();
   }

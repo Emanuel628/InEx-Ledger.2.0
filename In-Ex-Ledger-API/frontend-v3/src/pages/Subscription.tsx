@@ -29,10 +29,7 @@ type SubscriptionBusiness = { name: string; role: string; status: string }
 type SubscriptionModal = 'add-business' | 'manage-business' | null
 
 function Subscription(props: PageProps) {
-  const [interval, setBillingInterval] = useState<BillingInterval>(() => {
-    const saved = window.sessionStorage.getItem('inex-preferred-billing-interval')
-    return saved === 'yearly' ? 'yearly' : 'monthly'
-  })
+  const [interval, setBillingInterval] = useState<BillingInterval>(readPreferredBillingInterval)
   const [overview, setOverview] = useState<BillingOverview | null>(null)
   const [pricing, setPricing] = useState<BillingPricing | null>(null)
   const [loadingData, setLoadingData] = useState(true)
@@ -63,12 +60,6 @@ function Subscription(props: PageProps) {
       ])
       setOverview(nextOverview)
       setPricing(nextPricing)
-      const serverInterval = nextOverview.subscription?.billingInterval
-      if (serverInterval === 'monthly' || serverInterval === 'yearly') {
-        setBillingInterval(serverInterval)
-      } else {
-        window.sessionStorage.removeItem('inex-preferred-billing-interval')
-      }
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load subscription.')
       setOverview(null)
@@ -154,6 +145,11 @@ function Subscription(props: PageProps) {
     }
   }
 
+  function chooseBillingInterval(nextInterval: BillingInterval) {
+    setBillingInterval(nextInterval)
+    window.sessionStorage.setItem('inex-preferred-billing-interval', nextInterval)
+  }
+
   async function handleResume() {
     setWorking(true)
     setDataError('')
@@ -220,11 +216,11 @@ function Subscription(props: PageProps) {
           </div>
           <div className="subscription-renew-card">
             <div className="subscription-interval-toggle" role="group" aria-label="Billing interval">
-              <button className={interval === 'monthly' ? 'is-selected' : ''} type="button" onClick={() => setBillingInterval('monthly')}>
+              <button className={interval === 'monthly' ? 'is-selected' : ''} type="button" data-billing-interval="monthly" onClick={() => chooseBillingInterval('monthly')}>
                 Monthly
                 <strong>{formatIntervalPrice(pricing, 'monthly')}</strong>
               </button>
-              <button className={interval === 'yearly' ? 'is-selected' : ''} type="button" onClick={() => setBillingInterval('yearly')}>
+              <button className={interval === 'yearly' ? 'is-selected' : ''} type="button" data-billing-interval="yearly" onClick={() => chooseBillingInterval('yearly')}>
                 Yearly
                 <strong>{formatIntervalPrice(pricing, 'yearly')}</strong>
               </button>
@@ -557,6 +553,12 @@ function ManageBusinessModal({
       </section>
     </div>
   )
+}
+
+function readPreferredBillingInterval(): BillingInterval {
+  if (typeof window === 'undefined') return 'monthly'
+  const saved = window.sessionStorage.getItem('inex-preferred-billing-interval')
+  return saved === 'yearly' ? 'yearly' : 'monthly'
 }
 
 function formatIntervalPrice(pricing: BillingPricing | null, interval: BillingInterval) {
