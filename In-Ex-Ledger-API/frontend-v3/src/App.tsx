@@ -154,11 +154,16 @@ function getPathForPage(page: AppPage) {
     return '/'
   }
   const slug = pageSlugByPage[page]
+
   return slug ? `/${slug}` : '/transactions'
+=======
+  return slug ? `/${slug}` : '/'
+
 }
 
 function getCanonicalCurrentPath() {
   const requestedPage = getInitialPageFromPath()
+
   return requestedPage ? getPathForPage(requestedPage) : '/transactions'
 }
 
@@ -171,6 +176,8 @@ function normalizeLegacyAppV3Path() {
       window.history.replaceState({}, '', nextUrl)
     }
   }
+    return requestedPage ? getPathForPage(requestedPage) : '/'
+
 }
 
 function getLegacyAuthRoute(page: AppPage, next = getCanonicalCurrentPath()) {

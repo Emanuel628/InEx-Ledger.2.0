@@ -115,9 +115,13 @@ test("v3 API client preserves multipart bodies and retries stale CSRF once", () 
 test("v3 app routes use bare canonical paths and browser back drives page state", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
 
+
   assert.match(source, /return slug \? `\/\$\{slug\}` : '\/transactions'/);
   assert.match(source, /if \(page === 'Landing'\)[\s\S]*return '\/'/);
   assert.doesNotMatch(source, /return slug \? `\/app-v3\/\$\{slug\}`/);
+
+  assert.match(source, /return slug \? `\/\$\{slug\}` : '\/'/);
+
   assert.match(source, /getCanonicalCurrentPath/);
   assert.match(source, /normalizeLegacyAppV3Path/);
   assert.match(source, /login\?next=\$\{encodeURIComponent\(getPathForPage\(page\)\)\}/);
