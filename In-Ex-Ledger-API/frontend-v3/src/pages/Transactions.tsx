@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
 import {
   AlertTriangle,
   Calendar,
@@ -26,35 +25,23 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import useSessionDismissed from '../hooks/useSessionDismissed'
-
-type TransactionStatus = 'Cleared' | 'Needs review' | 'Missing receipt' | 'Draft'
-
-type Transaction = {
-  id: number
-  dateIso: string
-  date: string
-  description: string
-  category: string
-  account: string
-  receipt: 'Attached' | 'Missing' | 'Uploaded'
-  status: TransactionStatus
-  amount: number
-  merchantTone: string
-}
-
-type TransactionDraft = {
-  kind: 'Income' | 'Expense'
-  amount: string
-  description: string
-  date: string
-  category: string
-  account: string
-  note: string
-}
+import {
+  deleteTransaction,
+  importTransactionsCsv,
+  loadTransactionPageData,
+  saveTransactionDraft,
+  type AccountOption,
+  type CategoryOption,
+  type Transaction,
+  type TransactionDraft,
+  type TransactionStatus,
+} from '../lib/transactionsApi'
 
 const transactions: Transaction[] = [
   {
-    id: 1,
+    id: 'mock-1',
+    accountId: 'mock-checking',
+    categoryId: 'mock-income',
     dateIso: '2024-05-31',
     date: 'May 31',
     description: 'Stripe payout',
@@ -64,9 +51,13 @@ const transactions: Transaction[] = [
     status: 'Cleared',
     amount: 2450,
     merchantTone: 'blue',
+    note: '',
+    cleared: true,
   },
   {
-    id: 2,
+    id: 'mock-2',
+    accountId: 'mock-card',
+    categoryId: 'mock-software',
     dateIso: '2024-05-29',
     date: 'May 29',
     description: 'Adobe Creative Cloud',
@@ -76,9 +67,13 @@ const transactions: Transaction[] = [
     status: 'Cleared',
     amount: -52.99,
     merchantTone: 'red',
+    note: '',
+    cleared: true,
   },
   {
-    id: 3,
+    id: 'mock-3',
+    accountId: 'mock-card',
+    categoryId: 'mock-fuel',
     dateIso: '2024-05-28',
     date: 'May 28',
     description: 'Shell',
@@ -88,9 +83,13 @@ const transactions: Transaction[] = [
     status: 'Missing receipt',
     amount: -68.45,
     merchantTone: 'yellow',
+    note: '',
+    cleared: false,
   },
   {
-    id: 4,
+    id: 'mock-4',
+    accountId: 'mock-checking',
+    categoryId: 'mock-meals',
     dateIso: '2024-05-26',
     date: 'May 26',
     description: 'Client lunch',
@@ -100,9 +99,13 @@ const transactions: Transaction[] = [
     status: 'Needs review',
     amount: -134.86,
     merchantTone: 'coral',
+    note: '',
+    cleared: false,
   },
   {
-    id: 5,
+    id: 'mock-5',
+    accountId: 'mock-card',
+    categoryId: 'mock-software',
     dateIso: '2024-05-24',
     date: 'May 24',
     description: 'Google Workspace',
@@ -112,9 +115,13 @@ const transactions: Transaction[] = [
     status: 'Cleared',
     amount: -14.4,
     merchantTone: 'violet',
+    note: '',
+    cleared: true,
   },
   {
-    id: 6,
+    id: 'mock-6',
+    accountId: 'mock-checking',
+    categoryId: 'mock-income',
     dateIso: '2024-05-21',
     date: 'May 21',
     description: 'Consulting invoice',
@@ -124,7 +131,23 @@ const transactions: Transaction[] = [
     status: 'Cleared',
     amount: 1800,
     merchantTone: 'green',
+    note: '',
+    cleared: true,
   },
+]
+
+const fallbackAccounts: AccountOption[] = [
+  { id: 'mock-checking', name: 'Checking' },
+  { id: 'mock-card', name: 'Business Card' },
+  { id: 'mock-cash', name: 'Cash' },
+]
+
+const fallbackCategories: CategoryOption[] = [
+  { id: 'mock-income', name: 'Income', kind: 'income' },
+  { id: 'mock-software', name: 'Software', kind: 'expense' },
+  { id: 'mock-fuel', name: 'Fuel', kind: 'expense' },
+  { id: 'mock-meals', name: 'Meals', kind: 'expense' },
+  { id: 'mock-office', name: 'Office', kind: 'expense' },
 ]
 
 function Transactions(props: PageProps) {
@@ -132,8 +155,12 @@ function Transactions(props: PageProps) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [transactionRows, setTransactionRows] = useState<Transaction[]>(transactions)
+  const [accountOptions, setAccountOptions] = useState<AccountOption[]>(fallbackAccounts)
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>(fallbackCategories)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
-  const [actionMenuId, setActionMenuId] = useState<number | null>(null)
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
+  const [loadingData, setLoadingData] = useState(true)
+  const [dataError, setDataError] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [monthFilter, setMonthFilter] = useState('2024-05')
@@ -144,6 +171,24 @@ function Transactions(props: PageProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const csvInputRef = useRef<HTMLInputElement | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('transactions-review')
+
+  async function refreshPageData() {
+    setLoadingData(true)
+    setDataError('')
+    try {
+      const pageData = await loadTransactionPageData()
+      setTransactionRows(pageData.transactions)
+      setAccountOptions(pageData.accounts.length ? pageData.accounts : fallbackAccounts)
+      setCategoryOptions(pageData.categories.length ? pageData.categories : fallbackCategories)
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to load transactions.')
+      setTransactionRows(transactions)
+      setAccountOptions(fallbackAccounts)
+      setCategoryOptions(fallbackCategories)
+    } finally {
+      setLoadingData(false)
+    }
+  }
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -184,6 +229,10 @@ function Transactions(props: PageProps) {
   }, [accountFilter, categoryFilter, monthFilter, pageSize, searchTerm, statusFilter])
 
   useEffect(() => {
+    void refreshPageData()
+  }, [])
+
+  useEffect(() => {
     document.body.classList.toggle('modal-is-open', drawerOpen || Boolean(selectedTransaction) || filtersOpen)
 
     return () => document.body.classList.remove('modal-is-open')
@@ -201,20 +250,27 @@ function Transactions(props: PageProps) {
                 setDrawerOpen(false)
                 setEditingTransaction(null)
               }}
-              onSave={(transaction) => {
-                setTransactionRows((rows) => (
-                  editingTransaction
-                    ? rows.map((row) => (row.id === transaction.id ? transaction : row))
-                    : [transaction, ...rows]
-                ))
-                if (!editingTransaction && monthFilter !== 'All' && !transaction.dateIso.startsWith(monthFilter)) {
-                  setMonthFilter('All')
-                }
-                setEditingTransaction(null)
-                setDrawerOpen(false)
+              onSave={(draft) => {
+                void saveTransactionDraft(draft, editingTransaction, accountOptions, categoryOptions)
+                  .then((savedTransaction) => {
+                    setTransactionRows((rows) => (
+                      editingTransaction
+                        ? rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row))
+                        : [savedTransaction, ...rows]
+                    ))
+                    if (!editingTransaction && monthFilter !== 'All' && !savedTransaction.dateIso.startsWith(monthFilter)) {
+                      setMonthFilter('All')
+                    }
+                    setEditingTransaction(null)
+                    setDrawerOpen(false)
+                  })
+                  .catch((error) => {
+                    setDataError(error instanceof Error ? error.message : 'Unable to save transaction.')
+                  })
               }}
-              nextId={Math.max(...transactionRows.map((row) => row.id), 0) + 1}
               transaction={editingTransaction}
+              accounts={accountOptions}
+              categories={categoryOptions}
             />
           ) : null}
           {selectedTransaction ? (
@@ -226,8 +282,12 @@ function Transactions(props: PageProps) {
                 setSelectedTransaction(updated)
               }}
               onDelete={() => {
-                setTransactionRows((rows) => rows.filter((row) => row.id !== selectedTransaction.id))
-                setSelectedTransaction(null)
+                void deleteTransaction(selectedTransaction.id)
+                  .then(() => {
+                    setTransactionRows((rows) => rows.filter((row) => row.id !== selectedTransaction.id))
+                    setSelectedTransaction(null)
+                  })
+                  .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to delete transaction.'))
               }}
             />
           ) : null}
@@ -297,6 +357,19 @@ function Transactions(props: PageProps) {
             </section>
           ) : null}
 
+          {dataError ? (
+            <section className="top-alert" role="alert">
+              <AlertTriangle size={17} />
+              <div>
+                <strong>{dataError}</strong>
+                <span>{loadingData ? 'Loading current records.' : 'Showing local preview rows until live data is available.'}</span>
+              </div>
+              <button className="top-alert-close" type="button" aria-label="Dismiss data warning" onClick={() => setDataError('')}>
+                <X size={16} />
+              </button>
+            </section>
+          ) : null}
+
           <section className="summary-strip" aria-label="Transaction summary">
             <SummaryItem label="Income" value={formatMoney(incomeTotal)} tone="income" icon={TrendingUp} />
             <SummaryItem label="Expenses" value={formatMoney(expenseTotal)} tone="expense" icon={TrendingDown} />
@@ -342,8 +415,12 @@ function Transactions(props: PageProps) {
                   onChange={(event) => {
                     const file = event.target.files?.[0]
                     if (file) {
-                      void importCsv(file, transactionRows, setTransactionRows)
-                      setMonthFilter('All')
+                      void importTransactionsCsv(file)
+                        .then(() => {
+                          setMonthFilter('All')
+                          return refreshPageData()
+                        })
+                        .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to import CSV.'))
                     }
                     event.target.value = ''
                   }}
@@ -425,10 +502,17 @@ function Transactions(props: PageProps) {
                             <button
                               type="button"
                               onClick={() => {
-                                setTransactionRows((rows) => rows.map((row) => (
-                                  row.id === transaction.id ? { ...row, status: 'Cleared' } : row
-                                )))
-                                setActionMenuId(null)
+                                void saveTransactionDraft(
+                                  transactionToDraft(transaction),
+                                  { ...transaction, cleared: true, status: 'Cleared' },
+                                  accountOptions,
+                                  categoryOptions,
+                                )
+                                  .then((updated) => {
+                                    setTransactionRows((rows) => rows.map((row) => (row.id === updated.id ? updated : row)))
+                                    setActionMenuId(null)
+                                  })
+                                  .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to update transaction.'))
                               }}
                             >
                               Mark cleared
@@ -448,8 +532,12 @@ function Transactions(props: PageProps) {
                               className="is-danger"
                               type="button"
                               onClick={() => {
-                                setTransactionRows((rows) => rows.filter((row) => row.id !== transaction.id))
-                                setActionMenuId(null)
+                                void deleteTransaction(transaction.id)
+                                  .then(() => {
+                                    setTransactionRows((rows) => rows.filter((row) => row.id !== transaction.id))
+                                    setActionMenuId(null)
+                                  })
+                                  .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to delete transaction.'))
                               }}
                             >
                               Delete
@@ -605,13 +693,15 @@ const emptyDraft: TransactionDraft = {
 function TransactionDrawer({
   onClose,
   onSave,
-  nextId,
   transaction,
+  accounts,
+  categories,
 }: {
   onClose: () => void
-  onSave: (transaction: Transaction) => void
-  nextId: number
+  onSave: (draft: TransactionDraft) => void
   transaction: Transaction | null
+  accounts: AccountOption[]
+  categories: CategoryOption[]
 }) {
   const [draft, setDraft] = useState<TransactionDraft>(() => transaction ? transactionToDraft(transaction) : emptyDraft)
   const [error, setError] = useState('')
@@ -630,18 +720,7 @@ function TransactionDrawer({
       return
     }
 
-    onSave({
-      id: transaction?.id ?? nextId,
-      dateIso: draft.date || new Date().toISOString().slice(0, 10),
-      date: draft.date ? formatShortDate(draft.date) : 'Today',
-      description: draft.description.trim(),
-      category: draft.category || draft.kind,
-      account: draft.account || 'Checking',
-      receipt: transaction?.receipt ?? 'Missing',
-      status: transaction?.status ?? (draft.kind === 'Income' ? 'Cleared' : 'Needs review'),
-      amount: isIncome ? numericAmount : -numericAmount,
-      merchantTone: isIncome ? 'green' : 'red',
-    })
+    onSave(draft)
   }
 
   return (
@@ -688,20 +767,16 @@ function TransactionDrawer({
             Category
             <select value={draft.category} onChange={(event) => updateDraft('category', event.target.value)}>
               <option value="">Select category</option>
-              <option value="Income">Income</option>
-              <option value="Software">Software</option>
-              <option value="Fuel">Fuel</option>
-              <option value="Meals">Meals</option>
-              <option value="Office">Office</option>
+              {categories
+                .filter((category) => category.kind === (isIncome ? 'income' : 'expense'))
+                .map((category) => <option value={category.name} key={category.id}>{category.name}</option>)}
             </select>
           </label>
           <label>
             Account
             <select value={draft.account} onChange={(event) => updateDraft('account', event.target.value)}>
               <option value="">Select account</option>
-              <option value="Checking">Checking</option>
-              <option value="Business Card">Business Card</option>
-              <option value="Cash">Cash</option>
+              {accounts.map((account) => <option value={account.name} key={account.id}>{account.name}</option>)}
             </select>
           </label>
           <details>
@@ -885,11 +960,6 @@ function getMerchantInitial(description: string) {
   return description.trim().charAt(0).toUpperCase()
 }
 
-function formatShortDate(date: string) {
-  const parsed = new Date(`${date}T00:00:00`)
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
 function transactionToDraft(transaction: Transaction): TransactionDraft {
   return {
     kind: transaction.amount >= 0 ? 'Income' : 'Expense',
@@ -904,88 +974,6 @@ function transactionToDraft(transaction: Transaction): TransactionDraft {
 
 function uniqueValues(values: string[]) {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b))
-}
-
-async function importCsv(
-  file: File,
-  currentRows: Transaction[],
-  setTransactionRows: Dispatch<SetStateAction<Transaction[]>>,
-) {
-  const csvText = await file.text()
-  const lines = csvText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-  if (lines.length < 2) {
-    return
-  }
-
-  const headers = splitCsvLine(lines[0]).map((header) => normalizeHeader(header))
-  const startingId = Math.max(...currentRows.map((row) => row.id), 0) + 1
-  const importedRows = lines.slice(1).map((line, index) => {
-    const cells = splitCsvLine(line)
-    const valueFor = (...names: string[]) => {
-      const headerIndex = headers.findIndex((header) => names.includes(header))
-      return headerIndex >= 0 ? cells[headerIndex]?.trim() ?? '' : ''
-    }
-    const rawDate = valueFor('date', 'transactiondate', 'posteddate') || new Date().toISOString().slice(0, 10)
-    const dateIso = normalizeDate(rawDate)
-    const rawAmount = valueFor('amount', 'total', 'transactionamount') || '0'
-    const amount = Number(rawAmount.replace(/[$,]/g, '')) || 0
-    const description = valueFor('description', 'merchant', 'payee', 'name') || `Imported transaction ${index + 1}`
-    const category = valueFor('category', 'taxcategory') || (amount >= 0 ? 'Income' : 'Uncategorized')
-    const account = valueFor('account', 'bankaccount') || 'Imported'
-
-    return {
-      id: startingId + index,
-      dateIso,
-      date: formatShortDate(dateIso),
-      description,
-      category,
-      account,
-      receipt: 'Missing',
-      status: amount >= 0 ? 'Cleared' : 'Needs review',
-      amount,
-      merchantTone: amount >= 0 ? 'green' : 'red',
-    } satisfies Transaction
-  })
-
-  setTransactionRows((rows) => [...importedRows, ...rows])
-}
-
-function splitCsvLine(line: string) {
-  const cells: string[] = []
-  let current = ''
-  let quoted = false
-
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index]
-    const nextChar = line[index + 1]
-    if (char === '"' && nextChar === '"') {
-      current += '"'
-      index += 1
-    } else if (char === '"') {
-      quoted = !quoted
-    } else if (char === ',' && !quoted) {
-      cells.push(current)
-      current = ''
-    } else {
-      current += char
-    }
-  }
-
-  cells.push(current)
-  return cells
-}
-
-function normalizeHeader(header: string) {
-  return header.toLowerCase().replace(/[^a-z0-9]/g, '')
-}
-
-function normalizeDate(value: string) {
-  const parsed = new Date(value)
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10)
-  }
-
-  return new Date().toISOString().slice(0, 10)
 }
 
 export default Transactions
