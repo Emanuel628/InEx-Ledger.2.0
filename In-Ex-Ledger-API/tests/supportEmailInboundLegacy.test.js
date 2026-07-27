@@ -51,12 +51,13 @@ function loadLegacySupportInboundApp() {
       return {
         pool: {
           async query(sql, params = []) {
-            if (/SELECT id, sender_id, subject\s+FROM messages/i.test(sql)) {
+            if (/SELECT id, sender_id, subject, business_id\s+FROM messages/i.test(sql)) {
               return {
                 rows: [{
                   id: "77777777-7777-4777-8777-777777777777",
                   sender_id: "11111111-1111-4111-8111-111111111111",
-                  subject: "Need help"
+                  subject: "Need help",
+                  business_id: null
                 }],
                 rowCount: 1
               };

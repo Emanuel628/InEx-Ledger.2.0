@@ -429,8 +429,8 @@ router.post("/:id/send", async (req, res) => {
     await pool.query(
       `INSERT INTO messages
          (id, sender_id, receiver_id, message_type, subject, body,
-          external_sender_email, external_sender_name, invoice_id)
-       VALUES ($1, $2, $2, 'invoice_sent', $3, $4, $5, $6, $7)`,
+          external_sender_email, external_sender_name, invoice_id, business_id)
+       VALUES ($1, $2, $2, 'invoice_sent', $3, $4, $5, $6, $7, $8)`,
       [
         messageId,
         req.user.id,
@@ -438,7 +438,8 @@ router.post("/:id/send", async (req, res) => {
         customMessage || `Invoice ${invoice.invoice_number} was emailed to ${recipientEmail}${ccEmailText ? ` (cc ${ccEmailText})` : ""}.`,
         recipientEmail,
         invoice.customer_name || null,
-        invoice.id
+        invoice.id,
+        businessId
       ]
     );
 
