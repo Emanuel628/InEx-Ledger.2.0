@@ -56,6 +56,8 @@ function Analytics(props: PageProps) {
   }, [])
 
   const categoryRows = categoryMode === 'Income' ? analytics.topIncome : analytics.topExpenses
+  const hasCurrentMonthActivity = analytics.currentIncome > 0 || analytics.currentExpenses > 0
+  const monthProgressPct = hasCurrentMonthActivity ? analytics.monthProgressPct : 0
 
   return (
     <AppShell
@@ -123,10 +125,10 @@ function Analytics(props: PageProps) {
               <span className="analytics-muted">{analytics.currentMonthLabel || 'No activity yet'}</span>
             </div>
             <div className="month-progress">
-              <div className="progress-ring">{analytics.monthProgressPct}%</div>
+              <div className="progress-ring">{monthProgressPct}%</div>
               <div className="progress-copy">
                 <span>Month progress</span>
-                <div><i style={{ width: `${analytics.monthProgressPct}%` }} /></div>
+                <div><i style={{ width: `${monthProgressPct}%` }} /></div>
               </div>
             </div>
             <div className="month-stat income"><span>Income</span><strong>{formatMoney(analytics.currentIncome)}</strong></div>

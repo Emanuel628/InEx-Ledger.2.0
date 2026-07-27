@@ -96,16 +96,18 @@ const publicPages = new Set<AppPage>([
   'Register',
   'ForgotPassword',
   'ResetPassword',
+  'VerifyEmail',
+  'MfaChallenge',
 ])
 
-const legacyAuthRoutes: Partial<Record<AppPage, string | ((next: string) => string)>> = {
-  Login: (next) => `/login?next=${encodeURIComponent(next)}`,
-  Register: '/register',
-  ForgotPassword: '/forgot-password',
-  ResetPassword: '/reset-password',
-  VerifyEmail: '/verify-email',
-  MfaChallenge: (next) => `/login?next=${encodeURIComponent(next)}`,
-}
+const authFlowPages = new Set<AppPage>([
+  'Login',
+  'Register',
+  'ForgotPassword',
+  'ResetPassword',
+  'VerifyEmail',
+  'MfaChallenge',
+])
 
 const pageSlugByPage: Partial<Record<AppPage, string>> = {
   Transactions: 'transactions',
@@ -131,6 +133,12 @@ const pageSlugByPage: Partial<Record<AppPage, string>> = {
   Help: 'help',
   Upgrade: 'upgrade',
   TrialSetup: 'trial-setup',
+  Login: 'login',
+  Register: 'register',
+  ForgotPassword: 'forgot-password',
+  ResetPassword: 'reset-password',
+  VerifyEmail: 'verify-email',
+  MfaChallenge: 'mfa-challenge',
 }
 
 const pageBySlug = new Map(
@@ -176,9 +184,18 @@ function normalizeLegacyAppV3Path() {
   }
 }
 
-function getLegacyAuthRoute(page: AppPage, next = getCanonicalCurrentPath()) {
-  const route = legacyAuthRoutes[page]
-  return typeof route === 'function' ? route(next) : route
+/** Resolves a `?next=` redirect target (e.g. after a session-expired bounce
+ *  to /login) to a known in-app page, ignoring anything that isn't a safe
+ *  internal path or that points back into the auth flow itself. */
+function getNextPageFromQuery(): AppPage | null {
+  const next = String(new URLSearchParams(window.location.search).get('next') || '')
+  if (!next.startsWith('/') || next.startsWith('//')) {
+    return null
+  }
+
+  const normalized = next.toLowerCase().split(/[?#]/)[0].replace(/^\/+/, '').replace(/\/+$/, '')
+  const page = pageBySlug.get(normalized)
+  return page && !authFlowPages.has(page) ? page : null
 }
 
 function chooseAuthenticatedPage(user: AuthUser) {
@@ -186,8 +203,13 @@ function chooseAuthenticatedPage(user: AuthUser) {
     return user.emailVerified ? 'Onboarding' : 'VerifyEmail'
   }
 
+  const nextPage = getNextPageFromQuery()
+  if (nextPage) {
+    return nextPage
+  }
+
   const requestedPage = getInitialPageFromPath()
-  return requestedPage || 'Transactions'
+  return requestedPage && !authFlowPages.has(requestedPage) ? requestedPage : 'Transactions'
 }
 
 function App() {
@@ -301,12 +323,6 @@ function App() {
   }, [authUser])
 
   const navigate = (page: AppPage) => {
-    const legacyAuthRoute = legacyAuthRoutes[page]
-    if (legacyAuthRoute) {
-      window.location.assign(getLegacyAuthRoute(page) || '/login')
-      return
-    }
-
     if (!authUser && !publicPages.has(page)) {
       window.location.assign(`/login?next=${encodeURIComponent(getPathForPage(page))}`)
       return

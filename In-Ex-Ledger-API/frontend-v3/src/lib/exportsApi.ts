@@ -34,7 +34,6 @@ export type ExportHistoryItem = {
   period: string
   status: 'Current' | 'Stale'
   generated: string
-  canDownloadRedactedPdf: boolean
 }
 
 type DatasetResponse = {
@@ -132,6 +131,11 @@ export async function downloadRedactedExport(exportId: string) {
   downloadBlob(blob, 'inex-ledger-redacted-export.pdf')
 }
 
+export async function downloadCsvExport(exportId: string, filename: string) {
+  const blob = await apiBlobRequest(`/api/exports/history/${encodeURIComponent(exportId)}/csv`)
+  downloadBlob(blob, filename)
+}
+
 export async function deleteExportHistoryItem(exportId: string) {
   await apiRequest(`/api/exports/history/${encodeURIComponent(exportId)}`, { method: 'DELETE' })
 }
@@ -165,7 +169,6 @@ function mapHistoryItem(item: LegacyHistory): ExportHistoryItem {
     period: formatPeriod(item.start_date, item.end_date),
     status,
     generated: formatDate(item.created_at || ''),
-    canDownloadRedactedPdf: exportType === 'pdf',
   }
 }
 

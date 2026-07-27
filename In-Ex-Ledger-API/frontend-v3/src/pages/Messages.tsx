@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   Archive,
   ChevronDown,
-  Clock3,
   FileText,
   Headphones,
   Mail,
@@ -533,10 +532,6 @@ function MessageDetailModal({
           <button type="button" onClick={() => void onDelete(thread)}>
             <Trash2 size={17} />
             Delete
-          </button>
-          <button type="button">
-            <Clock3 size={17} />
-            Follow up
           </button>
           <TypePill type={thread.type} />
         </div>

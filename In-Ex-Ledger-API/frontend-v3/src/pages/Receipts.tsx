@@ -250,6 +250,7 @@ function Receipts(props: PageProps) {
                             disabled={rowLocked}
                             onClick={() => {
                               setLinkingReceipt(receipt)
+                              setActionMenuId(null)
                             }}
                           >
                             Link transaction

@@ -341,7 +341,8 @@ async function sendInvoiceEmail(resendClient, {
   ccEmails,
   businessName,
   senderName,
-  customMessage
+  customMessage,
+  attachments
 }) {
   if (!resendClient) {
     const err = new Error("Email service is not configured on this deployment.");
@@ -380,6 +381,10 @@ if (replyTo) {
   // would ship the invoice with no Reply-To and route replies to the From
   // address instead of the inbound address.
   payload.replyTo = businessName ? `${businessName} Billing <${replyTo}>` : replyTo;
+}
+
+if (attachments?.length) {
+  payload.attachments = attachments;
 }
 
 const result = await resendClient.emails.send(payload);

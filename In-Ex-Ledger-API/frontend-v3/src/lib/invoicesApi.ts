@@ -28,6 +28,7 @@ export type InvoiceLineItem = {
 
 export type InvoiceDraft = {
   title: string
+  lineItemDescription: string
   clientName: string
   clientEmail: string
   issueDate: string
@@ -42,6 +43,7 @@ export type InvoiceDraft = {
 
 type LegacyInvoice = {
   id: string
+  title?: string | null
   invoice_number?: string | null
   customer_name?: string | null
   customer_email?: string | null
@@ -60,7 +62,7 @@ export async function loadInvoices() {
   return invoices.map(mapInvoice)
 }
 
-export async function saveInvoiceDraft(draft: InvoiceDraft, invoice: InvoiceRecord | null, sendAfterSave: boolean) {
+export async function saveInvoiceDraft(draft: InvoiceDraft, invoice: InvoiceRecord | null, sendAfterSave: boolean, attachments?: File[]) {
   if (!draft.title.trim()) {
     throw new Error('Invoice title is required.')
   }
@@ -77,6 +79,7 @@ export async function saveInvoiceDraft(draft: InvoiceDraft, invoice: InvoiceReco
   }
 
   const body = JSON.stringify({
+    title: draft.title.trim(),
     customer_name: draft.clientName.trim(),
     customer_email: draft.clientEmail.trim(),
     issue_date: draft.issueDate,
@@ -87,7 +90,7 @@ export async function saveInvoiceDraft(draft: InvoiceDraft, invoice: InvoiceReco
     status: invoice?.status === 'Sent' ? 'sent' : 'draft',
     line_items: [
       {
-        description: draft.title.trim(),
+        description: draft.lineItemDescription.trim() || draft.title.trim(),
         quantity,
         unit_price: unitPrice,
       },
@@ -99,7 +102,7 @@ export async function saveInvoiceDraft(draft: InvoiceDraft, invoice: InvoiceReco
     : await apiRequest<LegacyInvoice>('/api/invoices-v1', { method: 'POST', body })
 
   if (sendAfterSave) {
-    await sendInvoice(saved.id, draft.clientEmail, draft.ccEmails)
+    await sendInvoice(saved.id, draft.clientEmail, draft.ccEmails, attachments)
     const refreshed = await apiRequest<LegacyInvoice>(`/api/invoices-v1/${saved.id}`)
     return mapInvoice(refreshed)
   }
@@ -107,7 +110,16 @@ export async function saveInvoiceDraft(draft: InvoiceDraft, invoice: InvoiceReco
   return mapInvoice(saved)
 }
 
-export async function sendInvoice(invoiceId: string, recipientEmail: string, ccEmails = '') {
+export async function sendInvoice(invoiceId: string, recipientEmail: string, ccEmails = '', attachments?: File[]) {
+  if (attachments?.length) {
+    const form = new FormData()
+    form.append('recipient_email', recipientEmail)
+    form.append('cc_emails', ccEmails)
+    attachments.forEach((file) => form.append('attachments', file))
+    await apiRequest(`/api/invoices-v1/${invoiceId}/send`, { method: 'POST', body: form })
+    return
+  }
+
   await apiRequest(`/api/invoices-v1/${invoiceId}/send`, {
     method: 'POST',
     body: JSON.stringify({
@@ -132,6 +144,7 @@ export async function deleteInvoice(invoiceId: string) {
 export function blankInvoiceDraft(currency = 'USD'): InvoiceDraft {
   return {
     title: '',
+    lineItemDescription: '',
     clientName: '',
     clientEmail: '',
     issueDate: new Date().toISOString().slice(0, 10),
@@ -149,6 +162,7 @@ export function draftFromInvoice(invoice: InvoiceRecord): InvoiceDraft {
   const lineItem = invoice.lineItems[0]
   return {
     title: invoice.title,
+    lineItemDescription: lineItem?.description || '',
     clientName: invoice.client,
     clientEmail: invoice.clientEmail,
     issueDate: invoice.issueDate,
@@ -167,7 +181,7 @@ function mapInvoice(row: LegacyInvoice): InvoiceRecord {
   const status = mapStatus(row.status, row.due_date)
   return {
     id: row.id,
-    title: lineItems[0]?.description || row.invoice_number || 'Untitled invoice',
+    title: row.title || lineItems[0]?.description || row.invoice_number || 'Untitled invoice',
     invoiceNumber: row.invoice_number || '',
     client: row.customer_name || 'Client',
     clientEmail: row.customer_email || '',

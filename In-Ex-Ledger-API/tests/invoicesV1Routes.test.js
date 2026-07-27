@@ -60,7 +60,7 @@ function loadInvoicesRouter() {
 
             if (/INSERT INTO invoices_v1/i.test(sql)) {
               state.insertAttempts += 1;
-              state.invoiceNumbersTried.push(params[2]);
+              state.invoiceNumbersTried.push(params[3]);
               if (state.insertAttempts === 1) {
                 const err = new Error("duplicate key value violates unique constraint");
                 err.code = "23505";
@@ -70,12 +70,13 @@ function loadInvoicesRouter() {
                 rows: [{
                   id: params[0],
                   business_id: params[1],
-                  invoice_number: params[2],
-                  customer_name: params[3],
-                  status: params[7],
-                  currency: params[8],
-                  line_items: JSON.parse(params[9]),
-                  total_amount: params[13]
+                  title: params[2],
+                  invoice_number: params[3],
+                  customer_name: params[4],
+                  status: params[8],
+                  currency: params[9],
+                  line_items: JSON.parse(params[10]),
+                  total_amount: params[14]
                 }],
                 rowCount: 1
               };
@@ -125,6 +126,7 @@ test("invoice creation retries with a fresh invoice number after a uniqueness co
     const response = await request(app)
       .post("/api/invoices-v1")
       .send({
+        title: "April consulting invoice",
         customer_name: "Client A",
         issue_date: "2026-04-25",
         due_date: "2026-05-25",

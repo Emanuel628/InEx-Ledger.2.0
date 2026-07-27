@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -8,6 +8,7 @@ import {
   FileText,
   Mail,
   MoreHorizontal,
+  Paperclip,
   Plus,
   Search,
   Send,
@@ -126,8 +127,8 @@ function Invoices(props: PageProps) {
     setEditingInvoice(null)
   }
 
-  function handleSave(draft: InvoiceDraft, sendAfterSave: boolean) {
-    return saveInvoiceDraft(draft, editingInvoice, sendAfterSave)
+  function handleSave(draft: InvoiceDraft, sendAfterSave: boolean, attachments: File[]) {
+    return saveInvoiceDraft(draft, editingInvoice, sendAfterSave, attachments)
       .then(() => {
         closeDrawer()
         return refreshInvoices()
@@ -341,6 +342,9 @@ function Invoices(props: PageProps) {
   )
 }
 
+const MAX_INVOICE_ATTACHMENT_BYTES = 10 * 1024 * 1024
+const MAX_INVOICE_ATTACHMENTS = 5
+
 function InvoiceDrawer({
   invoice,
   currency,
@@ -350,10 +354,13 @@ function InvoiceDrawer({
   invoice: InvoiceRecord | null
   currency: string
   onClose: () => void
-  onSave: (draft: InvoiceDraft, sendAfterSave: boolean) => Promise<unknown>
+  onSave: (draft: InvoiceDraft, sendAfterSave: boolean, attachments: File[]) => Promise<unknown>
 }) {
   const [draft, setDraft] = useState<InvoiceDraft>(() => invoice ? draftFromInvoice(invoice) : blankInvoiceDraft(currency))
   const [error, setError] = useState('')
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [attachmentError, setAttachmentError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const subtotal = Number(draft.quantity || 0) * Number(draft.unitPrice || 0)
   const tax = subtotal * (Number(draft.taxRatePercent || 0) / 100)
   const total = subtotal + tax
@@ -361,15 +368,37 @@ function InvoiceDrawer({
   useEffect(() => {
     setDraft(invoice ? draftFromInvoice(invoice) : blankInvoiceDraft(currency))
     setError('')
+    setAttachments([])
+    setAttachmentError('')
   }, [currency, invoice])
 
   function updateDraft(field: keyof InvoiceDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
+  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!files.length) return
+    if (attachments.length + files.length > MAX_INVOICE_ATTACHMENTS) {
+      setAttachmentError(`You can attach up to ${MAX_INVOICE_ATTACHMENTS} files.`)
+      return
+    }
+    if (files.some((file) => file.size > MAX_INVOICE_ATTACHMENT_BYTES)) {
+      setAttachmentError('Each attachment must be 10 MB or smaller.')
+      return
+    }
+    setAttachmentError('')
+    setAttachments((current) => [...current, ...files])
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((current) => current.filter((_, fileIndex) => fileIndex !== index))
+  }
+
   function save(sendAfterSave: boolean) {
     setError('')
-    onSave(draft, sendAfterSave)
+    onSave(draft, sendAfterSave, attachments)
       .catch((saveError) => setError(saveError instanceof Error ? saveError.message : 'Unable to save invoice.'))
   }
 
@@ -452,7 +481,7 @@ function InvoiceDrawer({
               <strong>Line item</strong>
             </div>
             <div className="invoice-line-row">
-              <input aria-label="Line item description" value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} placeholder="Consulting services" />
+              <input aria-label="Line item description" value={draft.lineItemDescription} onChange={(event) => updateDraft('lineItemDescription', event.target.value)} placeholder="Consulting services" />
               <input aria-label="Quantity" type="number" min="0.01" step="0.01" value={draft.quantity} onChange={(event) => updateDraft('quantity', event.target.value)} placeholder="1" />
               <input aria-label="Unit price" type="number" min="0" step="0.01" value={draft.unitPrice} onChange={(event) => updateDraft('unitPrice', event.target.value)} placeholder="1000.00" />
             </div>
@@ -469,9 +498,41 @@ function InvoiceDrawer({
             <textarea value={draft.notes} onChange={(event) => updateDraft('notes', event.target.value)} placeholder="Payment terms, bank details, thank you message..." />
           </label>
 
+          {attachments.length ? (
+            <div className="message-reply-attachment-list">
+              {attachments.map((file, index) => (
+                <div className="message-reply-attachment" key={`${file.name}-${index}`}>
+                  <Paperclip size={15} />
+                  <span>{file.name}</span>
+                  <button type="button" aria-label={`Remove ${file.name}`} onClick={() => removeAttachment(index)}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {attachmentError ? <p className="drawer-error" role="alert">{attachmentError}</p> : null}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="visually-hidden"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.txt,.csv,.doc,.docx,.xls,.xlsx"
+            onChange={handleAttachmentChange}
+          />
+
           {error ? <p className="drawer-error" role="alert">{error}</p> : null}
 
           <div className="drawer-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={attachments.length >= MAX_INVOICE_ATTACHMENTS}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip size={17} />
+              {attachments.length ? 'Add another attachment' : 'Attach'}
+            </button>
             <button className="secondary-button" type="submit">
               Save draft
             </button>

@@ -568,7 +568,10 @@ test("v3 logout resets next login to transactions instead of the prior app page"
   const source = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
 
   assert.match(source, /setCurrentPage\('Landing'\)[\s\S]*window\.history\.replaceState\(\{\}, '', '\/'\)/);
-  assert.match(source, /return requestedPage \|\| 'Transactions'/);
+  // Auth-flow pages (Login, MfaChallenge, ...) are never a valid landing
+  // page for an authenticated session, so they fall back to Transactions
+  // alongside the "no requested page at all" case.
+  assert.match(source, /return requestedPage && !authFlowPages\.has\(requestedPage\) \? requestedPage : 'Transactions'/);
 });
 
 test("v3 page polish removes redundant controls and decorations", () => {

@@ -3,7 +3,7 @@
 Phase 0 status: complete.
 Phase 1 (canonical bare URLs): complete. Client `pushState` and `login?next=` use `/transactions`-style paths; `/app-v3` and `/app-v3/<page>` 301 to bare paths; assets remain under `/app-v3/assets`.
 Phase 2 (one active app UI): complete. Migrated app-core legacy HTML files moved from active `public/html` into `In-Ex-Ledger-API/legacy/public-html/app-core`; old `.html` URLs redirect to canonical v3 routes.
-Phase 3 (one auth door, Strategy A): complete. Auth remains legacy for now; login, MFA, expired-session, idle, and auth-guard redirects preserve canonical v3 `next` paths.
+Phase 3 (one auth door, Strategy A): complete. Login, register, forgot/reset password, email verification, and MFA challenge are served by the v3 SPA with a real MFA-required login flow and register -> verify-email polling flow; expired-session, idle, and auth-guard redirects preserve canonical v3 `next` paths.
 Phase 4 (data plane correctness): in progress. Transactions uses server-driven `limit`/`offset`, API filter query params, API summary totals, id-based saves, CSRF retry, and reachable high-page pagination. Accounts no longer scans a capped transaction window for counts.
 
 This file is the freeze and map artifact for the move to one product, one UI, and one URL. It is intentionally operational: if a route is not listed here, do not migrate, delete, or add parallel behavior until this inventory is updated and verified.
@@ -53,12 +53,12 @@ Deprecated: `/app-v3` -> `/transactions`; `/app-v3/<slug>` -> `/<slug>` (301).
 
 | Path | Served today | v3 page | Legacy HTML | API wired | Keep as legacy |
 | --- | --- | --- | --- | --- | --- |
-| `/login` | legacy HTML | v3 component exists but redirects to legacy | `login.html` exists | yes | temporary |
-| `/register` | legacy HTML | v3 component exists but redirects to legacy | `register.html` exists | yes | temporary |
-| `/forgot-password` | legacy HTML | v3 component exists but redirects to legacy | `forgot-password.html` exists | yes | temporary |
-| `/reset-password` | legacy HTML | v3 component exists but redirects to legacy | `reset-password.html` exists | yes | temporary |
-| `/mfa-challenge` | legacy HTML | v3 component exists but redirects to legacy login/MFA flow | `mfa-challenge.html` exists | yes | temporary |
-| `/verify-email` | legacy HTML | v3 component exists | `verify-email.html` exists | partial | temporary |
+| `/login` | SPA | yes, with real MFA-required handoff to `/mfa-challenge` | `login.html` unreachable, still on disk | yes | no |
+| `/register` | SPA | yes, hands off to `/verify-email` | `register.html` unreachable, still on disk | yes | no |
+| `/forgot-password` | SPA | yes | `forgot-password.html` unreachable, still on disk | yes | no |
+| `/reset-password` | SPA | yes | `reset-password.html` unreachable, still on disk | yes | no |
+| `/mfa-challenge` | SPA | yes, verifies against `/api/auth/mfa/verify` for login and `/api/auth/confirm-email-change` for email changes | `mfa-challenge.html` unreachable, still on disk | yes | no |
+| `/verify-email` | SPA | yes, polls `/api/check-email-verified` and completes via `/api/auth/complete-verified-signup` | `verify-email.html` unreachable, still on disk | yes | no |
 
 ## Marketing And SEO Matrix
 

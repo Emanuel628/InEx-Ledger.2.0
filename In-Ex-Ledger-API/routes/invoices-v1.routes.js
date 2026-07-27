@@ -1,5 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
+const path = require("path");
+const multer = require("multer");
 const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
@@ -32,6 +34,57 @@ router.use(requireCsrfProtection);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VALID_STATUSES = new Set(["draft", "sent", "paid", "void"]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+const MAX_INVOICE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_INVOICE_ATTACHMENTS = 5;
+const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+]);
+const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
+  ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif",
+  ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx"
+]);
+
+function attachmentFileFilter(_req, file, cb) {
+  const ext = path.extname(String(file?.originalname || "")).toLowerCase();
+  const mime = String(file?.mimetype || "").toLowerCase();
+  if (!ALLOWED_ATTACHMENT_MIME_TYPES.has(mime) || !ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)) {
+    const error = new Error("Unsupported attachment type.");
+    error.status = 400;
+    return cb(error);
+  }
+  cb(null, true);
+}
+
+const invoiceAttachmentsUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_INVOICE_ATTACHMENT_BYTES, files: MAX_INVOICE_ATTACHMENTS },
+  fileFilter: attachmentFileFilter
+});
+
+function sanitizeAttachmentFilename(name) {
+  const base = path.basename(String(name || "attachment")).replace(/[^a-zA-Z0-9._-]/g, "_");
+  return base.slice(0, 150) || "attachment";
+}
+
+function buildResendAttachments(files) {
+  return (files || []).map((file) => ({
+    filename: sanitizeAttachmentFilename(file.originalname),
+    content: file.buffer,
+    contentType: file.mimetype
+  }));
+}
 
 function parseEmailList(value) {
   const values = Array.isArray(value)
@@ -67,8 +120,11 @@ async function requireProPlan(businessId, res) {
 }
 
 function validateInvoicePayload(body) {
-  const { customer_name, issue_date, due_date, line_items, currency } = body ?? {};
+  const { title, customer_name, issue_date, due_date, line_items, currency } = body ?? {};
 
+  if (!title || !String(title).trim()) {
+    return { valid: false, message: "title is required." };
+  }
   if (!customer_name || !String(customer_name).trim()) {
     return { valid: false, message: "customer_name is required." };
   }
@@ -116,6 +172,7 @@ function validateInvoicePayload(body) {
   return {
     valid: true,
     normalized: {
+      title: String(title).trim().slice(0, 200),
       customer_name: String(customer_name).trim().slice(0, 200),
       customer_email: String(body.customer_email || "").trim().slice(0, 1000) || null,
       issue_date: String(issue_date).slice(0, 10),
@@ -175,7 +232,7 @@ if (status === "deleted") {
 }
 
     const result = await pool.query(
-      `SELECT id, invoice_number, customer_name, customer_email, issue_date, due_date,
+      `SELECT id, title, invoice_number, customer_name, customer_email, issue_date, due_date,
               status, currency, subtotal, tax_rate, tax_amount, total_amount, notes,
               line_items, created_at, updated_at
        FROM invoices_v1
@@ -203,7 +260,7 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: validation.message });
     }
 
-    const { customer_name, customer_email, issue_date, due_date, currency,
+    const { title, customer_name, customer_email, issue_date, due_date, currency,
             line_items, subtotal, tax_rate, tax_amount, total_amount, notes } = validation.normalized;
 
     const status = String(req.body.status || "draft").toLowerCase();
@@ -215,13 +272,13 @@ router.post("/", async (req, res) => {
       try {
         const result = await pool.query(
           `INSERT INTO invoices_v1
-            (id, business_id, invoice_number, customer_name, customer_email,
+            (id, business_id, title, invoice_number, customer_name, customer_email,
              issue_date, due_date, status, currency, line_items,
              subtotal, tax_rate, tax_amount, total_amount, notes, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now(),now())
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now(),now())
            RETURNING *`,
           [
-            crypto.randomUUID(), businessId, invoiceNumber, customer_name, customer_email,
+            crypto.randomUUID(), businessId, title, invoiceNumber, customer_name, customer_email,
             issue_date, due_date, finalStatus, currency, JSON.stringify(line_items),
             subtotal, tax_rate, tax_amount, total_amount, notes
           ]
@@ -290,7 +347,7 @@ router.put("/:id", async (req, res) => {
     const validation = validateInvoicePayload(req.body);
     if (!validation.valid) return res.status(400).json({ error: validation.message });
 
-    const { customer_name, customer_email, issue_date, due_date, currency,
+    const { title, customer_name, customer_email, issue_date, due_date, currency,
             line_items, subtotal, tax_rate, tax_amount, total_amount, notes } = validation.normalized;
 
     const statusRaw = String(req.body.status || existing.rows[0].status).toLowerCase();
@@ -298,12 +355,12 @@ router.put("/:id", async (req, res) => {
 
     const result = await pool.query(
       `UPDATE invoices_v1
-       SET customer_name=$1, customer_email=$2, issue_date=$3, due_date=$4, status=$5,
-           currency=$6, line_items=$7, subtotal=$8, tax_rate=$9, tax_amount=$10,
-           total_amount=$11, notes=$12, updated_at=now()
-       WHERE id=$13 AND business_id=$14 AND deleted_at IS NULL
+       SET title=$1, customer_name=$2, customer_email=$3, issue_date=$4, due_date=$5, status=$6,
+           currency=$7, line_items=$8, subtotal=$9, tax_rate=$10, tax_amount=$11,
+           total_amount=$12, notes=$13, updated_at=now()
+       WHERE id=$14 AND business_id=$15 AND deleted_at IS NULL
        RETURNING *`,
-      [customer_name, customer_email, issue_date, due_date, status, currency,
+      [title, customer_name, customer_email, issue_date, due_date, status, currency,
        JSON.stringify(line_items), subtotal, tax_rate, tax_amount, total_amount, notes,
        req.params.id, businessId]
     );
@@ -342,7 +399,7 @@ router.patch("/:id/status", async (req, res) => {
 });
 
 /* ── POST /api/invoices-v1/:id/send ── email the invoice to the customer */
-router.post("/:id/send", async (req, res) => {
+router.post("/:id/send", invoiceAttachmentsUpload.array("attachments", MAX_INVOICE_ATTACHMENTS), async (req, res) => {
   if (!UUID_RE.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid invoice ID." });
   }
@@ -388,7 +445,8 @@ router.post("/:id/send", async (req, res) => {
         ccEmails,
         businessName: invoice.business_name,
         senderName: req.user?.email || null,
-        customMessage
+        customMessage,
+        attachments: req.files?.length ? buildResendAttachments(req.files) : undefined
       });
     } catch (err) {
       const status = err.status || 502;
@@ -434,7 +492,7 @@ router.post("/:id/send", async (req, res) => {
       [
         messageId,
         req.user.id,
-        `Invoice ${invoice.invoice_number} sent to ${recipientEmail}${ccEmailText ? ` (cc ${ccEmailText})` : ""}`,
+        `Invoice: ${invoice.title || invoice.invoice_number}`,
         customMessage || `Invoice ${invoice.invoice_number} was emailed to ${recipientEmail}${ccEmailText ? ` (cc ${ccEmailText})` : ""}.`,
         recipientEmail,
         invoice.customer_name || null,
