@@ -16,8 +16,14 @@ function Register(props: PageProps) {
     setSubmitting(true)
     setError('')
     try {
-      const { user } = await registerUser({ firstName, lastName, email, password, acceptedTerms })
-      props.onAuthChange(user)
+      if (!acceptedTerms) {
+        throw new Error('You must accept the Terms and Privacy Policy to create an account.')
+      }
+      const { verificationState, signupBootstrapToken } = await registerUser({ firstName, lastName, email, password, acceptedTerms })
+      window.sessionStorage.setItem('inex-verify-email-address', email)
+      window.sessionStorage.setItem('inex-verify-email-state', verificationState)
+      window.sessionStorage.setItem('inex-verify-signup-token', signupBootstrapToken)
+      props.onNavigate('VerifyEmail')
     } catch (registerError) {
       setError(registerError instanceof Error ? registerError.message : 'Unable to create account.')
     } finally {

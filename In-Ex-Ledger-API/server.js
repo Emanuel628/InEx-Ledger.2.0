@@ -103,7 +103,13 @@ const V3_APP_PAGES = new Set([
   "upgrade",
   "trial-setup",
   "privacy",
-  "terms"
+  "terms",
+  "login",
+  "register",
+  "forgot-password",
+  "reset-password",
+  "verify-email",
+  "mfa-challenge"
 ]);
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, EyeOff, LogIn } from 'lucide-react'
+import { LogIn } from 'lucide-react'
 import type { PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
 import { loginUser } from '../lib/authApi'
@@ -15,8 +15,14 @@ function Login(props: PageProps) {
     setSubmitting(true)
     setError('')
     try {
-      const { user } = await loginUser(email, password)
-      props.onAuthChange(user)
+      const result = await loginUser(email, password)
+      if (result.mfaRequired) {
+        window.sessionStorage.setItem('inex-mfa-context', 'login')
+        window.sessionStorage.setItem('inex-mfa-token', result.mfaToken)
+        props.onNavigate('MfaChallenge')
+        return
+      }
+      props.onAuthChange(result.user)
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Unable to sign in.')
     } finally {
@@ -54,10 +60,6 @@ function Login(props: PageProps) {
         <button className="primary-button" type="submit" disabled={submitting}>
           <LogIn size={18} />
           {submitting ? 'Signing in...' : 'Sign in'}
-        </button>
-        <button className="secondary-button" type="button" onClick={() => props.onNavigate('MfaChallenge')}>
-          {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-          Preview MFA step
         </button>
       </form>
       <div className="auth-card-footer">

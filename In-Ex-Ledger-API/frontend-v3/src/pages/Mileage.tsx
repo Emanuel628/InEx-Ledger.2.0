@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Calendar,
   Car,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Fuel,
   MoreHorizontal,
   Plus,
@@ -119,6 +122,7 @@ function Mileage(props: PageProps) {
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const pageStart = (safeCurrentPage - 1) * pageSize
   const visibleRows = filteredRows.slice(pageStart, pageStart + pageSize)
+  const paginationPages = getPaginationPages(safeCurrentPage, totalPages)
   const monthOptions = useMemo(() => {
     const values = uniqueValues(mileageEntries.map((entry) => entry.dateIso.slice(0, 7)).filter(Boolean))
     return values.sort((first, second) => second.localeCompare(first))
@@ -386,22 +390,35 @@ function Mileage(props: PageProps) {
           </div>
 
           <div className="table-footer">
-            <span>Showing {visibleRows.length ? pageStart + 1 : 0}-{pageStart + visibleRows.length} of {filteredRows.length} activities</span>
             <div className="pagination" aria-label="Mileage pages">
-              <button type="button" onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))} disabled={safeCurrentPage === 1}>
-                Previous
+              <button type="button" aria-label="Previous page" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+                <ChevronLeft size={16} />
               </button>
-              <button className="is-active" type="button">{safeCurrentPage}</button>
-              <button type="button" onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))} disabled={safeCurrentPage === totalPages}>
-                Next
+              {paginationPages.map((page, index) => (
+                page === 'ellipsis' ? (
+                  <span key={`ellipsis-${index}`}>...</span>
+                ) : (
+                  <button
+                    className={page === safeCurrentPage ? 'is-active' : ''}
+                    type="button"
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </button>
+                )
+              ))}
+              <button type="button" aria-label="Next page" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
+                <ChevronRight size={16} />
               </button>
             </div>
-            <label className="select-button per-page-button">
+            <label className="secondary-button per-page-button">
               <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
                 <option value={10}>10 per page</option>
                 <option value={20}>20 per page</option>
                 <option value={50}>50 per page</option>
               </select>
+              <ChevronDown size={16} />
             </label>
           </div>
         </section>
@@ -689,6 +706,25 @@ function getMoneyLocale() {
 
 function isCanadaBusiness(region?: string | null, currency?: string | null) {
   return String(region || '').toUpperCase() === 'CA' || String(currency || '').toUpperCase() === 'CAD'
+}
+
+function getPaginationPages(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1])
+  const sortedPages = Array.from(pages)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b)
+
+  return sortedPages.flatMap((page, index) => {
+    const previousPage = sortedPages[index - 1]
+    if (previousPage && page - previousPage > 1) {
+      return ['ellipsis' as const, page]
+    }
+    return [page]
+  })
 }
 
 export default Mileage

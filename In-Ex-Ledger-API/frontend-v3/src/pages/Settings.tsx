@@ -407,7 +407,7 @@ function AccountingLockControls() {
           <p>{loading ? 'Checking locked period...' : lock?.lockedThroughDate ? `Transactions are locked through ${formatSettingsDate(lock.lockedThroughDate)}.` : 'No accounting period lock is active.'}</p>
         </div>
         <div className="settings-row-action">
-          <span className={`status-pill ${lock?.lockedThroughDate ? 'status-needs-review' : 'status-cleared'}`}>
+          <span className={`status-pill ${lock?.lockedThroughDate ? 'status-inactive' : 'status-cleared'}`}>
             {lock?.lockedThroughDate ? 'Locked' : 'Unlocked'}
           </span>
         </div>

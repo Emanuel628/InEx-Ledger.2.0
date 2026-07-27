@@ -20,6 +20,7 @@ import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import {
   deleteExportHistoryItem,
+  downloadCsvExport,
   downloadRedactedExport,
   generateExport,
   loadExportPageData,
@@ -139,12 +140,10 @@ function Exports(props: PageProps) {
   }
 
   function handleDownload(item: ExportHistoryItem) {
-    if (!item.canDownloadRedactedPdf) {
-      setDataError('CSV history is recorded, but the backend only stores downloadable redacted PDFs.')
-      return
-    }
-    downloadRedactedExport(item.id)
-      .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to download export.'))
+    const download = item.format === 'PDF'
+      ? downloadRedactedExport(item.id)
+      : downloadCsvExport(item.id, item.name)
+    download.catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to download export.'))
   }
 
   function handleDelete(item: ExportHistoryItem) {

@@ -438,6 +438,9 @@ textarea:focus-visible {
 }
 
 .public-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   min-height: 72px;
   padding: 0 28px;
   border: 1px solid var(--line);

@@ -1244,6 +1244,94 @@ router.get("/history/:id/redacted", exportGrantLimiter, async (req, res) => {
   }
 });
 
+// GET /exports/history/:id/csv — Re-download a past CSV export.
+// CSV files aren't persisted to disk (unlike the redacted PDF snapshot), so
+// this rebuilds the CSV on demand from the export's original date range and
+// type using current data, rather than a stored file.
+router.get("/history/:id/csv", exportGrantLimiter, async (req, res) => {
+  try {
+    const user = req.user;
+    user.business_id = await resolveBusinessIdForUser(user);
+    const businessId = user.business_id;
+    const { id } = req.params;
+
+    const { rows } = await pool.query(
+      `SELECT e.export_type,
+              MAX(CASE WHEN m.key = 'start_date' THEN m.value END) AS start_date,
+              MAX(CASE WHEN m.key = 'end_date' THEN m.value END) AS end_date,
+              MAX(CASE WHEN m.key = 'language' THEN m.value END) AS language,
+              MAX(CASE WHEN m.key = 'currency' THEN m.value END) AS currency,
+              MAX(CASE WHEN m.key = 'filename' THEN m.value END) AS filename
+         FROM exports e
+         LEFT JOIN export_metadata m ON m.export_id = e.id
+        WHERE e.id = $1
+          AND e.business_id = $2
+        GROUP BY e.export_type`,
+      [id, businessId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Export not found." });
+    }
+
+    const row = rows[0];
+    const exportType = String(row.export_type || "").toLowerCase();
+    if (!SUPPORTED_EXPORT_TYPES.has(exportType) || exportType === "pdf") {
+      return res.status(400).json({ error: "This export is not a CSV export." });
+    }
+    if (!DATE_PATTERN.test(row.start_date) || !DATE_PATTERN.test(row.end_date)) {
+      return res.status(404).json({ error: "Export date range is no longer available." });
+    }
+
+    const sourceRows = await fetchExportSourceRows(businessId, row.start_date, row.end_date);
+    const business = sourceRows.business || {};
+    const region = String(business.region || "us").toLowerCase();
+    const categories = sourceRows.categories.map((c) => ({
+      ...c,
+      taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
+    }));
+
+    const dataset = buildNormalizedExportDataset({
+      transactions: sourceRows.transactions,
+      accounts: sourceRows.accounts,
+      categories,
+      receipts: sourceRows.receipts,
+      supportArtifactMap: sourceRows.supportArtifactMap,
+      reviewStateRows: sourceRows.reviewStateRows,
+      mileage: sourceRows.mileage,
+      vehicleCosts: sourceRows.vehicleCosts,
+      vehicleClaimMap: sourceRows.vehicleClaimMap,
+      capitalAssetTxMap: sourceRows.capitalAssetTxMap,
+      business,
+      region,
+      province: business.province || "",
+      startDate: row.start_date,
+      endDate: row.end_date,
+      currency: row.currency || "USD"
+    });
+
+    const csvBuffer = buildCsvBundle(dataset, {
+      exportType,
+      includeBusiness: exportType !== "csv_basic"
+    });
+    const filename = row.filename || buildCsvFilename(exportType, row.start_date, row.end_date);
+
+    logInfo("CSV export re-downloaded", {
+      userId: user.id,
+      businessId,
+      exportId: id
+    });
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    return res.send(csvBuffer);
+  } catch (err) {
+    logError("CSV re-download error", { err: err.message });
+    return res.status(500).json({ error: "Cannot download CSV export." });
+  }
+});
+
 // POST /exports/secure-export — single-step secure PDF export for the Secure Export Modal.
 // Accepts an encrypted tax ID (JWE) and date range, generates a PDF, and returns it directly.
 // Sensitive fields (ssn, sin, taxId_jwe) are redacted from all log output.

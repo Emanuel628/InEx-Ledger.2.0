@@ -78,17 +78,46 @@ export async function getCurrentUser() {
   return { user: mapLegacyUser(legacyUser) }
 }
 
-export async function loginUser(email: string, password: string) {
-  const response = await authRequest<{ mfa_required?: boolean }>('/api/auth/login', {
+export type LoginResult =
+  | { mfaRequired: false; user: AuthUser | null }
+  | { mfaRequired: true; mfaToken: string }
+
+export async function loginUser(email: string, password: string): Promise<LoginResult> {
+  // A wrong password is an ordinary, expected 401 here — not a signal that
+  // an existing session expired — so it must not trigger the global
+  // redirect-to-login side effect (that would wipe the form before the
+  // caller's own catch block ever runs).
+  const response = await authRequest<{ mfa_required?: boolean; mfa_token?: string }>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+    skipAuthRedirect: true,
   })
 
   if (response.mfa_required) {
-    throw new Error('MFA is required. Please use the current sign-in page to finish verification.')
+    return { mfaRequired: true, mfaToken: response.mfa_token || '' }
   }
 
+  const { user } = await getCurrentUser()
+  return { mfaRequired: false, user }
+}
+
+export async function verifyLoginMfa(mfaToken: string, code: string, trustDevice = true) {
+  // Same reasoning as loginUser: a wrong or expired code is an expected
+  // failure the caller handles inline, not a "your session expired" signal.
+  await authRequest('/api/auth/mfa/verify', {
+    method: 'POST',
+    body: JSON.stringify({ mfaToken, code, trustDevice }),
+    skipAuthRedirect: true,
+  })
   return getCurrentUser()
+}
+
+export async function resendLoginMfa(mfaToken: string) {
+  return authRequest<{ mfa_token?: string; message?: string }>('/api/auth/mfa/resend', {
+    method: 'POST',
+    body: JSON.stringify({ mfaToken }),
+    skipAuthRedirect: true,
+  })
 }
 
 export async function registerUser(input: {
@@ -98,7 +127,7 @@ export async function registerUser(input: {
   password: string
   acceptedTerms: boolean
 }) {
-  await authRequest('/api/auth/register', {
+  const response = await authRequest<{ verification_state?: string; signup_bootstrap_token?: string; message?: string }>('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({
       first_name: input.firstName,
@@ -108,16 +137,36 @@ export async function registerUser(input: {
       tos_consent: input.acceptedTerms,
     }),
   })
-  return { user: null }
+  return {
+    user: null,
+    verificationState: response.verification_state || '',
+    signupBootstrapToken: response.signup_bootstrap_token || '',
+  }
+}
+
+export async function checkEmailVerified(verificationState: string) {
+  return authRequest<{ verified?: boolean }>(`/api/check-email-verified?state=${encodeURIComponent(verificationState)}`, {
+    skipAuthRedirect: true,
+  })
+}
+
+export async function resendVerificationEmail(verificationState: string, email?: string) {
+  return authRequest<{ message?: string; verification_state?: string }>('/api/auth/send-verification', {
+    method: 'POST',
+    body: JSON.stringify(verificationState ? { verificationState } : { email }),
+  })
+}
+
+export async function completeVerifiedSignup(signupBootstrapToken: string) {
+  return authRequest<{ next?: string }>('/api/auth/complete-verified-signup', {
+    method: 'POST',
+    body: JSON.stringify({ signupBootstrapToken }),
+  })
 }
 
 export async function logoutUser() {
   await authRequest('/api/auth/logout', { method: 'POST' })
   return { ok: true }
-}
-
-export async function verifyEmail() {
-  return getCurrentUser()
 }
 
 export async function createBusiness(input: { name: string; type: string; currency: string }) {
@@ -240,11 +289,15 @@ export async function requestMfaToggle(enabled: boolean) {
 }
 
 export async function confirmMfaToggle(enabled: boolean, mfaToken: string, code: string) {
+  // A wrong/expired MFA toggle code is a normal inline error for the
+  // Settings modal to show, not a reason to bounce an authenticated user
+  // out to the login screen.
   return authRequest<{ message?: string; status?: { enabled?: boolean } }>(
     enabled ? '/api/auth/mfa/enable' : '/api/auth/mfa/disable',
     {
       method: 'POST',
       body: JSON.stringify({ mfaToken, code }),
+      skipAuthRedirect: true,
     },
   )
 }
