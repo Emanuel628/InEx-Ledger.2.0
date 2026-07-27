@@ -143,7 +143,47 @@ const SHOULD_NOT_AUTO_MAP_CASES = [
   { merchant: "BEST BUY 00001234", description: "BEST BUY 00001234" },
   { merchant: "CANADIAN TIRE #123", description: "CANADIAN TIRE #123 TORONTO ON" },
   { merchant: "LONDON DRUGS #221", description: "LONDON DRUGS #221" },
-  { merchant: "DOLLARAMA #4471", description: "DOLLARAMA #4471" }
+  { merchant: "DOLLARAMA #4471", description: "DOLLARAMA #4471" },
+  // Grocery stores are the same "sells everything a household or a business
+  // could buy" case as the big-box retailers above.
+  { merchant: "WHOLE FOODS MARKET", description: "WHOLE FOODS MARKET #123" },
+  { merchant: "TRADER JOES #456", description: "TRADER JOES #456" },
+  // Capital One (and card issuers generally) show up in bank text either as
+  // a credit-card statement payment/autopay or an account-to-account
+  // transfer — never a real expense category — so these must stay unmapped
+  // rather than default to whatever category a stray keyword happens to hit.
+  { merchant: "CAPITAL ONE", description: "CAPITAL ONE MOBILE PYMT" },
+  { merchant: "CAPITAL ONE", description: "CAPITAL ONE AUTOPAY PMT" },
+  { merchant: "CAPITAL ONE AUTO FINANCE", description: "CAPITAL ONE AUTO FIN PMT" }
+];
+
+// Regression coverage for a normalization bug: matching used to check whether
+// a normalized keyword was a raw substring of the normalized merchant/
+// description text, with no word-boundary requirement. That let short
+// keywords silently match *inside* unrelated words — "irs" inside "first",
+// "cra" inside "aircraft"/"Sacramento", "gas" inside "Vegas", "esso" inside
+// "espresso", "xero" inside "Xerox", "shaw" inside "shawarma", "rona" inside
+// "Corona", "mobil" inside "mobile"/"T-Mobile", and "at&t" (which normalizes
+// to "att") inside "attorney". Each of these previously produced either a
+// confidently wrong category or (via an accidental score tie) an unearned
+// fallback to Imported. Also covers the "e-transfer" keyword, which used to
+// normalize down to the single letter "e" and (via that same unbounded
+// substring check) matched almost every income transaction, forcing most
+// income onto "Service Income" regardless of its actual source.
+const WORD_BOUNDARY_COLLISION_CASES = [
+  { merchant: "SMITH & JONES ATTORNEYS", description: "LEGAL RETAINER FEE", expected: "Legal & Professional" },
+  { merchant: "FIRST NATIONAL BANK", description: "FIRST NATIONAL BANK MONTHLY FEE", expected: "Bank Fees" },
+  { merchant: "MARRIOTT LAS VEGAS", description: "MARRIOTT LAS VEGAS HOTEL STAY", expected: "Travel" },
+  { merchant: "XEROX", description: "XEROX TONER CARTRIDGE", expected: "Office Supplies" },
+  { merchant: "T-MOBILE", description: "T-MOBILE MONTHLY BILL", expected: "Phone & Internet" }
+];
+
+const WORD_BOUNDARY_NO_MATCH_CASES = [
+  { merchant: "SHAWARMA PALACE", description: "SHAWARMA PALACE LUNCH TAB" },
+  { merchant: "TOTAL WINE", description: "CORONA BEER CASE 24PK" },
+  { merchant: "ACME ESPRESSO SUPPLY CO", description: "ESPRESSO MACHINE PARTS ORDER" },
+  { merchant: "RANDOM CLIENT LLC", description: "WIRE DEPOSIT", kind: "income" },
+  { merchant: "ACME CORP", description: "ACME CORP INVOICE PAYMENT", kind: "income" }
 ];
 
 function runCases(cases, region) {
@@ -184,6 +224,27 @@ test("degree-of-certainty gate: ambiguous/generic transactions are not auto-mapp
       result.reason,
       "canonical_rule",
       `Expected "${testCase.merchant} / ${testCase.description}" to stay unmapped, but it confidently guessed a category`
+    );
+  }
+});
+
+test("word-boundary regression: real keywords still match despite short/ambiguous substrings", () => {
+  const failures = runCases(WORD_BOUNDARY_COLLISION_CASES, "US");
+  assert.deepEqual(failures, [], `Miscategorized: ${JSON.stringify(failures, null, 2)}`);
+});
+
+test("word-boundary regression: unrelated words containing a keyword substring don't get miscategorized", () => {
+  const categorize = createTransactionCategorizer({ categories: makeFullCategories("US"), region: "US" });
+  for (const testCase of WORD_BOUNDARY_NO_MATCH_CASES) {
+    const result = categorize({
+      type: testCase.kind || "expense",
+      merchantName: testCase.merchant,
+      description: testCase.description
+    });
+    assert.notEqual(
+      result.reason,
+      "canonical_rule",
+      `Expected "${testCase.merchant} / ${testCase.description}" to stay unmapped, but it confidently guessed "${result.categoryName}"`
     );
   }
 });

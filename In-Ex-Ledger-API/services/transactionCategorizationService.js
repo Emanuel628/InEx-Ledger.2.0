@@ -246,7 +246,7 @@ const CATEGORY_RULE_EXPANSIONS = [
     usCategory: "Service Income",
     caCategory: "Service Income",
     keywords: [
-      "professional service income", "service income", "client fee", "e-transfer",
+      "professional service income", "service income", "client fee",
       "interac e-transfer", "interac etransfer", "zelle", "venmo", "settlement deposit"
     ]
   },
@@ -573,7 +573,7 @@ const EXTENDED_BRAND_EXPANSIONS = [
     caCategory: "Software & Subscriptions",
     keywords: [
       "pipedrive", "clickup", "airtable", "miro", "loom", "zapier", "integromat",
-      "make.com", "n8n", "segment", "mixpanel", "amplitude", "moz", "screaming frog",
+      "make.com", "n8n.io", "segment", "mixpanel", "amplitude", "moz", "screaming frog",
       "later app", "sketch app", "invision", "webflow", "bigcommerce", "woocommerce",
       "magento", "netsuite", "workday hcm", "zoho", "zoho books", "zoho crm",
       "cisco webex", "gotomeeting", "ringcentral", "8x8", "vonage business",
@@ -840,24 +840,55 @@ function categoryExists(categoryLookup, kind, name) {
   return categoryLookup.has(`${kind}::${String(name || "").trim().toLowerCase()}`);
 }
 
-function normalizedContains(normalizedText, compactText, keyword) {
-  const normalizedKw = normalizeMappingText(keyword);
-  if (!normalizedKw) return false;
-  const compactKw = normalizedKw.replace(/\s+/g, "");
-  return normalizedText.includes(normalizedKw) || (compactKw && compactText.includes(compactKw));
+// Below this length, a keyword's despaced form is common enough to turn up
+// by pure accident inside an unrelated word (e.g. "irs" inside "first", "cra"
+// inside "aircraft", "gas" inside "Vegas", "esso" inside "espresso", "xero"
+// inside "Xerox", "shaw" inside "shawarma", "att" inside "attorney", "mobil"
+// inside "mobile"/"T-Mobile"). Below this floor we require a real word-boundary
+// match (see containsTokenPhrase) instead of a raw substring scan; at or above
+// it, a despaced/no-space substring match (for merchant text like "HOMEDEPOT"
+// or "UBEREATS" that ran two keyword words together) is specific enough to
+// trust without word boundaries.
+const COMPACT_MATCH_MIN_LENGTH = 5;
+
+function tokenize(normalizedText) {
+  return normalizedText ? normalizedText.split(" ").filter(Boolean) : [];
 }
 
-function scoreRule(rule, { normalizedMerchant, compactMerchant, normalizedDescFull, compactDescFull, providerHintText }) {
+function containsTokenPhrase(textTokens, keywordTokens) {
+  if (!keywordTokens.length || keywordTokens.length > textTokens.length) return false;
+  for (let start = 0; start <= textTokens.length - keywordTokens.length; start++) {
+    let matched = true;
+    for (let offset = 0; offset < keywordTokens.length; offset++) {
+      if (textTokens[start + offset] !== keywordTokens[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return true;
+  }
+  return false;
+}
+
+function normalizedContains(textTokens, compactText, keyword) {
+  const normalizedKw = normalizeMappingText(keyword);
+  if (!normalizedKw) return false;
+  if (containsTokenPhrase(textTokens, normalizedKw.split(" ").filter(Boolean))) return true;
+  const compactKw = normalizedKw.replace(/\s+/g, "");
+  return compactKw.length >= COMPACT_MATCH_MIN_LENGTH && compactText.includes(compactKw);
+}
+
+function scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactDescFull, providerHintText }) {
   let score = 0;
   let merchantStrong = false;
 
   for (const keyword of rule.keywords || []) {
     const isMultiWord = keyword.includes(" ");
-    const merchantHit = normalizedContains(normalizedMerchant, compactMerchant, keyword);
+    const merchantHit = normalizedContains(merchantTokens, compactMerchant, keyword);
     if (merchantHit) {
       score += isMultiWord ? 4 : 3;
       merchantStrong = true;
-    } else if (normalizedContains(normalizedDescFull, compactDescFull, keyword)) {
+    } else if (normalizedContains(descTokens, compactDescFull, keyword)) {
       score += isMultiWord ? 3 : 2;
     }
   }
@@ -891,8 +922,10 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
     const haystack = `${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`.toLowerCase();
     const normalizedMerchant = normalizeMappingText(rawMerchant);
     const compactMerchant = normalizedMerchant.replace(/\s+/g, "");
+    const merchantTokens = tokenize(normalizedMerchant);
     const normalizedDescFull = normalizeMappingText(`${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`);
     const compactDescFull = normalizedDescFull.replace(/\s+/g, "");
+    const descTokens = tokenize(normalizedDescFull);
     const providerHintText = normalizeMappingText(categoryGuess);
 
     const explicitRule =
@@ -932,7 +965,7 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
     let secondBestScore = 0;
     for (const rule of CATEGORY_RULES) {
       if (rule.kind !== kind) continue;
-      const { score, merchantStrong } = scoreRule(rule, { normalizedMerchant, compactMerchant, normalizedDescFull, compactDescFull, providerHintText });
+      const { score, merchantStrong } = scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactDescFull, providerHintText });
       if (!best || score > best.score) {
         secondBestScore = best?.score || 0;
         best = { rule, score, merchantStrong };
