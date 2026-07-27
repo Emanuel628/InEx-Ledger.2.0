@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Calendar,
   Car,
-  Edit3,
   Fuel,
   MoreHorizontal,
   Plus,
   Search,
   Settings2,
   SlidersHorizontal,
-  Trash2,
   Wrench,
   X,
   type LucideIcon,
@@ -357,30 +355,22 @@ function Mileage(props: PageProps) {
                       {entry.distance ? `${entry.distance.toFixed(1)} ${unitShort}` : formatMoney(entry.amount || 0)}
                     </td>
                     <td data-label="Actions" className="action-col receipt-actions">
-                      <button className="row-action" type="button" aria-label={`Edit ${entry.title}`} disabled={rowLocked} onClick={() => openDrawer(entry.kind, entry)}>
-                        <Edit3 size={17} />
+                      <button
+                        className="row-action"
+                        type="button"
+                        aria-expanded={actionMenuId === entry.id}
+                        aria-label={`More actions for ${entry.title}`}
+                        onClick={() => setActionMenuId(actionMenuId === entry.id ? null : entry.id)}
+                      >
+                        <MoreHorizontal size={18} />
                       </button>
-                      <button className="row-action" type="button" aria-label={`Delete ${entry.title}`} disabled={rowLocked} onClick={() => handleDelete(entry)}>
-                        <Trash2 size={17} />
-                      </button>
-                      <div className="row-menu-wrap">
-                        <button
-                          className="row-action"
-                          type="button"
-                          aria-expanded={actionMenuId === entry.id}
-                          aria-label={`More actions for ${entry.title}`}
-                          onClick={() => setActionMenuId(actionMenuId === entry.id ? null : entry.id)}
-                        >
-                          <MoreHorizontal size={18} />
-                        </button>
-                        {actionMenuId === entry.id ? (
-                          <div className="row-menu" role="menu">
-                            {rowLocked ? <p className="row-action-menu-note">Locked through {formatMonthDate(accountingLock?.lockedThroughDate || '')}</p> : null}
-                            <button type="button" disabled={rowLocked} onClick={() => openDrawer(entry.kind, entry)}>Edit activity</button>
-                            <button type="button" disabled={rowLocked} onClick={() => handleDelete(entry)}>Delete activity</button>
-                          </div>
-                        ) : null}
-                      </div>
+                      {actionMenuId === entry.id ? (
+                        <div className="row-action-menu" role="menu">
+                          {rowLocked ? <p className="row-action-menu-note">Locked through {formatMonthDate(accountingLock?.lockedThroughDate || '')}</p> : null}
+                          <button type="button" disabled={rowLocked} onClick={() => openDrawer(entry.kind, entry)}>Edit activity</button>
+                          <button type="button" disabled={rowLocked} onClick={() => handleDelete(entry)}>Delete activity</button>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                   )

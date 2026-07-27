@@ -46,6 +46,17 @@ textarea {
   font: inherit;
 }
 
+/* Native form controls (especially `input[type="date"]`) carry a browser
+   intrinsic minimum width that ignores `width: 100%` on narrow viewports,
+   so they can overflow past their card/grid container in mobile view.
+   Force them to always respect their container's width instead. */
+input,
+select,
+textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
 button {
   cursor: pointer;
 }
@@ -1762,6 +1773,7 @@ td strong {
 .merchant-coral { background: #ff5e73; }
 .merchant-violet { background: #6847df; }
 .merchant-green { background: #078c58; }
+.merchant-slate { background: #60708a; }
 
 .category-icon {
   color: var(--blue);
@@ -3540,6 +3552,7 @@ tbody tr:last-child td {
 
 .analytics-card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
@@ -3734,11 +3747,17 @@ tbody tr:last-child td {
 
 .category-bar-row {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
   color: var(--ink);
   font-size: 14px;
+}
+
+.category-bar-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .category-bar-row div {
@@ -4266,6 +4285,14 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
 
+  .analytics-segmented {
+    min-width: 0;
+  }
+
+  .category-bar-row {
+    grid-template-columns: minmax(0, 84px) minmax(0, 1fr) auto auto;
+  }
+
   .message-list-toolbar {
     grid-template-columns: 1fr;
   }
@@ -4336,6 +4363,16 @@ tbody tr:last-child td {
   .public-footer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .public-header {
+    min-height: 0;
+    padding: 18px 20px;
+    gap: 12px;
+  }
+
+  .public-footer nav {
+    display: none;
   }
 
   .public-nav,
