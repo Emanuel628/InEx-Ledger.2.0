@@ -42,11 +42,12 @@ function loadInboundEmailApp() {
       return {
         pool: {
           async query(sql, params = []) {
-            if (/SELECT id, sender_id\s+FROM messages/i.test(sql)) {
+            if (/SELECT id, sender_id, business_id\s+FROM messages/i.test(sql)) {
               return {
                 rows: [{
                   id: "77777777-7777-4777-8777-777777777777",
-                  sender_id: "11111111-1111-4111-8111-111111111111"
+                  sender_id: "11111111-1111-4111-8111-111111111111",
+                  business_id: null
                 }],
                 rowCount: 1
               };

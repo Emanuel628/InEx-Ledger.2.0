@@ -8,6 +8,7 @@ const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { Resend } = require("resend");
+const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getInvoiceFromEmail, buildReplyToAddress } = require("../services/invoiceEmailService.js");
 const {
   buildSupportReplyToAddress,
@@ -162,6 +163,7 @@ function threadKeySql(alias = "m") {
 // Lightweight endpoint polled by the frontend for unread badges.
 router.get("/unread-count", async (req, res) => {
   try {
+    const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
       `SELECT COUNT(*)::int AS total_count,
               COUNT(*) FILTER (
@@ -176,9 +178,10 @@ router.get("/unread-count", async (req, res) => {
               )::int AS message_count
          FROM messages
         WHERE receiver_id = $1
+          AND business_id = $2
           AND is_read = FALSE
           AND is_deleted_by_receiver = FALSE`,
-      [req.user.id]
+      [req.user.id, businessId]
     );
     const row = result.rows[0] || {};
     res.json({
@@ -200,6 +203,7 @@ router.get("/unread-count", async (req, res) => {
 //   - Users with role = 'it_support' or 'admin' (support channel)
 router.get("/contacts", async (req, res) => {
   try {
+    const businessId = await resolveBusinessIdForUser(req.user);
     const { rows } = await pool.query(
       `SELECT DISTINCT u.id,
               COALESCE(u.display_name, u.full_name, u.email) AS name,
@@ -208,18 +212,21 @@ router.get("/contacts", async (req, res) => {
          FROM users u
         WHERE u.id != $1
           AND (
-            -- Previously exchanged messages (reply flow)
+            -- Previously exchanged messages within this business (reply flow)
             EXISTS (
               SELECT 1 FROM messages m
-              WHERE (m.sender_id = $1 AND m.receiver_id = u.id)
-                 OR (m.receiver_id = $1 AND m.sender_id = u.id)
+              WHERE m.business_id = $2
+                AND (
+                  (m.sender_id = $1 AND m.receiver_id = u.id)
+                   OR (m.receiver_id = $1 AND m.sender_id = u.id)
+                )
             )
             -- Support staff — always visible
             OR u.role IN ('it_support', 'admin')
           )
         ORDER BY name ASC
         LIMIT 200`,
-      [req.user.id]
+      [req.user.id, businessId]
     );
 
     const contacts = rows
@@ -241,6 +248,7 @@ router.get("/contacts", async (req, res) => {
 // GET /api/messages/inbox
 router.get("/inbox", async (req, res) => {
   try {
+    const businessId = await resolveBusinessIdForUser(req.user);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), MAX_PAGE_SIZE);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const archived = req.query.archived === "true";
@@ -251,6 +259,7 @@ router.get("/inbox", async (req, res) => {
              ${threadKeySql("m")} AS thread_key
         FROM messages m
        WHERE m.receiver_id = $1
+         AND m.business_id = $5
          AND m.is_deleted_by_receiver = FALSE
          AND m.is_archived_by_receiver = $2
     ),
@@ -277,7 +286,7 @@ router.get("/inbox", async (req, res) => {
      WHERE r.rn = 1
      ORDER BY r.created_at DESC
      LIMIT $3 OFFSET $4`,
-  [req.user.id, archived, limit, offset]
+  [req.user.id, archived, limit, offset, businessId]
 );
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
@@ -290,6 +299,7 @@ router.get("/inbox", async (req, res) => {
 // GET /api/messages/sent
 router.get("/sent", async (req, res) => {
   try {
+    const businessId = await resolveBusinessIdForUser(req.user);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), MAX_PAGE_SIZE);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const archived = req.query.archived === "true";
@@ -300,6 +310,7 @@ router.get("/sent", async (req, res) => {
              ${threadKeySql("m")} AS thread_key
         FROM messages m
        WHERE m.sender_id = $1
+         AND m.business_id = $5
          AND m.is_deleted_by_sender = FALSE
          AND m.is_archived_by_sender = $2
     ),
@@ -326,7 +337,7 @@ router.get("/sent", async (req, res) => {
      WHERE r.rn = 1
      ORDER BY r.created_at DESC
      LIMIT $3 OFFSET $4`,
-  [req.user.id, archived, limit, offset]
+  [req.user.id, archived, limit, offset, businessId]
 );
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
@@ -340,6 +351,7 @@ router.get("/sent", async (req, res) => {
 // Returns archived messages for both inbox and sent conversations.
 router.get("/archived", async (req, res) => {
   try {
+    const businessId = await resolveBusinessIdForUser(req.user);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), MAX_PAGE_SIZE);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
@@ -348,7 +360,9 @@ router.get("/archived", async (req, res) => {
       SELECT m.*,
              ${threadKeySql("m")} AS thread_key
         FROM messages m
-       WHERE (
+       WHERE m.business_id = $4
+         AND (
+          (
           m.receiver_id = $1
           AND m.is_deleted_by_receiver = FALSE
           AND m.is_archived_by_receiver = TRUE
@@ -357,6 +371,7 @@ router.get("/archived", async (req, res) => {
           AND m.is_deleted_by_sender = FALSE
           AND m.is_archived_by_sender = TRUE
        )
+        )
     ),
     ranked AS (
       SELECT vm.*,
@@ -381,7 +396,7 @@ router.get("/archived", async (req, res) => {
      WHERE r.rn = 1
      ORDER BY r.created_at DESC
      LIMIT $2 OFFSET $3`,
-  [req.user.id, limit, offset]
+  [req.user.id, limit, offset, businessId]
 );
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
@@ -415,13 +430,12 @@ router.post("/:id/reply-email", replyAttachmentUpload.single("attachment"), asyn
     const { rows } = await pool.query(
       `SELECT m.*,
               inv.invoice_number,
-              inv.business_id,
               b.name AS business_name,
               b.user_id AS owner_id,
               COALESCE(m.parent_id, m.id) AS thread_root_id
          FROM messages m
          LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
-         LEFT JOIN businesses b ON b.id = inv.business_id
+         LEFT JOIN businesses b ON b.id = COALESCE(inv.business_id, m.business_id)
         WHERE m.id = $1
           AND (
             (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
@@ -500,8 +514,8 @@ router.post("/:id/reply-email", replyAttachmentUpload.single("attachment"), asyn
       `INSERT INTO messages
          (id, sender_id, receiver_id, message_type, subject, body,
           external_sender_email, external_sender_name, invoice_id, parent_id,
-          is_read, is_deleted_by_receiver)
-       VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, TRUE)`,
+          is_read, is_deleted_by_receiver, business_id)
+       VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, TRUE, $10)`,
       [
         outboundMessageId,
         req.user.id,
@@ -511,7 +525,8 @@ router.post("/:id/reply-email", replyAttachmentUpload.single("attachment"), asyn
         original.external_sender_email,
         original.external_sender_name,
         original.invoice_id || null,
-        original.thread_root_id || original.id
+        original.thread_root_id || original.id,
+        original.business_id
       ]
     );
 
@@ -547,17 +562,19 @@ router.get("/:id/thread", async (req, res) => {
       return res.status(400).json({ error: "Invalid message ID." });
     }
 
+    const businessId = await resolveBusinessIdForUser(req.user);
     const baseResult = await pool.query(
       `SELECT id, invoice_id, COALESCE(parent_id, id) AS thread_root_id
          FROM messages
         WHERE id = $1
+          AND business_id = $3
           AND (
             (receiver_id = $2 AND is_deleted_by_receiver = FALSE)
             OR
             (sender_id = $2 AND is_deleted_by_sender = FALSE)
           )
         LIMIT 1`,
-      [messageId, req.user.id]
+      [messageId, req.user.id, businessId]
     );
 
     if (!baseResult.rowCount) {
@@ -581,13 +598,14 @@ router.get("/:id/thread", async (req, res) => {
            LEFT JOIN users r ON r.id = m.receiver_id
            LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
           WHERE m.invoice_id = $1
+            AND m.business_id = $3
             AND (
               (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
               OR
               (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
             )
           ORDER BY m.created_at ASC`,
-        [baseMessage.invoice_id, req.user.id]
+        [baseMessage.invoice_id, req.user.id, businessId]
       );
 
       rows = result.rows;
@@ -605,13 +623,14 @@ router.get("/:id/thread", async (req, res) => {
            LEFT JOIN users r ON r.id = m.receiver_id
            LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
           WHERE COALESCE(m.parent_id, m.id) = $1
+            AND m.business_id = $3
             AND (
               (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
               OR
               (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
             )
           ORDER BY m.created_at ASC`,
-        [rootId, req.user.id]
+        [rootId, req.user.id, businessId]
       );
 
       rows = result.rows;
@@ -643,6 +662,7 @@ router.get("/:id", async (req, res) => {
     if (!isUuid(messageId)) {
       return res.status(400).json({ error: "Invalid message ID." });
     }
+    const businessId = await resolveBusinessIdForUser(req.user);
     const { rows } = await pool.query(
       `SELECT m.*,
               COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
@@ -655,12 +675,13 @@ router.get("/:id", async (req, res) => {
          LEFT JOIN users r ON r.id = m.receiver_id
          LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
         WHERE m.id = $1
+          AND m.business_id = $3
           AND (
             (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
             OR (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
           )
         LIMIT 1`,
-      [messageId, req.user.id]
+      [messageId, req.user.id, businessId]
     );
 
     if (!rows.length) {
@@ -694,6 +715,7 @@ router.post("/support-email", async (req, res) => {
       return res.status(400).json({ error: "Message body is required." });
     }
 
+    const businessId = await resolveBusinessIdForUser(req.user);
     const resend = getResendClient();
     if (!resend) {
       return res.status(503).json({ error: "Email service is not configured." });
@@ -789,8 +811,8 @@ router.post("/support-email", async (req, res) => {
       `INSERT INTO messages
          (id, sender_id, receiver_id, message_type, subject, body,
           external_sender_email, external_sender_name,
-          is_read, is_deleted_by_receiver, external_message_id)
-       VALUES ($1, $2, $3, 'support_request', $4, $5, $6, $7, TRUE, TRUE, $8)`,
+          is_read, is_deleted_by_receiver, external_message_id, business_id)
+       VALUES ($1, $2, $3, 'support_request', $4, $5, $6, $7, TRUE, TRUE, $8, $9)`,
       [
         messageId,
         req.user.id,
@@ -799,7 +821,8 @@ router.post("/support-email", async (req, res) => {
         body,
         supportTo,
         "InEx Support",
-        sendResult?.data?.id || null
+        sendResult?.data?.id || null,
+        businessId
       ]
     );
 
@@ -851,6 +874,7 @@ router.post("/send-email", async (req, res) => {
       return res.status(503).json({ error: "Email service is not configured." });
     }
 
+    const businessId = await resolveBusinessIdForUser(req.user);
     const supportFrom = getSupportFromEmail();
     const supportTo = getSupportToEmail();
     const messageId = crypto.randomUUID();
@@ -912,8 +936,8 @@ router.post("/send-email", async (req, res) => {
       `INSERT INTO messages
          (id, sender_id, receiver_id, message_type, subject, body,
           external_sender_email, external_sender_name,
-          is_read, is_deleted_by_receiver, external_message_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, TRUE, $9)`,
+          is_read, is_deleted_by_receiver, external_message_id, business_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, TRUE, $9, $10)`,
       [
         messageId,
         req.user.id,
@@ -923,7 +947,8 @@ router.post("/send-email", async (req, res) => {
         body,
         parsedTo.emails.join(", "),
         accountName,
-        sendResult?.data?.id || null
+        sendResult?.data?.id || null,
+        businessId
       ]
     );
 
@@ -974,6 +999,8 @@ router.post("/", async (req, res) => {
   }
 
   try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+
     // Verify receiver exists
     const receiverCheck = await pool.query(
       "SELECT id, role FROM users WHERE id = $1 LIMIT 1",
@@ -993,15 +1020,18 @@ router.post("/", async (req, res) => {
            FROM users u
           WHERE u.id = $2
             AND (
-              -- Prior message exchange exists (reply flow)
+              -- Prior message exchange exists within this business (reply flow)
               EXISTS (
                 SELECT 1 FROM messages m
-                WHERE (m.sender_id = $1 AND m.receiver_id = u.id)
-                   OR (m.receiver_id = $1 AND m.sender_id = u.id)
+                WHERE m.business_id = $3
+                  AND (
+                    (m.sender_id = $1 AND m.receiver_id = u.id)
+                     OR (m.receiver_id = $1 AND m.sender_id = u.id)
+                  )
               )
             )
           LIMIT 1`,
-        [req.user.id, receiverId]
+        [req.user.id, receiverId, businessId]
       );
       if (!contactCheck.rowCount) {
         return res.status(403).json({ error: "You are not permitted to message this user." });
@@ -1013,12 +1043,13 @@ router.post("/", async (req, res) => {
       const parentCheck = await pool.query(
         `SELECT id, COALESCE(parent_id, id) AS thread_root_id FROM messages
           WHERE id = $1
+            AND business_id = $4
             AND (
               (sender_id = $2 AND receiver_id = $3)
               OR (sender_id = $3 AND receiver_id = $2)
             )
           LIMIT 1`,
-        [parentId, req.user.id, receiverId]
+        [parentId, req.user.id, receiverId, businessId]
       );
       if (!parentCheck.rowCount) {
         return res.status(400).json({ error: "Invalid parent message." });
@@ -1028,8 +1059,8 @@ router.post("/", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO messages
-         (id, sender_id, receiver_id, message_type, subject, body, parent_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (id, sender_id, receiver_id, message_type, subject, body, parent_id, business_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         crypto.randomUUID(),
@@ -1038,7 +1069,8 @@ router.post("/", async (req, res) => {
         messageType,
         subject || null,
         body,
-        req.threadRootId || parentId || null
+        req.threadRootId || parentId || null,
+        businessId
       ]
     );
 
@@ -1084,14 +1116,16 @@ router.patch("/:id/read", async (req, res) => {
     if (!isUuid(messageId)) {
       return res.status(400).json({ error: "Invalid message ID." });
     }
+    const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
       `UPDATE messages
           SET is_read = TRUE, updated_at = NOW()
         WHERE id = $1
           AND receiver_id = $2
+          AND business_id = $3
           AND is_deleted_by_receiver = FALSE
         RETURNING id, is_read`,
-      [messageId, req.user.id]
+      [messageId, req.user.id, businessId]
     );
 
     if (!result.rowCount) {
@@ -1113,15 +1147,17 @@ router.patch("/:id/archive", async (req, res) => {
     if (!isUuid(messageId)) {
       return res.status(400).json({ error: "Invalid message ID." });
     }
+    const businessId = await resolveBusinessIdForUser(req.user);
     // Determine which column to toggle
     const msgCheck = await pool.query(
       `SELECT id, sender_id, receiver_id,
               is_archived_by_sender, is_archived_by_receiver
          FROM messages
         WHERE id = $1
+          AND business_id = $3
           AND (sender_id = $2 OR receiver_id = $2)
         LIMIT 1`,
-      [messageId, req.user.id]
+      [messageId, req.user.id, businessId]
     );
 
     if (!msgCheck.rowCount) {
@@ -1160,14 +1196,16 @@ router.patch("/:id/resolve", async (req, res) => {
     if (!isUuid(messageId)) {
       return res.status(400).json({ error: "Invalid message ID." });
     }
+    const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
       `UPDATE messages
           SET is_archived_by_sender = TRUE, updated_at = NOW()
         WHERE id = $1
           AND sender_id = $2
+          AND business_id = $3
           AND is_deleted_by_sender = FALSE
         RETURNING id`,
-      [messageId, req.user.id]
+      [messageId, req.user.id, businessId]
     );
 
     if (!result.rowCount) {
@@ -1189,13 +1227,15 @@ router.delete("/:id", async (req, res) => {
     if (!isUuid(messageId)) {
       return res.status(400).json({ error: "Invalid message ID." });
     }
+    const businessId = await resolveBusinessIdForUser(req.user);
     const msgCheck = await pool.query(
       `SELECT id, sender_id, receiver_id
          FROM messages
         WHERE id = $1
+          AND business_id = $3
           AND (sender_id = $2 OR receiver_id = $2)
         LIMIT 1`,
-      [messageId, req.user.id]
+      [messageId, req.user.id, businessId]
     );
 
     if (!msgCheck.rowCount) {

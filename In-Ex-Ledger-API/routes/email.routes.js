@@ -560,6 +560,7 @@ router.post("/inbound", async (req, res) => {
     let invoice = null;
     let ownerId = null;
     let rootMessageId = supportThreadId || null;
+    let threadBusinessId = null;
 
     if (invoiceId) {
       const invoiceResult = await pool.query(
@@ -576,13 +577,14 @@ router.post("/inbound", async (req, res) => {
       }
       invoice = invoiceResult.rows[0];
       ownerId = invoice.owner_id;
+      threadBusinessId = invoice.business_id || null;
       if (!ownerId) {
         logWarn("inbound email webhook: business has no owner", { invoiceId });
         return res.status(200).json({ ok: true, ignored: "no_owner" });
       }
     } else {
       const supportThreadResult = await pool.query(
-        `SELECT id, sender_id
+        `SELECT id, sender_id, business_id
            FROM messages
           WHERE id = $1
           LIMIT 1`,
@@ -594,6 +596,7 @@ router.post("/inbound", async (req, res) => {
       }
       ownerId = supportThreadResult.rows[0].sender_id || null;
       rootMessageId = supportThreadResult.rows[0].id;
+      threadBusinessId = supportThreadResult.rows[0].business_id || null;
       if (!ownerId) {
         logWarn("inbound email webhook: support thread missing owner", { supportThreadId });
         return res.status(200).json({ ok: true, ignored: "no_owner" });
@@ -622,8 +625,8 @@ const body =
       `INSERT INTO messages
    (id, sender_id, receiver_id, message_type, subject, body,
     external_sender_email, external_sender_name, invoice_id, parent_id,
-    external_message_id, external_references, external_in_reply_to)
- VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    external_message_id, external_references, external_in_reply_to, business_id)
+ VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         messageId,
         ownerId,
@@ -636,7 +639,8 @@ const body =
         rootMessageId,
         receivedEmail?.message_id || payload?.data?.message_id || null,
         receivedEmail?.headers?.references || receivedEmail?.headers?.References || null,
-        receivedEmail?.headers?.in_reply_to || receivedEmail?.headers?.["In-Reply-To"] || null
+        receivedEmail?.headers?.in_reply_to || receivedEmail?.headers?.["In-Reply-To"] || null,
+        threadBusinessId
       ]
     );
 
@@ -644,15 +648,16 @@ const body =
     await pool.query(
       `INSERT INTO messages
    (id, sender_id, receiver_id, message_type, subject, body,
-    external_sender_email, external_sender_name, is_read)
- VALUES ($1, NULL, $2, 'notification', $3, $4, $5, $6, FALSE)`,
+    external_sender_email, external_sender_name, is_read, business_id)
+ VALUES ($1, NULL, $2, 'notification', $3, $4, $5, $6, FALSE, $7)`,
       [
         crypto.randomUUID(),
         ownerId,
         notification.subject,
         notification.body,
         from.email,
-        from.name
+        from.name,
+        threadBusinessId
       ]
     );
 

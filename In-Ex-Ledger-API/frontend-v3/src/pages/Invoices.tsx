@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Mail,
   MoreHorizontal,
@@ -108,6 +111,7 @@ function Invoices(props: PageProps) {
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const pageStart = (safeCurrentPage - 1) * pageSize
   const visibleInvoices = filteredInvoices.slice(pageStart, pageStart + pageSize)
+  const paginationPages = getPaginationPages(safeCurrentPage, totalPages)
   const monthOptions = uniqueValues(invoices.map((invoice) => invoice.issueDate.slice(0, 7)).filter(Boolean))
     .sort((first, second) => second.localeCompare(first))
 
@@ -300,22 +304,35 @@ function Invoices(props: PageProps) {
           </div>
 
           <div className="table-footer">
-            <span>Showing {visibleInvoices.length ? pageStart + 1 : 0}-{pageStart + visibleInvoices.length} of {filteredInvoices.length} invoices</span>
             <div className="pagination" aria-label="Invoice pages">
-              <button type="button" onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))} disabled={safeCurrentPage === 1}>
-                Previous
+              <button type="button" aria-label="Previous page" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}>
+                <ChevronLeft size={16} />
               </button>
-              <button className="is-active" type="button">{safeCurrentPage}</button>
-              <button type="button" onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))} disabled={safeCurrentPage === totalPages}>
-                Next
+              {paginationPages.map((page, index) => (
+                page === 'ellipsis' ? (
+                  <span key={`ellipsis-${index}`}>...</span>
+                ) : (
+                  <button
+                    className={page === safeCurrentPage ? 'is-active' : ''}
+                    type="button"
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </button>
+                )
+              ))}
+              <button type="button" aria-label="Next page" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))}>
+                <ChevronRight size={16} />
               </button>
             </div>
-            <label className="select-button per-page-button">
+            <label className="secondary-button per-page-button">
               <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
                 <option value={10}>10 per page</option>
                 <option value={20}>20 per page</option>
                 <option value={50}>50 per page</option>
               </select>
+              <ChevronDown size={16} />
             </label>
           </div>
         </section>
@@ -383,11 +400,25 @@ function InvoiceDrawer({
           </label>
           <label>
             Client email
-            <input value={draft.clientEmail} onChange={(event) => updateDraft('clientEmail', event.target.value)} placeholder="client@example.com" />
+            <input
+              type="email"
+              name="invoice-client-email"
+              autoComplete="email"
+              value={draft.clientEmail}
+              onChange={(event) => updateDraft('clientEmail', event.target.value)}
+              placeholder="client@example.com"
+            />
           </label>
           <label>
             CC emails
-            <input value={draft.ccEmails} onChange={(event) => updateDraft('ccEmails', event.target.value)} placeholder="name@example.com, second@example.com" />
+            <input
+              type="text"
+              name="invoice-cc-emails"
+              autoComplete="off"
+              value={draft.ccEmails}
+              onChange={(event) => updateDraft('ccEmails', event.target.value)}
+              placeholder="name@example.com, second@example.com"
+            />
           </label>
           <div className="export-field-grid">
             <label>
@@ -506,6 +537,25 @@ function formatMoney(value: number, currency = getActiveCurrency()) {
 
 function getActiveCurrency() {
   return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
+}
+
+function getPaginationPages(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1])
+  const sortedPages = Array.from(pages)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b)
+
+  return sortedPages.flatMap((page, index) => {
+    const previousPage = sortedPages[index - 1]
+    if (previousPage && page - previousPage > 1) {
+      return ['ellipsis' as const, page]
+    }
+    return [page]
+  })
 }
 
 export default Invoices

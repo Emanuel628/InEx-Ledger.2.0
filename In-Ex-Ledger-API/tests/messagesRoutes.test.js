@@ -7,6 +7,7 @@ const express = require("express");
 const request = require("supertest");
 
 const MESSAGES_ROUTE_PATH = require.resolve("../routes/messages.routes.js");
+const TEST_BUSINESS_ID = "33333333-3333-4333-8333-333333333333";
 
 function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows = null } = {}) {
   const originalLoad = Module._load.bind(Module);
@@ -21,7 +22,7 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
               return { rows: contactRows, rowCount: contactRows.length };
             }
 
-            if (/FROM messages\s+WHERE receiver_id = \$1\s+AND is_read = FALSE\s+AND is_deleted_by_receiver = FALSE/i.test(sql.replace(/\s+/g, " "))) {
+            if (/FROM messages\s+WHERE receiver_id = \$1\s+AND business_id = \$2\s+AND is_read = FALSE\s+AND is_deleted_by_receiver = FALSE/i.test(sql.replace(/\s+/g, " "))) {
               return {
                 rows: [{
                   total_count: 4,
@@ -94,6 +95,13 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
           next();
         }
       };
+    }
+
+    if (
+      requestName === "../api/utils/resolveBusinessIdForUser.js" ||
+      /resolveBusinessIdForUser\.js$/.test(requestName)
+    ) {
+      return { resolveBusinessIdForUser: async () => TEST_BUSINESS_ID };
     }
 
     if (
@@ -418,6 +426,10 @@ function loadMessagesRouterForReply() {
       return { requireAuth: (req, _res, next) => { req.user = { id: OWNER_ID, email: "owner@example.com" }; next(); } };
     }
 
+    if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
+      return { resolveBusinessIdForUser: async () => TEST_BUSINESS_ID };
+    }
+
     if (requestName === "../middleware/csrf.middleware.js" || /csrf\.middleware\.js$/.test(requestName)) {
       return { requireCsrfProtection: (_req, _res, next) => next() };
     }
@@ -539,5 +551,108 @@ test("messages reply-email without an attachment still sends normally", async ()
     fixture.cleanup();
     if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
     else process.env.RESEND_API_KEY = beforeApiKey;
+  }
+});
+
+// Regression coverage for the business-isolation fix: a user with more than
+// one business must only ever see messages tagged with the currently active
+// business_id — never messages created while a different business was
+// active. This is what "messages bleed into a second business" looked like
+// before messages.business_id existed.
+function loadMessagesRouterForIsolation({ activeBusinessId, rows }) {
+  const originalLoad = Module._load.bind(Module);
+
+  Module._load = function (requestName, parent, isMain) {
+    if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
+      return {
+        pool: {
+          async query(sql, params = []) {
+            if (/WITH visible_messages AS/i.test(sql)) {
+              const requestedBusinessId = params[params.length - 1];
+              const matches = rows.filter((row) => row.business_id === requestedBusinessId);
+              return { rows: matches, rowCount: matches.length };
+            }
+            return { rows: [], rowCount: 0 };
+          }
+        }
+      };
+    }
+
+    if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
+      return { requireAuth: (req, _res, next) => { req.user = { id: "owner-1", email: "owner@example.com" }; next(); } };
+    }
+
+    if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
+      return { resolveBusinessIdForUser: async () => activeBusinessId };
+    }
+
+    if (requestName === "../middleware/csrf.middleware.js" || /csrf\.middleware\.js$/.test(requestName)) {
+      return { requireCsrfProtection: (_req, _res, next) => next() };
+    }
+
+    if (requestName === "../middleware/rate-limit.middleware.js" || /rate-limit\.middleware\.js$/.test(requestName)) {
+      return { createDataApiLimiter: () => (_req, _res, next) => next() };
+    }
+
+    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
+      return { logError() {}, logWarn() {}, logInfo() {} };
+    }
+
+    if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
+      return { AUDIT_ACTIONS: {}, async recordAuditEventForRequest() { return "audit-1"; } };
+    }
+
+    if (requestName === "resend") {
+      return { Resend: class Resend {} };
+    }
+
+    return originalLoad(requestName, parent, isMain);
+  };
+
+  delete require.cache[MESSAGES_ROUTE_PATH];
+
+  try {
+    const router = require("../routes/messages.routes.js");
+    const app = express();
+    app.use(express.json());
+    app.use("/api/messages", router);
+
+    return {
+      app,
+      cleanup() {
+        delete require.cache[MESSAGES_ROUTE_PATH];
+        Module._load = originalLoad;
+      }
+    };
+  } catch (err) {
+    Module._load = originalLoad;
+    throw err;
+  }
+}
+
+test("messages inbox only returns rows tagged with the currently active business", async () => {
+  const businessA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const businessB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const rows = [
+    { id: "m-a", business_id: businessA, created_at: "2026-01-01", receiver_id: "owner-1", sender_id: "other", is_read: false },
+    { id: "m-b", business_id: businessB, created_at: "2026-01-02", receiver_id: "owner-1", sender_id: "other", is_read: false }
+  ];
+
+  const fixtureA = loadMessagesRouterForIsolation({ activeBusinessId: businessA, rows });
+  try {
+    const res = await request(fixtureA.app).get("/api/messages/inbox");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.messages.map((m) => m.id), ["m-a"]);
+  } finally {
+    fixtureA.cleanup();
+  }
+
+  const fixtureB = loadMessagesRouterForIsolation({ activeBusinessId: businessB, rows });
+  try {
+    const res = await request(fixtureB.app).get("/api/messages/inbox");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.messages.map((m) => m.id), ["m-b"]);
+  } finally {
+    fixtureB.cleanup();
   }
 });
