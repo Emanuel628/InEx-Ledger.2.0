@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import type { PageProps, ThemeMode } from '../App'
 import AppShell from '../components/AppShell'
+import { normalizeLanguage as normalizeLanguageValue } from '../lib/i18n'
 import { confirmMfaToggle, loadMfaStatus, requestMfaToggle } from '../lib/authApi'
 import {
   exportAccountData,
@@ -47,7 +48,7 @@ const settingsSections = [
   { label: 'Business', note: 'Identity and taxes', icon: Building2 },
   { label: 'Billing', note: 'Plan and invoices', icon: CreditCard },
   { label: 'Security', note: 'MFA and sessions', icon: ShieldCheck },
-  { label: 'Preferences', note: 'Language and defaults', icon: SlidersHorizontal },
+  { label: 'Preferences', note: 'Theme and privacy', icon: SlidersHorizontal },
   { label: 'Data', note: 'Exports and deletion', icon: Database },
 ] satisfies { label: SettingsSection; note: string; icon: LucideIcon }[]
 
@@ -101,13 +102,17 @@ function Settings(props: PageProps) {
       .catch(() => setPrivacySettings(null))
   }, [props.authUser?.currentBusinessId])
 
-  const saveButtonLabel = useMemo(() => {
-    if (saving) return 'Saving'
-    if (activeSection === 'Account') return 'Save account'
-    if (activeSection === 'Business') return 'Save business'
-    if (activeSection === 'Preferences' || activeSection === 'Data') return 'Save choices'
-    return 'Save changes'
-  }, [activeSection, saving])
+  const saveButtonLabel = useMemo(() => (
+    saving
+      ? 'Saving'
+      : activeSection === 'Account'
+        ? 'Save account'
+        : activeSection === 'Business'
+          ? 'Save business'
+          : activeSection === 'Preferences' || activeSection === 'Data'
+            ? 'Save choices'
+            : 'Save changes'
+  ), [activeSection, saving])
 
   async function saveCurrentSection() {
     setSaving(true)
@@ -192,7 +197,14 @@ function Settings(props: PageProps) {
 
           <div className="settings-content">
             {activeSection === 'Account' ? <AccountSettings authUser={props.authUser} fullName={fullName} setFullName={setFullName} onNavigate={props.onNavigate} /> : null}
-            {activeSection === 'Business' ? <BusinessSettings profile={businessProfile} updateBusiness={updateBusiness} fieldErrors={fieldErrors} /> : null}
+            {activeSection === 'Business' ? (
+              <BusinessSettings
+                profile={businessProfile}
+                updateBusiness={updateBusiness}
+                fieldErrors={fieldErrors}
+                onLanguageChange={props.onLanguageChange}
+              />
+            ) : null}
             {activeSection === 'Billing' ? <BillingSettings onNavigate={props.onNavigate} /> : null}
             {activeSection === 'Security' ? <SecuritySettings onNavigate={props.onNavigate} authUser={props.authUser} onAuthChange={props.onAuthChange} /> : null}
             {activeSection === 'Preferences' ? <PreferenceSettings privacySettings={privacySettings} updatePrivacy={updatePrivacy} theme={props.theme} setTheme={props.setTheme} /> : null}
@@ -253,10 +265,12 @@ function BusinessSettings({
   profile,
   updateBusiness,
   fieldErrors,
+  onLanguageChange,
 }: {
   profile: BusinessProfile | null
   updateBusiness: <K extends keyof BusinessProfile>(key: K, value: BusinessProfile[K]) => void
   fieldErrors: Record<string, string>
+  onLanguageChange: PageProps['onLanguageChange']
 }) {
   if (!profile) {
     return <SettingsPanel eyebrow="Business" title="Business profile" description="Business details load after onboarding."><div className="empty-table-state">No business profile loaded.</div></SettingsPanel>
@@ -274,7 +288,15 @@ function BusinessSettings({
         <Field label="Business name" value={profile.name || ''} onChange={(value) => updateBusiness('name', value)} placeholder="Business name" />
         <Field label="Contact name" value={profile.contact_full_name || ''} onChange={(value) => updateBusiness('contact_full_name', value)} placeholder="Contact name" />
         <SelectField label="Region" value={profile.region || 'US'} options={['US', 'CA']} onChange={(value) => updateBusiness('region', value as BusinessProfile['region'])} />
-        <SelectField label="Language" value={profile.language || 'en'} options={languageOptions} onChange={(value) => updateBusiness('language', value)} />
+        <SelectField
+          label="Language"
+          value={profile.language || 'en'}
+          options={languageOptions}
+          onChange={(value) => {
+            updateBusiness('language', value)
+            onLanguageChange(normalizeLanguageValue(value))
+          }}
+        />
         {profile.region === 'CA' ? (
           <SelectField
             label="Province"

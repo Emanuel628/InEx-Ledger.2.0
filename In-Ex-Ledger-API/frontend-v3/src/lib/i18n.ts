@@ -6,8 +6,9 @@ export type TranslationKey = keyof typeof translations.en
 
 const STORAGE_KEY = 'lb_language'
 const TRANSLATABLE_ATTRS = ['aria-label', 'placeholder', 'title'] as const
-const originalTextNodes = new WeakMap<Text, string>()
-const originalAttrs = new WeakMap<Element, Partial<Record<(typeof TRANSLATABLE_ATTRS)[number], string>>>()
+type TranslationRecord = { original: string; lastOutput: string }
+const originalTextNodes = new WeakMap<Text, TranslationRecord>()
+const originalAttrs = new WeakMap<Element, Partial<Record<(typeof TRANSLATABLE_ATTRS)[number], TranslationRecord>>>()
 
 export const translations = {
   en: {
@@ -196,6 +197,13 @@ export function observeV3PhraseTranslations(root: ParentNode, languageProvider: 
       if (mutation.type === 'attributes' && mutation.target instanceof Element) {
         translateElementAttributes(mutation.target, languageProvider())
       }
+      // React frequently updates a computed label (e.g. a save button whose
+      // text depends on active tab) by mutating an existing Text node's data
+      // in place rather than replacing the node, which is neither an added
+      // node nor an attribute change — only a characterData mutation.
+      if (mutation.type === 'characterData' && mutation.target.nodeType === Node.TEXT_NODE) {
+        translateTextNode(mutation.target as Text, languageProvider())
+      }
     }
   })
   observer.observe(root, {
@@ -203,18 +211,28 @@ export function observeV3PhraseTranslations(root: ParentNode, languageProvider: 
     subtree: true,
     attributes: true,
     attributeFilter: [...TRANSLATABLE_ATTRS],
+    characterData: true,
   })
   return observer
 }
 
 function translateTextNodes(root: ParentNode, language: AppLanguage) {
+  // Deliberately does not filter by "is the current text a catalog phrase":
+  // once a node has been translated its current text is the *target*
+  // language, not English, so that check would reject it on every later
+  // pass (e.g. switching es -> fr, or a re-render that restores English).
+  // translateTextNode decides translatability itself, from the tracked
+  // original plus a fresh check when the underlying text has changed.
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement
-      if (!parent || ['SCRIPT', 'STYLE', 'TEXTAREA', 'OPTION'].includes(parent.tagName)) {
+      // <option> is deliberately translatable: its visible text is display-only
+      // (selection is driven by the `value` attribute, untouched here), and
+      // dropdown labels like region/account-type options are common UI text.
+      if (!parent || ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(parent.tagName)) {
         return NodeFilter.FILTER_REJECT
       }
-      return isCatalogPhrase(node.textContent || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+      return (node.textContent || '').trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
     },
   })
 
@@ -226,13 +244,26 @@ function translateTextNodes(root: ParentNode, language: AppLanguage) {
 }
 
 function translateTextNode(node: Text, language: AppLanguage) {
-  const original = originalTextNodes.get(node) || normalizePhrase(node.textContent || '')
-  if (!original) return
-  originalTextNodes.set(node, original)
-  const translated = translatePhrase(original, language)
-  if (node.textContent !== translated) {
-    node.textContent = preserveEdgeWhitespace(node.textContent || '', translated)
+  const currentText = node.textContent || ''
+  const cached = originalTextNodes.get(node)
+  // If the live text still matches what we last wrote, nothing external
+  // touched this node since our last pass — keep translating from the
+  // remembered original. Otherwise a re-render just replaced it with a
+  // fresh English value (React always renders the literal source string),
+  // so that fresh value becomes the new original.
+  const original = cached && currentText === cached.lastOutput ? cached.original : normalizePhrase(currentText)
+
+  if (!isCatalogPhrase(original)) {
+    if (cached) originalTextNodes.delete(node)
+    return
   }
+
+  const translated = translatePhrase(original, language)
+  const output = preserveEdgeWhitespace(currentText, translated)
+  if (currentText !== output) {
+    node.textContent = output
+  }
+  originalTextNodes.set(node, { original, lastOutput: output })
 }
 
 function translateAttributes(root: ParentNode, language: AppLanguage) {
@@ -247,15 +278,33 @@ function translateElementAttributes(element: Element, language: AppLanguage) {
   let changed = false
   for (const attr of TRANSLATABLE_ATTRS) {
     const current = element.getAttribute(attr)
-    if (!current) continue
-    const original = stored[attr] || normalizePhrase(current)
-    if (!isCatalogPhrase(original)) continue
-    stored[attr] = original
-    changed = true
+    if (!current) {
+      if (stored[attr]) {
+        delete stored[attr]
+        changed = true
+      }
+      continue
+    }
+
+    const cached = stored[attr]
+    // Same reasoning as translateTextNode: only trust the cached original
+    // while the live attribute still matches what we last wrote to it.
+    const original = cached && current === cached.lastOutput ? cached.original : normalizePhrase(current)
+
+    if (!isCatalogPhrase(original)) {
+      if (cached) {
+        delete stored[attr]
+        changed = true
+      }
+      continue
+    }
+
     const translated = translatePhrase(original, language)
     if (current !== translated) {
       element.setAttribute(attr, translated)
     }
+    stored[attr] = { original, lastOutput: translated }
+    changed = true
   }
   if (changed) {
     originalAttrs.set(element, stored)
