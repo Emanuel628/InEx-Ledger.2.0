@@ -24,6 +24,8 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import BankCsvHelpGuide from '../components/BankCsvHelp'
+import LoadingDots from '../components/LoadingDots'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
@@ -54,6 +56,7 @@ import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
 const TRANSACTION_PAGE_SIZE_KEY = 'inex-v3-transactions-page-size'
 
 function Transactions(props: PageProps) {
+  const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
@@ -213,6 +216,23 @@ function Transactions(props: PageProps) {
                     setDataError(error instanceof Error ? error.message : 'Unable to save transaction.')
                   })
               }}
+              onSaveAndAttachReceipt={(draft) => (
+                saveTransactionDraft(draft, editingTransaction, accountOptions, categoryOptions)
+                  .then((savedTransaction) => {
+                    setTransactionRows((rows) => (
+                      editingTransaction
+                        ? rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row))
+                        : [savedTransaction, ...rows]
+                    ))
+                    setEditingTransaction(null)
+                    setDrawerOpen(false)
+                    setReceiptTransaction(savedTransaction)
+                  })
+                  .catch((error) => {
+                    setDataError(error instanceof Error ? error.message : 'Unable to save transaction.')
+                    throw error
+                  })
+              )}
               transaction={editingTransaction}
               accounts={accountOptions}
               categories={categoryOptions}
@@ -335,6 +355,7 @@ function Transactions(props: PageProps) {
           {csvImportOpen ? (
             <CsvImportModal
               accounts={accountOptions}
+              region={businessRegion}
               onClose={() => setCsvImportOpen(false)}
               onImport={(input) => importTransactionsCsv(input)}
               onImported={async (result) => {
@@ -683,11 +704,13 @@ function Transactions(props: PageProps) {
 
 function CsvImportModal({
   accounts,
+  region,
   onClose,
   onImport,
   onImported,
 }: {
   accounts: AccountOption[]
+  region: 'US' | 'CA'
   onClose: () => void
   onImport: (input: { file: File; accountId: string; startDate?: string; endDate?: string }) => Promise<CsvImportResult>
   onImported: (result: CsvImportResult) => Promise<CsvImportResult>
@@ -699,6 +722,7 @@ function CsvImportModal({
   const [error, setError] = useState('')
   const [result, setResult] = useState<CsvImportResult | null>(null)
   const [importing, setImporting] = useState(false)
+  const [showBankHelp, setShowBankHelp] = useState(false)
 
   async function startImport() {
     setError('')
@@ -764,6 +788,15 @@ function CsvImportModal({
           </div>
         ) : (
           <form className="drawer-form csv-import-form" onSubmit={(event) => event.preventDefault()}>
+            <button
+              className="csv-import-help-toggle"
+              type="button"
+              aria-expanded={showBankHelp}
+              onClick={() => setShowBankHelp((value) => !value)}
+            >
+              {showBankHelp ? 'Hide bank CSV help' : 'Need help finding your bank CSV?'}
+            </button>
+            {showBankHelp ? <BankCsvHelpGuide region={region} /> : null}
             <label>
               Destination account
               <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
@@ -797,7 +830,7 @@ function CsvImportModal({
           </button>
           {result ? null : (
             <button className="primary-button" type="button" disabled={importing} onClick={() => void startImport()}>
-              {importing ? 'Importing...' : 'Import'}
+              {importing ? <>Importing<LoadingDots /></> : 'Import'}
             </button>
           )}
         </div>
@@ -1197,6 +1230,7 @@ const emptyDraft: TransactionDraft = {
 function TransactionDrawer({
   onClose,
   onSave,
+  onSaveAndAttachReceipt,
   transaction,
   accounts,
   categories,
@@ -1205,6 +1239,7 @@ function TransactionDrawer({
 }: {
   onClose: () => void
   onSave: (draft: TransactionDraft) => void
+  onSaveAndAttachReceipt: (draft: TransactionDraft) => Promise<void>
   transaction: Transaction | null
   accounts: AccountOption[]
   categories: CategoryOption[]
@@ -1229,14 +1264,27 @@ function TransactionDrawer({
     setError('')
   }
 
-  function saveTransaction() {
+  function validateDraft() {
     const numericAmount = Number(draft.amount.replace(/[$,]/g, ''))
     if (!draft.description.trim() || !Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError('Add a description and a valid amount.')
-      return
+      return false
     }
+    return true
+  }
 
+  function saveTransaction() {
+    if (!validateDraft()) return
     onSave(draft)
+  }
+
+  async function saveAndAttachReceipt() {
+    if (!validateDraft()) return
+    try {
+      await onSaveAndAttachReceipt(draft)
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save transaction.')
+    }
   }
 
   return (
@@ -1319,17 +1367,14 @@ function TransactionDrawer({
           <details className={needsReceiptReview || needsNotesReview ? 'field-needs-review' : undefined}>
             <summary>Receipt, tax treatment, and notes</summary>
             <div className="advanced-fields">
-              {transaction ? (
-                <button className="secondary-button" type="button" onClick={() => onAttachReceipt(transaction)}>
-                  <ReceiptText size={17} />
-                  Attach receipt
-                </button>
-              ) : (
-                <button className="secondary-button" type="button" disabled>
-                  <Upload size={17} />
-                  Save before attaching a receipt
-                </button>
-              )}
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => (transaction ? onAttachReceipt(transaction) : void saveAndAttachReceipt())}
+              >
+                <ReceiptText size={17} />
+                Attach receipt
+              </button>
               <textarea
                 placeholder="Internal note"
                 value={draft.note}

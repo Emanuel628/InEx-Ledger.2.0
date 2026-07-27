@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { BookOpen, Car, ChevronDown, CreditCard, Download, FileText, FolderTree, Landmark, Mail, Receipt, Search, Settings, ShieldCheck, Tags, type LucideIcon } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import BankCsvHelpGuide from '../components/BankCsvHelp'
 
 type HelpCategory = 'All' | 'Setup' | 'Records' | 'Tax' | 'Billing' | 'Support'
 
@@ -93,6 +94,7 @@ const helpItems = [
 ] satisfies { title: string; body: string; detail: string; icon: LucideIcon; category: Exclude<HelpCategory, 'All'> }[]
 
 function Help(props: PageProps) {
+  const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
   const [searchTerm, setSearchTerm] = useState('')
   const [category, setCategory] = useState<HelpCategory>('All')
   const [openTitle, setOpenTitle] = useState<string | null>(helpItems[0].title)
@@ -120,6 +122,17 @@ function Help(props: PageProps) {
             <Mail size={18} />
             Request support
           </button>
+        </section>
+
+        <section className="export-card export-form-panel">
+          <div className="export-card-header">
+            <div>
+              <p className="eyebrow">Records</p>
+              <h2>Import your CSV from your bank</h2>
+            </div>
+            <FileText size={20} />
+          </div>
+          <BankCsvHelpGuide region={businessRegion} />
         </section>
 
         <section className="table-toolbar">

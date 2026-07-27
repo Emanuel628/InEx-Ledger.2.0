@@ -367,3 +367,177 @@ test("messages archived route returns archived inbox and sent messages", async (
     fixture.cleanup();
   }
 });
+
+function loadMessagesRouterForReply() {
+  const originalLoad = Module._load.bind(Module);
+  const state = { sentEmails: [], insertedMessages: [] };
+  const MESSAGE_ID = "55555555-5555-4555-8555-555555555555";
+  const OWNER_ID = "11111111-1111-4111-8111-111111111111";
+
+  Module._load = function (requestName, parent, isMain) {
+    if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
+      return {
+        pool: {
+          async query(sql, params = []) {
+            if (/FROM messages m\s+LEFT JOIN invoices_v1/i.test(sql.replace(/\s+/g, " "))) {
+              return {
+                rows: [{
+                  id: MESSAGE_ID,
+                  sender_id: OWNER_ID,
+                  receiver_id: OWNER_ID,
+                  is_deleted_by_receiver: false,
+                  is_deleted_by_sender: false,
+                  invoice_id: null,
+                  invoice_number: null,
+                  business_id: null,
+                  business_name: "Test Business",
+                  owner_id: OWNER_ID,
+                  thread_root_id: MESSAGE_ID,
+                  external_sender_email: "client@example.com",
+                  external_sender_name: "Client Example",
+                  external_message_id: null,
+                  external_references: null,
+                  subject: "Need help"
+                }],
+                rowCount: 1
+              };
+            }
+
+            if (/INSERT INTO messages/i.test(sql)) {
+              state.insertedMessages.push({ sql, params });
+              return { rows: [{ id: "66666666-6666-4666-8666-666666666666" }], rowCount: 1 };
+            }
+
+            return { rows: [], rowCount: 0 };
+          }
+        }
+      };
+    }
+
+    if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
+      return { requireAuth: (req, _res, next) => { req.user = { id: OWNER_ID, email: "owner@example.com" }; next(); } };
+    }
+
+    if (requestName === "../middleware/csrf.middleware.js" || /csrf\.middleware\.js$/.test(requestName)) {
+      return { requireCsrfProtection: (_req, _res, next) => next() };
+    }
+
+    if (requestName === "../middleware/rate-limit.middleware.js" || /rate-limit\.middleware\.js$/.test(requestName)) {
+      return { createDataApiLimiter: () => (_req, _res, next) => next() };
+    }
+
+    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
+      return { logError() {}, logWarn() {}, logInfo() {} };
+    }
+
+    if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
+      return { AUDIT_ACTIONS: {}, async recordAuditEventForRequest() { return "audit-1"; } };
+    }
+
+    if (requestName === "resend") {
+      return {
+        Resend: class Resend {
+          constructor() {
+            this.emails = {
+              send: async (payload) => {
+                state.sentEmails.push(payload);
+                return { data: { id: "resend-msg-1" } };
+              }
+            };
+          }
+        }
+      };
+    }
+
+    return originalLoad(requestName, parent, isMain);
+  };
+
+  delete require.cache[MESSAGES_ROUTE_PATH];
+
+  try {
+    const router = require("../routes/messages.routes.js");
+    const app = express();
+    app.use(express.json());
+    app.use("/api/messages", router);
+
+    return {
+      app,
+      state,
+      cleanup() {
+        delete require.cache[MESSAGES_ROUTE_PATH];
+        Module._load = originalLoad;
+      }
+    };
+  } catch (err) {
+    Module._load = originalLoad;
+    throw err;
+  }
+}
+
+test("messages reply-email attaches an uploaded file to the outbound email", async () => {
+  const beforeApiKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = "re_test_123";
+
+  const fixture = loadMessagesRouterForReply();
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
+      .field("body", "Please see the attached file.")
+      .attach("attachment", Buffer.from("id,amount\n1,2.50"), { filename: "export.csv", contentType: "text/csv" });
+
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.sentEmails.length, 1);
+    const sent = fixture.state.sentEmails[0];
+    assert.equal(sent.attachments?.length, 1);
+    assert.equal(sent.attachments[0].filename, "export.csv");
+    assert.equal(sent.attachments[0].contentType, "text/csv");
+    assert.ok(Buffer.isBuffer(sent.attachments[0].content));
+  } finally {
+    fixture.cleanup();
+    if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = beforeApiKey;
+  }
+});
+
+test("messages reply-email rejects an unsupported attachment type", async () => {
+  const beforeApiKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = "re_test_123";
+
+  const fixture = loadMessagesRouterForReply();
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
+      .field("body", "Please see the attached file.")
+      .attach("attachment", Buffer.from("#!/bin/sh\necho hi"), { filename: "script.sh", contentType: "application/x-sh" });
+
+    assert.equal(res.status, 400);
+    assert.equal(fixture.state.sentEmails.length, 0);
+  } finally {
+    fixture.cleanup();
+    if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = beforeApiKey;
+  }
+});
+
+test("messages reply-email without an attachment still sends normally", async () => {
+  const beforeApiKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = "re_test_123";
+
+  const fixture = loadMessagesRouterForReply();
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
+      .send({ body: "No attachment here." });
+
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.sentEmails.length, 1);
+    assert.equal(fixture.state.sentEmails[0].attachments, undefined);
+  } finally {
+    fixture.cleanup();
+    if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = beforeApiKey;
+  }
+});
