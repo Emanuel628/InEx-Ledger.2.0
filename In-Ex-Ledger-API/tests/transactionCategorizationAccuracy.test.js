@@ -52,16 +52,16 @@ const US_CASES = [
   { merchant: "FIVE GUYS 00231", description: "FIVE GUYS 00231", expected: "Meals" },
   { merchant: "DOMINOS PIZZA #7734", description: "DOMINOS PIZZA #7734 ONLINE", expected: "Meals" },
   { merchant: "IHOP #2091", description: "IHOP #2091 DENVER CO", expected: "Meals" },
-  { merchant: "WAL-MART #2145", description: "WAL-MART #2145 SUPERCENTER", expected: "Office Supplies" },
-  { merchant: "TARGET T-1234", description: "TARGET T-1234 CHICAGO IL", expected: "Office Supplies" },
-  { merchant: "COSTCO WHSE #0123", description: "COSTCO WHSE #0123", expected: "Office Supplies" },
-  { merchant: "BEST BUY 00001234", description: "BEST BUY 00001234", expected: "Office Supplies" },
-  { merchant: "THE HOME DEPOT #4471", description: "THE HOME DEPOT #4471", expected: "Office Supplies" },
-  { merchant: "LOWES #00234", description: "LOWES #00234 HOME CENTER", expected: "Office Supplies" },
+  { merchant: "LOWES #00234", description: "LOWES #00234 HOME CENTER", expected: "Repairs & Maintenance" },
   { merchant: "STAPLES #0234", description: "STAPLES #0234 OFFICE SUPPLIES", expected: "Office Supplies" },
-  { merchant: "HARBOR FREIGHT TOOLS #341", description: "HARBOR FREIGHT TOOLS #341", expected: "Office Supplies" },
+  { merchant: "THE HOME DEPOT #4471", description: "THE HOME DEPOT #4471", expected: "Repairs & Maintenance" },
+  { merchant: "HARBOR FREIGHT TOOLS #341", description: "HARBOR FREIGHT TOOLS #341", expected: "Repairs & Maintenance" },
   { merchant: "SHELL OIL 48293", description: "SHELL OIL 48293 NEW JERSEY", expected: "Car & Truck Expenses" },
   { merchant: "CHEVRON 00934581", description: "CHEVRON 00934581", expected: "Car & Truck Expenses" },
+  { merchant: "CIRCLE K #2734", description: "CIRCLE K #2734", expected: "Car & Truck Expenses" },
+  { merchant: "WAWA #123", description: "WAWA #123", expected: "Car & Truck Expenses" },
+  { merchant: "CASEYS #4471", description: "CASEYS GEN STORE #4471", expected: "Car & Truck Expenses" },
+  { merchant: "7-ELEVEN #4471", description: "7-ELEVEN #4471", expected: "Car & Truck Expenses" },
   { merchant: "SHEETZ #00341", description: "SHEETZ #00341 FUEL", expected: "Car & Truck Expenses" },
   { merchant: "JIFFY LUBE #3341", description: "JIFFY LUBE #3341 OIL CHANGE", expected: "Car & Truck Expenses" },
   { merchant: "DISCOUNT TIRE #341", description: "DISCOUNT TIRE #341", expected: "Car & Truck Expenses" },
@@ -107,9 +107,7 @@ const CA_CASES = [
   { merchant: "MR SUB #1129", description: "MR SUB #1129", expected: "Meals & Entertainment" },
   { merchant: "PETRO-CANADA #4521", description: "PETRO-CANADA #4521 GAS", expected: "Motor Vehicle" },
   { merchant: "ESSO #3341", description: "ESSO #3341", expected: "Motor Vehicle" },
-  { merchant: "CANADIAN TIRE #123", description: "CANADIAN TIRE #123 TORONTO ON", expected: "Office Supplies" },
-  { merchant: "LONDON DRUGS #221", description: "LONDON DRUGS #221", expected: "Office Supplies" },
-  { merchant: "DOLLARAMA #4471", description: "DOLLARAMA #4471", expected: "Office Supplies" },
+  { merchant: "CANADIAN TIRE GAS #123", description: "CANADIAN TIRE GAS #123 TORONTO ON", expected: "Motor Vehicle" },
   { merchant: "AIR CANADA", description: "AIR CANADA FLIGHT 0341", expected: "Travel" },
   { merchant: "WESTJET", description: "WESTJET 0067234", expected: "Travel" },
   { merchant: "ROGERS", description: "ROGERS COMMUNICATIONS PMT", expected: "Phone & Internet" },
@@ -135,7 +133,17 @@ const SHOULD_NOT_AUTO_MAP_CASES = [
   { merchant: "TRANSFER", description: "TRANSFER TO CHECKING 8814" },
   { merchant: "Amazon.com", description: "Amzn.pmts USD 138.45" },
   { merchant: "", description: "DEBIT CARD PURCHASE" },
-  { merchant: "PAYPAL", description: "PAYPAL *GENERIC" }
+  { merchant: "PAYPAL", description: "PAYPAL *GENERIC" },
+  // General-merchandise/big-box retailers sell literally everything, so a
+  // purchase there is exactly as likely to be personal as business — these
+  // must NOT get a confident "Office Supplies" (or any other) guess.
+  { merchant: "WAL-MART #2145", description: "WAL-MART #2145 SUPERCENTER" },
+  { merchant: "TARGET T-1234", description: "TARGET T-1234 CHICAGO IL" },
+  { merchant: "COSTCO WHSE #0123", description: "COSTCO WHSE #0123" },
+  { merchant: "BEST BUY 00001234", description: "BEST BUY 00001234" },
+  { merchant: "CANADIAN TIRE #123", description: "CANADIAN TIRE #123 TORONTO ON" },
+  { merchant: "LONDON DRUGS #221", description: "LONDON DRUGS #221" },
+  { merchant: "DOLLARAMA #4471", description: "DOLLARAMA #4471" }
 ];
 
 function runCases(cases, region) {

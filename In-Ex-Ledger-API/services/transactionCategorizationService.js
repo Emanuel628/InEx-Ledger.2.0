@@ -131,6 +131,15 @@ const CATEGORY_RULES = [
     providerHints: ["insurance"]
   },
   {
+    // Deliberately excludes general-merchandise/big-box retailers (Walmart,
+    // Target, Costco, Canadian Tire, dollar stores, Best Buy, IKEA, London
+    // Drugs, etc.) — same reasoning as Amazon.com elsewhere in this file:
+    // these sell literally everything, so a purchase there is exactly as
+    // likely to be personal (groceries, a TV) as a business supply run.
+    // Guessing "Office Supplies" for a Walmart trip is a wrong, overconfident
+    // answer, not a helpful one — leave those in Imported for manual review.
+    // True hardware/home-improvement stores go to Repairs & Maintenance
+    // instead (see below), since that's their more realistic business use.
     kind: "expense",
     usCategory: "Office Supplies",
     caCategory: "Office Supplies",
@@ -314,8 +323,8 @@ const CATEGORY_RULE_EXPANSIONS = [
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
     keywords: [
-      "bp gas", "exxon", "mobil gas", "sunoco", "marathon gas", "speedway gas",
-      "circle k gas", "wawa gas", "pilot flying", "loves travel stop", "petrocan",
+      "bp gas station", "exxon", "mobil", "sunoco", "marathon gas", "speedway gas",
+      "circle k", "wawa", "pilot flying", "loves travel stop", "petrocan",
       "husky gas", "ultramar", "irving oil", "kwik trip", "advance auto",
       "o'reilly auto", "oreilly auto", "midas", "meineke", "firestone", "goodyear",
       "pep boys", "car wash"
@@ -405,7 +414,7 @@ const MAJOR_BRAND_EXPANSIONS = [
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
     keywords: [
-      "76 gas station", "arco", "valero", "quiktrip", "caseys general store",
+      "76 gas station", "arco", "valero", "quiktrip", "caseys",
       "maverik", "sams club fuel", "costco gas", "sinclair oil", "conoco", "phillips 66 gas",
       "co op gas", "coop gas", "mohawk gas", "fas gas", "car wash", "canadian tire gas"
     ]
@@ -457,16 +466,6 @@ const MAJOR_BRAND_EXPANSIONS = [
     ]
   },
   {
-    usCategory: "Office Supplies",
-    caCategory: "Office Supplies",
-    keywords: [
-      "walmart", "wal mart", "target", "costco", "costco whse", "costco wholesale",
-      "sams club", "bjs wholesale",
-      "canadian tire", "london drugs", "dollarama", "dollar tree", "dollar general",
-      "five below", "best buy", "home depot", "lowes", "rona", "home hardware", "ikea"
-    ]
-  },
-  {
     usCategory: "Utilities",
     caCategory: "Utilities",
     keywords: [
@@ -505,6 +504,21 @@ CATEGORY_RULES.push({
   providerHints: ["shipping", "postage", "delivery"]
 });
 
+CATEGORY_RULES.push({
+  // Hardware/home-improvement/tool retailers: a small business's realistic
+  // use case for these stores is repairs, tools, and maintenance supplies,
+  // not general office supplies — a distinct category from Office Supplies.
+  kind: "expense",
+  usCategory: "Repairs & Maintenance",
+  caCategory: "Repairs & Maintenance",
+  keywords: [
+    "home depot", "lowes", "rona", "home hardware", "ace hardware",
+    "true value hardware", "menards", "do it best", "harbor freight tools",
+    "princess auto", "tsc stores", "repair service", "maintenance fee", "handyman service"
+  ],
+  providerHints: ["repair", "maintenance", "hardware"]
+});
+
 // Second, larger coverage pass. Same rule: only unambiguous, clearly-business
 // merchants get added — nothing here is the kind of place (groceries, general
 // e-commerce) where a purchase could as easily be personal as business. That
@@ -533,7 +547,7 @@ const EXTENDED_BRAND_EXPANSIONS = [
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
     keywords: [
-      "7 eleven fuel", "kum go", "racetrac", "sheetz", "getgo", "stewarts shops",
+      "7 eleven", "kum go", "racetrac", "sheetz", "getgo", "stewarts shops",
       "cumberland farms", "kwik star", "citgo", "murphy usa", "murphy express",
       "discount tire", "big o tires", "les schwab", "mavis tire",
       "christian brothers automotive", "monro auto", "tires plus", "brakes plus",
@@ -608,9 +622,7 @@ const EXTENDED_BRAND_EXPANSIONS = [
     caCategory: "Office Supplies",
     keywords: [
       "grainger", "quill.com", "global industrial", "msc industrial", "fastenal",
-      "mcmaster carr", "harbor freight tools", "ace hardware", "true value hardware",
-      "menards", "do it best", "container store", "michaels craft", "hobby lobby",
-      "joann fabrics", "party city", "princess auto", "tsc stores"
+      "mcmaster carr"
     ]
   },
   {
