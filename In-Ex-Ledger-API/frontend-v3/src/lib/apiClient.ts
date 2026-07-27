@@ -1,4 +1,11 @@
-export async function apiRequest<T>(url: string, init: RequestInit = {}) {
+export type ApiRequestInit = RequestInit & {
+  /** Skip the automatic redirect-to-login on 401. Used by identity probes
+   *  (e.g. getCurrentUser) that are expected to 401 for anonymous visitors
+   *  on public pages and already handle a null result themselves. */
+  skipAuthRedirect?: boolean
+}
+
+export async function apiRequest<T>(url: string, init: ApiRequestInit = {}) {
   let response = await fetchWithAuth(url, init)
   if (response.status === 403 && await isCsrfFailure(response)) {
     await refreshCsrfToken()
@@ -10,7 +17,7 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}) {
 
   const data = await readJson<T & { error?: string; code?: string; details?: unknown }>(response)
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && !init.skipAuthRedirect) {
       redirectToLogin()
     }
     throw new ApiRequestError(data.error || 'Request failed.', response.status, data.code, data.details)

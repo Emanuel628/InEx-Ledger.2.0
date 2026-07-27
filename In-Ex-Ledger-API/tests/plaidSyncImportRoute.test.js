@@ -279,7 +279,7 @@ test("POST /api/plaid/connections/:id/sync applies categorization and mapping me
     category_id: categoryIdByName.get("Advertising & Marketing"),
     category_guess: "ADVERTISING",
     category_mapping_reason: "canonical_rule",
-    category_mapping_confidence: "high",
+    category_mapping_confidence: "medium",
     category_mapping_rule_id: null,
     external_id: "plaid-modified-1"
   }]);

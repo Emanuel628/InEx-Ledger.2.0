@@ -37,6 +37,7 @@ import {
   type BusinessProfile,
   type PrivacySettings,
 } from '../lib/settingsApi'
+import { deleteAllTransactions } from '../lib/transactionsApi'
 
 type SettingsSection = 'Account' | 'Business' | 'Billing' | 'Security' | 'Preferences' | 'Data'
 type SelectOption = string | { value: string; label: string }
@@ -596,6 +597,22 @@ function DataSettings({
     }
   }
 
+  async function handleDeleteAllTransactions() {
+    const typed = window.prompt(
+      'This permanently deletes every transaction in this business. This cannot be undone from the app. Type DELETE to confirm.',
+    )
+    if (typed !== 'DELETE') {
+      return
+    }
+    try {
+      const result = await deleteAllTransactions()
+      window.alert(`Deleted ${result.count} transaction(s).`)
+      window.location.reload()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete all transactions.')
+    }
+  }
+
   return (
     <SettingsPanel eyebrow="Data" title="Privacy, exports, and deletion" description="Sensitive exports and deletion controls stay explicit and reviewable.">
       <SettingsRow icon={Download} title="Account data export" description="Download a complete data package for records or migration.">
@@ -610,6 +627,16 @@ function DataSettings({
           updatePrivacy('consentGiven', Boolean(privacySettings?.dataSharingOptOut))
         }} />
       </SettingsRow>
+      <div className="settings-danger-zone">
+        <div>
+          <strong>Delete all transactions</strong>
+          <p>Permanently deletes every transaction in this business. Locked accounting periods are protected.</p>
+        </div>
+        <button className="secondary-button danger-button" type="button" onClick={() => void handleDeleteAllTransactions()}>
+          <Trash2 size={17} />
+          Delete all
+        </button>
+      </div>
       <div className="settings-danger-zone">
         <div>
           <strong>Danger zone</strong>

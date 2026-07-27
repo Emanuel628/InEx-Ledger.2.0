@@ -1,4 +1,4 @@
-import { apiRequest } from './apiClient'
+import { apiRequest, type ApiRequestInit } from './apiClient'
 
 export type AuthBusiness = {
   id: string
@@ -69,7 +69,12 @@ type LegacySession = {
 }
 
 export async function getCurrentUser() {
-  const legacyUser = await authRequest<LegacyUser>('/api/me')
+  // This is an identity probe, not a page load that requires auth: it's
+  // expected to 401 for anonymous visitors (e.g. on the public landing page).
+  // Callers (App.tsx) already branch correctly on a rejected promise vs a
+  // resolved user, so only the global redirect-to-login side effect needs
+  // to be suppressed here — the 401 should still reject as before.
+  const legacyUser = await authRequest<LegacyUser>('/api/me', { skipAuthRedirect: true })
   return { user: mapLegacyUser(legacyUser) }
 }
 
@@ -184,7 +189,7 @@ export async function revokeOtherSessions() {
   return { ok: true }
 }
 
-async function authRequest<T>(url: string, init: RequestInit = {}) {
+async function authRequest<T>(url: string, init: ApiRequestInit = {}) {
   return apiRequest<T>(url, init)
 }
 

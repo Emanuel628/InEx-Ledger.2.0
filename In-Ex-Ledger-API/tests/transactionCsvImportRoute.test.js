@@ -311,7 +311,7 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
         categoryId: categoryIdByName.get("Software & Subscriptions"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "medium"
       },
       {
         merchant: "Uber* Eats",
@@ -346,7 +346,7 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
         categoryId: categoryIdByName.get("Advertising & Marketing"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "medium"
+        confidence: "low"
       },
       {
         merchant: "Amazon.com",

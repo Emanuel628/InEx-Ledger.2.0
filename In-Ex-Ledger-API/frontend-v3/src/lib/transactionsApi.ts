@@ -306,6 +306,14 @@ export async function deleteTransaction(transactionId: string) {
   })
 }
 
+export async function deleteAllTransactions() {
+  const response = await apiRequest<{ message?: string; count?: number }>('/api/transactions/bulk-delete-all', {
+    method: 'DELETE',
+    body: JSON.stringify({ confirm: 'DELETE' }),
+  })
+  return { count: Number(response.count || 0) }
+}
+
 export async function undoDeletedTransaction() {
   const response = await apiRequest<{
     transaction?: LegacyTransaction

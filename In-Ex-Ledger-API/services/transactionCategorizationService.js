@@ -4,6 +4,17 @@ const { findDefaultCategoryForRegion } = require("../api/utils/seedDefaultsForBu
 const { normalizeRuleValue } = require("./transactionMappingRuleService.js");
 
 const MAX_HISTORY_ROWS = 4000;
+
+// Degree-of-certainty gate for keyword-rule auto-mapping. A rule's score is a
+// weighted count of keyword/provider-hint hits (see scoreRule): a single-word
+// merchant-field hit scores 3, a multi-word merchant-field hit scores 4, and
+// so on. MIN_SCORE_TO_AUTO_MAP is the floor a rule must clear before its
+// category guess is ever applied — anything weaker is left for manual review
+// (via the Imported fallback) instead of guessing. HIGH/MEDIUM_CONFIDENCE_SCORE
+// only label how sure the applied guess is; they don't gate whether it applies.
+const MIN_SCORE_TO_AUTO_MAP = 3;
+const HIGH_CONFIDENCE_SCORE = 6;
+const MEDIUM_CONFIDENCE_SCORE = 4;
 const IMPORTED_CATEGORY_NAMES = {
   income: "Imported Income",
   expense: "Imported Expense"
@@ -49,7 +60,7 @@ const CATEGORY_RULES = [
     caCategory: "Service Income",
     keywords: [
       "consulting fee", "consultant fee", "service fee", "freelance fee", "retainer fee",
-      "project fee", "client payment", "invoice payment", "payment received",
+      "project fee",
       "stripe", "paypal", "square", "direct deposit client", "billable"
     ],
     providerHints: ["income", "service", "professional_services", "business_services"]
@@ -92,7 +103,7 @@ const CATEGORY_RULES = [
       "adobe", "adobe systems", "photoshop", "github", "slack", "zoom", "dropbox",
       "google workspace", "notion", "figma", "canva", "aws", "digitalocean",
       "cloudflare", "twilio", "sendgrid", "openai", "chatgpt", "anthropic",
-      "subscription", "saas", "software"
+      "subscription", "saas", "software", "shopify"
     ],
     providerHints: ["software", "internet_software", "digital_goods"]
   },
@@ -196,7 +207,7 @@ const CATEGORY_RULES = [
     kind: "expense",
     usCategory: "Rent",
     caCategory: "Rent",
-    keywords: ["rent payment", "lease payment", "monthly rent", "office rent"],
+    keywords: ["monthly rent", "office rent"],
     providerHints: ["rent"]
   },
   {
@@ -294,7 +305,7 @@ const CATEGORY_RULE_EXPANSIONS = [
     keywords: [
       "southwest air", "spirit air", "jetblue", "frontier airlines", "alaska airlines",
       "porter airlines", "flair airlines", "sunwing", "holiday inn", "hampton inn",
-      "doubletree", "residence inn", "best western", "motel 6", "super 8", "comfort inn",
+      "doubletree", "residence inn", "best western", "motel 6", "super 8 motel", "comfort inn",
       "hotels.com", "priceline", "travelocity", "amtrak", "via rail", "greyhound bus",
       "lyft", "yellow cab", "taxicab", "rideshare", "airport parking"
     ]
@@ -330,7 +341,7 @@ const CATEGORY_RULE_EXPANSIONS = [
     keywords: [
       "bank service fee", "banking fee", "account service fee", "monthly banking",
       "bank maintenance", "account maintenance fee", "service charge", "wire transfer fee",
-      "foreign transaction", "returned item", "account fee", "stop payment", "insufficient funds"
+      "foreign transaction", "returned item", "account fee", "stop payment fee", "insufficient funds"
     ]
   },
   {
@@ -348,12 +359,132 @@ const CATEGORY_RULE_EXPANSIONS = [
     caCategory: "Business Tax & Licenses",
     keywords: [
       "irs", "cra", "revenue canada", "revenu canada", "government fee",
-      "vehicle registration", "tax payment", "government of canada", "dmv"
+      "vehicle registration", "tax payment remittance", "government of canada", "dmv"
     ]
   }
 ];
 
 CATEGORY_RULE_EXPANSIONS.forEach((expansion) => {
+  const rule = CATEGORY_RULES.find((candidate) =>
+    candidate.usCategory === expansion.usCategory &&
+    candidate.caCategory === expansion.caCategory
+  );
+  if (rule) {
+    rule.keywords.push(...expansion.keywords);
+  }
+});
+
+// Major US/Canada brand coverage. These are the household names a first-time
+// CSV import is most likely to contain, so getting them right up front is
+// what actually reduces manual review volume for a new user's first import.
+const MAJOR_BRAND_EXPANSIONS = [
+  {
+    usCategory: "Meals",
+    caCategory: "Meals & Entertainment",
+    keywords: [
+      "starbucks", "mcdonalds", "mcdonald's", "burger king", "wendys", "wendy's",
+      "taco bell", "kfc", "kentucky fried chicken", "popeyes", "chick fil a", "chickfila",
+      "subway", "chipotle", "panera", "panera bread", "dunkin", "dunkin donuts",
+      "dairy queen", "sonic drive in", "jack in the box", "arbys", "hardees", "carls jr",
+      "in n out", "five guys", "shake shack", "wingstop", "panda express",
+      "jimmy johns", "jersey mikes", "firehouse subs", "qdoba", "del taco", "whataburger",
+      "culvers", "raising canes", "olive garden", "applebees", "chilis",
+      "outback steakhouse", "texas roadhouse", "red lobster", "ihop", "dennys",
+      "waffle house", "cracker barrel", "buffalo wild wings", "papa johns",
+      "dominos pizza", "little caesars", "pizza hut", "cold stone creamery",
+      "baskin robbins", "krispy kreme", "peets coffee", "caribou coffee",
+      "jamba juice", "smoothie king", "einstein bros bagels", "noodles company",
+      "mr sub", "st hubert", "st-hubert", "m&m food market", "moxies", "milestones",
+      "jack astors", "montanas", "kelseys", "east side marios", "freshii",
+      "booster juice", "second cup", "coffee time", "country style", "robins donuts",
+      "new york fries", "browns socialhouse", "original joe's", "joey restaurant",
+      "coras breakfast", "eggsmart", "chatime", "wok box", "pita pit", "extreme pita"
+    ]
+  },
+  {
+    usCategory: "Car & Truck Expenses",
+    caCategory: "Motor Vehicle",
+    keywords: [
+      "76 gas station", "arco", "valero", "quiktrip", "caseys general store",
+      "maverik", "sams club fuel", "costco gas", "sinclair oil", "conoco", "phillips 66 gas",
+      "co op gas", "coop gas", "mohawk gas", "fas gas", "car wash", "canadian tire gas"
+    ]
+  },
+  {
+    usCategory: "Travel",
+    caCategory: "Travel",
+    keywords: [
+      "uber", "orbitz", "tripadvisor", "vrbo", "sheraton", "ramada", "days inn",
+      "la quinta", "red roof inn", "extended stay america", "choice hotels", "wyndham",
+      "radisson", "fairmont hotel", "four seasons hotel", "delta hotels", "sunwing vacations",
+      "westjet vacations", "greyhound", "national car rental", "alamo rent a car",
+      "thrifty car rental", "budget rent a car", "enterprise rent a car", "hertz",
+      "avis rent a car", "turo", "discount car rental"
+    ]
+  },
+  {
+    usCategory: "Software & Subscriptions",
+    caCategory: "Software & Subscriptions",
+    keywords: [
+      "apple.com bill", "itunes", "google play", "gitlab", "bitbucket", "atlassian",
+      "jira software", "zendesk", "intercom", "freshdesk", "docusign", "calendly",
+      "asana", "trello", "monday.com", "1password", "lastpass", "nordvpn", "expressvpn",
+      "midjourney", "canva pro", "box.com", "intuit", "adobe creative cloud"
+    ]
+  },
+  {
+    usCategory: "Advertising & Marketing",
+    caCategory: "Advertising",
+    keywords: [
+      "yelp ads", "angi ads", "thumbtack", "mailerlite", "vistaprint",
+      "google local services ads"
+    ]
+  },
+  {
+    usCategory: "Insurance",
+    caCategory: "Insurance",
+    keywords: [
+      "hartford insurance", "chubb insurance", "travelers insurance", "hiscox",
+      "next insurance", "biberk", "belairdirect", "economical insurance", "wawanesa"
+    ]
+  },
+  {
+    usCategory: "Phone & Internet",
+    caCategory: "Phone & Internet",
+    keywords: [
+      "sprint", "cricket wireless", "boost mobile", "metropcs", "metro pcs",
+      "us cellular", "consumer cellular", "chatr mobile", "public mobile", "lucky mobile"
+    ]
+  },
+  {
+    usCategory: "Office Supplies",
+    caCategory: "Office Supplies",
+    keywords: [
+      "walmart", "wal mart", "target", "costco", "costco whse", "costco wholesale",
+      "sams club", "bjs wholesale",
+      "canadian tire", "london drugs", "dollarama", "dollar tree", "dollar general",
+      "five below", "best buy", "home depot", "lowes", "rona", "home hardware", "ikea"
+    ]
+  },
+  {
+    usCategory: "Utilities",
+    caCategory: "Utilities",
+    keywords: [
+      "duke energy", "dominion energy", "xcel energy", "southern california edison",
+      "pacific gas and electric", "pepco", "georgia power", "florida power light",
+      "eversource", "ameren", "entergy", "nrg energy", "direct energy", "txu energy",
+      "reliant energy", "hydro one", "hydro quebec", "saskpower", "manitoba hydro",
+      "nova scotia power", "newfoundland power", "enmax", "toronto hydro"
+    ]
+  },
+  {
+    usCategory: "Contract Labor",
+    caCategory: "Legal & Accounting Fees",
+    keywords: ["freelancer.com", "guru.com"]
+  }
+];
+
+MAJOR_BRAND_EXPANSIONS.forEach((expansion) => {
   const rule = CATEGORY_RULES.find((candidate) =>
     candidate.usCategory === expansion.usCategory &&
     candidate.caCategory === expansion.caCategory
@@ -372,6 +503,212 @@ CATEGORY_RULES.push({
     "purolator", "canpar", "loomis express", "postage", "courier service"
   ],
   providerHints: ["shipping", "postage", "delivery"]
+});
+
+// Second, larger coverage pass. Same rule: only unambiguous, clearly-business
+// merchants get added — nothing here is the kind of place (groceries, general
+// e-commerce) where a purchase could as easily be personal as business. That
+// judgment call is what keeps the "Amazon.com" and "Costco" (bare, no aisle
+// context) cases out of this list even though they're major brands.
+const EXTENDED_BRAND_EXPANSIONS = [
+  {
+    usCategory: "Meals",
+    caCategory: "Meals & Entertainment",
+    keywords: [
+      "zaxbys", "bojangles", "churchs chicken", "el pollo loco", "long john silvers",
+      "captain ds", "rallys", "checkers drive in", "white castle", "steak n shake",
+      "fatburger", "wahlburgers", "smashburger", "freddys frozen custard", "culvers",
+      "portillos", "pf changs", "cheesecake factory", "red robin", "tgi fridays",
+      "ruby tuesday", "bob evans", "perkins restaurant", "village inn", "golden corral",
+      "shoneys", "sizzler", "black angus steakhouse", "longhorn steakhouse",
+      "bonefish grill", "carrabbas", "bahama breeze", "yard house", "bj's restaurant",
+      "california pizza kitchen", "noodles and company", "chuys", "el torito",
+      "baja fresh", "wahoos fish taco", "rubios", "corner bakery", "au bon pain",
+      "pret a manger", "cosi", "potbelly", "which wich", "mcalisters deli",
+      "schlotzskys", "blimpie", "quiznos", "togos", "beavertails", "mucho burrito",
+      "manchu wok", "yogen fruz", "menchies", "marble slab creamery"
+    ]
+  },
+  {
+    usCategory: "Car & Truck Expenses",
+    caCategory: "Motor Vehicle",
+    keywords: [
+      "7 eleven fuel", "kum go", "racetrac", "sheetz", "getgo", "stewarts shops",
+      "cumberland farms", "kwik star", "citgo", "murphy usa", "murphy express",
+      "discount tire", "big o tires", "les schwab", "mavis tire",
+      "christian brothers automotive", "monro auto", "tires plus", "brakes plus",
+      "tuffy auto", "grease monkey", "take 5 oil change", "kal tire", "ok tire",
+      "mr lube", "active green ross", "speedy auto"
+    ]
+  },
+  {
+    usCategory: "Travel",
+    caCategory: "Travel",
+    keywords: [
+      "sun country airlines", "breeze airways", "avelo airlines", "lynx air",
+      "sixt rent a car", "zipcar", "silvercar", "drury hotels", "omni hotels",
+      "loews hotels", "kimpton hotels", "st regis", "ritz carlton", "sonesta",
+      "aloft hotels", "element hotels", "tru by hilton", "home2 suites",
+      "candlewood suites", "staybridge suites", "homeaway", "agoda", "trivago",
+      "skyscanner", "getaround", "park n fly", "407 etr", "sunpass", "fastrak",
+      "ez pass", "e zpass"
+    ]
+  },
+  {
+    usCategory: "Software & Subscriptions",
+    caCategory: "Software & Subscriptions",
+    keywords: [
+      "pipedrive", "clickup", "airtable", "miro", "loom", "zapier", "integromat",
+      "make.com", "n8n", "segment", "mixpanel", "amplitude", "moz", "screaming frog",
+      "later app", "sketch app", "invision", "webflow", "bigcommerce", "woocommerce",
+      "magento", "netsuite", "workday hcm", "zoho", "zoho books", "zoho crm",
+      "cisco webex", "gotomeeting", "ringcentral", "8x8", "vonage business",
+      "grasshopper", "openphone", "aircall", "front app", "help scout", "livechat",
+      "drift chat", "tidio", "crisp chat", "wistia", "descript", "otter.ai",
+      "grammarly", "envato", "shutterstock", "getty images", "adobe stock", "istock",
+      "bluehost", "hostgator", "siteground", "dreamhost", "wp engine", "kinsta",
+      "vercel", "netlify", "render.com", "linode", "vultr", "google cloud platform",
+      "ibm cloud", "bench accounting", "pilot.com bookkeeping", "bill.com",
+      "expensify", "ramp card", "brex", "divvy card", "airbase"
+    ]
+  },
+  {
+    usCategory: "Advertising & Marketing",
+    caCategory: "Advertising",
+    keywords: [
+      "taboola", "outbrain", "reddit ads", "nextdoor ads", "yext", "brightlocal",
+      "podium", "birdeye", "omnisend", "sendinblue", "brevo", "drip email",
+      "convertkit", "aweber", "getresponse", "campaign monitor", "icontact"
+    ]
+  },
+  {
+    usCategory: "Insurance",
+    caCategory: "Insurance",
+    keywords: [
+      "american family insurance", "erie insurance", "auto owners insurance",
+      "amica insurance", "metlife", "prudential insurance", "new york life",
+      "northwestern mutual", "guardian life", "mutual of omaha", "colonial life",
+      "aflac", "cna insurance", "zurich insurance", "aig insurance", "markel insurance",
+      "beazley", "vouch insurance", "coalition insurance", "embroker",
+      "definity insurance", "gore mutual", "peace hills insurance", "sonnet insurance",
+      "td meloche monnex", "square one insurance"
+    ]
+  },
+  {
+    usCategory: "Phone & Internet",
+    caCategory: "Phone & Internet",
+    keywords: [
+      "google fiber", "ziply fiber", "optimum altice", "rcn internet", "wow internet",
+      "mediacom", "hargray", "tds telecom", "consolidated communications",
+      "distributel", "teksavvy", "start.ca", "execulink", "cogeco"
+    ]
+  },
+  {
+    usCategory: "Office Supplies",
+    caCategory: "Office Supplies",
+    keywords: [
+      "grainger", "quill.com", "global industrial", "msc industrial", "fastenal",
+      "mcmaster carr", "harbor freight tools", "ace hardware", "true value hardware",
+      "menards", "do it best", "container store", "michaels craft", "hobby lobby",
+      "joann fabrics", "party city", "princess auto", "tsc stores"
+    ]
+  },
+  {
+    usCategory: "Utilities",
+    caCategory: "Utilities",
+    keywords: [
+      "pseg", "avista utilities", "puget sound energy", "portland general electric",
+      "idaho power", "tucson electric", "salt river project", "aps arizona public service",
+      "el paso electric", "oncor", "centerpoint energy", "aep american electric power",
+      "firstenergy", "ppl electric", "peco energy", "delmarva power", "bge baltimore gas",
+      "consumers energy", "dte energy", "we energies", "alliant energy",
+      "midamerican energy", "black hills energy", "hydro ottawa", "london hydro",
+      "waterloo north hydro", "horizon utilities", "fortis alberta", "atco electric",
+      "saskenergy", "just energy"
+    ]
+  },
+  {
+    usCategory: "Contract Labor",
+    caCategory: "Legal & Accounting Fees",
+    keywords: ["peopleperhour", "workmarket", "contra.com", "braintrust"]
+  },
+  {
+    usCategory: "Meals",
+    caCategory: "Meals & Entertainment",
+    keywords: [
+      "wingstreet", "hooters", "twin peaks restaurant", "dave and busters",
+      "chuck e cheese", "ihop express", "waffle house", "huddle house",
+      "cracker barrel old country store", "boston market", "kfc canada",
+      "a and w canada", "razzles", "dickeys barbecue pit", "sonny's bbq",
+      "famous daves", "hard rock cafe", "rainforest cafe"
+    ]
+  },
+  {
+    usCategory: "Software & Subscriptions",
+    caCategory: "Software & Subscriptions",
+    keywords: [
+      "typeform", "surveymonkey", "docsend", "pandadoc", "hellosign",
+      "adobe sign", "smartsheet", "basecamp", "teamwork.com", "wrike",
+      "float.com scheduling", "harvest time tracking", "toggl track", "clockify"
+    ]
+  },
+  {
+    usCategory: "Car & Truck Expenses",
+    caCategory: "Motor Vehicle",
+    keywords: [
+      "loves country store", "flying j travel", "ta travel centers", "petro stopping center",
+      "wilco hess", "rutters", "sheetz fuel", "royal farms"
+    ]
+  },
+  {
+    usCategory: "Legal & Professional",
+    caCategory: "Legal & Accounting Fees",
+    keywords: [
+      "rocket lawyer", "legalzoom", "avvo", "clio legal", "mycase", "practicepanther",
+      "lawpay", "upcounsel", "contractscounsel", "nolo.com"
+    ]
+  },
+  {
+    usCategory: "Rent",
+    caCategory: "Rent",
+    keywords: ["wework", "regus", "industrious coworking", "spaces coworking", "servcorp", "novel coworking", "common desk"]
+  },
+  {
+    usCategory: "Sales Tax",
+    caCategory: "Business Tax & Licenses",
+    keywords: [
+      "secretary of state filing fee", "business license renewal",
+      "delaware franchise tax", "corporate registry fee", "wsib premium",
+      "workers compensation board", "ei premium remittance", "cpp remittance"
+    ]
+  },
+  {
+    usCategory: "Supplies",
+    caCategory: "Delivery & Freight",
+    keywords: [
+      "ontrac", "lasership", "estes express", "old dominion freight", "xpo logistics",
+      "yrc freight", "r+l carriers", "saia ltl", "abf freight"
+    ]
+  },
+  {
+    usCategory: "Bank Fees",
+    caCategory: "Interest & Bank Charges",
+    keywords: [
+      "returned check fee", "cashiers check fee", "money order fee",
+      "safety deposit box fee", "clover processing", "toast pos fee", "helcim",
+      "moneris", "global payments", "worldpay", "authorize.net", "elavon", "bambora"
+    ]
+  }
+];
+
+EXTENDED_BRAND_EXPANSIONS.forEach((expansion) => {
+  const rule = CATEGORY_RULES.find((candidate) =>
+    candidate.usCategory === expansion.usCategory &&
+    candidate.caCategory === expansion.caCategory
+  );
+  if (rule) {
+    rule.keywords.push(...expansion.keywords);
+  }
 });
 
 function normalizeMappingText(value) {
@@ -592,16 +929,23 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
       }
     }
 
-    const winsGeneric = best && best.score >= 3 && best.score > secondBestScore;
-    const winsMerchant = best && best.merchantStrong && best.score >= 2 && best.score >= secondBestScore + 1;
-    if (winsGeneric || winsMerchant) {
+    // A rule only gets to auto-map a category if its keyword-match score clears
+    // this floor AND clearly beats every other rule (no near-ties). Below the
+    // floor, or in a near-tie between two plausible categories, we don't guess
+    // — the transaction stays in the Imported bucket for manual review instead
+    // of risking a confidently-wrong category on a weak signal.
+    const meetsConfidenceThreshold = best
+      && best.score >= MIN_SCORE_TO_AUTO_MAP
+      && best.score > secondBestScore;
+
+    if (meetsConfidenceThreshold) {
       const categoryName = pickRuleCategoryName(best.rule, region);
       return {
         categoryName,
         reason: "canonical_rule",
-        confidence: best.score >= 5
+        confidence: best.score >= HIGH_CONFIDENCE_SCORE
           ? "high"
-          : (best.merchantStrong || best.score >= 3)
+          : best.score >= MEDIUM_CONFIDENCE_SCORE
             ? "medium"
             : "low"
       };
