@@ -30,7 +30,7 @@ import Onboarding from './pages/Onboarding'
 import Help from './pages/Help'
 import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
-import { applyV3PhraseTranslations, getStoredLanguage, getUserLanguage, observeV3PhraseTranslations, setStoredLanguage, translate } from './lib/i18n'
+import { applyV3PhraseTranslations, getStoredLanguage, getUserLanguage, observeV3PhraseTranslations, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
 
 declare global {
   interface Window {
@@ -82,6 +82,8 @@ export type PageProps = {
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>
   theme: ThemeMode
   setTheme: Dispatch<SetStateAction<ThemeMode>>
+  language: AppLanguage
+  onLanguageChange: (language: AppLanguage) => void
 }
 
 const publicPages = new Set<AppPage>([
@@ -227,6 +229,13 @@ function App() {
     setStoredLanguage(nextLanguage)
   }, [authUser])
 
+  // Applies a language pick immediately (Settings, Onboarding) instead of
+  // waiting for a save + refetch round trip through authUser.
+  const handleLanguageChange = (nextLanguage: AppLanguage) => {
+    setLanguage(nextLanguage)
+    setStoredLanguage(nextLanguage)
+  }
+
   useEffect(() => {
     window.__LUNA_ME__ = authUser
   }, [authUser])
@@ -339,6 +348,8 @@ function App() {
     setSidebarCollapsed,
     theme,
     setTheme,
+    language,
+    onLanguageChange: handleLanguageChange,
   }
 
   if (authLoading) {

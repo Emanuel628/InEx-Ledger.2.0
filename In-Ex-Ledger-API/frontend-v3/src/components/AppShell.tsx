@@ -24,7 +24,7 @@ import {
 import type { AppPage, PageProps } from '../App'
 import { getCurrentUser } from '../lib/authApi'
 import { activateBusiness, loadBusinesses, type BusinessRecord } from '../lib/businessesApi'
-import { formatCountLabel, getUserLanguage, translate, type TranslationKey } from '../lib/i18n'
+import { formatCountLabel, translate, type AppLanguage, type TranslationKey } from '../lib/i18n'
 import { loadUnreadCounts } from '../lib/messagesApi'
 
 const navItems = [
@@ -59,6 +59,7 @@ function AppShell({
   sidebarCollapsed,
   setSidebarCollapsed,
   theme,
+  language,
   searchPlaceholder,
   searchValue = '',
   onSearch,
@@ -66,7 +67,6 @@ function AppShell({
   overlay,
   hideTopbar = false,
 }: AppShellProps) {
-  const language = getUserLanguage(authUser)
   const t = (key: TranslationKey) => translate(key, language)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [businessMenuOpen, setBusinessMenuOpen] = useState(false)
@@ -412,7 +412,7 @@ function AppShell({
   )
 }
 
-function buildNotifications(counts: { total?: number; messages?: number; support?: number; notifications?: number }, language = getUserLanguage(null)) {
+function buildNotifications(counts: { total?: number; messages?: number; support?: number; notifications?: number }, language: AppLanguage) {
   const items: AppNotification[] = []
   const supportCount = Number(counts.support || 0)
   const noticeCount = Number(counts.notifications || 0)

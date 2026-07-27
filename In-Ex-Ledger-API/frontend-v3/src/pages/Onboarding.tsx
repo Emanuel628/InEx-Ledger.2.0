@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AppPage, PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
+import { normalizeLanguage } from '../lib/i18n'
 import { completeOnboarding, type OnboardingDraft } from '../lib/settingsApi'
 
 function Onboarding(props: PageProps) {
@@ -82,7 +83,13 @@ function Onboarding(props: PageProps) {
           </label>
           <label>
             Language
-            <select value={draft.language} onChange={(event) => updateDraft('language', event.target.value)}>
+            <select
+              value={draft.language}
+              onChange={(event) => {
+                updateDraft('language', event.target.value)
+                props.onLanguageChange(normalizeLanguage(event.target.value))
+              }}
+            >
               <option value="en">English</option>
               <option value="es">Spanish</option>
               <option value="fr">French</option>

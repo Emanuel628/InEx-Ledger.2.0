@@ -208,9 +208,16 @@ test("v3 shell has an SPA-owned i18n runtime wired to business language", () => 
   assert.match(authSource, /language\?: string \| null/);
   assert.match(authSource, /language: activeBusiness\.language \|\| null/);
   assert.match(appSource, /getStoredLanguage/);
+  assert.match(appSource, /getUserLanguage\(authUser\)/);
   assert.match(appSource, /setStoredLanguage\(nextLanguage\)/);
   assert.match(appSource, /translate\('app\.loading\.title', language\)/);
-  assert.match(shellSource, /const language = getUserLanguage\(authUser\)/);
+  assert.match(appSource, /language: AppLanguage/);
+  assert.match(appSource, /onLanguageChange: \(language: AppLanguage\) => void/);
+  // AppShell consumes the same shared `language` from PageProps rather than
+  // independently recomputing it from authUser, so it can't diverge from an
+  // in-progress (unsaved) language pick made in Settings or Onboarding.
+  assert.match(shellSource, /\n {2}language,\n/);
+  assert.doesNotMatch(shellSource, /getUserLanguage/);
   assert.match(shellSource, /translate\(key, language\)/);
   assert.match(shellSource, /i18nKey: 'shell\.nav\.transactions'/);
   assert.doesNotMatch(shellSource, /data-i18n/);
