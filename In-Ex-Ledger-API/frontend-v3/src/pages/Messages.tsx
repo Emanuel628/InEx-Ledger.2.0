@@ -526,7 +526,6 @@ function MessageDetailModal({
           <div className="message-reply-box">
             <textarea placeholder="Write your reply..." aria-label="Write your reply" value={replyBody} onChange={(event) => setReplyBody(event.target.value)} />
             <div className="message-reply-actions">
-              <button className="secondary-button" type="button">Snippets</button>
               <button className="secondary-button" type="button">
                 <Paperclip size={17} />
                 Attach

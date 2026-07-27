@@ -617,7 +617,6 @@ function DataSettings({
     <SettingsPanel eyebrow="Data" title="Privacy, exports, and deletion" description="Sensitive exports and deletion controls stay explicit and reviewable.">
       <SettingsRow icon={Download} title="Account data export" description="Download a complete data package for records or migration.">
         <div className="filter-actions">
-          <button className="secondary-button" type="button" onClick={() => void runExport('json')}>JSON</button>
           <button className="secondary-button" type="button" onClick={() => void runExport('csv')}>CSV</button>
         </div>
       </SettingsRow>
