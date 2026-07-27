@@ -918,7 +918,7 @@ function ReceiptUploadModal({
         <div className="drawer-actions">
           <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
           <button className="primary-button" type="button" disabled={uploading} onClick={() => void submitUpload()}>
-            {uploading ? 'Uploading...' : 'Attach receipt'}
+            {uploading ? <>Uploading<LoadingDots /></> : 'Attach receipt'}
           </button>
         </div>
       </section>

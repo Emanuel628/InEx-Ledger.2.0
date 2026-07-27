@@ -34,6 +34,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_MESSAGE_ATTACHMENTS = 5;
 const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
@@ -53,20 +54,30 @@ const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
   ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx"
 ]);
 
-const replyAttachmentUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_ATTACHMENT_BYTES },
-  fileFilter(_req, file, cb) {
-    const ext = path.extname(String(file?.originalname || "")).toLowerCase();
-    const mime = String(file?.mimetype || "").toLowerCase();
-    if (!ALLOWED_ATTACHMENT_MIME_TYPES.has(mime) || !ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)) {
-      const error = new Error("Unsupported attachment type.");
-      error.status = 400;
-      return cb(error);
-    }
-    cb(null, true);
+function attachmentFileFilter(_req, file, cb) {
+  const ext = path.extname(String(file?.originalname || "")).toLowerCase();
+  const mime = String(file?.mimetype || "").toLowerCase();
+  if (!ALLOWED_ATTACHMENT_MIME_TYPES.has(mime) || !ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)) {
+    const error = new Error("Unsupported attachment type.");
+    error.status = 400;
+    return cb(error);
   }
+  cb(null, true);
+}
+
+const messageAttachmentsUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_ATTACHMENT_BYTES, files: MAX_MESSAGE_ATTACHMENTS },
+  fileFilter: attachmentFileFilter
 });
+
+function buildResendAttachments(files) {
+  return (files || []).map((file) => ({
+    filename: sanitizeAttachmentFilename(file.originalname),
+    content: file.buffer,
+    contentType: file.mimetype
+  }));
+}
 
 function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
@@ -409,7 +420,7 @@ router.get("/archived", async (req, res) => {
 // GET /api/messages/:id
 // Fetches a single message and marks it as read if the current user is the receiver.
 // POST /api/messages/:id/reply-email
-router.post("/:id/reply-email", replyAttachmentUpload.single("attachment"), async (req, res) => {
+router.post("/:id/reply-email", messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS), async (req, res) => {
   try {
     const messageId = String(req.params.id || "").trim();
     const replyBody = String(req.body?.body || "").trim().slice(0, 10000);
@@ -491,12 +502,8 @@ router.post("/:id/reply-email", replyAttachmentUpload.single("attachment"), asyn
       payload.replyTo = replyToDisplay;
     }
 
-    if (req.file) {
-      payload.attachments = [{
-        filename: sanitizeAttachmentFilename(req.file.originalname),
-        content: req.file.buffer,
-        contentType: req.file.mimetype
-      }];
+    if (req.files?.length) {
+      payload.attachments = buildResendAttachments(req.files);
     }
 
     const sendResult = await resend.emails.send(payload);
@@ -706,7 +713,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/support-email", async (req, res) => {
+router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS), async (req, res) => {
   try {
     const subject = String(req.body?.subject || "Support Request").trim().slice(0, MAX_SUBJECT_LEN);
     const body = String(req.body?.body || "").trim().slice(0, MAX_BODY_LEN);
@@ -786,6 +793,10 @@ router.post("/support-email", async (req, res) => {
       html
     };
 
+    if (req.files?.length) {
+      payload.attachments = buildResendAttachments(req.files);
+    }
+
     if (replyTo) {
       // Resend's Node SDK reads `replyTo` (camelCase); a snake_case `reply_to`
       // key is dropped, so the reply would never route back into the app.
@@ -849,7 +860,7 @@ router.post("/support-email", async (req, res) => {
   }
 });
 
-router.post("/send-email", async (req, res) => {
+router.post("/send-email", messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS), async (req, res) => {
   try {
     const parsedTo = parseEmailList(req.body?.to_email);
     const messageType = String(req.body?.message_type || "general").trim();
@@ -921,6 +932,10 @@ router.post("/send-email", async (req, res) => {
     if (replyTo) {
       const replyToDisplay = `InEx Ledger Messages <${replyTo}>`;
       payload.replyTo = replyToDisplay;
+    }
+
+    if (req.files?.length) {
+      payload.attachments = buildResendAttachments(req.files);
     }
 
     const sendResult = await resend.emails.send(payload);

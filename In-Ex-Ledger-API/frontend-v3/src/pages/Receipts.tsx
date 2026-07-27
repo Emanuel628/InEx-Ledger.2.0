@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import LoadingDots from '../components/LoadingDots'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
@@ -91,12 +92,15 @@ function Receipts(props: PageProps) {
             <ReceiptUploadDrawer
               transactions={transactionOptions}
               onClose={() => setDrawerOpen(false)}
-              onSave={(file, transactionId) => {
-                void uploadReceipt(file, transactionId)
+              onSave={(file, transactionId) => (
+                uploadReceipt(file, transactionId)
                   .then(() => refreshReceipts())
                   .then(() => setDrawerOpen(false))
-                  .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to upload receipt.'))
-              }}
+                  .catch((error) => {
+                    setDataError(error instanceof Error ? error.message : 'Unable to upload receipt.')
+                    throw error
+                  })
+              )}
             />
           ) : null}
           {linkingReceipt ? (
@@ -400,11 +404,12 @@ function ReceiptUploadDrawer({
 }: {
   transactions: TransactionLinkOption[]
   onClose: () => void
-  onSave: (file: File, transactionId: string) => void
+  onSave: (file: File, transactionId: string) => Promise<void>
 }) {
   const [file, setFile] = useState<File | null>(null)
   const [transactionId, setTransactionId] = useState('')
   const [error, setError] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   function chooseFile(nextFile: File | undefined) {
     if (!nextFile) {
@@ -414,12 +419,19 @@ function ReceiptUploadDrawer({
     setError('')
   }
 
-  function submitReceipt() {
+  async function submitReceipt() {
     if (!file) {
       setError('Choose a receipt file.')
       return
     }
-    onSave(file, transactionId)
+    setUploading(true)
+    try {
+      await onSave(file, transactionId)
+    } catch {
+      // Upload failures are surfaced by the page-level error banner.
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -465,8 +477,8 @@ function ReceiptUploadDrawer({
           <button className="secondary-button" type="button" onClick={onClose}>
             Cancel
           </button>
-          <button className="primary-button" type="button" onClick={submitReceipt}>
-            Save receipt
+          <button className="primary-button" type="button" disabled={uploading} onClick={() => void submitReceipt()}>
+            {uploading ? <>Uploading<LoadingDots /></> : 'Save receipt'}
           </button>
         </div>
       </aside>

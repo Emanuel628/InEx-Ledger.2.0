@@ -496,7 +496,7 @@ test("messages reply-email attaches an uploaded file to the outbound email", asy
     const res = await request(fixture.app)
       .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
       .field("body", "Please see the attached file.")
-      .attach("attachment", Buffer.from("id,amount\n1,2.50"), { filename: "export.csv", contentType: "text/csv" });
+      .attach("attachments", Buffer.from("id,amount\n1,2.50"), { filename: "export.csv", contentType: "text/csv" });
 
     assert.equal(res.status, 200);
     assert.equal(fixture.state.sentEmails.length, 1);
@@ -505,6 +505,31 @@ test("messages reply-email attaches an uploaded file to the outbound email", asy
     assert.equal(sent.attachments[0].filename, "export.csv");
     assert.equal(sent.attachments[0].contentType, "text/csv");
     assert.ok(Buffer.isBuffer(sent.attachments[0].content));
+  } finally {
+    fixture.cleanup();
+    if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = beforeApiKey;
+  }
+});
+
+test("messages reply-email attaches multiple uploaded files to the outbound email", async () => {
+  const beforeApiKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = "re_test_123";
+
+  const fixture = loadMessagesRouterForReply();
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
+      .field("body", "Please see the attached files.")
+      .attach("attachments", Buffer.from("id,amount\n1,2.50"), { filename: "export.csv", contentType: "text/csv" })
+      .attach("attachments", Buffer.from("hello"), { filename: "note.txt", contentType: "text/plain" });
+
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.sentEmails.length, 1);
+    const sent = fixture.state.sentEmails[0];
+    assert.equal(sent.attachments?.length, 2);
+    assert.deepEqual(sent.attachments.map((entry) => entry.filename).sort(), ["export.csv", "note.txt"]);
   } finally {
     fixture.cleanup();
     if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
@@ -522,7 +547,7 @@ test("messages reply-email rejects an unsupported attachment type", async () => 
     const res = await request(fixture.app)
       .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
       .field("body", "Please see the attached file.")
-      .attach("attachment", Buffer.from("#!/bin/sh\necho hi"), { filename: "script.sh", contentType: "application/x-sh" });
+      .attach("attachments", Buffer.from("#!/bin/sh\necho hi"), { filename: "script.sh", contentType: "application/x-sh" });
 
     assert.equal(res.status, 400);
     assert.equal(fixture.state.sentEmails.length, 0);

@@ -72,8 +72,19 @@ export async function loadUnreadCounts() {
   return apiRequest<UnreadCounts>('/api/messages/unread-count')
 }
 
-export async function sendGeneralMessage(toEmail: string, ccEmail: string, subject: string, body: string) {
+export async function sendGeneralMessage(toEmail: string, ccEmail: string, subject: string, body: string, attachments?: File[]) {
   const recipients = [toEmail, ccEmail].filter((value) => value.trim()).join(', ')
+  if (attachments?.length) {
+    const form = new FormData()
+    form.append('to_email', recipients)
+    form.append('message_type', 'general')
+    form.append('subject', subject)
+    form.append('body', body)
+    attachments.forEach((file) => form.append('attachments', file))
+    await apiRequest('/api/messages/send-email', { method: 'POST', body: form })
+    return
+  }
+
   await apiRequest('/api/messages/send-email', {
     method: 'POST',
     body: JSON.stringify({
@@ -85,18 +96,27 @@ export async function sendGeneralMessage(toEmail: string, ccEmail: string, subje
   })
 }
 
-export async function sendSupportMessage(subject: string, body: string) {
+export async function sendSupportMessage(subject: string, body: string, attachments?: File[]) {
+  if (attachments?.length) {
+    const form = new FormData()
+    form.append('subject', subject)
+    form.append('body', body)
+    attachments.forEach((file) => form.append('attachments', file))
+    await apiRequest('/api/messages/support-email', { method: 'POST', body: form })
+    return
+  }
+
   await apiRequest('/api/messages/support-email', {
     method: 'POST',
     body: JSON.stringify({ subject, body }),
   })
 }
 
-export async function replyToMessage(messageId: string, body: string, attachment?: File | null) {
-  if (attachment) {
+export async function replyToMessage(messageId: string, body: string, attachments?: File[]) {
+  if (attachments?.length) {
     const form = new FormData()
     form.append('body', body)
-    form.append('attachment', attachment)
+    attachments.forEach((file) => form.append('attachments', file))
     await apiRequest(`/api/messages/${messageId}/reply-email`, {
       method: 'POST',
       body: form,

@@ -9,6 +9,19 @@
   margin: 16px auto 0;
   min-height: auto;
   padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.auth-header .brand-mark {
+  background: url("/brand/inex-mark-color.svg") center / 28px 28px no-repeat !important;
+  border-radius: 0 !important;
+}
+
+.auth-header .brand-mark::before,
+.auth-header .brand-mark::after {
+  content: none !important;
 }
 
 .auth-header nav a {
