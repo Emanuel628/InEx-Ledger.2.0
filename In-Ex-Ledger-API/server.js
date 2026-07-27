@@ -101,7 +101,9 @@ const V3_APP_PAGES = new Set([
   "onboarding",
   "help",
   "upgrade",
-  "trial-setup"
+  "trial-setup",
+  "privacy",
+  "terms"
 ]);
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([

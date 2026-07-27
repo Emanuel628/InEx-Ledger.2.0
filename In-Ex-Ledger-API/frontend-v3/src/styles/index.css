@@ -1353,16 +1353,16 @@ textarea:focus-visible {
 }
 
 .undo-delete-button {
-  border: 1px solid rgba(200, 121, 0, 0.45);
-  background: rgba(200, 121, 0, 0.14);
-  color: #8a5500;
+  border: 1px solid rgba(216, 59, 59, 0.45);
+  background: #ffffff;
+  color: var(--red);
   font-weight: 900;
 }
 
 .undo-delete-button:hover {
-  border-color: rgba(200, 121, 0, 0.65);
-  background: rgba(200, 121, 0, 0.22);
-  color: #6b4200;
+  border-color: rgba(216, 59, 59, 0.7);
+  background: rgba(216, 59, 59, 0.08);
+  color: #b62b2b;
 }
 
 .summary-strip,
@@ -1688,10 +1688,11 @@ textarea:focus-visible {
 }
 
 .filter-popover {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 25;
+  position: fixed;
+  top: var(--filter-popover-top, 0);
+  left: var(--filter-popover-left, 0);
+  right: auto;
+  z-index: 120;
   width: min(280px, calc(100vw - 40px));
   display: grid;
   gap: 12px;
@@ -2700,6 +2701,7 @@ tbody tr:last-child td {
   width: min(520px, 100%);
   max-height: calc(100dvh - 48px);
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -2712,6 +2714,7 @@ tbody tr:last-child td {
   gap: 16px;
   padding: 18px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .csv-import-modal {
@@ -2727,6 +2730,7 @@ tbody tr:last-child td {
 .csv-import-result {
   padding: 18px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .form-grid-2 {
@@ -3948,6 +3952,33 @@ tbody tr:last-child td {
   display: grid;
 }
 
+.empty-panel {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-panel svg {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.empty-panel strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.empty-panel p {
+  margin: 0;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .message-row-card {
   min-width: 0;
   display: grid;
@@ -4090,10 +4121,15 @@ tbody tr:last-child td {
   border-bottom: 1px solid var(--line);
 }
 
+.message-modal-header > div:first-child {
+  min-width: 0;
+}
+
 .message-modal-header h2 {
   margin: 0;
   font-size: 24px;
   line-height: 1.2;
+  overflow-wrap: break-word;
 }
 
 .message-modal-header p:not(.eyebrow) {
@@ -4108,6 +4144,7 @@ tbody tr:last-child td {
   gap: 14px;
   padding: 18px 22px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .message-reading-actions {
@@ -4147,6 +4184,7 @@ tbody tr:last-child td {
   gap: 14px;
   padding: 18px 22px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .compose-form label {
@@ -4182,6 +4220,10 @@ tbody tr:last-child td {
   padding: 16px 22px;
   border-top: 1px solid var(--line);
   background: #ffffff;
+}
+
+.message-modal-actions .compose-attach-button {
+  margin-right: auto;
 }
 
 .message-detail-header {
@@ -4266,6 +4308,12 @@ tbody tr:last-child td {
   border: 0;
   outline: 0;
   resize: vertical;
+}
+
+.message-reply-attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .message-reply-attachment {
@@ -4414,7 +4462,7 @@ tbody tr:last-child td {
   }
 
   .filter-actions {
-    justify-content: flex-start;
+    justify-content: flex-end;
   }
 
   .exports-layout {

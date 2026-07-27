@@ -37,6 +37,7 @@ import {
 } from '../lib/messagesApi'
 
 const MAX_REPLY_ATTACHMENT_BYTES = 10 * 1024 * 1024
+const MAX_MESSAGE_ATTACHMENTS = 5
 
 type LaneLabel = 'Inbox' | 'Invoices' | 'Support' | 'Notices' | 'Sent' | 'Archived'
 
@@ -187,9 +188,9 @@ function Messages(props: PageProps) {
     }
   }
 
-  async function handleReply(thread: MessageRecord, body: string, attachment: File | null) {
+  async function handleReply(thread: MessageRecord, body: string, attachments: File[]) {
     try {
-      await replyToMessage(thread.id, body, attachment)
+      await replyToMessage(thread.id, body, attachments)
       setDetailOpen(false)
       await refreshMessages()
     } catch (error) {
@@ -197,12 +198,12 @@ function Messages(props: PageProps) {
     }
   }
 
-  async function handleCompose(payload: { to: string; cc: string; subject: string; body: string }) {
+  async function handleCompose(payload: { to: string; cc: string; subject: string; body: string; attachments: File[] }) {
     try {
       if (composeType === 'support') {
-        await sendSupportMessage(payload.subject, payload.body)
+        await sendSupportMessage(payload.subject, payload.body, payload.attachments)
       } else {
-        await sendGeneralMessage(payload.to, payload.cc, payload.subject, payload.body)
+        await sendGeneralMessage(payload.to, payload.cc, payload.subject, payload.body, payload.attachments)
       }
       setComposeOpen(false)
       await refreshMessages()
@@ -457,34 +458,42 @@ function MessageDetailModal({
   onArchive: (thread: MessageRecord) => Promise<void>
   onClose: () => void
   onDelete: (thread: MessageRecord) => Promise<void>
-  onReply: (thread: MessageRecord, body: string, attachment: File | null) => Promise<void>
+  onReply: (thread: MessageRecord, body: string, attachments: File[]) => Promise<void>
 }) {
   const [replyBody, setReplyBody] = useState('')
-  const [attachment, setAttachment] = useState<File | null>(null)
+  const [attachments, setAttachments] = useState<File[]>([])
   const [attachmentError, setAttachmentError] = useState('')
   const [sending, setSending] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const visibleMessages = messages.length ? messages : [thread]
 
   function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] || null
+    const files = Array.from(event.target.files || [])
     event.target.value = ''
-    if (!file) return
-    if (file.size > MAX_REPLY_ATTACHMENT_BYTES) {
-      setAttachmentError('Attachment must be 10 MB or smaller.')
+    if (!files.length) return
+    if (attachments.length + files.length > MAX_MESSAGE_ATTACHMENTS) {
+      setAttachmentError(`You can attach up to ${MAX_MESSAGE_ATTACHMENTS} files.`)
+      return
+    }
+    if (files.some((file) => file.size > MAX_REPLY_ATTACHMENT_BYTES)) {
+      setAttachmentError('Each attachment must be 10 MB or smaller.')
       return
     }
     setAttachmentError('')
-    setAttachment(file)
+    setAttachments((current) => [...current, ...files])
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((current) => current.filter((_, fileIndex) => fileIndex !== index))
   }
 
   async function submitReply() {
     if (!replyBody.trim()) return
     setSending(true)
     try {
-      await onReply(thread, replyBody, attachment)
+      await onReply(thread, replyBody, attachments)
       setReplyBody('')
-      setAttachment(null)
+      setAttachments([])
     } finally {
       setSending(false)
     }
@@ -543,27 +552,32 @@ function MessageDetailModal({
 
           <div className="message-reply-box">
             <textarea placeholder="Write your reply..." aria-label="Write your reply" value={replyBody} onChange={(event) => setReplyBody(event.target.value)} />
-            {attachment ? (
-              <div className="message-reply-attachment">
-                <Paperclip size={15} />
-                <span>{attachment.name}</span>
-                <button type="button" aria-label="Remove attachment" onClick={() => setAttachment(null)}>
-                  <X size={14} />
-                </button>
+            {attachments.length ? (
+              <div className="message-reply-attachment-list">
+                {attachments.map((file, index) => (
+                  <div className="message-reply-attachment" key={`${file.name}-${index}`}>
+                    <Paperclip size={15} />
+                    <span>{file.name}</span>
+                    <button type="button" aria-label={`Remove ${file.name}`} onClick={() => removeAttachment(index)}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : null}
             {attachmentError ? <p className="drawer-error" role="alert">{attachmentError}</p> : null}
             <input
               ref={fileInputRef}
               type="file"
+              multiple
               className="visually-hidden"
               accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.txt,.csv,.doc,.docx,.xls,.xlsx"
               onChange={handleAttachmentChange}
             />
             <div className="message-reply-actions">
-              <button className="secondary-button" type="button" onClick={() => fileInputRef.current?.click()}>
+              <button className="secondary-button" type="button" disabled={attachments.length >= MAX_MESSAGE_ATTACHMENTS} onClick={() => fileInputRef.current?.click()}>
                 <Paperclip size={17} />
-                {attachment ? 'Replace attachment' : 'Attach'}
+                {attachments.length ? 'Add another attachment' : 'Attach'}
               </button>
               <button className="primary-button" type="button" disabled={sending || !replyBody.trim()} onClick={() => void submitReply()}>
                 <Send size={18} />
@@ -584,18 +598,41 @@ function ComposeModal({
 }: {
   mode: 'general' | 'support'
   onClose: () => void
-  onSend: (payload: { to: string; cc: string; subject: string; body: string }) => Promise<void>
+  onSend: (payload: { to: string; cc: string; subject: string; body: string; attachments: File[] }) => Promise<void>
 }) {
   const [to, setTo] = useState('')
   const [cc, setCc] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [attachmentError, setAttachmentError] = useState('')
   const [sending, setSending] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!files.length) return
+    if (attachments.length + files.length > MAX_MESSAGE_ATTACHMENTS) {
+      setAttachmentError(`You can attach up to ${MAX_MESSAGE_ATTACHMENTS} files.`)
+      return
+    }
+    if (files.some((file) => file.size > MAX_REPLY_ATTACHMENT_BYTES)) {
+      setAttachmentError('Each attachment must be 10 MB or smaller.')
+      return
+    }
+    setAttachmentError('')
+    setAttachments((current) => [...current, ...files])
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((current) => current.filter((_, fileIndex) => fileIndex !== index))
+  }
 
   async function submitForm() {
     setSending(true)
     try {
-      await onSend({ to, cc, subject, body })
+      await onSend({ to, cc, subject, body, attachments })
     } finally {
       setSending(false)
     }
@@ -659,9 +696,35 @@ function ComposeModal({
             Message
             <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write your message..." />
           </label>
+          {attachments.length ? (
+            <div className="message-reply-attachment-list">
+              {attachments.map((file, index) => (
+                <div className="message-reply-attachment" key={`${file.name}-${index}`}>
+                  <Paperclip size={15} />
+                  <span>{file.name}</span>
+                  <button type="button" aria-label={`Remove ${file.name}`} onClick={() => removeAttachment(index)}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {attachmentError ? <p className="drawer-error" role="alert">{attachmentError}</p> : null}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="visually-hidden"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.txt,.csv,.doc,.docx,.xls,.xlsx"
+            onChange={handleAttachmentChange}
+          />
         </form>
 
         <div className="message-modal-actions">
+          <button className="secondary-button compose-attach-button" type="button" disabled={attachments.length >= MAX_MESSAGE_ATTACHMENTS} onClick={() => fileInputRef.current?.click()}>
+            <Paperclip size={17} />
+            {attachments.length ? 'Add another attachment' : 'Attach'}
+          </button>
           <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
           <button className="primary-button" type="button" disabled={sending || !canSend} onClick={() => void submitForm()}>
             <Send size={18} />

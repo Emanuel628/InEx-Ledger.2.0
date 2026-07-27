@@ -1373,6 +1373,20 @@ router.delete("/bulk-delete-all", async (req, res) => {
           AND deleted_at IS NULL`,
       [businessId]
     );
+    // Delete All is a hard reset: any transaction that was already
+    // soft-deleted (and still undo-eligible) before this run must also be
+    // excluded, or its pre-existing undo entry would keep the Undo Delete
+    // button visible after the reset.
+    await pool.query(
+      `UPDATE transactions
+          SET deleted_reason = 'bulk_delete_all'
+        WHERE business_id = $1
+          AND deleted_at IS NOT NULL
+          AND (is_void = true OR is_void IS NULL)
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_reason IS DISTINCT FROM 'bulk_delete_all'`,
+      [businessId]
+    );
     void invalidateSnapshotsForBusiness({
       businessId,
       reason: "Transactions changed after export."

@@ -40,6 +40,10 @@ function loadTransactionsRouterWithState({
         return { rows: [], rowCount: deletedCount };
       }
 
+      if (/UPDATE transactions\s+SET deleted_reason = 'bulk_delete_all'\s+WHERE business_id = \$1\s+AND deleted_at IS NOT NULL/i.test(sql)) {
+        return { rows: [], rowCount: 0 };
+      }
+
       throw new Error(`Unhandled pool SQL: ${sql}`);
     },
     async connect() {
@@ -180,4 +184,17 @@ test("DELETE /api/transactions/bulk-delete-all soft-deletes every transaction fo
   assert.ok(updateQuery, "expected an UPDATE transactions query to run");
   assert.deepEqual(updateQuery.params, [BUSINESS_ID]);
   assert.match(updateQuery.sql, /deleted_at IS NULL/);
+});
+
+test("DELETE /api/transactions/bulk-delete-all also clears any pre-existing undo-eligible deletion so Undo Delete resets", async () => {
+  const { app, state } = loadTransactionsRouterWithState({ deletedCount: 3 });
+  const response = await request(app).delete("/api/transactions/bulk-delete-all").send({ confirm: "DELETE" });
+  assert.equal(response.status, 200);
+
+  const resetQuery = state.poolQueries.find((entry) =>
+    /UPDATE transactions\s+SET deleted_reason = 'bulk_delete_all'\s+WHERE business_id = \$1\s+AND deleted_at IS NOT NULL/i.test(entry.sql)
+  );
+  assert.ok(resetQuery, "expected a follow-up UPDATE clearing prior undo-eligible deletions");
+  assert.deepEqual(resetQuery.params, [BUSINESS_ID]);
+  assert.match(resetQuery.sql, /deleted_reason IS DISTINCT FROM 'bulk_delete_all'/);
 });
