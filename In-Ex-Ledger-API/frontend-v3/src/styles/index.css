@@ -57,6 +57,27 @@ textarea {
   max-width: 100%;
 }
 
+/* Grid/flex items default to `min-width: auto`, which floors their size at
+   their content's min-content width — so a `<label>` wrapping a date input
+   (our standard field markup) can still refuse to shrink below the native
+   date picker's intrinsic width and blow out of its grid track even though
+   the input itself has `min-width: 0` above. Every field label in this app
+   is meant to be fully compressible, so remove that floor at the wrapper
+   level too. */
+label {
+  min-width: 0;
+}
+
+/* Extra-explicit safety net for date/time controls specifically, since
+   their intrinsic width is the most likely to exceed a narrow mobile card. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 button {
   cursor: pointer;
 }
@@ -1331,6 +1352,19 @@ textarea:focus-visible {
   color: var(--ink);
 }
 
+.undo-delete-button {
+  border: 1px solid rgba(200, 121, 0, 0.45);
+  background: rgba(200, 121, 0, 0.14);
+  color: #8a5500;
+  font-weight: 900;
+}
+
+.undo-delete-button:hover {
+  border-color: rgba(200, 121, 0, 0.65);
+  background: rgba(200, 121, 0, 0.22);
+  color: #6b4200;
+}
+
 .summary-strip,
 .table-panel,
 .progressive-panel {
@@ -2527,6 +2561,93 @@ tbody tr:last-child td {
   font-weight: 850;
 }
 
+.csv-import-help-toggle {
+  align-self: flex-start;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.bank-csv-help-panel {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.bank-help-intro,
+.bank-help-warning,
+.bank-help-privacy,
+.bank-help-desktop-note,
+.bank-help-disclaimer {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.bank-help-review-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(216, 59, 59, 0.24);
+  border-radius: var(--radius);
+  background: rgba(216, 59, 59, 0.08);
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.bank-help-picker {
+  display: grid;
+  gap: 6px;
+  max-width: 320px;
+}
+
+.bank-help-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.bank-help-picker select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.bank-help-instructions {
+  display: grid;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.bank-help-bank-name {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.bank-help-steps {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bank-help-link {
+  justify-self: start;
+}
+
 .drawer-form details {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -2544,6 +2665,12 @@ tbody tr:last-child td {
   display: grid;
   gap: 12px;
   padding: 0 13px 13px;
+}
+
+.loading-dots {
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
 }
 
 .drawer-actions {
@@ -4141,6 +4268,34 @@ tbody tr:last-child td {
   resize: vertical;
 }
 
+.message-reply-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.message-reply-attachment span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-reply-attachment button {
+  display: inline-flex;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
 .message-reply-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4187,6 +4342,12 @@ tbody tr:last-child td {
   .mobile-nav-is-open .app-sidebar {
     transform: translateX(0);
     box-shadow: 22px 0 44px rgba(7, 29, 58, 0.24);
+  }
+
+  /* Collapsing the sidebar is a no-op on mobile (it's always shown full-width
+     as a slide-out drawer above), so the toggle has nothing to do here. */
+  .sidebar-collapse {
+    display: none;
   }
 
   .mobile-nav-is-open.sidebar-is-collapsed .app-sidebar {
@@ -4369,10 +4530,6 @@ tbody tr:last-child td {
     min-height: 0;
     padding: 18px 20px;
     gap: 12px;
-  }
-
-  .public-footer nav {
-    display: none;
   }
 
   .public-nav,
@@ -4734,6 +4891,12 @@ tbody tr:last-child td {
   .message-row-meta,
   .message-row-date {
     grid-column: 3 / -1;
+  }
+
+  .message-row-actions {
+    grid-row: 1;
+    grid-column: 4;
+    justify-self: end;
   }
 
   .message-bubble.is-sent {

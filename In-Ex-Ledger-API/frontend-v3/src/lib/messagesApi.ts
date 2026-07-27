@@ -92,7 +92,18 @@ export async function sendSupportMessage(subject: string, body: string) {
   })
 }
 
-export async function replyToMessage(messageId: string, body: string) {
+export async function replyToMessage(messageId: string, body: string, attachment?: File | null) {
+  if (attachment) {
+    const form = new FormData()
+    form.append('body', body)
+    form.append('attachment', attachment)
+    await apiRequest(`/api/messages/${messageId}/reply-email`, {
+      method: 'POST',
+      body: form,
+    })
+    return
+  }
+
   await apiRequest(`/api/messages/${messageId}/reply-email`, {
     method: 'POST',
     body: JSON.stringify({ body }),

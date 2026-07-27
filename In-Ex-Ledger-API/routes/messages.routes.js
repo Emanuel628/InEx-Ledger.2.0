@@ -1,5 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
+const path = require("path");
+const multer = require("multer");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
@@ -30,8 +32,48 @@ const MAX_PAGE_SIZE = 50;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+]);
+const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
+  ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif",
+  ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx"
+]);
+
+const replyAttachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_ATTACHMENT_BYTES },
+  fileFilter(_req, file, cb) {
+    const ext = path.extname(String(file?.originalname || "")).toLowerCase();
+    const mime = String(file?.mimetype || "").toLowerCase();
+    if (!ALLOWED_ATTACHMENT_MIME_TYPES.has(mime) || !ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)) {
+      const error = new Error("Unsupported attachment type.");
+      error.status = 400;
+      return cb(error);
+    }
+    cb(null, true);
+  }
+});
+
 function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
+}
+
+function sanitizeAttachmentFilename(name) {
+  const base = path.basename(String(name || "attachment")).replace(/[^a-zA-Z0-9._-]/g, "_");
+  return base.slice(0, 150) || "attachment";
 }
 
 function isEmail(value) {
@@ -352,7 +394,7 @@ router.get("/archived", async (req, res) => {
 // GET /api/messages/:id
 // Fetches a single message and marks it as read if the current user is the receiver.
 // POST /api/messages/:id/reply-email
-router.post("/:id/reply-email", async (req, res) => {
+router.post("/:id/reply-email", replyAttachmentUpload.single("attachment"), async (req, res) => {
   try {
     const messageId = String(req.params.id || "").trim();
     const replyBody = String(req.body?.body || "").trim().slice(0, 10000);
@@ -433,6 +475,14 @@ router.post("/:id/reply-email", async (req, res) => {
     if (replyTo) {
       const replyToDisplay = `${companyName} Billing <${replyTo}>`;
       payload.replyTo = replyToDisplay;
+    }
+
+    if (req.file) {
+      payload.attachments = [{
+        filename: sanitizeAttachmentFilename(req.file.originalname),
+        content: req.file.buffer,
+        contentType: req.file.mimetype
+      }];
     }
 
     const sendResult = await resend.emails.send(payload);

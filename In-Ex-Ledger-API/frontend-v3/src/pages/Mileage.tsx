@@ -368,7 +368,7 @@ function Mileage(props: PageProps) {
                         <div className="row-action-menu" role="menu">
                           {rowLocked ? <p className="row-action-menu-note">Locked through {formatMonthDate(accountingLock?.lockedThroughDate || '')}</p> : null}
                           <button type="button" disabled={rowLocked} onClick={() => openDrawer(entry.kind, entry)}>Edit activity</button>
-                          <button type="button" disabled={rowLocked} onClick={() => handleDelete(entry)}>Delete activity</button>
+                          <button className="is-danger" type="button" disabled={rowLocked} onClick={() => handleDelete(entry)}>Delete activity</button>
                         </div>
                       ) : null}
                     </td>

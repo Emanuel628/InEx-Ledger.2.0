@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   Archive,
   ChevronDown,
@@ -35,6 +35,8 @@ import {
   type MessageType,
   type UnreadCounts,
 } from '../lib/messagesApi'
+
+const MAX_REPLY_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 type LaneLabel = 'Inbox' | 'Invoices' | 'Support' | 'Notices' | 'Sent' | 'Archived'
 
@@ -185,9 +187,9 @@ function Messages(props: PageProps) {
     }
   }
 
-  async function handleReply(thread: MessageRecord, body: string) {
+  async function handleReply(thread: MessageRecord, body: string, attachment: File | null) {
     try {
-      await replyToMessage(thread.id, body)
+      await replyToMessage(thread.id, body, attachment)
       setDetailOpen(false)
       await refreshMessages()
     } catch (error) {
@@ -455,18 +457,34 @@ function MessageDetailModal({
   onArchive: (thread: MessageRecord) => Promise<void>
   onClose: () => void
   onDelete: (thread: MessageRecord) => Promise<void>
-  onReply: (thread: MessageRecord, body: string) => Promise<void>
+  onReply: (thread: MessageRecord, body: string, attachment: File | null) => Promise<void>
 }) {
   const [replyBody, setReplyBody] = useState('')
+  const [attachment, setAttachment] = useState<File | null>(null)
+  const [attachmentError, setAttachmentError] = useState('')
   const [sending, setSending] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const visibleMessages = messages.length ? messages : [thread]
+
+  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] || null
+    event.target.value = ''
+    if (!file) return
+    if (file.size > MAX_REPLY_ATTACHMENT_BYTES) {
+      setAttachmentError('Attachment must be 10 MB or smaller.')
+      return
+    }
+    setAttachmentError('')
+    setAttachment(file)
+  }
 
   async function submitReply() {
     if (!replyBody.trim()) return
     setSending(true)
     try {
-      await onReply(thread, replyBody)
+      await onReply(thread, replyBody, attachment)
       setReplyBody('')
+      setAttachment(null)
     } finally {
       setSending(false)
     }
@@ -525,10 +543,27 @@ function MessageDetailModal({
 
           <div className="message-reply-box">
             <textarea placeholder="Write your reply..." aria-label="Write your reply" value={replyBody} onChange={(event) => setReplyBody(event.target.value)} />
+            {attachment ? (
+              <div className="message-reply-attachment">
+                <Paperclip size={15} />
+                <span>{attachment.name}</span>
+                <button type="button" aria-label="Remove attachment" onClick={() => setAttachment(null)}>
+                  <X size={14} />
+                </button>
+              </div>
+            ) : null}
+            {attachmentError ? <p className="drawer-error" role="alert">{attachmentError}</p> : null}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="visually-hidden"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.txt,.csv,.doc,.docx,.xls,.xlsx"
+              onChange={handleAttachmentChange}
+            />
             <div className="message-reply-actions">
-              <button className="secondary-button" type="button">
+              <button className="secondary-button" type="button" onClick={() => fileInputRef.current?.click()}>
                 <Paperclip size={17} />
-                Attach
+                {attachment ? 'Replace attachment' : 'Attach'}
               </button>
               <button className="primary-button" type="button" disabled={sending || !replyBody.trim()} onClick={() => void submitReply()}>
                 <Send size={18} />

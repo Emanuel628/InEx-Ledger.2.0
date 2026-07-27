@@ -301,39 +301,6 @@ function resolveEstimatedTaxProfile(region, province) {
   };
 }
 
-const DESKTOP_VIEW_KEY = "lb_desktop_view";
-
-function isDesktopViewRequested() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("view") === "desktop") {
-    return true;
-  }
-  try {
-    return localStorage.getItem(DESKTOP_VIEW_KEY) === "true";
-  } catch (_) {
-    return false;
-  }
-}
-
-function applyDesktopViewport() {
-  let meta = document.querySelector('meta[name="viewport"]');
-  if (!meta) {
-    meta = document.createElement("meta");
-    meta.name = "viewport";
-    document.head.appendChild(meta);
-  }
-  meta.content = "width=1280";
-  document.documentElement.classList.add("desktop-view-requested");
-  document.body.classList.add("desktop-view-requested");
-}
-
-function isMobileDevice() {
-  // Exclude Macintosh to avoid false-positive on iPads using "Request Desktop Website"
-  // (which sends a Mac UA but still has touch points)
-  return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    || (navigator.maxTouchPoints > 0 && !/Macintosh/i.test(navigator.userAgent));
-}
-
 function injectSkipLink() {
   const main = document.querySelector("main");
   if (!main) return;
@@ -355,80 +322,6 @@ function injectSkipLink() {
   link.setAttribute("data-i18n", "a11y_skip_to_main");
   link.textContent = "Skip to main content";
   document.body.insertBefore(link, document.body.firstChild);
-}
-
-function injectViewportSwitchLink() {
-  const desktopRequested = isDesktopViewRequested();
-
-  if (!desktopRequested && !isMobileDevice()) {
-    return;
-  }
-
-  document.querySelectorAll(".mobile-desktop-link, .mobile-view-link").forEach(function (node) {
-    node.remove();
-  });
-
-  const wrapper = document.createElement("div");
-  wrapper.className = desktopRequested
-    ? "mobile-desktop-link mobile-view-link"
-    : "mobile-desktop-link desktop-view-link";
-
-  wrapper.style.position = "static";
-  wrapper.style.display = "block";
-  wrapper.style.margin = "28px auto 20px";
-  wrapper.style.padding = "0";
-  wrapper.style.background = "transparent";
-  wrapper.style.border = "none";
-  wrapper.style.boxShadow = "none";
-  wrapper.style.textAlign = "center";
-  wrapper.style.pointerEvents = "none";
-
-  const link = document.createElement("a");
-  link.href = "#";
-  link.textContent = desktopRequested ? "Mobile View" : "Desktop Version";
-  link.style.display = "inline-flex";
-  link.style.alignItems = "center";
-  link.style.justifyContent = "center";
-  link.style.minHeight = "44px";
-  link.style.padding = "0 18px";
-  link.style.borderRadius = "999px";
-  link.style.background = "#102236";
-  link.style.color = "#fff";
-  link.style.fontWeight = "700";
-  link.style.textDecoration = "none";
-  link.style.boxShadow = "none";
-  link.style.pointerEvents = "auto";
-
-  link.addEventListener("click", function (e) {
-    e.preventDefault();
-
-    const url = new URL(window.location.href);
-
-    if (desktopRequested) {
-      try {
-        localStorage.removeItem(DESKTOP_VIEW_KEY);
-      } catch (_) {}
-
-      url.searchParams.delete("view");
-    } else {
-      try {
-        localStorage.setItem(DESKTOP_VIEW_KEY, "true");
-      } catch (_) {}
-
-      url.searchParams.set("view", "desktop");
-    }
-
-    window.location.href = url.toString();
-  });
-
-  wrapper.appendChild(link);
-  document.body.appendChild(wrapper);
-}
-
-function initViewportSwitchLinks() {
-  try {
-    injectViewportSwitchLink();
-  } catch (_) {}
 }
 
 function injectMobileMenu() {
@@ -1925,7 +1818,6 @@ document.addEventListener("DOMContentLoaded", () => {
   applyDateInputConstraints();
   markRequiredFields();
   disableNumberInputWheel();
-  initViewportSwitchLinks();
   applyMileageNavLabel();
   window.addEventListener("lunaDistanceUnitChanged", applyMileageNavLabel);
   window.addEventListener("lunaRegionChanged", applyMileageNavLabel);
@@ -1964,21 +1856,6 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("focus", refreshGlobalUnreadCount);
   window.addEventListener("pageshow", refreshGlobalUnreadCount);
 });
-
-(function () {
-  if (isDesktopViewRequested()) {
-    try {
-      localStorage.setItem(DESKTOP_VIEW_KEY, "true");
-    } catch (_) {}
-    applyDesktopViewport();
-  }
-})();
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initViewportSwitchLinks);
-} else {
-  initViewportSwitchLinks();
-}
 
 window.applyGlobalTheme = applyGlobalTheme;
 window.setGlobalTheme = setGlobalTheme;

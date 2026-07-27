@@ -30,6 +30,7 @@ async function restoreMostRecentArchivedTransaction({ pool, businessId, userId, 
           AND deleted_at IS NOT NULL
           AND (is_void = true OR is_void IS NULL)
           AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_reason IS DISTINCT FROM 'bulk_delete_all'
         ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
         LIMIT 1`,
       [businessId]
@@ -72,6 +73,7 @@ async function countRestorableArchivedTransactions({ pool, businessId, limit = 2
             AND deleted_at IS NOT NULL
             AND (is_void = true OR is_void IS NULL)
             AND (is_adjustment = false OR is_adjustment IS NULL)
+            AND deleted_reason IS DISTINCT FROM 'bulk_delete_all'
           ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
           LIMIT $2
        ) recent_archived`,

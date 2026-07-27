@@ -487,8 +487,8 @@ function resolveEstimatedTaxProfile(business: LegacyBusiness | null): BusinessTa
     ? `${province || 'Canada'} tax estimate`
     : 'US Schedule C estimate'
   const note = region === 'CA'
-    ? `Draft T2125 estimate using the legacy combined income tax + CPP rate for ${province || 'Canada'}: ${formatPercent(rate, province)}. This is not GST/HST.`
-    : `Draft Schedule C estimate based on net profit using the legacy ${formatPercent(rate)} buffer.`
+    ? `Draft T2125 estimate using the combined income tax + CPP rate for ${province || 'Canada'}: ${formatPercent(rate, province)}. This is not GST/HST.`
+    : `Draft Schedule C estimate based on net profit using a ${formatPercent(rate)} buffer.`
   return { region, province, rate, label, note }
 }
 
