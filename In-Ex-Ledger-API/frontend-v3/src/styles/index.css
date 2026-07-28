@@ -2019,13 +2019,6 @@ tbody tr:last-child td {
   font: inherit;
 }
 
-.checkout-addon-control p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .row-action-menu .is-danger {
   color: var(--red);
 }

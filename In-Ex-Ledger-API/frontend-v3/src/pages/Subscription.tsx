@@ -42,7 +42,6 @@ function Subscription(props: PageProps) {
   const [modal, setModal] = useState<SubscriptionModal>(null)
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessRecord | null>(null)
   const [additionalBusinessDraft, setAdditionalBusinessDraft] = useState('0')
-  const [checkoutAdditionalBusinessDraft, setCheckoutAdditionalBusinessDraft] = useState('0')
 
   const businesses: SubscriptionBusiness[] = businessRows.length
     ? businessRows.map((business) => ({
@@ -65,7 +64,6 @@ function Subscription(props: PageProps) {
       setOverview(nextOverview)
       setPricing(nextPricing)
       setAdditionalBusinessDraft(String(Number(nextOverview.subscription?.additionalBusinesses || 0)))
-      setCheckoutAdditionalBusinessDraft(String(Number(nextOverview.subscription?.additionalBusinesses || 0)))
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load subscription.')
       setOverview(null)
@@ -106,15 +104,23 @@ function Subscription(props: PageProps) {
 
   const subscription = overview?.subscription
   const selectedPrice = pricing?.pricing?.[interval]
-  const checkoutAdditionalBusinesses = normalizeSlotDraft(checkoutAdditionalBusinessDraft)
-  const checkoutTotal = selectedPrice ? selectedPrice.base + (selectedPrice.addon * checkoutAdditionalBusinesses) : null
+  // Pro checkout is plan-only: extra business slots are purchased separately,
+  // after Pro is active, via the "Add business" / Stripe billing portal flow.
+  const checkoutTotal = selectedPrice ? selectedPrice.base : null
   const price = checkoutTotal !== null && pricing ? formatSubscriptionMoney(checkoutTotal, pricing.currency) : interval === 'monthly' ? '$12/mo' : '$122.40/yr'
   const note = interval === 'monthly' ? 'Billed monthly. Cancel or change later in Stripe.' : 'Billed yearly with the annual discount.'
   const planName = subscription?.effectiveTierName || 'Basic'
   const statusLabel = getSubscriptionStatus(subscription)
   const isProActive = subscription?.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing)
   const canResume = Boolean(subscription?.cancelAtPeriodEnd || subscription?.isCanceledWithRemainingAccess)
-  const shouldManageExistingSubscription = Boolean(isProActive && !canResume)
+  // Only route to "Open Stripe billing" when a real Stripe subscription (paid,
+  // or already checked out and still within its Stripe trial window) exists.
+  // A trialing user with no Stripe subscription yet counts as Pro-tier access
+  // (isProActive) but has no Stripe customer, so routing them here too made
+  // the primary CTA an always-disabled portal button (portalAvailable
+  // requires a Stripe customer) instead of Checkout -- meaning every new
+  // trial user could never actually start Stripe checkout.
+  const shouldManageExistingSubscription = Boolean((subscription?.isPaid || subscription?.stripeSubscriptionId) && !canResume)
   const needsBillingPortal = ['past_due', 'unpaid'].includes(String(subscription?.effectiveStatus || subscription?.status || '').toLowerCase())
 
   const capacity = useMemo(() => {
@@ -136,7 +142,7 @@ function Subscription(props: PageProps) {
         await openBillingPortal()
         return
       }
-      await startCheckout(interval, checkoutAdditionalBusinesses)
+      await startCheckout(interval)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start checkout.'
       if (/existing subscription|already have an active subscription|conflict/i.test(message)) {
@@ -199,7 +205,6 @@ function Subscription(props: PageProps) {
       const updated = await updateAdditionalBusinesses(nextValue)
       setOverview((current) => current ? { ...current, subscription: updated } : current)
       setAdditionalBusinessDraft(String(Number(updated.additionalBusinesses || nextValue)))
-      setCheckoutAdditionalBusinessDraft(String(Number(updated.additionalBusinesses || nextValue)))
       await refreshBusinesses()
       await refreshUser()
     } catch (error) {
@@ -257,24 +262,8 @@ function Subscription(props: PageProps) {
             </div>
             <div className="subscription-price-line">
               <strong>{price}</strong>
-              <span>{checkoutAdditionalBusinesses && !canResume ? `${note} Includes ${checkoutAdditionalBusinesses} extra business slot${checkoutAdditionalBusinesses === 1 ? '' : 's'} in checkout.` : note}</span>
+              <span>{note}</span>
             </div>
-            {!isProActive ? (
-              <div className="subscription-addon-control checkout-addon-control">
-                <label>
-                  Extra business slots in checkout
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={checkoutAdditionalBusinessDraft}
-                    onChange={(event) => setCheckoutAdditionalBusinessDraft(event.target.value)}
-                  />
-                </label>
-                <p>One business is included. Add slots here if you want multiple businesses available after checkout.</p>
-              </div>
-            ) : null}
             {canResume ? (
               <button className="primary-button" type="button" disabled={working} onClick={() => void handleResume()}>
                 <CreditCard size={18} />
@@ -417,8 +406,7 @@ function Subscription(props: PageProps) {
               }
             }}
             onBuySlots={async (neededSlots) => {
-              const targetAdditionalBusinesses = Math.max(capacity.additional + neededSlots, checkoutAdditionalBusinesses, 1)
-              setCheckoutAdditionalBusinessDraft(String(targetAdditionalBusinesses))
+              const targetAdditionalBusinesses = Math.max(capacity.additional + neededSlots, 1)
               if (canResume) {
                 await resumeSubscription(interval)
                 setAdditionalBusinessDraft(String(targetAdditionalBusinesses))
@@ -436,7 +424,9 @@ function Subscription(props: PageProps) {
                 await refreshUser()
                 return
               }
-              await startCheckout(interval, targetAdditionalBusinesses)
+              // Not yet Pro: extra business slots can only be purchased after a
+              // plan-only Pro checkout completes, not bundled into it.
+              throw new Error('Start a Pro subscription first, then add extra business slots from Subscription.')
             }}
             currentBusinessCount={capacity.active}
             maxBusinessesAllowed={capacity.max}
@@ -682,12 +672,6 @@ function readPreferredBillingInterval(): BillingInterval {
   if (typeof window === 'undefined') return 'monthly'
   const saved = window.sessionStorage.getItem('inex-preferred-billing-interval')
   return saved === 'yearly' ? 'yearly' : 'monthly'
-}
-
-function normalizeSlotDraft(value: string) {
-  const number = Number(value)
-  if (!Number.isInteger(number) || number < 0) return 0
-  return Math.min(100, number)
 }
 
 function isAdditionalBusinessPaymentRequired(error: unknown) {

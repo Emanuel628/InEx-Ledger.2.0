@@ -465,13 +465,14 @@ test("billing checkout ignores client currency and uses verified region currency
     assert.ok(checkoutRequest, "Stripe checkout request should be created");
     assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_cad");
     assert.equal(checkoutRequest.body.get("line_items[0][quantity]"), "1");
-    assert.equal(checkoutRequest.body.get("line_items[1][price]"), "price_addon_month_cad");
-    assert.equal(checkoutRequest.body.get("line_items[1][quantity]"), "2");
+    // Pro checkout is plan-only: a client-supplied additionalBusinesses is
+    // ignored, so no addon line item is ever added to this session.
+    assert.equal(checkoutRequest.body.get("line_items[1][price]"), null);
     assert.equal(checkoutRequest.body.get("allow_promotion_codes"), "true");
     assert.equal(checkoutRequest.body.get("metadata[billing_interval]"), "monthly");
-    assert.equal(checkoutRequest.body.get("metadata[additional_businesses]"), "2");
+    assert.equal(checkoutRequest.body.get("metadata[additional_businesses]"), "0");
     assert.equal(checkoutRequest.body.get("subscription_data[metadata][billing_interval]"), "monthly");
-    assert.equal(checkoutRequest.body.get("subscription_data[metadata][additional_businesses]"), "2");
+    assert.equal(checkoutRequest.body.get("subscription_data[metadata][additional_businesses]"), "0");
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
     assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
     assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
@@ -693,7 +694,8 @@ test("billing checkout records an audit event with resolved checkout metadata", 
     assert.equal(fixture.state.auditCalls[0].businessId, "22222222-2222-4222-8222-222222222222");
     assert.equal(fixture.state.auditCalls[0].metadata.billingInterval, "monthly");
     assert.equal(fixture.state.auditCalls[0].metadata.currency, "cad");
-    assert.equal(fixture.state.auditCalls[0].metadata.additionalBusinesses, 2);
+    // Pro checkout is plan-only; a client-supplied additionalBusinesses is ignored.
+    assert.equal(fixture.state.auditCalls[0].metadata.additionalBusinesses, 0);
   } finally {
     fixture.cleanup();
   }
@@ -728,7 +730,8 @@ test("billing checkout keeps the existing subscription currency when trial metad
 
     assert.ok(checkoutRequest, "Stripe checkout request should be created");
     assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_usd");
-    assert.equal(checkoutRequest.body.get("line_items[1][price]"), "price_addon_month_usd");
+    // Pro checkout is plan-only; a client-supplied additionalBusinesses is ignored.
+    assert.equal(checkoutRequest.body.get("line_items[1][price]"), null);
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "usd");
   } finally {
     fixture.cleanup();
