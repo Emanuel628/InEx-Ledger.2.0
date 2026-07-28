@@ -26,6 +26,12 @@ const STRING_PROP_NAMES = new Set([
   'message',
   'detail',
   'body',
+  'text',
+  'question',
+  'answer',
+  'action',
+  'items',
+  'features',
 ])
 const USER_MESSAGE_CALLS = new Set([
   'Error',
@@ -122,8 +128,22 @@ function collectPhrases(file) {
         addPhrase(phrases, node.initializer.text)
       }
 
-      if (STRING_PROP_NAMES.has(attrName) && ts.isStringLiteral(node.initializer)) {
-        addPhrase(phrases, node.initializer.text)
+      if (STRING_PROP_NAMES.has(attrName)) {
+        if (ts.isStringLiteral(node.initializer)) {
+          addPhrase(phrases, node.initializer.text)
+        } else if (ts.isJsxExpression(node.initializer) && node.initializer.expression) {
+          // Covers both a braced string (`title={'...'}`) and a static array
+          // of strings (`items={['Missing receipts', 'Cleanup marathons']}`),
+          // the latter common for bullet lists passed as component props.
+          const inner = node.initializer.expression
+          if (ts.isArrayLiteralExpression(inner)) {
+            for (const element of inner.elements) {
+              addPhrase(phrases, stringFromExpression(element))
+            }
+          } else {
+            addPhrase(phrases, stringFromExpression(inner))
+          }
+        }
       }
     }
 

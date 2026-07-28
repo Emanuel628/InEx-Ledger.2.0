@@ -1180,8 +1180,21 @@ router.patch("/:id/archive", async (req, res) => {
     }
 
     const msg = msgCheck.rows[0];
+    const isReceiver = msg.receiver_id === req.user.id;
+    const isSender = msg.sender_id === req.user.id;
 
-    if (msg.receiver_id === req.user.id) {
+    // Self-authored rows (sender_id === receiver_id) satisfy both checks at
+    // once. Toggling only the receiver side left the Sent-lane query (which
+    // reads is_archived_by_sender) unaffected, so the archive action appeared
+    // to silently do nothing from that lane.
+    if (isReceiver && isSender) {
+      const next = !msg.is_archived_by_receiver;
+      await pool.query(
+        "UPDATE messages SET is_archived_by_receiver = $1, is_archived_by_sender = $1, updated_at = NOW() WHERE id = $2",
+        [next, msg.id]
+      );
+      res.json({ success: true, archived: next });
+    } else if (isReceiver) {
       const next = !msg.is_archived_by_receiver;
       await pool.query(
         "UPDATE messages SET is_archived_by_receiver = $1, updated_at = NOW() WHERE id = $2",
@@ -1258,8 +1271,20 @@ router.delete("/:id", async (req, res) => {
     }
 
     const msg = msgCheck.rows[0];
+    const isReceiver = msg.receiver_id === req.user.id;
+    const isSender = msg.sender_id === req.user.id;
 
-    if (msg.receiver_id === req.user.id) {
+    // Self-authored rows (sender_id === receiver_id, e.g. compose/invoice/
+    // notification copies) satisfy both checks at once. Marking only one side
+    // left the row still matching the other lane's visibility query, so the
+    // "deleted" message kept reappearing there. Clear whichever side(s) this
+    // user actually holds.
+    if (isReceiver && isSender) {
+      await pool.query(
+        "UPDATE messages SET is_deleted_by_receiver = TRUE, is_deleted_by_sender = TRUE, updated_at = NOW() WHERE id = $1",
+        [msg.id]
+      );
+    } else if (isReceiver) {
       await pool.query(
         "UPDATE messages SET is_deleted_by_receiver = TRUE, updated_at = NOW() WHERE id = $1",
         [msg.id]
