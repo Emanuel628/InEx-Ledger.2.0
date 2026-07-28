@@ -17,6 +17,7 @@ export type AuthUser = {
   lastName: string
   emailVerified: boolean
   mfaEnabled: boolean
+  onboardingCompleted: boolean
   tier: 'free' | 'pro' | 'business'
   currentBusinessId: string | null
   business: AuthBusiness | null
@@ -48,6 +49,8 @@ type LegacyUser = {
   role?: string
   email_verified?: boolean
   mfa_enabled?: boolean
+  onboarding_completed?: boolean
+  onboarding?: { completed?: boolean } | null
   business_id?: string | null
   active_business_id?: string | null
   active_business?: LegacyBusiness | null
@@ -127,7 +130,11 @@ export async function registerUser(input: {
   password: string
   acceptedTerms: boolean
 }) {
-  const response = await authRequest<{ verification_state?: string; signup_bootstrap_token?: string; message?: string }>('/api/auth/register', {
+  // Registration now signs the user straight into an authenticated session
+  // (see routes/auth.routes.js POST /register) instead of gating access
+  // behind a magic-link click, so the caller can navigate directly into
+  // Onboarding once we've fetched the fresh user record.
+  await authRequest<{ next?: string }>('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({
       first_name: input.firstName,
@@ -137,11 +144,8 @@ export async function registerUser(input: {
       tos_consent: input.acceptedTerms,
     }),
   })
-  return {
-    user: null,
-    verificationState: response.verification_state || '',
-    signupBootstrapToken: response.signup_bootstrap_token || '',
-  }
+  const { user } = await getCurrentUser()
+  return { user }
 }
 
 export async function checkEmailVerified(verificationState: string) {
@@ -161,6 +165,24 @@ export async function completeVerifiedSignup(signupBootstrapToken: string) {
   return authRequest<{ next?: string }>('/api/auth/complete-verified-signup', {
     method: 'POST',
     body: JSON.stringify({ signupBootstrapToken }),
+  })
+}
+
+// Onboarding's one-time email verification code. The same code both verifies
+// the email and (if wantsMfa was true when it was requested) turns on MFA --
+// there is no separate MFA verification round during onboarding.
+export async function sendOnboardingVerificationCode(wantsMfa: boolean) {
+  return authRequest<{ mfa_token?: string; message?: string }>('/api/auth/onboarding/send-verification-code', {
+    method: 'POST',
+    body: JSON.stringify({ wantsMfa }),
+  })
+}
+
+export async function verifyOnboardingCode(mfaToken: string, code: string) {
+  return authRequest<{ email_verified?: boolean; mfa_enabled?: boolean }>('/api/auth/onboarding/verify-code', {
+    method: 'POST',
+    body: JSON.stringify({ mfaToken, code }),
+    skipAuthRedirect: true,
   })
 }
 
@@ -263,6 +285,7 @@ function mapLegacyUser(user: LegacyUser | null): AuthUser | null {
     lastName: lastNameParts.join(' '),
     emailVerified: Boolean(user.email_verified),
     mfaEnabled: Boolean(user.mfa_enabled),
+    onboardingCompleted: Boolean(user.onboarding_completed ?? user.onboarding?.completed),
     tier,
     currentBusinessId: user.active_business_id || user.business_id || activeBusiness?.id || null,
     business: activeBusiness?.id ? {

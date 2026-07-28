@@ -88,6 +88,9 @@ function loadAuthRouterFixture(options = {}) {
               state.passwordResetTokenInserts += 1;
               return { rows: [], rowCount: 1 };
             }
+            if (/INSERT INTO refresh_tokens/i.test(sql)) {
+              return { rows: [], rowCount: 1 };
+            }
             throw new Error(`Unhandled pool SQL: ${sql}`);
           }
         }

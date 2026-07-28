@@ -522,7 +522,7 @@ test("new-device sign-in succeeds directly when MFA is disabled", async () => {
   }
 });
 
-test("login rejects unverified users before issuing any session", async () => {
+test("login signs unverified users in and points them back to onboarding", async () => {
   const fixture = loadAuthRouter({
     nodeEnv: "test",
     appBaseUrl: "https://app.inexledger.test"
@@ -536,10 +536,16 @@ test("login rejects unverified users before issuing any session", async () => {
       .set("User-Agent", "TestBrowser/1.0")
       .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
 
-    assert.equal(loginResponse.status, 403);
+    assert.equal(loginResponse.status, 200);
     assert.equal(loginResponse.body?.token, undefined);
     assert.equal(loginResponse.body?.mfa_token, undefined);
-    assert.match(String(loginResponse.body?.error || ""), /verify your email/i);
+    assert.equal(loginResponse.body?.email_verified, false);
+    assert.equal(loginResponse.body?.next, "/onboarding");
+    assert.ok(
+      Array.isArray(loginResponse.headers["set-cookie"]) &&
+        loginResponse.headers["set-cookie"].some((cookie) => cookie.startsWith("refresh_token=")),
+      "an authenticated session should still be issued so the user can resume onboarding"
+    );
   } finally {
     fixture.cleanup();
   }

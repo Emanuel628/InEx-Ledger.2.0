@@ -4713,6 +4713,15 @@ tbody tr:last-child td {
     justify-self: start;
   }
 
+  .settings-row-action-stack {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settings-row-action-stack .secondary-button {
+    width: auto;
+  }
+
   .summary-strip {
     grid-template-columns: 1fr;
   }

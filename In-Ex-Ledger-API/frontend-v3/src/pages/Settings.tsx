@@ -78,15 +78,20 @@ const provinceOptions = [
 function Settings(props: PageProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('Account')
   const [fullName, setFullName] = useState('')
+  const [originalFullName, setOriginalFullName] = useState('')
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
+  const [originalBusinessProfile, setOriginalBusinessProfile] = useState<BusinessProfile | null>(null)
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null)
+  const [originalPrivacySettings, setOriginalPrivacySettings] = useState<PrivacySettings | null>(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    setFullName([props.authUser?.firstName, props.authUser?.lastName].filter(Boolean).join(' '))
+    const name = [props.authUser?.firstName, props.authUser?.lastName].filter(Boolean).join(' ')
+    setFullName(name)
+    setOriginalFullName(name)
   }, [props.authUser])
 
   useEffect(() => {
@@ -94,13 +99,32 @@ function Settings(props: PageProps) {
     if (!businessId) return
 
     loadBusinessProfile(businessId)
-      .then(setBusinessProfile)
+      .then((profile) => {
+        setBusinessProfile(profile)
+        setOriginalBusinessProfile(profile)
+      })
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : 'Unable to load business profile.'))
 
     loadPrivacySettings()
-      .then(setPrivacySettings)
+      .then((settings) => {
+        setPrivacySettings(settings)
+        setOriginalPrivacySettings(settings)
+      })
       .catch(() => setPrivacySettings(null))
   }, [props.authUser?.currentBusinessId])
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (activeSection === 'Account') {
+      return fullName !== originalFullName
+    }
+    if (activeSection === 'Business') {
+      return JSON.stringify(businessProfile) !== JSON.stringify(originalBusinessProfile)
+    }
+    if (activeSection === 'Preferences' || activeSection === 'Data') {
+      return JSON.stringify(privacySettings) !== JSON.stringify(originalPrivacySettings)
+    }
+    return false
+  }, [activeSection, fullName, originalFullName, businessProfile, originalBusinessProfile, privacySettings, originalPrivacySettings])
 
   const saveButtonLabel = useMemo(() => (
     saving
@@ -123,6 +147,7 @@ function Settings(props: PageProps) {
       if (activeSection === 'Account') {
         const { user } = await saveProfile(fullName)
         props.onAuthChange(user)
+        setOriginalFullName(fullName)
       }
       if (activeSection === 'Business' && businessProfile) {
         const validationErrors = validateBusinessProfile(businessProfile)
@@ -132,10 +157,12 @@ function Settings(props: PageProps) {
         }
         const saved = await saveBusinessProfile(businessProfile.id, businessProfile)
         setBusinessProfile(saved)
+        setOriginalBusinessProfile(saved)
         props.onAuthChange((await refreshCurrentUser()).user)
       }
       if ((activeSection === 'Preferences' || activeSection === 'Data') && privacySettings) {
         await savePrivacySettings(privacySettings)
+        setOriginalPrivacySettings(privacySettings)
       }
       setStatusMessage('Changes saved.')
     } catch (saveError) {
@@ -168,10 +195,12 @@ function Settings(props: PageProps) {
             <h1>Settings</h1>
             <p>Manage account access, business identity, billing, preferences, and protected data from one place.</p>
           </div>
-          <button className="primary-button" type="button" disabled={saving} onClick={() => void saveCurrentSection()}>
-            <Save size={18} />
-            {saveButtonLabel}
-          </button>
+          {hasUnsavedChanges ? (
+            <button className="primary-button" type="button" disabled={saving} onClick={() => void saveCurrentSection()}>
+              <Save size={18} />
+              {saveButtonLabel}
+            </button>
+          ) : null}
         </section>
 
         {error ? <TopAlert message={error} detail="Review the fields and try again." onDismiss={() => setError('')} /> : null}
