@@ -105,7 +105,13 @@ function loadMeRouterFixture(options = {}) {
                   return { rows: [], rowCount: 0 };
                 }
                 if (/SELECT onboarding_completed,\s*trial_eligible FROM users WHERE id = \$1 FOR UPDATE/i.test(sql)) {
-                  return { rows: [{ onboarding_completed: false, trial_eligible: true }], rowCount: 1 };
+                  return {
+                    rows: [{
+                      onboarding_completed: options.alreadyCompletedOnboarding === true,
+                      trial_eligible: true
+                    }],
+                    rowCount: 1
+                  };
                 }
                 if (/UPDATE businesses/i.test(sql)) {
                   return { rows: [], rowCount: 1 };
@@ -298,6 +304,37 @@ test("PUT /api/me/onboarding creates a starter account when the business has non
     const businessUpdate = fixture.state.txQueries.find((entry) => /UPDATE businesses/i.test(entry.sql));
     assert.equal(businessUpdate?.params?.[1], "US");
     assert.equal(fixture.state.clientReleased, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("PUT /api/me/onboarding creates a starter account even if the user completed onboarding before (e.g. for a prior business)", async () => {
+  const fixture = loadMeRouterFixture({ alreadyCompletedOnboarding: true });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put("/api/me/onboarding")
+      .send({
+        business_name: "New Business After Reset",
+        region: "US",
+        language: "en",
+        starter_account_type: "checking",
+        starter_account_name: "Primary Checking",
+        start_focus: "transactions",
+        business_activity_code: "541611",
+        accounting_method: "cash",
+        material_participation: "yes"
+      });
+
+    assert.equal(response.status, 200);
+
+    const txSql = fixture.state.txQueries.map((entry) => entry.sql);
+    const insertIdx = txSql.findIndex((sql) => /INSERT INTO accounts/i.test(sql));
+    assert.ok(
+      insertIdx !== -1,
+      "onboarding should insert a starter account for a business with none, even if the user's onboarding_completed flag is already true"
+    );
   } finally {
     fixture.cleanup();
   }

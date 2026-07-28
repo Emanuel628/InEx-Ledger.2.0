@@ -2290,7 +2290,6 @@ tbody tr:last-child td {
   max-height: min(52vh, 460px);
   display: grid;
   gap: 8px;
-  margin-top: 14px;
   overflow-y: auto;
 }
 

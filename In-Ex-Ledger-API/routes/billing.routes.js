@@ -815,11 +815,21 @@ async function fetchBillingOverviewForBusiness(billingBusinessId) {
   let invoices = [];
 
   if (stripeCustomerId) {
-    const customer = await stripeGet(
-      `/customers/${encodeURIComponent(stripeCustomerId)}?expand[]=invoice_settings.default_payment_method`
-    );
-    paymentMethod = summarizeDefaultPaymentMethod(customer?.invoice_settings?.default_payment_method || null);
-    invoices = await fetchBillingInvoicesForCustomer(stripeCustomerId, 24);
+    // Payment-method/invoice-history display is supplementary -- a Stripe
+    // hiccup fetching it must not take down the whole overview and hide the
+    // subscription status/plan that were already resolved above.
+    try {
+      const customer = await stripeGet(
+        `/customers/${encodeURIComponent(stripeCustomerId)}?expand[]=invoice_settings.default_payment_method`
+      );
+      paymentMethod = summarizeDefaultPaymentMethod(customer?.invoice_settings?.default_payment_method || null);
+      invoices = await fetchBillingInvoicesForCustomer(stripeCustomerId, 24);
+    } catch (err) {
+      logWarn("Billing overview: payment method/invoice fetch failed, showing subscription status only", {
+        businessId: billingBusinessId,
+        err: err.message
+      });
+    }
   }
 
   return {
@@ -1432,6 +1442,84 @@ function buildCheckoutIdempotencyKey({ businessId, billingInterval, currency, ad
 
   return `checkout:${businessId}:${digest}`;
 }
+
+// Sends an existing Stripe subscriber to a Stripe-hosted confirmation page
+// for a specific addon-quantity change (adding business slots), instead of
+// silently updating the subscription in the background. Only applies once a
+// real Stripe subscription exists -- a trialing business with no Stripe
+// subscription yet has nothing to confirm against and keeps using the
+// direct PATCH /additional-businesses update below.
+router.post("/additional-businesses/checkout", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
+  try {
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    let hasActiveProAccess =
+      subscription.effectiveTier === "v1" &&
+      (subscription.isPaid || subscription.isTrialing);
+
+    if (!hasActiveProAccess || (subscription.cancelAtPeriodEnd && !subscription.isTrialing) || subscription.isCanceledWithRemainingAccess) {
+      subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
+      hasActiveProAccess =
+        subscription.effectiveTier === "v1" &&
+        (subscription.isPaid || subscription.isTrialing);
+    }
+
+    if (!hasActiveProAccess) {
+      return res.status(403).json({
+        error: "Additional business slots require an active Pro subscription."
+      });
+    }
+    if (!subscription.stripeSubscriptionId || !subscription.stripeCustomerId) {
+      return res.status(409).json({ error: "No active Stripe subscription found." });
+    }
+
+    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+    if (additionalBusinesses <= 0) {
+      return res.status(400).json({ error: "additionalBusinesses must be a positive whole number." });
+    }
+
+    const stripeSub = await stripeGet(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+    );
+    const items = Array.isArray(stripeSub.items?.data) ? stripeSub.items.data : [];
+    const addonPriceIds = getAddonPriceIds();
+    const existingAddonItem = items.find((item) => addonPriceIds.has(item?.price?.id)) || null;
+    const terms = resolveSubscriptionBillingTerms(subscription, stripeSub);
+    const configurationId = await buildBillingPortalConfiguration(terms.currency);
+
+    const sessionPayload = {
+      customer: subscription.stripeCustomerId,
+      configuration: configurationId,
+      return_url: buildAppUrl("/subscription?billing=updated"),
+      "flow_data[type]": "subscription_update_confirm",
+      "flow_data[subscription_update_confirm][subscription]": subscription.stripeSubscriptionId,
+      "flow_data[after_completion][type]": "redirect",
+      "flow_data[after_completion][redirect][return_url]": buildAppUrl("/subscription?billing=updated")
+    };
+    if (existingAddonItem) {
+      sessionPayload["flow_data[subscription_update_confirm][items][0][id]"] = existingAddonItem.id;
+      sessionPayload["flow_data[subscription_update_confirm][items][0][quantity]"] = additionalBusinesses;
+    } else {
+      sessionPayload["flow_data[subscription_update_confirm][items][0][price]"] =
+        resolveAddonPriceIdForSubscription(subscription, stripeSub);
+      sessionPayload["flow_data[subscription_update_confirm][items][0][quantity]"] = additionalBusinesses;
+    }
+
+    const session = await stripeRequest("/billing_portal/sessions", sessionPayload);
+    logInfo("Additional-business slot checkout session created", {
+      userId: req.user?.id,
+      businessId: billingBusinessId,
+      additionalBusinesses
+    });
+    res.status(200).json({ url: session.url });
+  } catch (err) {
+    logError("POST /api/billing/additional-businesses/checkout error:", err.message);
+    const status = err instanceof BillingValidationError ? 400 : 500;
+    res.status(status).json({
+      error: status === 400 ? err.message : "Failed to start business slot checkout."
+    });
+  }
+});
 
 router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {

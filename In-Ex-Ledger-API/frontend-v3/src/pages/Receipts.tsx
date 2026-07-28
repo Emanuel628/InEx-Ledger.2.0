@@ -374,20 +374,22 @@ function ReceiptLinkModal({
           </button>
         </div>
 
-        <label className="field search-field">
-          <Search size={18} />
-          <input type="search" placeholder="Search transactions" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
-        </label>
+        <div className="transaction-detail-body">
+          <label className="field search-field">
+            <Search size={18} />
+            <input type="search" placeholder="Search transactions" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+          </label>
 
-        <div className="receipt-link-list">
-          {visibleTransactions.map((transaction) => (
-            <button className="receipt-link-option" type="button" key={transaction.id} onClick={() => onLink(transaction.id)}>
-              <span>{transaction.label}</span>
-            </button>
-          ))}
-          {visibleTransactions.length === 0 ? (
-            <p className="progressive-panel-note">{searchError || 'No transactions match this search.'}</p>
-          ) : null}
+          <div className="receipt-link-list">
+            {visibleTransactions.map((transaction) => (
+              <button className="receipt-link-option" type="button" key={transaction.id} onClick={() => onLink(transaction.id)}>
+                <span>{transaction.label}</span>
+              </button>
+            ))}
+            {visibleTransactions.length === 0 ? (
+              <p className="progressive-panel-note">{searchError || 'No transactions match this search.'}</p>
+            ) : null}
+          </div>
         </div>
 
         <div className="drawer-actions">

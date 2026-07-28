@@ -596,6 +596,179 @@ test("billing portal sessions use a configuration with monthly and yearly plan c
   }
 });
 
+test("additional-business slot checkout sends the user to a Stripe subscription_update_confirm session for a new addon item", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_update_123",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ],
+    stripeSubscriptionResponse: {
+      items: { data: [] }
+    }
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/additional-businesses/checkout")
+      .send({ additionalBusinesses: 2 });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.url, "https://billing.stripe.com/p/session/test_123");
+
+    const portalRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/sessions")
+    );
+    assert.ok(portalRequest, "should create a billing portal session");
+    assert.equal(portalRequest.body.get("configuration"), "bpc_test_123");
+    assert.equal(portalRequest.body.get("flow_data[type]"), "subscription_update_confirm");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][subscription]"), "sub_test_update_123");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][price]"), "price_addon_month_usd");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][quantity]"), "2");
+    assert.equal(portalRequest.body.get("return_url"), "https://app.inexledger.test/subscription?billing=updated");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("additional-business slot checkout reuses the existing addon subscription item by id when one already exists", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_update_456",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ],
+    stripeSubscriptionResponse: {
+      items: {
+        data: [
+          { id: "si_base_123", price: { id: "price_month_usd" } },
+          { id: "si_addon_123", price: { id: "price_addon_month_usd" } }
+        ]
+      }
+    }
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/additional-businesses/checkout")
+      .send({ additionalBusinesses: 3 });
+
+    assert.equal(res.status, 200);
+
+    const portalRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/sessions")
+    );
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][id]"), "si_addon_123");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][quantity]"), "3");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][price]"), null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("additional-business slot checkout rejects a non-positive quantity", async () => {
+  const fixture = loadBillingRouter({
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_update_789",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/additional-businesses/checkout")
+      .send({ additionalBusinesses: 0 });
+
+    assert.equal(res.status, 400);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("additional-business slot checkout requires an existing Stripe subscription", async () => {
+  const fixture = loadBillingRouter({
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        effectiveTier: "v1",
+        isPaid: false,
+        isTrialing: true,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/additional-businesses/checkout")
+      .send({ additionalBusinesses: 1 });
+
+    assert.equal(res.status, 409);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing overview still returns the subscription status when the Stripe payment-method/invoice lookup fails", async () => {
+  // The fixture's mocked fetch has no case for GET /customers/:id?expand=..., so
+  // it throws "Unexpected fetch URL" -- simulating a live Stripe hiccup fetching
+  // supplementary payment-method/invoice display data. The overview must still
+  // succeed with the already-resolved subscription snapshot instead of 500ing.
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_overview_123",
+        stripeCustomerId: "cus_test_overview_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app).get("/api/billing/overview");
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.subscription?.stripeCustomerId, "cus_test_overview_123");
+    assert.equal(res.body.paymentMethod, null);
+    assert.deepEqual(res.body.invoices, []);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("billing pricing context does not stay pinned to a stale IP cache when the verified region changes", async () => {
   const fixture = loadBillingRouter({ country: "Canada" });
 

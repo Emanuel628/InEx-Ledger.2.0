@@ -11,6 +11,7 @@ import {
   loadBillingPricing,
   openBillingPortal,
   resumeSubscription,
+  startAdditionalBusinessCheckout,
   startCheckout,
   updateAdditionalBusinesses,
   type BillingInterval,
@@ -106,7 +107,7 @@ function Subscription(props: PageProps) {
   const planName = subscription?.effectiveTierName || 'Basic'
   const statusLabel = getSubscriptionStatus(subscription)
   const isProActive = subscription?.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing)
-  const canResume = Boolean(subscription?.cancelAtPeriodEnd || subscription?.isCanceledWithRemainingAccess)
+  const canResume = Boolean(subscription?.cancelAtPeriodEnd || subscription?.isCanceledWithRemainingAccess || subscription?.isTrialDowngradedToFree)
   // Only route to "Open Stripe billing" when a real Stripe subscription (paid,
   // or already checked out and still within its Stripe trial window) exists.
   // A trialing user with no Stripe subscription yet counts as Pro-tier access
@@ -354,11 +355,20 @@ function Subscription(props: PageProps) {
             <div className="billing-card-icon danger-icon">
               <ShieldAlert size={20} />
             </div>
-            <div>
-              <strong>Cancel subscription</strong>
-              <p>Cancellation keeps free-tier access available after paid access ends.</p>
-            </div>
-            <button className="secondary-button danger-button" type="button" disabled={working} onClick={() => void handleCancel()}>Cancel</button>
+            {canResume ? (
+              <div>
+                <strong>Cancellation confirmed</strong>
+                <p>{buildStatusDetail(subscription)} Use "Keep Pro active" above to undo.</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <strong>Cancel subscription</strong>
+                  <p>Cancellation keeps free-tier access available after paid access ends.</p>
+                </div>
+                <button className="secondary-button danger-button" type="button" disabled={working} onClick={() => void handleCancel()}>Cancel</button>
+              </>
+            )}
           </section>
         ) : null}
 
@@ -388,26 +398,30 @@ function Subscription(props: PageProps) {
             }}
             onBuySlots={async (neededSlots) => {
               const targetAdditionalBusinesses = Math.max(capacity.additional + neededSlots, 1)
+              const canBuySlots = canResume || (isProActive && !canResume && !needsBillingPortal)
+              if (!canBuySlots) {
+                // Not yet Pro: extra business slots can only be purchased after a
+                // plan-only Pro checkout completes, not bundled into it.
+                throw new Error('Start a Pro subscription first, then add extra business slots from Subscription.')
+              }
               if (canResume) {
                 await resumeSubscription(interval)
-                setAdditionalBusinessDraft(String(targetAdditionalBusinesses))
-                await updateAdditionalBusinesses(targetAdditionalBusinesses)
-                await refreshSubscription()
-                await refreshBusinesses()
-                await refreshUser()
+              }
+              if (subscription?.stripeSubscriptionId) {
+                // Real Stripe subscription: send the user to a Stripe-hosted
+                // page to confirm and pay for the new total, instead of
+                // changing what they're billed silently in the background.
+                await startAdditionalBusinessCheckout(targetAdditionalBusinesses)
                 return
               }
-              if (isProActive && !canResume && !needsBillingPortal) {
-                setAdditionalBusinessDraft(String(targetAdditionalBusinesses))
-                await updateAdditionalBusinesses(targetAdditionalBusinesses)
-                await refreshSubscription()
-                await refreshBusinesses()
-                await refreshUser()
-                return
-              }
-              // Not yet Pro: extra business slots can only be purchased after a
-              // plan-only Pro checkout completes, not bundled into it.
-              throw new Error('Start a Pro subscription first, then add extra business slots from Subscription.')
+              // Trial with no Stripe subscription yet: nothing to confirm
+              // with Stripe, so record the slot count locally -- it carries
+              // over once the user completes Pro checkout.
+              setAdditionalBusinessDraft(String(targetAdditionalBusinesses))
+              await updateAdditionalBusinesses(targetAdditionalBusinesses)
+              await refreshSubscription()
+              await refreshBusinesses()
+              await refreshUser()
             }}
             currentBusinessCount={capacity.active}
             maxBusinessesAllowed={capacity.max}
@@ -421,6 +435,9 @@ function Subscription(props: PageProps) {
             activeBusinessId={activeBusinessId}
             businessCount={businessRows.length || businesses.length}
             saving={working}
+            subscription={subscription}
+            pricing={pricing}
+            interval={interval}
             onClose={() => {
               setModal(null)
               setSelectedBusiness(null)
@@ -562,6 +579,9 @@ function ManageBusinessModal({
   activeBusinessId,
   businessCount,
   saving,
+  subscription,
+  pricing,
+  interval,
   onClose,
   onActivate,
   onDelete,
@@ -570,6 +590,9 @@ function ManageBusinessModal({
   activeBusinessId: string | null
   businessCount: number
   saving: boolean
+  subscription?: BillingSubscription | null
+  pricing?: BillingPricing | null
+  interval: BillingInterval
   onClose: () => void
   onActivate: (businessId: string) => Promise<void>
   onDelete: (businessId: string, password: string) => Promise<void>
@@ -579,6 +602,12 @@ function ManageBusinessModal({
   const [error, setError] = useState('')
   const canDelete = businessCount > 1
   const isActive = business?.id === activeBusinessId
+  const hasBilling = Boolean(subscription?.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing))
+  const nextAdditionalBusinesses = Math.max(businessCount - 2, 0)
+  const priceForInterval = pricing?.pricing?.[interval]
+  const newTotal = priceForInterval
+    ? priceForInterval.base + priceForInterval.addon * nextAdditionalBusinesses
+    : null
 
   async function submitDelete() {
     if (!business?.id) return
@@ -627,10 +656,15 @@ function ManageBusinessModal({
               Delete business
             </button>
           ) : (
-            <div className="settings-danger-zone">
+            <div className="settings-danger-zone settings-danger-form">
               <div>
                 <strong>Delete business</strong>
                 <p>{canDelete ? 'This deletes this business and its records. Enter your password to continue.' : 'You cannot delete your only business. Delete the account from Settings instead.'}</p>
+                {canDelete && hasBilling && newTotal !== null ? (
+                  <p>
+                    After deleting, your plan will bill {formatSubscriptionMoney(newTotal, pricing?.currency)}/{interval === 'monthly' ? 'mo' : 'yr'} going forward.
+                  </p>
+                ) : null}
               </div>
               <label className="field">
                 Password
@@ -670,7 +704,7 @@ function formatIntervalPrice(pricing: BillingPricing | null, interval: BillingIn
 
 function getSubscriptionStatus(subscription?: BillingSubscription | null) {
   const status = subscription?.effectiveStatus || subscription?.status || 'free'
-  if (subscription?.cancelAtPeriodEnd) return 'Canceling'
+  if (subscription?.cancelAtPeriodEnd || subscription?.isTrialDowngradedToFree) return 'Canceling'
   if (subscription?.isTrialing) return 'Trial'
   if (status === 'active') return 'Active'
   if (status === 'free') return 'Free tier'
@@ -682,6 +716,9 @@ function buildPlanSummary(subscription?: BillingSubscription | null) {
   if (subscription.cancelAtPeriodEnd) {
     return `Pro access stays active until ${formatSubscriptionDate(subscription.currentPeriodEnd) || 'the end of the paid period'}.`
   }
+  if (subscription.isTrialDowngradedToFree) {
+    return `Canceling confirmed. Pro access stays active until ${formatSubscriptionDate(subscription.trialEndsAt) || 'the trial ends'}, then the account moves to Basic.`
+  }
   if (subscription.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing)) {
     return 'Pro workflows are active for this workspace.'
   }
@@ -692,6 +729,9 @@ function buildStatusDetail(subscription?: BillingSubscription | null) {
   if (!subscription) return 'No subscription details loaded yet.'
   if (subscription.cancelAtPeriodEnd) {
     return `Paid access ends ${formatSubscriptionDate(subscription.currentPeriodEnd) || 'at period end'}, then the account returns to Basic.`
+  }
+  if (subscription.isTrialDowngradedToFree) {
+    return `Canceling confirmed. Access ends ${formatSubscriptionDate(subscription.trialEndsAt) || 'at the trial end date'}, then the account returns to Basic.`
   }
   if (subscription.isTrialing) {
     return `Trial access ends ${formatSubscriptionDate(subscription.trialEndsAt) || 'at the trial end date'}.`
