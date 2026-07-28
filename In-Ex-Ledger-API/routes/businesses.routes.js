@@ -113,7 +113,10 @@ function getStripeBaseItem(subscription) {
 
 function getStripeAddonItem(subscription) {
   const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
-  return items.find((item) => STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
+  return items.find((item) => {
+    const priceId = item?.price?.id;
+    return (
+      priceId && STRIPE_ADDON_PRICE_IDS.has(priceId) && !STRIPE_BASE_PRICE_IDS.has(priceId)); }) || null;
 }
 
 function resolveStripeAdditionalBusinesses(subscription) {
