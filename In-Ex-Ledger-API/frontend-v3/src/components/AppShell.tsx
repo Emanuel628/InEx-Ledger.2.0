@@ -383,6 +383,7 @@ function AppShell({
                         type="button"
                         key={notification.id}
                         onClick={() => {
+                          setNotifications((current) => current.filter((item) => item.id !== notification.id))
                           goToPage(notification.page)
                         }}
                       >

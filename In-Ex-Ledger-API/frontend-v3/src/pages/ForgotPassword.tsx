@@ -45,7 +45,6 @@ function ForgotPassword(props: PageProps) {
           <Mail size={18} />
           {submitting ? 'Creating code...' : 'Send reset code'}
         </button>
-        <button className="secondary-button" type="button" onClick={() => props.onNavigate('ResetPassword')}>I have a code</button>
         <button className="secondary-button" type="button" onClick={() => props.onNavigate('Login')}>Back to sign in</button>
       </form>
     </AuthShell>
