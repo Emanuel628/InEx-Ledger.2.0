@@ -101,7 +101,7 @@ function Accounts(props: PageProps) {
                 setDrawerOpen(false)
                 setEditingAccount(null)
               })
-              .catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to save account.'))
+              .catch((error) => setDataError(friendlyAccountError(error instanceof Error ? error.message : 'Unable to save account.')))
           }}
         />
       ) : null}
@@ -392,12 +392,12 @@ function AccountDrawer({
               <option value="" disabled>
                 Select account type
               </option>
-              <option>Checking</option>
-              <option>Savings</option>
-              <option>Credit Card</option>
-              <option>Cash</option>
-              <option>Loan</option>
-              <option>Other</option>
+              <option value="Checking">Checking</option>
+              <option value="Savings">Savings</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="Cash">Cash</option>
+              <option value="Loan">Loan</option>
+              <option value="Other">Other</option>
             </select>
           </label>
           {error ? <p className="drawer-error" role="alert">{error}</p> : null}
@@ -423,6 +423,15 @@ function getAccountInitial(name: string) {
 function resolveAccountCurrency(currency?: string | null, region?: string | null) {
   if (String(currency || '').toUpperCase() === 'CAD') return 'CAD'
   return String(region || '').toUpperCase() === 'CA' ? 'CAD' : 'USD'
+}
+
+// The backend returns a raw, English-only validation message built from its
+// internal enum values (e.g. "credit_card"). Swap it for a static, translatable
+// string with human-friendly type names instead of passing it through as-is.
+function friendlyAccountError(message: string) {
+  return /^Account type must be one of:/i.test(message)
+    ? 'Choose a valid account type: Checking, Savings, Credit Card, Cash, Loan, or Other.'
+    : message
 }
 
 export default Accounts
