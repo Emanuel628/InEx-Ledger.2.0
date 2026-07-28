@@ -9,6 +9,7 @@ export type BillingSubscription = {
   status?: string | null
   isPaid?: boolean | null
   isTrialing?: boolean | null
+  isTrialDowngradedToFree?: boolean | null
   cancelAtPeriodEnd?: boolean | null
   isCanceledWithRemainingAccess?: boolean | null
   maxBusinessesAllowed?: number | null
@@ -108,6 +109,18 @@ export async function updateAdditionalBusinesses(additionalBusinesses: number) {
     body: JSON.stringify({ additionalBusinesses }),
   })
   return data.subscription
+}
+
+// Sends the user to a Stripe-hosted confirmation page for the new business-slot
+// total instead of silently updating the subscription in the background. Only
+// valid once a real Stripe subscription exists (see updateAdditionalBusinesses
+// for the pre-checkout trial case, which has nothing to confirm with Stripe yet).
+export async function startAdditionalBusinessCheckout(additionalBusinesses: number) {
+  const data = await apiRequest<{ url: string }>('/api/billing/additional-businesses/checkout', {
+    method: 'POST',
+    body: JSON.stringify({ additionalBusinesses }),
+  })
+  window.location.assign(data.url)
 }
 
 export function formatSubscriptionMoney(amount: number, currency = 'usd') {
