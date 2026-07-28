@@ -1096,6 +1096,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
 
     if (isEnvFlagEnabled("STRIPE_AUTOMATIC_TAX_ENABLED", true)) {
       sessionPayload["automatic_tax[enabled]"] = true;
+      sessionPayload["customer_update[address]"] = "auto";
     }
 
     if (priceSelection.addonPriceId) {
