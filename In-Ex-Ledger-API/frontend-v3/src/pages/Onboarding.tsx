@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AppPage, PageProps } from '../App'
+import type { PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
 import { normalizeLanguage } from '../lib/i18n'
 import { completeOnboarding, type OnboardingDraft } from '../lib/settingsApi'
@@ -37,9 +37,9 @@ function Onboarding(props: PageProps) {
     setSubmitting(true)
     setError('')
     try {
-      const { user, redirectTo } = await completeOnboarding(draft)
+      const { user } = await completeOnboarding(draft)
       props.onAuthChange(user)
-      props.onNavigate(pageFromRedirect(redirectTo))
+      props.onNavigate('Transactions')
     } catch (businessError) {
       setError(businessError instanceof Error ? businessError.message : 'Unable to complete onboarding.')
     } finally {
@@ -123,38 +123,6 @@ function Onboarding(props: PageProps) {
             <input value={draft.starterAccountName} onChange={(event) => updateDraft('starterAccountName', event.target.value)} placeholder="Primary Checking" />
           </label>
         </div>
-        <div className="auth-form-grid">
-          <label>
-            Start with
-            <select value={draft.startFocus} onChange={(event) => updateDraft('startFocus', event.target.value)}>
-              <option value="transactions">Transactions</option>
-              <option value="categories">Categories</option>
-              <option value="receipts">Receipts</option>
-              <option value="mileage">Mileage</option>
-              <option value="exports">Exports</option>
-            </select>
-          </label>
-          <label>
-            Accounting method
-            <select value={draft.accountingMethod} onChange={(event) => updateDraft('accountingMethod', event.target.value)}>
-              <option value="cash">Cash</option>
-              <option value="accrual">Accrual</option>
-            </select>
-          </label>
-        </div>
-        {draft.region === 'US' ? (
-          <label>
-            Material participation
-            <select value={draft.materialParticipation} onChange={(event) => updateDraft('materialParticipation', event.target.value)}>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </label>
-        ) : null}
-        <label>
-          Business activity code
-          <input inputMode="numeric" placeholder="Optional 6-digit NAICS code" value={draft.businessActivityCode} onChange={(event) => updateDraft('businessActivityCode', event.target.value)} />
-        </label>
         {error ? <p className="auth-error" role="alert">{error}</p> : null}
         <button className="primary-button" type="submit" disabled={submitting}>{submitting ? 'Saving setup...' : 'Enter dashboard'}</button>
       </form>
@@ -168,17 +136,6 @@ function defaultAccountName(type: string, region: string) {
   if (type === 'cash') return 'Cash'
   if (type === 'loan') return 'Business Loan'
   return region === 'CA' ? 'Primary Chequing' : 'Primary Checking'
-}
-
-function pageFromRedirect(path: string): AppPage {
-  const normalized = path.split('?')[0].replace(/^\/+/, '')
-  if (normalized === 'categories') return 'Categories'
-  if (normalized === 'receipts') return 'Receipts'
-  if (normalized === 'mileage') return 'Mileage'
-  if (normalized === 'exports') return 'Exports'
-  if (normalized === 'trial-setup') return 'TrialSetup'
-  if (normalized === 'subscription') return 'Subscription'
-  return 'Transactions'
 }
 
 export default Onboarding

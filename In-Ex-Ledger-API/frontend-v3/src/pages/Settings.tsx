@@ -23,7 +23,7 @@ import {
 import type { PageProps, ThemeMode } from '../App'
 import AppShell from '../components/AppShell'
 import { normalizeLanguage as normalizeLanguageValue } from '../lib/i18n'
-import { confirmMfaToggle, loadMfaStatus, requestMfaToggle } from '../lib/authApi'
+import { confirmMfaToggle, deleteMyAccount, loadMfaStatus, requestAccountDeleteReauth, requestMfaToggle } from '../lib/authApi'
 import {
   exportAccountData,
   loadAccountingLock,
@@ -208,7 +208,15 @@ function Settings(props: PageProps) {
             {activeSection === 'Billing' ? <BillingSettings onNavigate={props.onNavigate} /> : null}
             {activeSection === 'Security' ? <SecuritySettings onNavigate={props.onNavigate} authUser={props.authUser} onAuthChange={props.onAuthChange} /> : null}
             {activeSection === 'Preferences' ? <PreferenceSettings privacySettings={privacySettings} updatePrivacy={updatePrivacy} theme={props.theme} setTheme={props.setTheme} /> : null}
-            {activeSection === 'Data' ? <DataSettings privacySettings={privacySettings} updatePrivacy={updatePrivacy} setError={setError} /> : null}
+            {activeSection === 'Data' ? (
+              <DataSettings
+                privacySettings={privacySettings}
+                updatePrivacy={updatePrivacy}
+                setError={setError}
+                authUser={props.authUser}
+                onAuthChange={props.onAuthChange}
+              />
+            ) : null}
           </div>
         </section>
       </main>
@@ -606,11 +614,25 @@ function DataSettings({
   privacySettings,
   updatePrivacy,
   setError,
+  authUser,
+  onAuthChange,
 }: {
   privacySettings: PrivacySettings | null
   updatePrivacy: <K extends keyof PrivacySettings>(key: K, value: PrivacySettings[K]) => void
   setError: (value: string) => void
+  authUser: PageProps['authUser']
+  onAuthChange: PageProps['onAuthChange']
 }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaToken, setMfaToken] = useState('')
+  const [reauthToken, setReauthToken] = useState('')
+  const [awaitingMfaCode, setAwaitingMfaCode] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
   async function runExport(format: 'json' | 'csv') {
     try {
       await exportAccountData(format)
@@ -632,6 +654,62 @@ function DataSettings({
       window.location.reload()
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete all transactions.')
+    }
+  }
+
+  function resetDeleteAccountState() {
+    setConfirmingDelete(false)
+    setConfirmText('')
+    setDeletePassword('')
+    setMfaCode('')
+    setMfaToken('')
+    setReauthToken('')
+    setAwaitingMfaCode(false)
+    setDeleteError('')
+  }
+
+  async function submitDeleteAccount() {
+    if (confirmText.trim() !== 'DELETE') {
+      setDeleteError('Type DELETE to confirm.')
+      return
+    }
+    if (!deletePassword) {
+      setDeleteError('Enter your password to continue.')
+      return
+    }
+    setDeleteError('')
+    setDeleting(true)
+    try {
+      let tokenForDelete = reauthToken
+      if (authUser?.mfaEnabled && !tokenForDelete) {
+        if (awaitingMfaCode && !mfaCode.trim()) {
+          setDeleteError('Enter the verification code we emailed you.')
+          return
+        }
+        const reauth = await requestAccountDeleteReauth({
+          currentPassword: deletePassword,
+          ...(awaitingMfaCode ? { code: mfaCode.trim(), mfaToken } : {}),
+        })
+        if (reauth.pending_verification && reauth.mfa_token) {
+          setMfaToken(reauth.mfa_token)
+          setAwaitingMfaCode(true)
+          setDeleteError(reauth.message || 'We emailed you a verification code. Enter it to continue.')
+          return
+        }
+        if (!reauth.reauth_token) {
+          setDeleteError('Unable to verify. Try again.')
+          return
+        }
+        tokenForDelete = reauth.reauth_token
+        setReauthToken(reauth.reauth_token)
+      }
+
+      await deleteMyAccount({ password: deletePassword, mfaReauthToken: tokenForDelete || undefined })
+      onAuthChange(null)
+    } catch (accountDeleteError) {
+      setDeleteError(accountDeleteError instanceof Error ? accountDeleteError.message : 'Unable to delete account.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -658,16 +736,37 @@ function DataSettings({
           Delete all
         </button>
       </div>
-      <div className="settings-danger-zone">
-        <div>
-          <strong>Danger zone</strong>
-          <p>Account deletion requires password and MFA checks. Use the hardened legacy deletion flow for now.</p>
+      {!confirmingDelete ? (
+        <div className="settings-danger-zone">
+          <div>
+            <strong>Danger zone</strong>
+            <p>Permanently deletes your account, businesses, and all associated data. This cannot be undone.</p>
+          </div>
+          <button className="secondary-button danger-button" type="button" onClick={() => setConfirmingDelete(true)}>
+            <Trash2 size={17} />
+            Delete account
+          </button>
         </div>
-        <button className="secondary-button danger-button" type="button" onClick={() => window.location.assign('/settings#data')}>
-          <Trash2 size={17} />
-          Delete
-        </button>
-      </div>
+      ) : (
+        <div className="settings-danger-zone settings-danger-form">
+          <div>
+            <strong>Delete account</strong>
+            <p>Type DELETE and enter your password to permanently delete your account and all its data.</p>
+          </div>
+          <Field label="Type DELETE to confirm" value={confirmText} onChange={setConfirmText} />
+          <Field label="Password" type="password" value={deletePassword} onChange={setDeletePassword} />
+          {awaitingMfaCode ? (
+            <Field label="Verification code" value={mfaCode} onChange={setMfaCode} />
+          ) : null}
+          {deleteError ? <p className="drawer-error" role="alert">{deleteError}</p> : null}
+          <div className="filter-actions">
+            <button className="secondary-button" type="button" onClick={resetDeleteAccountState} disabled={deleting}>Cancel</button>
+            <button className="secondary-button danger-button" type="button" onClick={() => void submitDeleteAccount()} disabled={deleting}>
+              {deleting ? 'Deleting...' : awaitingMfaCode ? 'Verify and delete' : 'Confirm delete'}
+            </button>
+          </div>
+        </div>
+      )}
     </SettingsPanel>
   )
 }

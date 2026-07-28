@@ -281,6 +281,31 @@ export async function loadMfaStatus() {
   return authRequest<{ enabled?: boolean; enabled_at?: string | null; delivery?: string }>('/api/auth/mfa/status')
 }
 
+export async function requestAccountDeleteReauth(input: { currentPassword: string; code?: string; mfaToken?: string }) {
+  return authRequest<{ pending_verification?: boolean; mfa_token?: string; reauth_token?: string; message?: string }>(
+    '/api/auth/mfa/reauth',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword: input.currentPassword,
+        ...(input.code ? { code: input.code } : {}),
+        ...(input.mfaToken ? { mfaToken: input.mfaToken } : {}),
+      }),
+    },
+  )
+}
+
+export async function deleteMyAccount(input: { password: string; mfaReauthToken?: string }) {
+  await authRequest('/api/me', {
+    method: 'DELETE',
+    body: JSON.stringify({
+      password: input.password,
+      ...(input.mfaReauthToken ? { mfaReauthToken: input.mfaReauthToken } : {}),
+    }),
+  })
+  return { ok: true }
+}
+
 export async function requestMfaToggle(enabled: boolean) {
   return authRequest<{ pending_verification?: boolean; mfa_token?: string; message?: string; status?: { enabled?: boolean } }>(
     enabled ? '/api/auth/mfa/enable' : '/api/auth/mfa/disable',
