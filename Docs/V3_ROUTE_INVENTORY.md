@@ -4,7 +4,7 @@ Phase 0 status: complete.
 Phase 1 (canonical bare URLs): complete. Client `pushState` and `login?next=` use `/transactions`-style paths; `/app-v3` and `/app-v3/<page>` 301 to bare paths; assets remain under `/app-v3/assets`.
 Phase 2 (one active app UI): complete. Migrated app-core legacy HTML files moved from active `public/html` into `In-Ex-Ledger-API/legacy/public-html/app-core`; old `.html` URLs redirect to canonical v3 routes.
 Phase 3 (one auth door, Strategy A): complete. Login, register, forgot/reset password, email verification, and MFA challenge are served by the v3 SPA with a real MFA-required login flow and register -> verify-email polling flow; expired-session, idle, and auth-guard redirects preserve canonical v3 `next` paths.
-Phase 4 (data plane correctness): in progress. Transactions uses server-driven `limit`/`offset`, API filter query params, API summary totals, id-based saves, CSRF retry, and reachable high-page pagination. Accounts no longer scans a capped transaction window for counts.
+Phase 4 (data plane correctness): complete. Transactions uses server-driven `limit`/`offset`, API filter query params, API summary totals, id-based saves, CSRF retry, and reachable high-page pagination. Accounts no longer scans a capped transaction window for counts.
 
 This file is the freeze and map artifact for the move to one product, one UI, and one URL. It is intentionally operational: if a route is not listed here, do not migrate, delete, or add parallel behavior until this inventory is updated and verified.
 
@@ -134,3 +134,13 @@ These pages are intentionally not Pro-tier v3 parity yet. They should remain loc
 - Pagination no longer renders only the first five pages; first, nearby, and last pages remain reachable for large ledgers.
 - Accounts list rows receive `transaction_count` from `/api/accounts`, instead of loading `/api/transactions?limit=500&offset=0` and reducing locally.
 - `tests/transactionsListFilters.test.js` and `tests/frontendV3Wiring.test.js` verify the route and UI contracts.
+
+## Post-Phase-4 Data Plane Fixes
+
+Additional data-plane correctness fixes landed on other app-core pages after Phase 4 closed:
+
+- Invoices: `invoices_v1` gained an independent `title` column so editing the line item description no longer overwrites the invoice title; outbound invoice emails support file attachments.
+- Receipts: the receipt list JOIN now excludes soft-deleted (`deleted_at`) transactions, so a receipt correctly flips to "Unlinked" once its linked transaction is deleted.
+- Exports: CSV history downloads are regenerated on demand from `export_metadata` instead of relying on a persisted file (only PDF redacted files were ever persisted).
+- Messages: delete and archive now clear both sender- and receiver-side visibility flags for self-authored rows (`sender_id === receiver_id`, e.g. compose/invoice/notification copies), fixing rows that previously stayed visible in the Sent lane forever.
+- Accounts: the account-type `<select>` now sets an explicit `value` on every `<option>`, so translated display text can never leak into the submitted account type.

@@ -1,6 +1,6 @@
 # API Route Inventory
 
-Last reviewed: 2026-06-12
+Last reviewed: 2026-07-28
 
 This inventory documents the mounted API surface from [server.js](/c:/Projects/InEx-Ledger.2.0/In-Ex-Ledger-API/server.js) and [routes/index.js](/c:/Projects/InEx-Ledger.2.0/In-Ex-Ledger-API/routes/index.js). It is intended as a security and operations reference, not a full endpoint-by-endpoint API spec.
 

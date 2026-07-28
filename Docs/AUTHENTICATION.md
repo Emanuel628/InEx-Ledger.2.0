@@ -1,10 +1,10 @@
 ## Authentication Contract
 
-This project enforces the authentication contract used by the live frontend bundle in `In-Ex-Ledger-API/public`.
+This project enforces the authentication contract used by the live v3 frontend SPA (`In-Ex-Ledger-API/frontend-v3`), served from `In-Ex-Ledger-API/public/app-v3`. The v3 SPA is the canonical logged-in product experience and also owns the full auth bridge (login, register, forgot/reset password, email verification, MFA challenge) — see `Docs/V3_ROUTE_INVENTORY.md`.
 
-- `/api/me` is the **only** source of truth for session validity.
-- `window.API_BASE` (set from `auth.js`) is the canonical base URL for all client API calls.
-- Refresh tokens are **not** used during guard checks; no client-side retries or recursive refresh flows exist.
-- Guards never short-circuit based on token presence alone; every protected page hits `/api/me` and makes decisions from that response.
+- `/api/me` is the **only** source of truth for session validity. `getCurrentUser()` in `frontend-v3/src/lib/authApi.ts` is the canonical call site; `App.tsx` calls it on load to decide the authenticated vs. public app state.
+- Session and CSRF tokens are cookie-only (`httpOnly` access/refresh tokens, a readable `csrf_token` cookie mirrored into an `X-CSRF-Token` header on mutating requests). No bearer token is ever stored in `localStorage` or read by client code — see `frontend-v3/src/lib/apiClient.ts`.
+- `apiClient.ts`'s `apiRequest`/`apiBlobRequest` helpers retry a request exactly once after a `401` by POSTing to `/api/auth/refresh` (cookie-based silent refresh, no token exposed to JS); if that refresh fails, or the retried request still 401s, the client redirects to `/login?reason=expired&next=<canonical path>` unless the caller opted out via `skipAuthRedirect` (used by identity probes such as `getCurrentUser()` and by auth-flow calls where a 401/expected failure is normal, e.g. wrong password or wrong MFA code, and must not trigger a hard navigation away from the form).
+- Guards never short-circuit based on token presence alone; every protected page's authenticated/public decision comes from an actual `/api/me` response, not from cookie or storage presence.
 
-Auth-related frontend changes must be applied in `In-Ex-Ledger-API/public`.
+Auth-related frontend changes must be applied in `In-Ex-Ledger-API/frontend-v3/src` (primarily `lib/apiClient.ts`, `lib/authApi.ts`, `lib/i18n.ts`, and the `pages/Login.tsx` / `Register.tsx` / `ForgotPassword.tsx` / `ResetPassword.tsx` / `VerifyEmail.tsx` / `MfaChallenge.tsx` pages), then rebuilt with `npm run build:frontend-v3`. The legacy `In-Ex-Ledger-API/public/js` auth scripts are no longer reachable — the auth routes are served by the v3 SPA.
