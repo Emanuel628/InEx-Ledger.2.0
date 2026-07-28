@@ -458,6 +458,49 @@ test("webhook: invoice.payment_succeeded re-syncs the subscription using the sto
   }
 });
 
+test("webhook: invoice.paid with a $0 invoice syncs the subscription (payment_succeeded never fires for it)", async () => {
+  const fixture = loadBillingRouter({ customerBusinessId: "biz_test_lookup" });
+
+  try {
+    const { event } = buildWebhookEvent("invoice.paid", {
+      id: "in_test_zero_123",
+      object: "invoice",
+      subscription: "sub_test123",
+      customer: "cus_test123",
+      amount_paid: 0,
+      total: 0
+    });
+
+    const res = await sendWebhook(fixture.app, event);
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.syncCalls.length, 1);
+    assert.equal(fixture.state.syncCalls[0].bizId, "biz_test_lookup");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: invoice.paid with a nonzero invoice is a no-op (invoice.payment_succeeded already handles it, avoiding a duplicate sync/email)", async () => {
+  const fixture = loadBillingRouter({ customerBusinessId: "biz_test_lookup" });
+
+  try {
+    const { event } = buildWebhookEvent("invoice.paid", {
+      id: "in_test_nonzero_123",
+      object: "invoice",
+      subscription: "sub_test123",
+      customer: "cus_test123",
+      amount_paid: 4200,
+      total: 4200
+    });
+
+    const res = await sendWebhook(fixture.app, event);
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.syncCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("webhook: invoice.payment_failed sends an email that directs the user to update billing", async () => {
   const fixture = loadBillingRouter({ customerBusinessId: "biz_test_lookup" });
 

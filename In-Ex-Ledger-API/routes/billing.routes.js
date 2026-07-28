@@ -1873,6 +1873,27 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
           logInfo("Stripe invoice.payment_succeeded synced for business:", businessId);
         }
       }
+    } else if (event.type === "invoice.paid") {
+      // invoice.payment_succeeded (above) already syncs and emails for every
+      // ordinary paid invoice. invoice.paid additionally fires for invoices
+      // Stripe never runs a charge for at all -- e.g. a $0 invoice from a
+      // 100%-off coupon or a trial transition -- where payment_succeeded
+      // never fires. Only act on those here so a normal payment doesn't get
+      // synced (and emailed) twice.
+      const amountPaid = Number(object?.amount_paid ?? object?.total ?? 0);
+      if (amountPaid === 0) {
+        const subscriptionId = object?.subscription;
+        const businessId = object?.customer
+          ? await findBusinessByStripeCustomerId(object.customer)
+          : null;
+        if (subscriptionId && businessId) {
+          const sub = await stripeGet(`/subscriptions/${encodeURIComponent(subscriptionId)}`).catch(() => null);
+          if (sub && !sub.error) {
+            await syncStripeSubscriptionForBusiness(businessId, sub);
+            logInfo("Stripe invoice.paid ($0 invoice) synced for business:", businessId);
+          }
+        }
+      }
     } else if (event.type === "invoice.payment_failed") {
       const customerId = object?.customer;
       const businessId = customerId

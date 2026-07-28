@@ -450,6 +450,7 @@ test("billing checkout ignores client currency and uses verified region currency
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         currency: "usd",
         additionalBusinesses: 2
@@ -492,7 +493,7 @@ test("billing checkout rejects Stripe prices mapped to the wrong recurring inter
   try {
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
-      .send({ billingInterval: "monthly" });
+      .send({ checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", billingInterval: "monthly" });
 
     assert.equal(res.status, 400);
     assert.match(res.body.error || "", /Monthly base Stripe Price is configured for year, not month/);
@@ -799,6 +800,7 @@ test("billing checkout reuses an existing Stripe customer found by metadata sear
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -833,6 +835,7 @@ test("billing checkout persists a created Stripe customer even when the subscrip
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -856,6 +859,7 @@ test("billing checkout records an audit event with resolved checkout metadata", 
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 2,
         returnPath: "/trial-setup?next=%2Ftransactions"
@@ -891,6 +895,7 @@ test("billing checkout keeps the existing subscription currency when trial metad
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 1
       });
@@ -921,6 +926,7 @@ test("billing checkout rejects insecure APP_BASE_URL values", async () => {
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -947,6 +953,7 @@ test("billing checkout blocks duplicate subscription creation when Stripe alread
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 1
       });
@@ -965,12 +972,14 @@ test("billing checkout reuses a deterministic Stripe idempotency key for identic
     const first = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         billingInterval: "monthly",
         additionalBusinesses: 1
       });
     const second = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         billingInterval: "monthly",
         additionalBusinesses: 1
       });
@@ -1011,6 +1020,7 @@ test("billing checkout blocks new sessions for past-due subscriptions", async ()
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -1041,6 +1051,7 @@ test("billing checkout blocks unpaid subscriptions with a targeted payment-updat
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -1074,6 +1085,7 @@ test("billing checkout allows a fresh checkout after Stripe has already canceled
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -1098,6 +1110,7 @@ test("billing checkout returns a validation error when pricing is not configured
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -1141,6 +1154,7 @@ test("billing checkout normalizes downgraded trial state before creating Stripe 
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -1166,6 +1180,7 @@ test("billing checkout enables Stripe automatic tax by default", async () => {
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -1190,6 +1205,7 @@ test("billing checkout can disable Stripe automatic tax with env flag", async ()
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });

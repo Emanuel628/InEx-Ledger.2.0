@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, CreditCard, Plus, ShieldAlert, X } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Check, CreditCard, Plus, ShieldAlert, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import {
@@ -102,6 +102,7 @@ function Subscription(props: PageProps) {
   const subscription = overview?.subscription
   const planName = subscription?.effectiveTierName || 'Basic'
   const statusLabel = getSubscriptionStatus(subscription)
+  const renewalLabel = buildRenewalLabel(subscription)
   const isProActive = Boolean(subscription?.effectiveTier === 'v1' && (subscription?.isPaid || subscription?.isTrialing))
   const canResume = Boolean(subscription?.cancelAtPeriodEnd || subscription?.isCanceledWithRemainingAccess || subscription?.isTrialDowngradedToFree)
   // Only route to "Open Stripe billing" when a real Stripe subscription (paid,
@@ -299,17 +300,24 @@ function Subscription(props: PageProps) {
           </div>
         </section>
 
-        <section className="subscription-detail-grid"> <article className="subscription-simple-card">
-          <div className="billing-card-icon">
-            <Check size={21} />
-          </div>
-
-          <span>Status</span>
+        <section className="subscription-detail-grid">
+          <article className="subscription-simple-card">
+            <div className="billing-card-icon">
+              <Check size={21} />
+            </div>
+            <span>Status</span>
             <strong>{statusLabel}</strong>
-              <p>{buildStatusDetail(subscription)}</p>
+            <p>{buildStatusDetail(subscription)}</p>
+          </article>
+          <article className="subscription-simple-card subscription-renewal-card">
+            <div className="billing-card-icon">
+              <CalendarClock size={21} />
+            </div>
+            <span>{renewalLabel.caption}</span>
+            <strong>{renewalLabel.value}</strong>
+            <p>{planName} plan</p>
           </article>
         </section>
-
 
         <section className="table-panel">
           <div className="table-panel-header">
@@ -317,8 +325,18 @@ function Subscription(props: PageProps) {
               <h2>Workspace capacity</h2>
               <p>Businesses attached to this subscription.</p>
             </div>
-            <button className="secondary-button" type="button" disabled={working || loadingData} onClick={() => setModal('add-business')}> 
+            <button className="secondary-button" type="button" disabled={working || loadingData} onClick={() => setModal('add-business')}>
               <Plus size={17} />Add business</button>
+          </div>
+          <div className="subscription-capacity-bar" role="img" aria-label={`${capacity.active} of ${capacity.max} business slots used`}>
+            <div className="subscription-capacity-bar-track">
+              <div
+                key={`${capacity.active}-${capacity.max}`}
+                className="subscription-capacity-bar-fill"
+                style={{ width: `${capacity.max > 0 ? Math.min(100, Math.round((capacity.active / capacity.max) * 100)) : 0}%` }}
+              />
+            </div>
+            <span key={`${capacity.active}-of-${capacity.max}-label`} className="subscription-capacity-bar-label">{capacity.active} of {capacity.max} slots used</span>
           </div>
           <div className="subscription-business-list">
             {businesses.length ? (
@@ -703,19 +721,30 @@ function AddBusinessModal({
 
                 {currentSubscriptionTotal !== null &&
                 nextSubscriptionTotal !== null ? (
-                  <p>
-                    Your subscription will change from{' '}
-                    {formatSubscriptionMoney(
-                      currentSubscriptionTotal,
-                      currency
-                    )}
-                    {billingSuffix} to{' '}
-                    {formatSubscriptionMoney(
-                      nextSubscriptionTotal,
-                      currency
-                    )}
-                    {billingSuffix}.
-                  </p>
+                  <div className="subscription-price-summary">
+                    <div className="subscription-price-summary-row">
+                      <span>Current subscription</span>
+                      <strong>{formatSubscriptionMoney(currentSubscriptionTotal, currency)}{billingSuffix}</strong>
+                    </div>
+                    <div className="subscription-price-summary-row">
+                      <span>New subscription</span>
+                      <strong>{formatSubscriptionMoney(nextSubscriptionTotal, currency)}{billingSuffix}</strong>
+                    </div>
+                    <p className="subscription-price-summary-totals">
+                      Your subscription will change from{' '}
+                      {formatSubscriptionMoney(
+                        currentSubscriptionTotal,
+                        currency
+                      )}
+                      {billingSuffix}
+                      <span className="subscription-price-arrow"> {'->'} </span>
+                      {formatSubscriptionMoney(
+                        nextSubscriptionTotal,
+                        currency
+                      )}
+                      {billingSuffix}.
+                    </p>
+                  </div>
                 ) : null}
 
                 <p>
@@ -967,6 +996,20 @@ function buildPlanSummary(subscription?: BillingSubscription | null) {
     return 'Pro workflows are active for this workspace.'
   }
   return 'Free tier stays available. Start checkout when you are ready to unlock Pro workflows.'
+}
+
+function buildRenewalLabel(subscription?: BillingSubscription | null) {
+  if (!subscription) return { caption: 'Next renewal', value: 'Not started' }
+  if (subscription.cancelAtPeriodEnd) {
+    return { caption: 'Access ends', value: formatSubscriptionDate(subscription.currentPeriodEnd) || 'Unknown' }
+  }
+  if (subscription.isTrialDowngradedToFree || subscription.isTrialing) {
+    return { caption: 'Trial ends', value: formatSubscriptionDate(subscription.trialEndsAt) || 'Unknown' }
+  }
+  if (subscription.isPaid) {
+    return { caption: 'Renews', value: formatSubscriptionDate(subscription.currentPeriodEnd) || 'Unknown' }
+  }
+  return { caption: 'Next renewal', value: 'Not started' }
 }
 
 function buildStatusDetail(subscription?: BillingSubscription | null) {

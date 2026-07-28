@@ -2030,6 +2030,314 @@ tbody tr:last-child td {
   font: inherit;
 }
 
+/* Subscription page: give the plan/renew panel a clear "primary action"
+   identity so it reads as the main thing to do on this page, ahead of the
+   secondary business-capacity and danger-zone sections below it. */
+.subscription-plan-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.subscription-plan-copy h2 {
+  margin: 6px 0 4px;
+}
+
+.subscription-plan-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 46ch;
+}
+
+.subscription-renew-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 260px;
+}
+
+.subscription-interval-toggle {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.subscription-interval-toggle button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.subscription-interval-toggle button strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.subscription-interval-toggle button.is-selected {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--blue);
+  box-shadow: 0 6px 14px rgba(12, 31, 58, 0.08);
+}
+
+.subscription-interval-toggle button.is-selected strong {
+  color: var(--blue);
+}
+
+/* Status / renewal stat tiles */
+.subscription-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.subscription-simple-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 3px 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.subscription-simple-card .billing-card-icon {
+  grid-row: 1 / span 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #e9f0ff;
+  color: var(--blue);
+}
+
+.subscription-simple-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.subscription-simple-card strong {
+  font-size: 20px;
+}
+
+.subscription-simple-card p {
+  grid-column: 2;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.subscription-renewal-card .billing-card-icon {
+  background: #dff8f5;
+  color: var(--teal);
+}
+
+/* Business capacity progress bar -- animates whenever the active/max slot
+   counts change (the fill re-renders as a fresh node keyed on the values,
+   so the width transition replays on every real change). */
+.subscription-capacity-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.subscription-capacity-bar-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.subscription-capacity-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+  animation: subscriptionCapacityGrow 0.5s ease;
+}
+
+@keyframes subscriptionCapacityGrow {
+  from {
+    filter: brightness(1.35);
+  }
+  to {
+    filter: brightness(1);
+  }
+}
+
+.subscription-capacity-bar-label {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  animation: subscriptionCapacityFade 0.4s ease;
+}
+
+@keyframes subscriptionCapacityFade {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.subscription-business-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.subscription-business-row:last-child {
+  border-bottom: none;
+}
+
+.subscription-business-row p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.subscription-danger-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid rgba(216, 59, 59, 0.24);
+  border-radius: var(--radius);
+  background: #fff6f6;
+}
+
+.subscription-danger-panel .danger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fde8e8;
+  color: var(--red);
+  flex-shrink: 0;
+}
+
+.subscription-danger-panel > div:not(.danger-icon) {
+  flex: 1;
+}
+
+.subscription-danger-panel strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.subscription-danger-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Add-business pricing summary -- current -> new totals, scannable at a glance */
+.subscription-price-summary {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.subscription-price-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.subscription-price-summary-row span:first-child {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.subscription-price-summary-row strong {
+  font-size: 15px;
+}
+
+.subscription-price-summary-totals {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  font-size: 14px;
+}
+
+.subscription-price-summary-totals .subscription-price-arrow {
+  color: var(--muted);
+}
+
+.subscription-price-summary-totals strong:last-child {
+  color: var(--blue);
+}
+
+@media (max-width: 720px) {
+  .subscription-plan-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .subscription-renew-card {
+    width: 100%;
+  }
+
+  .subscription-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .subscription-danger-panel {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 .row-action-menu .is-danger {
   color: var(--red);
 }
