@@ -102,7 +102,7 @@ function Subscription(props: PageProps) {
   const subscription = overview?.subscription
   const planName = subscription?.effectiveTierName || 'Basic'
   const statusLabel = getSubscriptionStatus(subscription)
-  const isProActive = subscription?.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing)
+  const isProActive = Boolean(subscription?.effectiveTier === 'v1' && (subscription?.isPaid || subscription?.isTrialing))
   const canResume = Boolean(subscription?.cancelAtPeriodEnd || subscription?.isCanceledWithRemainingAccess || subscription?.isTrialDowngradedToFree)
   // Only route to "Open Stripe billing" when a real Stripe subscription (paid,
   // or already checked out and still within its Stripe trial window) exists.
