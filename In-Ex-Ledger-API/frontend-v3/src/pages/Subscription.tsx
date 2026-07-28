@@ -274,40 +274,6 @@ function Subscription(props: PageProps) {
           </div>
         </section>
 
-        <section className="subscription-detail-grid">
-          <article className="subscription-simple-card">
-            <div className="billing-card-icon">
-              <Building2 size={21} />
-            </div>
-            <span>Businesses allowed</span>
-            <strong>{capacity.max}</strong>
-            <p>{capacity.additional ? `${capacity.additional} additional business slot${capacity.additional === 1 ? '' : 's'} attached.` : 'One business is included with the current plan.'}</p>
-            <div className="subscription-addon-control">
-              <label>
-                Extra slots
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={additionalBusinessDraft}
-                  onChange={(event) => setAdditionalBusinessDraft(event.target.value)}
-                />
-              </label>
-              <button className="secondary-button compact-button" type="button" disabled={working || loadingData} onClick={() => void handleAdditionalBusinessUpdate()}>
-                Save slots
-              </button>
-            </div>
-          </article>
-          <article className="subscription-simple-card">
-            <div className="billing-card-icon">
-              <Check size={21} />
-            </div>
-            <span>Status</span>
-            <strong>{statusLabel}</strong>
-            <p>{buildStatusDetail(subscription)}</p>
-          </article>
-        </section>
 
         <section className="table-panel">
           <div className="table-panel-header">
