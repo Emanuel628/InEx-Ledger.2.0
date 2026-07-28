@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Check, CreditCard, Plus, ShieldAlert, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
-import { ApiRequestError } from '../lib/apiClient'
 import {
   cancelSubscription,
   formatSubscriptionDate,
@@ -939,13 +938,6 @@ function readPreferredBillingInterval(): BillingInterval {
   if (typeof window === 'undefined') return 'monthly'
   const saved = window.sessionStorage.getItem('inex-preferred-billing-interval')
   return saved === 'yearly' ? 'yearly' : 'monthly'
-}
-
-function isAdditionalBusinessPaymentRequired(error: unknown) {
-  return error instanceof ApiRequestError && (
-    error.status === 402 ||
-    error.code === 'additional_business_payment_required'
-  )
 }
 
 function formatIntervalPrice(pricing: BillingPricing | null, interval: BillingInterval) {
