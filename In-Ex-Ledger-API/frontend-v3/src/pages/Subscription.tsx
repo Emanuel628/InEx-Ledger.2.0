@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Building2, Check, CreditCard, ExternalLink, Plus, ShieldAlert, X } from 'lucide-react'
+import { AlertTriangle, Building2, Check, CreditCard, Plus, ShieldAlert, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { ApiRequestError } from '../lib/apiClient'
@@ -103,12 +103,6 @@ function Subscription(props: PageProps) {
   }
 
   const subscription = overview?.subscription
-  const selectedPrice = pricing?.pricing?.[interval]
-  // Pro checkout is plan-only: extra business slots are purchased separately,
-  // after Pro is active, via the "Add business" / Stripe billing portal flow.
-  const checkoutTotal = selectedPrice ? selectedPrice.base : null
-  const price = checkoutTotal !== null && pricing ? formatSubscriptionMoney(checkoutTotal, pricing.currency) : interval === 'monthly' ? '$12/mo' : '$122.40/yr'
-  const note = interval === 'monthly' ? 'Billed monthly. Cancel or change later in Stripe.' : 'Billed yearly with the annual discount.'
   const planName = subscription?.effectiveTierName || 'Basic'
   const statusLabel = getSubscriptionStatus(subscription)
   const isProActive = subscription?.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing)
@@ -260,10 +254,6 @@ function Subscription(props: PageProps) {
                 <strong>{formatIntervalPrice(pricing, 'yearly')}</strong>
               </button>
             </div>
-            <div className="subscription-price-line">
-              <strong>{price}</strong>
-              <span>{note}</span>
-            </div>
             {canResume ? (
               <button className="primary-button" type="button" disabled={working} onClick={() => void handleResume()}>
                 <CreditCard size={18} />
@@ -316,14 +306,6 @@ function Subscription(props: PageProps) {
             <strong>{statusLabel}</strong>
             <p>{buildStatusDetail(subscription)}</p>
           </article>
-          <article className="subscription-simple-card">
-            <div className="billing-card-icon">
-              <ExternalLink size={21} />
-            </div>
-            <span>Stripe portal</span>
-            <strong>{overview?.portalAvailable ? 'Available' : 'Not connected'}</strong>
-            <p>{overview?.portalAvailable ? 'Use Billing for payment methods and official invoices.' : 'The portal becomes available after Stripe checkout.'}</p>
-          </article>
         </section>
 
         <section className="table-panel">
@@ -341,7 +323,6 @@ function Subscription(props: PageProps) {
             {businesses.length ? (
               businesses.map((business, index) => (
                 <article className="subscription-business-row" key={business.name}>
-                  <div className="merchant-logo merchant-blue">{business.name.charAt(0)}</div>
                   <div>
                     <strong>{business.name}</strong>
                     <p>{business.role}</p>
