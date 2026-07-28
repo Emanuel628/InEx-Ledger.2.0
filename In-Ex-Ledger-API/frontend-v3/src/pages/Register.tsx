@@ -4,6 +4,7 @@ import AuthShell from '../components/AuthShell'
 import { registerUser } from '../lib/authApi'
 
 function Register(props: PageProps) {
+  const [showPassword, setShowPassword] = useState(false)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -58,7 +59,11 @@ function Register(props: PageProps) {
         </label>
         <label>
           Password
-          <input type="password" autoComplete="new-password" placeholder="Create password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" placeholder="Create password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        </label>
+        <label className="auth-check">
+          <input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />
+          Show password
         </label>
         <label className="auth-check">
           <input type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} />
