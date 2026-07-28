@@ -601,7 +601,6 @@ async function buildBillingPortalConfiguration(currency) {
   });
 
   const payload = {
-    active: true,
     "business_profile[headline]": "Manage InEx Ledger billing",
     "features[customer_update][enabled]": true,
     "features[customer_update][allowed_updates][0]": "email",
