@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Building2, Check, CreditCard, Plus, ShieldAlert, X } from 'lucide-react'
+import { AlertTriangle, Check, CreditCard, Plus, ShieldAlert, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { ApiRequestError } from '../lib/apiClient'
@@ -13,7 +13,6 @@ import {
   resumeSubscription,
   startAdditionalBusinessCheckout,
   startCheckout,
-  updateAdditionalBusinesses,
   type BillingInterval,
   type BillingOverview,
   type BillingPricing,
@@ -42,7 +41,6 @@ function Subscription(props: PageProps) {
   const [activeBusinessId, setActiveBusinessId] = useState<string | null>(props.authUser?.currentBusinessId || null)
   const [modal, setModal] = useState<SubscriptionModal>(null)
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessRecord | null>(null)
-  const [additionalBusinessDraft, setAdditionalBusinessDraft] = useState('0')
 
   const businesses: SubscriptionBusiness[] = businessRows.length
     ? businessRows.map((business) => ({
@@ -64,7 +62,6 @@ function Subscription(props: PageProps) {
       ])
       setOverview(nextOverview)
       setPricing(nextPricing)
-      setAdditionalBusinessDraft(String(Number(nextOverview.subscription?.additionalBusinesses || 0)))
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load subscription.')
       setOverview(null)
@@ -188,26 +185,6 @@ function Subscription(props: PageProps) {
     }
   }
 
-  async function handleAdditionalBusinessUpdate() {
-    const nextValue = Number(additionalBusinessDraft)
-    if (!Number.isInteger(nextValue) || nextValue < 0 || nextValue > 100) {
-      setDataError('Additional business slots must be a whole number from 0 to 100.')
-      return
-    }
-    setWorking(true)
-    setDataError('')
-    try {
-      const updated = await updateAdditionalBusinesses(nextValue)
-      setOverview((current) => current ? { ...current, subscription: updated } : current)
-      setAdditionalBusinessDraft(String(Number(updated.additionalBusinesses || nextValue)))
-      await refreshBusinesses()
-      await refreshUser()
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to update additional business slots.')
-    } finally {
-      setWorking(false)
-    }
-  }
 
   return (
     <AppShell {...props} searchPlaceholder="Search plans, businesses, billing">
@@ -274,6 +251,17 @@ function Subscription(props: PageProps) {
           </div>
         </section>
 
+        <section className="subscription-detail-grid"> <article className="subscription-simple-card">
+          <div className="billing-card-icon">
+            <Check size={21} />
+          </div>
+
+          <span>Status</span>
+            <strong>{statusLabel}</strong>
+              <p>{buildStatusDetail(subscription)}</p>
+          </article>
+        </section>
+
 
         <section className="table-panel">
           <div className="table-panel-header">
@@ -281,10 +269,8 @@ function Subscription(props: PageProps) {
               <h2>Workspace capacity</h2>
               <p>Businesses attached to this subscription.</p>
             </div>
-            <button className="secondary-button" type="button" onClick={() => setModal('add-business')}>
-              <Plus size={17} />
-              Add business
-            </button>
+            <button className="secondary-button" type="button" disabled={working || loadingData} onClick={() => setModal('add-business')}> 
+              <Plus size={17} />Add business</button>
           </div>
           <div className="subscription-business-list">
             {businesses.length ? (
@@ -339,61 +325,86 @@ function Subscription(props: PageProps) {
         ) : null}
 
         {modal === 'add-business' ? (
-          <AddBusinessModal
-            onClose={() => setModal(null)}
-            onSave={async (input) => {
-              setWorking(true)
-              setDataError('')
-              try {
-                const response = await createBusiness(input)
-                setBusinessRows(response.businesses || [])
-                setActiveBusinessId(response.active_business_id || response.active_business?.id || null)
-                setModal(null)
-                await refreshSubscription()
-                await refreshUser()
-              } catch (error) {
-                if (isAdditionalBusinessPaymentRequired(error)) {
-                  setDataError('Add at least one extra business slot before creating another business.')
-                } else {
-                  setDataError(error instanceof Error ? error.message : 'Unable to add business.')
-                }
-                throw error
-              } finally {
-                setWorking(false)
-              }
-            }}
-            onBuySlots={async (neededSlots) => {
-              const targetAdditionalBusinesses = Math.max(capacity.additional + neededSlots, 1)
-              const canBuySlots = canResume || (isProActive && !canResume && !needsBillingPortal)
-              if (!canBuySlots) {
-                // Not yet Pro: extra business slots can only be purchased after a
-                // plan-only Pro checkout completes, not bundled into it.
-                throw new Error('Start a Pro subscription first, then add extra business slots from Subscription.')
-              }
-              if (canResume) {
-                await resumeSubscription(interval)
-              }
-              if (subscription?.stripeSubscriptionId) {
-                // Real Stripe subscription: send the user to a Stripe-hosted
-                // page to confirm and pay for the new total, instead of
-                // changing what they're billed silently in the background.
-                await startAdditionalBusinessCheckout(targetAdditionalBusinesses)
-                return
-              }
-              // Trial with no Stripe subscription yet: nothing to confirm
-              // with Stripe, so record the slot count locally -- it carries
-              // over once the user completes Pro checkout.
-              setAdditionalBusinessDraft(String(targetAdditionalBusinesses))
-              await updateAdditionalBusinesses(targetAdditionalBusinesses)
-              await refreshSubscription()
-              await refreshBusinesses()
-              await refreshUser()
-            }}
-            currentBusinessCount={capacity.active}
-            maxBusinessesAllowed={capacity.max}
-            saving={working}
-          />
-        ) : null}
+  <AddBusinessModal
+    onClose={() => setModal(null)}
+    onSave={async (input) => {
+      setWorking(true)
+      setDataError('')
+
+      try {
+        const response = await createBusiness(input)
+
+        setBusinessRows(response.businesses || [])
+
+        setActiveBusinessId(
+          response.active_business_id ||
+            response.active_business?.id ||
+            null
+        )
+
+        setModal(null)
+
+        await refreshSubscription()
+        await refreshUser()
+      } catch (error) {
+        setDataError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to add business.'
+        )
+
+        throw error
+      } finally {
+        setWorking(false)
+      }
+    }}
+    onStartAdditionalBusinessCheckout={async () => {
+      setWorking(true)
+      setDataError('')
+
+      try {
+        await startAdditionalBusinessCheckout(
+          nextAdditionalBusinesses
+        )
+      } catch (error) {
+        setDataError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to open additional business checkout.'
+        )
+
+        throw error
+      } finally {
+        setWorking(false)
+      }
+    }}
+    onStartProCheckout={async () => {
+      setModal(null)
+      await handleCheckout()
+    }}
+    currentBusinessCount={capacity.active}
+    maxBusinessesAllowed={capacity.max}
+    hasAvailableBusinessSlot={hasAvailableBusinessSlot}
+    isProActive={isProActive}
+    hasStripeSubscription={Boolean(
+      subscription?.stripeSubscriptionId
+    )}
+    canPurchaseAdditionalBusiness={
+      canPurchaseAdditionalBusiness
+    }
+    isCancellationPending={Boolean(
+      subscription?.cancelAtPeriodEnd ||
+        subscription?.isCanceledWithRemainingAccess
+    )}
+    billingInterval={activeBillingInterval}
+    currency={pricing?.currency || subscription?.currency || 'usd'}
+    additionalBusinessPrice={additionalBusinessPrice}
+    currentSubscriptionTotal={currentSubscriptionTotal}
+    nextSubscriptionTotal={nextSubscriptionTotal}
+    nextAdditionalBusinesses={nextAdditionalBusinesses}
+    saving={working}
+  />
+) : null}
 
         {modal === 'manage-business' ? (
           <ManageBusinessModal
@@ -447,6 +458,47 @@ function Subscription(props: PageProps) {
     </AppShell>
   )
 }
+
+const activeBillingInterval: BillingInterval =
+  subscription?.billingInterval === 'yearly'
+    ? 'yearly'
+    : 'monthly'
+
+const activePricing =
+  pricing?.pricing?.[activeBillingInterval] || null
+
+const currentAdditionalBusinesses = Math.max(
+  Number(subscription?.additionalBusinesses || 0),
+  0
+)
+
+const nextAdditionalBusinesses =
+  currentAdditionalBusinesses + 1
+
+const currentSubscriptionTotal = activePricing
+  ? activePricing.base +
+    activePricing.addon * currentAdditionalBusinesses
+  : null
+
+const nextSubscriptionTotal = activePricing
+  ? activePricing.base +
+    activePricing.addon * nextAdditionalBusinesses
+  : null
+
+const additionalBusinessPrice =
+  activePricing?.addon ?? null
+
+const hasAvailableBusinessSlot =
+  capacity.active < capacity.max
+
+const canPurchaseAdditionalBusiness =
+  Boolean(
+    isProActive &&
+      subscription?.stripeSubscriptionId &&
+      !subscription?.cancelAtPeriodEnd &&
+      !subscription?.isCanceledWithRemainingAccess &&
+      !needsBillingPortal
+  )
 
 function AddBusinessModal({
   onClose,
