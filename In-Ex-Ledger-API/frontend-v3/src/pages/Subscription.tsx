@@ -122,46 +122,6 @@ function Subscription(props: PageProps) {
     return { max, active, additional }
   }, [businesses.length, subscription])
 
- const activeBillingInterval: BillingInterval =
-  subscription?.billingInterval === 'yearly'
-    ? 'yearly'
-    : 'monthly'
-
-const activePricing =
-  pricing?.pricing?.[activeBillingInterval] || null
-
-const currentAdditionalBusinesses = Math.max(
-  Number(subscription?.additionalBusinesses || 0),
-  0
-)
-
-const nextAdditionalBusinesses =
-  currentAdditionalBusinesses + 1
-
-const currentSubscriptionTotal = activePricing
-  ? activePricing.base +
-    activePricing.addon * currentAdditionalBusinesses
-  : null
-
-const nextSubscriptionTotal = activePricing
-  ? activePricing.base +
-    activePricing.addon * nextAdditionalBusinesses
-  : null
-
-const additionalBusinessPrice =
-  activePricing?.addon ?? null
-
-const hasAvailableBusinessSlot =
-  capacity.active < capacity.max
-
-const canPurchaseAdditionalBusiness = Boolean(
-  isProActive &&
-    subscription?.stripeSubscriptionId &&
-    !subscription?.cancelAtPeriodEnd &&
-    !subscription?.isCanceledWithRemainingAccess &&
-    !needsBillingPortal
-)
-
   async function handleCheckout() {
     setWorking(true)
     setDataError('')
