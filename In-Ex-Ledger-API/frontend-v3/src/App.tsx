@@ -199,8 +199,14 @@ function getNextPageFromQuery(): AppPage | null {
 }
 
 function chooseAuthenticatedPage(user: AuthUser) {
-  if (!user.currentBusinessId) {
-    return user.emailVerified ? 'Onboarding' : 'VerifyEmail'
+  // A placeholder business/account is auto-created the moment a session
+  // exists (see resolveBusinessIdForUser), so currentBusinessId is set well
+  // before onboarding runs and can't be used to detect "still onboarding"
+  // anymore. onboarding_completed is the real signal now, and email
+  // verification is itself one of the steps onboarding walks the user
+  // through, so an unverified user always lands back in Onboarding too.
+  if (!user.emailVerified || !user.onboardingCompleted) {
+    return 'Onboarding'
   }
 
   const nextPage = getNextPageFromQuery()
@@ -345,7 +351,16 @@ function App() {
       return
     }
 
-    setCurrentPage(chooseAuthenticatedPage(user))
+    const nextPage = chooseAuthenticatedPage(user)
+    setCurrentPage(nextPage)
+    // Callers of onAuthChange (Register, Login's MFA success, email-change
+    // confirm, ...) don't separately push a history entry -- without this the
+    // address bar is left showing whatever auth-flow page the user came from
+    // even though the rendered page has already moved on.
+    const path = getPathForPage(nextPage)
+    if (window.location.pathname !== path) {
+      window.history.replaceState({}, '', path)
+    }
   }
 
   const handleLogout = async () => {

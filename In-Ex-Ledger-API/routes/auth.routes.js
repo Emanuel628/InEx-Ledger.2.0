@@ -516,9 +516,9 @@ async function revokeAllRefreshTokensForUser(userId) {
   ]);
 }
 
-async function buildAuthenticatedAccessPayload(user, businessIdOverride = null, { mfaAuthenticated = false } = {}) {
+async function buildAuthenticatedAccessPayload(user, businessIdOverride = null, { mfaAuthenticated = false, allowUnverified = false } = {}) {
   const verified = Boolean(user.email_verified);
-  if (!verified) {
+  if (!verified && !allowUnverified) {
     throw new EmailNotVerifiedError();
   }
 
@@ -552,10 +552,11 @@ async function issueAuthenticatedSession(
   res,
   user,
   businessIdOverride = null,
-  { mfaAuthenticated = false, req = null } = {}
+  { mfaAuthenticated = false, req = null, allowUnverified = false } = {}
 ) {
   const accessPayload = await buildAuthenticatedAccessPayload(user, businessIdOverride, {
-    mfaAuthenticated
+    mfaAuthenticated,
+    allowUnverified
   });
   setAccessCookie(res, accessPayload.token);
 
@@ -720,11 +721,17 @@ async function createMfaEmailChallenge(user, req, options = {}) {
 
   // Localised page label for the footer line
   const locationLabelFr = {
-    "/login":    "Page de connexion",
-    "/settings": "Paramètres"
+    "/login":      "Page de connexion",
+    "/settings":   "Paramètres",
+    "/onboarding": "Configuration du compte"
+  };
+  const locationLabelEn = {
+    "/login":      "Sign-in page",
+    "/settings":   "Settings",
+    "/onboarding": "Onboarding"
   };
   const locationLabel = options.locationLabel
-    ?? (lang === "fr" ? (locationLabelFr[locationPath] ?? "InEx Ledger") : (mfaContentKey === "signin" ? "Sign-in page" : "Settings"));
+    ?? (lang === "fr" ? (locationLabelFr[locationPath] ?? "InEx Ledger") : (locationLabelEn[locationPath] ?? "Settings"));
 
   const expiryLine =
     lang === "fr"
@@ -1141,28 +1148,30 @@ await client.query(
     await client.query("COMMIT");
     committed = true;
 
-    // --- START OF EMAIL LOGIC ---
-    try {
-      const { token } = await createVerificationToken(email);
-      const verificationLink = buildVerificationLink(req, token);
-      // For new registrations the business language hasn't been set yet via
-      // onboarding, so we infer language from province: QC defaults to French.
-      const registrationLang = (country === "CA" && province === "QC") ? "fr" : "en";
-      const emailContent = buildWelcomeVerificationEmail(registrationLang, verificationLink);
-      await sendAppEmail({ to: email, ...emailContent });
-    } catch (emailErr) {
-      logError("Email failed to send, but account was created:", emailErr);
-    }
-    // --- END OF EMAIL LOGIC ---
+    // Log the user straight into an authenticated session so they land on
+    // Onboarding immediately. Email verification is now a 6-digit code
+    // completed later, inside Onboarding, rather than a magic link that
+    // gates access before the user ever sees the app.
+    const sessionUser = {
+      id: newUserId,
+      email,
+      email_verified: false,
+      mfa_enabled: false,
+      role: "user"
+    };
+    const session = await issueAuthenticatedSession(res, sessionUser, null, {
+      req,
+      allowUnverified: true
+    });
 
     return res.status(201).json({
       success: true,
       message: reopenedWithoutTrial
-        ? "Account reopened. Check your email to continue. A new free trial is not available on reopened accounts."
-        : "Account created. Check your email!",
+        ? "Account reopened. A new free trial is not available on reopened accounts."
+        : "Account created.",
       reactivated_without_trial: reopenedWithoutTrial,
-      verification_state: createVerificationStatusToken(email),
-      signup_bootstrap_token: createVerifiedSignupBootstrapToken({ id: newUserId, email }, req)
+      next: "/onboarding",
+      ...buildPublicSessionPayload(session)
     });
   } catch (err) {
     if (!committed) {
@@ -1282,7 +1291,9 @@ router.post("/complete-verified-signup", requireCsrfProtection, authLimiter, asy
 
 /**
  * POST /login
- * Requires verified email before issuing a session.
+ * Issues a session even for unverified accounts so users can resume
+ * onboarding; email verification happens via a 6-digit code inside
+ * onboarding rather than gating sign-in itself.
  */
 router.post("/login", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
@@ -1382,12 +1393,15 @@ router.post("/login", authLimiter, async (req, res) => {
 
     const verified = Boolean(user.email_verified);
     if (!verified) {
-      clearRefreshCookie(res);
-      clearAccessCookie(res);
-      clearMfaTrustCookie(res);
-      return res.status(403).json({
-        error: "Please verify your email address before signing in. Check your inbox for a verification link.",
-        code: "email_not_verified"
+      // Unverified accounts can no longer have MFA enabled (MFA is only ever
+      // turned on together with email verification, see the onboarding
+      // verify-code endpoint below), so it's safe to sign them straight in
+      // and let onboarding pick up the verification step where they left off,
+      // instead of hard-blocking sign-in behind a magic-link email.
+      const session = await issueAuthenticatedSession(res, user, null, { req, allowUnverified: true });
+      return res.status(200).json({
+        ...buildPublicSessionPayload(session),
+        next: "/onboarding"
       });
     }
     const businessId = await resolveBusinessIdForUser(user);
@@ -2109,6 +2123,126 @@ router.post("/mfa/resend", requireCsrfProtection, authLimiter, async (req, res) 
   } catch (err) {
     logError("MFA resend error:", err);
     return res.status(401).json({ error: "Verification session expired. Sign in again." });
+  }
+});
+
+/**
+ * POST /onboarding/send-verification-code
+ * Sends the one-time email verification code used during onboarding. The
+ * caller indicates whether the user also opted in to MFA on the same
+ * onboarding screen; that choice rides along on the pending token so a
+ * single code can both verify the email and (optionally) turn on MFA.
+ */
+router.post("/onboarding/send-verification-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (user.email_verified) {
+      return res.status(400).json({ error: "Email is already verified." });
+    }
+
+    const wantsMfa = req.body?.wantsMfa === true;
+    const userLang = await getPreferredLanguageForUser(user.id);
+    const mfaToken = await createMfaEmailChallenge(user, req, {
+      businessId: req.user?.business_id || null,
+      tokenPurpose: "signup_email_verify",
+      tokenPayload: { wants_mfa: wantsMfa },
+      lang: userLang,
+      mfaContentKey: "signup",
+      locationPath: "/onboarding"
+    });
+
+    return res.status(200).json({
+      success: true,
+      mfa_token: mfaToken,
+      message: "We emailed you a verification code."
+    });
+  } catch (err) {
+    logError("Onboarding verification code send error:", err);
+    return res.status(500).json({ error: "Unable to send verification code." });
+  }
+});
+
+/**
+ * POST /onboarding/verify-code
+ * Confirms the onboarding email-verification code. If the pending token
+ * carries wants_mfa: true (set when the user opted in on the MFA step),
+ * this same code also enables MFA -- no separate MFA verification round
+ * is required.
+ */
+router.post("/onboarding/verify-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  const code = String(req.body?.code || "").trim();
+  const mfaToken = String(req.body?.mfaToken || "").trim();
+
+  if (!code || !mfaToken) {
+    return res.status(400).json({ error: "Verification code and token are required." });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    let pending;
+    try {
+      pending = verifyToken(mfaToken);
+    } catch (error) {
+      return res.status(401).json({ error: "Verification session expired. Request a new code." });
+    }
+
+    if (pending.purpose !== "signup_email_verify" || pending.id !== user.id || pending.email !== user.email) {
+      return res.status(401).json({ error: "Verification session expired. Request a new code." });
+    }
+
+    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+    if (!challenge) {
+      return res.status(401).json({ error: "Verification code expired. Request a new code." });
+    }
+
+    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
+      return res.status(429).json({ error: "Too many invalid attempts. Request a new code." });
+    }
+
+    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
+      await recordFailedMfaEmailAttempt(challenge.id);
+      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
+        return res.status(429).json({ error: "Too many invalid attempts. Request a new code." });
+      }
+      return res.status(401).json({ error: "Invalid verification code." });
+    }
+
+    await consumeMfaEmailChallenge(challenge.id);
+    const wantsMfa = pending.wants_mfa === true;
+    await pool.query(
+      `UPDATE users
+          SET email_verified = true,
+              mfa_enabled = CASE WHEN $2 THEN true ELSE mfa_enabled END,
+              mfa_enabled_at = CASE WHEN $2 THEN COALESCE(mfa_enabled_at, NOW()) ELSE mfa_enabled_at END
+        WHERE id = $1`,
+      [user.id, wantsMfa]
+    );
+
+    const refreshedUser = await findUserById(user.id);
+    const session = await resetCurrentRefreshSession(res, refreshedUser, {
+      mfaAuthenticated: wantsMfa,
+      req
+    });
+    logInfo("Onboarding email verified", {
+      userId: user.id,
+      mfaEnabled: wantsMfa
+    });
+
+    return res.status(200).json({
+      success: true,
+      ...buildPublicSessionPayload(session)
+    });
+  } catch (err) {
+    logError("Onboarding verify-code error:", err);
+    return res.status(500).json({ error: "Unable to verify code." });
   }
 });
 

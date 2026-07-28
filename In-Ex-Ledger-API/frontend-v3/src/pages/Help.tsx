@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { BookOpen, Car, ChevronDown, CreditCard, Download, FileText, FolderTree, Landmark, Mail, Receipt, Search, Settings, ShieldCheck, Tags, type LucideIcon } from 'lucide-react'
+import { BookOpen, Building2, Car, ChevronDown, CreditCard, Download, FileText, FolderTree, Landmark, Mail, Receipt, Search, Settings, ShieldCheck, Tags, type LucideIcon } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import BankCsvHelpGuide from '../components/BankCsvHelp'
@@ -78,6 +78,29 @@ const helpItems = [
     category: 'Billing',
   },
   {
+    title: 'How to fill out your business profile',
+    body: 'Plain-language help for every field in Settings > Business, including the confusing ones: accounting method, accrual, and material participation.',
+    detail: [
+      'Business name: the legal or everyday name of your business. If you operate under your own name (for example, a freelancer with no separate company name), just type your own name here.',
+      'Contact name: the person Categories, invoices, and support should treat as the point of contact for this business. For a solo owner, this is usually you.',
+      'Region: choose US if your business operates in the United States, or CA if it operates in Canada. This controls which tax rules, forms, and currency the app uses everywhere else (Schedule C vs. T2125, USD vs. CAD, Mileage vs. Kilometers, and so on). Pick the country where you actually run and report the business.',
+      'Province (Canada only): the Canadian province or territory your business is based in. This affects GST/HST rules that apply to you.',
+      'Fiscal year start: the date your business "year" begins for accounting purposes, in MM-DD format (for example, 01-01 for January 1st). Almost every small business and solo owner should just use 01-01 (a normal calendar year) unless your accountant has specifically told you to use a different fiscal year.',
+      'Operating name (DBA): short for "Doing Business As." Only fill this in if you legally operate under a different public-facing name than your official business name (for example, your business is legally "Jane Smith" but customers know you as "Jane’s Bakery"). If that does not apply to you, leave it blank.',
+      'Business activity code (NAICS code, US only): a 6-digit code the IRS uses on Schedule C to describe, in general terms, what kind of business you run (for example, a certain code means "graphic design services," another means "food trucks"). You do not need to get this perfectly precise — it is used for broad government statistics, not to calculate your taxes. If you do not know your code offhand, search "NAICS code" plus a word or two describing what your business does, or ask your tax preparer. If you truly cannot find an exact match, pick whichever code comes closest to what you do.',
+      'Accounting method — Cash vs. Accrual, explained simply: this setting decides WHEN a sale or bill counts in your books. There is no trick to it — pick whichever matches how you already think about your money.',
+      '  • Cash method: you record income the moment money actually lands in your hands or bank account, and you record an expense the moment you actually pay it. If you have not been paid yet, it is not income yet. If you have not paid a bill yet, it is not an expense yet. This is the simplest method to understand and to keep track of, and it is what the large majority of solo owners, freelancers, and very small businesses use.',
+      '  • Accrual method: you record income the moment you EARN it — for example, the day you finish a job or send an invoice — even if the client has not paid you yet. You record an expense the moment you receive a bill, even if you have not paid it yet. This method gives a more "big picture" view of your business but is more work to track and is mostly used by larger businesses, or ones an accountant has specifically told to use it.',
+      '  • If you are not sure which one applies to you: choose Cash. It is the standard default for a small or solo business, and you can always change it later if your accountant advises you to.',
+      'Material participation (US only) — what this question is actually asking: this is not about your bookkeeping method. It is a tax-law question the IRS asks: did YOU personally do the work of running this business — regularly, continuously, and to a significant degree — during the year? It is asking whether you are a hands-on, active owner, or a hands-off, passive owner (for example, someone who only invested money and does not do any of the actual work).',
+      '  • Answer Yes if: you are the owner (or one of the owners) and you personally do the day-to-day work of the business — seeing clients, making the product, managing the books, running the operations, etc. This describes almost every solo owner and freelancer using this app.',
+      '  • Answer No only if: you are a passive investor in someone else’s business and do not personally work in it (for example, a silent business partner who only put in money). This is a fairly rare situation for a solo small-business owner.',
+      '  • When in doubt: if you are asking yourself this question at all because you personally run your own business day to day, the answer is Yes.',
+    ],
+    icon: Building2,
+    category: 'Setup',
+  },
+  {
     title: 'Settings and security',
     body: 'Manage business profile, preferences, language, theme, MFA, sessions, data export, and account danger-zone actions from Settings.',
     detail: 'Email changes use a six-digit email verification flow. Accounting period locks live in Business Profile and protect locked transaction, receipt, and mileage edits.',
@@ -91,7 +114,7 @@ const helpItems = [
     icon: Download,
     category: 'Tax',
   },
-] satisfies { title: string; body: string; detail: string; icon: LucideIcon; category: Exclude<HelpCategory, 'All'> }[]
+] satisfies { title: string; body: string; detail: string | string[]; icon: LucideIcon; category: Exclude<HelpCategory, 'All'> }[]
 
 function Help(props: PageProps) {
   const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
@@ -103,7 +126,8 @@ function Help(props: PageProps) {
     const normalizedSearch = searchTerm.trim().toLowerCase()
     return helpItems.filter((item) => {
       const matchesCategory = category === 'All' || item.category === category
-      const matchesSearch = !normalizedSearch || [item.title, item.body, item.detail, item.category]
+      const detailValues = Array.isArray(item.detail) ? item.detail : [item.detail]
+      const matchesSearch = !normalizedSearch || [item.title, item.body, ...detailValues, item.category]
         .some((value) => value.toLowerCase().includes(normalizedSearch))
       return matchesCategory && matchesSearch
     })
@@ -160,7 +184,11 @@ function Help(props: PageProps) {
                 <div>
                   <strong>{title}</strong>
                   <p>{body}</p>
-                  {isOpen ? <p>{detail}</p> : null}
+                  {isOpen ? (
+                    Array.isArray(detail)
+                      ? detail.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+                      : <p>{detail}</p>
+                  ) : null}
                 </div>
                 <button className="secondary-button" type="button" onClick={() => setOpenTitle(isOpen ? null : title)}>
                   {isOpen ? 'Close' : 'Open'}

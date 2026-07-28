@@ -20,11 +20,12 @@ function Register(props: PageProps) {
       if (!acceptedTerms) {
         throw new Error('You must accept the Terms and Privacy Policy to create an account.')
       }
-      const { verificationState, signupBootstrapToken } = await registerUser({ firstName, lastName, email, password, acceptedTerms })
-      window.sessionStorage.setItem('inex-verify-email-address', email)
-      window.sessionStorage.setItem('inex-verify-email-state', verificationState)
-      window.sessionStorage.setItem('inex-verify-signup-token', signupBootstrapToken)
-      props.onNavigate('VerifyEmail')
+      const { user } = await registerUser({ firstName, lastName, email, password, acceptedTerms })
+      // onAuthChange alone routes to the right destination (chooseAuthenticatedPage
+      // sends a fresh, unverified user to Onboarding) -- calling onNavigate right
+      // after would race the setAuthUser state update and read the stale (still
+      // logged-out) authUser from this render's closure.
+      props.onAuthChange(user)
     } catch (registerError) {
       setError(registerError instanceof Error ? registerError.message : 'Unable to create account.')
     } finally {
