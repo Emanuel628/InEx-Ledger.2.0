@@ -122,6 +122,46 @@ function Subscription(props: PageProps) {
     return { max, active, additional }
   }, [businesses.length, subscription])
 
+ const activeBillingInterval: BillingInterval =
+  subscription?.billingInterval === 'yearly'
+    ? 'yearly'
+    : 'monthly'
+
+const activePricing =
+  pricing?.pricing?.[activeBillingInterval] || null
+
+const currentAdditionalBusinesses = Math.max(
+  Number(subscription?.additionalBusinesses || 0),
+  0
+)
+
+const nextAdditionalBusinesses =
+  currentAdditionalBusinesses + 1
+
+const currentSubscriptionTotal = activePricing
+  ? activePricing.base +
+    activePricing.addon * currentAdditionalBusinesses
+  : null
+
+const nextSubscriptionTotal = activePricing
+  ? activePricing.base +
+    activePricing.addon * nextAdditionalBusinesses
+  : null
+
+const additionalBusinessPrice =
+  activePricing?.addon ?? null
+
+const hasAvailableBusinessSlot =
+  capacity.active < capacity.max
+
+const canPurchaseAdditionalBusiness = Boolean(
+  isProActive &&
+    subscription?.stripeSubscriptionId &&
+    !subscription?.cancelAtPeriodEnd &&
+    !subscription?.isCanceledWithRemainingAccess &&
+    !needsBillingPortal
+)
+
   async function handleCheckout() {
     setWorking(true)
     setDataError('')
@@ -358,13 +398,13 @@ function Subscription(props: PageProps) {
         setWorking(false)
       }
     }}
-    onStartAdditionalBusinessCheckout={async () => {
+    onBuySlots={async (neededSlots) => {
       setWorking(true)
       setDataError('')
 
       try {
         await startAdditionalBusinessCheckout(
-          nextAdditionalBusinesses
+          capacity.additional + neededSlots
         )
       } catch (error) {
         setDataError(
@@ -378,30 +418,8 @@ function Subscription(props: PageProps) {
         setWorking(false)
       }
     }}
-    onStartProCheckout={async () => {
-      setModal(null)
-      await handleCheckout()
-    }}
     currentBusinessCount={capacity.active}
     maxBusinessesAllowed={capacity.max}
-    hasAvailableBusinessSlot={hasAvailableBusinessSlot}
-    isProActive={isProActive}
-    hasStripeSubscription={Boolean(
-      subscription?.stripeSubscriptionId
-    )}
-    canPurchaseAdditionalBusiness={
-      canPurchaseAdditionalBusiness
-    }
-    isCancellationPending={Boolean(
-      subscription?.cancelAtPeriodEnd ||
-        subscription?.isCanceledWithRemainingAccess
-    )}
-    billingInterval={activeBillingInterval}
-    currency={pricing?.currency || subscription?.currency || 'usd'}
-    additionalBusinessPrice={additionalBusinessPrice}
-    currentSubscriptionTotal={currentSubscriptionTotal}
-    nextSubscriptionTotal={nextSubscriptionTotal}
-    nextAdditionalBusinesses={nextAdditionalBusinesses}
     saving={working}
   />
 ) : null}
@@ -458,47 +476,6 @@ function Subscription(props: PageProps) {
     </AppShell>
   )
 }
-
-const activeBillingInterval: BillingInterval =
-  subscription?.billingInterval === 'yearly'
-    ? 'yearly'
-    : 'monthly'
-
-const activePricing =
-  pricing?.pricing?.[activeBillingInterval] || null
-
-const currentAdditionalBusinesses = Math.max(
-  Number(subscription?.additionalBusinesses || 0),
-  0
-)
-
-const nextAdditionalBusinesses =
-  currentAdditionalBusinesses + 1
-
-const currentSubscriptionTotal = activePricing
-  ? activePricing.base +
-    activePricing.addon * currentAdditionalBusinesses
-  : null
-
-const nextSubscriptionTotal = activePricing
-  ? activePricing.base +
-    activePricing.addon * nextAdditionalBusinesses
-  : null
-
-const additionalBusinessPrice =
-  activePricing?.addon ?? null
-
-const hasAvailableBusinessSlot =
-  capacity.active < capacity.max
-
-const canPurchaseAdditionalBusiness =
-  Boolean(
-    isProActive &&
-      subscription?.stripeSubscriptionId &&
-      !subscription?.cancelAtPeriodEnd &&
-      !subscription?.isCanceledWithRemainingAccess &&
-      !needsBillingPortal
-  )
 
 function AddBusinessModal({
   onClose,
