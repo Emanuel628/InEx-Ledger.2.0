@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+No import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Check, CreditCard, Plus, ShieldAlert, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
@@ -121,6 +121,55 @@ function Subscription(props: PageProps) {
     const additional = Number(subscription?.additionalBusinesses || 0)
     return { max, active, additional }
   }, [businesses.length, subscription])
+
+  const activeBillingInterval: BillingInterval =
+    subscription?.billingInterval === 'yearly'
+      ? 'yearly'
+      : interval
+
+  const activePricing =
+    pricing?.pricing?.[activeBillingInterval] || null
+
+  const currentAdditionalBusinesses = Math.max(
+    Number(subscription?.additionalBusinesses || 0),
+    0
+  )
+
+  const nextAdditionalBusinesses =
+    currentAdditionalBusinesses + 1
+
+  const currentSubscriptionTotal = activePricing
+    ? activePricing.base +
+      activePricing.addon * currentAdditionalBusinesses
+    : null
+
+  const nextSubscriptionTotal = activePricing
+    ? activePricing.base +
+      activePricing.addon * nextAdditionalBusinesses
+    : null
+
+  const additionalBusinessPrice =
+    activePricing?.addon ?? null
+
+  const hasAvailableBusinessSlot =
+    capacity.active < capacity.max
+
+  const isCancellationPending = Boolean(
+    subscription?.cancelAtPeriodEnd ||
+      subscription?.isCanceledWithRemainingAccess ||
+      subscription?.isTrialDowngradedToFree
+  )
+
+  const hasStripeSubscription = Boolean(
+    subscription?.stripeSubscriptionId
+  )
+
+  const canPurchaseAdditionalBusiness = Boolean(
+    isProActive &&
+      hasStripeSubscription &&
+      !isCancellationPending &&
+      !needsBillingPortal
+  )
 
   async function handleCheckout() {
     setWorking(true)
@@ -324,65 +373,84 @@ function Subscription(props: PageProps) {
           </section>
         ) : null}
 
-        {modal === 'add-business' ? (
-  <AddBusinessModal
-    onClose={() => setModal(null)}
-    onSave={async (input) => {
-      setWorking(true)
-      setDataError('')
+                {modal === 'add-business' ? (
+          <AddBusinessModal
+            onClose={() => setModal(null)}
+            onSave={async (input) => {
+              setWorking(true)
+              setDataError('')
 
-      try {
-        const response = await createBusiness(input)
+              try {
+                const response = await createBusiness(input)
 
-        setBusinessRows(response.businesses || [])
+                setBusinessRows(response.businesses || [])
+                setActiveBusinessId(
+                  response.active_business_id ||
+                    response.active_business?.id ||
+                    null
+                )
 
-        setActiveBusinessId(
-          response.active_business_id ||
-            response.active_business?.id ||
-            null
-        )
+                setModal(null)
 
-        setModal(null)
+                await refreshSubscription()
+                await refreshUser()
+              } catch (error) {
+                setDataError(
+                  error instanceof Error
+                    ? error.message
+                    : 'Unable to add business.'
+                )
 
-        await refreshSubscription()
-        await refreshUser()
-      } catch (error) {
-        setDataError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to add business.'
-        )
+                throw error
+              } finally {
+                setWorking(false)
+              }
+            }}
+            onStartAdditionalBusinessCheckout={async () => {
+              setWorking(true)
+              setDataError('')
 
-        throw error
-      } finally {
-        setWorking(false)
-      }
-    }}
-    onBuySlots={async (neededSlots) => {
-      setWorking(true)
-      setDataError('')
+              try {
+                await startAdditionalBusinessCheckout(
+                  nextAdditionalBusinesses
+                )
+              } catch (error) {
+                setDataError(
+                  error instanceof Error
+                    ? error.message
+                    : 'Unable to open additional business checkout.'
+                )
 
-      try {
-        await startAdditionalBusinessCheckout(
-          capacity.additional + neededSlots
-        )
-      } catch (error) {
-        setDataError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to open additional business checkout.'
-        )
-
-        throw error
-      } finally {
-        setWorking(false)
-      }
-    }}
-    currentBusinessCount={capacity.active}
-    maxBusinessesAllowed={capacity.max}
-    saving={working}
-  />
-) : null}
+                throw error
+              } finally {
+                setWorking(false)
+              }
+            }}
+            onStartProCheckout={async () => {
+              await handleCheckout()
+            }}
+            currentBusinessCount={capacity.active}
+            maxBusinessesAllowed={capacity.max}
+            hasAvailableBusinessSlot={hasAvailableBusinessSlot}
+            isProActive={isProActive}
+            hasStripeSubscription={hasStripeSubscription}
+            canPurchaseAdditionalBusiness={
+              canPurchaseAdditionalBusiness
+            }
+            isCancellationPending={isCancellationPending}
+            billingInterval={activeBillingInterval}
+            currency={
+              pricing?.currency ||
+              subscription?.currency ||
+              'usd'
+            }
+            additionalBusinessPrice={additionalBusinessPrice}
+            currentSubscriptionTotal={currentSubscriptionTotal}
+            nextSubscriptionTotal={nextSubscriptionTotal}
+            nextAdditionalBusinesses={nextAdditionalBusinesses}
+            saving={working}
+          />
+        ) : null}
 
         {modal === 'manage-business' ? (
           <ManageBusinessModal
@@ -440,89 +508,318 @@ function Subscription(props: PageProps) {
 function AddBusinessModal({
   onClose,
   onSave,
-  onBuySlots,
+  onStartAdditionalBusinessCheckout,
+  onStartProCheckout,
   currentBusinessCount,
   maxBusinessesAllowed,
+  hasAvailableBusinessSlot,
+  isProActive,
+  hasStripeSubscription,
+  canPurchaseAdditionalBusiness,
+  isCancellationPending,
+  billingInterval,
+  currency,
+  additionalBusinessPrice,
+  currentSubscriptionTotal,
+  nextSubscriptionTotal,
+  nextAdditionalBusinesses,
   saving,
 }: {
   onClose: () => void
-  onSave: (input: { name: string; region: 'US' | 'CA'; language: string }) => Promise<void>
-  onBuySlots: (neededSlots: number) => Promise<void>
+  onSave: (input: {
+    name: string
+    region: 'US' | 'CA'
+    language: string
+  }) => Promise<void>
+  onStartAdditionalBusinessCheckout: () => Promise<void>
+  onStartProCheckout: () => Promise<void>
   currentBusinessCount: number
   maxBusinessesAllowed: number
+  hasAvailableBusinessSlot: boolean
+  isProActive: boolean
+  hasStripeSubscription: boolean
+  canPurchaseAdditionalBusiness: boolean
+  isCancellationPending: boolean
+  billingInterval: BillingInterval
+  currency: string
+  additionalBusinessPrice: number | null
+  currentSubscriptionTotal: number | null
+  nextSubscriptionTotal: number | null
+  nextAdditionalBusinesses: number
   saving: boolean
 }) {
   const [name, setName] = useState('')
   const [region, setRegion] = useState<'US' | 'CA'>('US')
   const [error, setError] = useState('')
-  const [needsSlotPayment, setNeedsSlotPayment] = useState(false)
-  const [buyingSlots, setBuyingSlots] = useState(false)
-  const neededSlots = Math.max(1, currentBusinessCount + 1 - maxBusinessesAllowed)
+  const [openingCheckout, setOpeningCheckout] = useState(false)
+
+  const billingSuffix =
+    billingInterval === 'monthly' ? '/mo' : '/yr'
 
   async function submit() {
     if (!name.trim()) {
       setError('Business name is required.')
       return
     }
+
+    if (!hasAvailableBusinessSlot) {
+      setError(
+        'Purchase another business slot before creating this business.'
+      )
+      return
+    }
+
     setError('')
-    setNeedsSlotPayment(false)
+
     try {
-      await onSave({ name, region, language: 'en' })
+      await onSave({
+        name: name.trim(),
+        region,
+        language: 'en',
+      })
     } catch (saveError) {
-      if (isAdditionalBusinessPaymentRequired(saveError)) {
-        setNeedsSlotPayment(true)
-        setError(`You need ${neededSlots} extra business slot${neededSlots === 1 ? '' : 's'} before adding this business.`)
-      } else {
-        setError(saveError instanceof Error ? saveError.message : 'Unable to add business.')
-      }
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : 'Unable to add business.'
+      )
     }
   }
 
-  async function buySlots() {
-    setBuyingSlots(true)
+  async function startSlotCheckout() {
+    setOpeningCheckout(true)
     setError('')
+
     try {
-      await onBuySlots(neededSlots)
-    } catch (slotError) {
-      setError(slotError instanceof Error ? slotError.message : 'Unable to buy business slots.')
+      await onStartAdditionalBusinessCheckout()
+    } catch (checkoutError) {
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : 'Unable to open additional business checkout.'
+      )
     } finally {
-      setBuyingSlots(false)
+      setOpeningCheckout(false)
+    }
+  }
+
+  async function startProCheckout() {
+    setOpeningCheckout(true)
+    setError('')
+
+    try {
+      await onStartProCheckout()
+    } catch (checkoutError) {
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : 'Unable to open Pro checkout.'
+      )
+    } finally {
+      setOpeningCheckout(false)
     }
   }
 
   return (
-    <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="transaction-detail-modal subscription-action-modal" role="dialog" aria-modal="true" aria-labelledby="addBusinessTitle" onMouseDown={(event) => event.stopPropagation()}>
+    <div
+      className="transaction-modal-backdrop"
+      role="presentation"
+      onMouseDown={onClose}
+    >
+      <section
+        className="transaction-detail-modal subscription-action-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="addBusinessTitle"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="drawer-header">
           <div>
             <h2 id="addBusinessTitle">Add business</h2>
-            <p>Create another business under this subscription. Extra slots are checked before saving.</p>
+            <p>
+              Create and manage another business under your
+              subscription.
+            </p>
           </div>
-          <button className="icon-button" type="button" aria-label="Close add business" onClick={onClose}><X size={18} /></button>
+
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Close add business"
+            onClick={onClose}
+          >
+            <X size={18} />
+          </button>
         </div>
-        <form className="drawer-form" onSubmit={(event) => event.preventDefault()}>
-          <label>
-            Business name
-            <input value={name} placeholder="Business name" onChange={(event) => setName(event.target.value)} />
-          </label>
-          <label>
-            Region
-            <select value={region} onChange={(event) => setRegion(event.target.value === 'CA' ? 'CA' : 'US')}>
-              <option value="US">United States</option>
-              <option value="CA">Canada</option>
-            </select>
-          </label>
-          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
-          {needsSlotPayment ? (
-            <button className="primary-button" type="button" disabled={saving || buyingSlots} onClick={() => void buySlots()}>
-              <CreditCard size={18} />
-              {buyingSlots ? 'Opening checkout...' : `Buy ${neededSlots} extra slot${neededSlots === 1 ? '' : 's'}`}
+
+        <div className="transaction-detail-body">
+          <div className="subscription-simple-card">
+            <span>Business capacity</span>
+            <strong>
+              {currentBusinessCount} of {maxBusinessesAllowed} used
+            </strong>
+          </div>
+
+          {!isProActive ? (
+            <div className="settings-danger-zone">
+              <div>
+                <strong>Pro is required</strong>
+                <p>
+                  Upgrade to Pro before adding another business.
+                </p>
+              </div>
+
+              <button
+                className="primary-button"
+                type="button"
+                disabled={saving || openingCheckout}
+                onClick={() => void startProCheckout()}
+              >
+                <CreditCard size={18} />
+                {openingCheckout
+                  ? 'Opening checkout...'
+                  : 'Upgrade to Pro'}
+              </button>
+            </div>
+          ) : !hasAvailableBusinessSlot ? (
+            <div className="settings-danger-zone">
+              <div>
+                <strong>Add another business slot</strong>
+
+                {additionalBusinessPrice !== null ? (
+                  <p>
+                    One additional business costs{' '}
+                    {formatSubscriptionMoney(
+                      additionalBusinessPrice,
+                      currency
+                    )}
+                    {billingSuffix}.
+                  </p>
+                ) : (
+                  <p>
+                    Purchase another slot before creating this
+                    business.
+                  </p>
+                )}
+
+                {currentSubscriptionTotal !== null &&
+                nextSubscriptionTotal !== null ? (
+                  <p>
+                    Your subscription will change from{' '}
+                    {formatSubscriptionMoney(
+                      currentSubscriptionTotal,
+                      currency
+                    )}
+                    {billingSuffix} to{' '}
+                    {formatSubscriptionMoney(
+                      nextSubscriptionTotal,
+                      currency
+                    )}
+                    {billingSuffix}.
+                  </p>
+                ) : null}
+
+                <p>
+                  Your plan will include{' '}
+                  {nextAdditionalBusinesses} additional business{' '}
+                  {nextAdditionalBusinesses === 1
+                    ? 'slot'
+                    : 'slots'}.
+                </p>
+              </div>
+
+              {isCancellationPending ? (
+                <p className="drawer-error" role="note">
+                  Your subscription is scheduled to end. Keep Pro
+                  active before purchasing another business slot.
+                </p>
+              ) : !hasStripeSubscription ? (
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={saving || openingCheckout}
+                  onClick={() => void startProCheckout()}
+                >
+                  <CreditCard size={18} />
+                  {openingCheckout
+                    ? 'Opening checkout...'
+                    : 'Start Pro billing'}
+                </button>
+              ) : (
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={
+                    saving ||
+                    openingCheckout ||
+                    !canPurchaseAdditionalBusiness
+                  }
+                  onClick={() => void startSlotCheckout()}
+                >
+                  <CreditCard size={18} />
+                  {openingCheckout
+                    ? 'Opening checkout...'
+                    : 'Buy another business slot'}
+                </button>
+              )}
+            </div>
+          ) : (
+            <form
+              className="drawer-form"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <label>
+                Business name
+                <input
+                  value={name}
+                  placeholder="Business name"
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </label>
+
+              <label>
+                Region
+                <select
+                  value={region}
+                  onChange={(event) =>
+                    setRegion(
+                      event.target.value === 'CA' ? 'CA' : 'US'
+                    )
+                  }
+                >
+                  <option value="US">United States</option>
+                  <option value="CA">Canada</option>
+                </select>
+              </label>
+            </form>
+          )}
+
+          {error ? (
+            <p className="drawer-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="drawer-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+
+          {hasAvailableBusinessSlot && isProActive ? (
+            <button
+              className="primary-button"
+              type="button"
+              disabled={saving || openingCheckout}
+              onClick={() => void submit()}
+            >
+              {saving ? 'Saving...' : 'Add business'}
             </button>
           ) : null}
-        </form>
-        <div className="drawer-actions">
-          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
-          <button className="primary-button" type="button" disabled={saving} onClick={() => void submit()}>{saving ? 'Saving...' : 'Add business'}</button>
         </div>
       </section>
     </div>
