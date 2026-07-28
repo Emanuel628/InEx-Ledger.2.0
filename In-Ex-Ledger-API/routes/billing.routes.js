@@ -970,6 +970,12 @@ router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => 
 
 router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
+    const checkoutAttemptId = String(req.body?.checkoutAttemptId || "").trim();
+    
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(checkoutAttemptId)) {
+      throw new BillingValidationError("A valid checkout attempt ID is required.");
+    }
+    
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
     let subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
     // Pro checkout is plan-only: exactly one base Pro price, monthly or
@@ -1083,7 +1089,9 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       "subscription_data[metadata][currency]": priceSelection.currency,
       "subscription_data[metadata][currency_source]": billingContext.source,
       "subscription_data[metadata][country_code]": billingContext.countryCode || "unknown",
-      "subscription_data[metadata][additional_businesses]": additionalBusinesses
+      "subscription_data[metadata][additional_businesses]": additionalBusinesses,
+      "metadata[checkout_attempt_id]": checkoutAttemptId,
+      "subscription_data[metadata][checkout_attempt_id]": checkoutAttemptId
     };
 
     if (isEnvFlagEnabled("STRIPE_AUTOMATIC_TAX_ENABLED", true)) {
@@ -1105,14 +1113,9 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     }
 
     const session = await stripeRequest("/checkout/sessions", sessionPayload, {
-      idempotencyKey: buildCheckoutIdempotencyKey({
-        businessId: billingBusinessId,
-        billingInterval: priceSelection.billingInterval,
-        currency: priceSelection.currency,
-        additionalBusinesses,
-        userId: req.user?.id
-      })
+      idempotencyKey: `checkout:${billingBusinessId}:${checkoutAttemptId}`
     });
+
     logInfo("Billing checkout session created", {
       userId: req.user?.id,
       businessId: billingBusinessId,
