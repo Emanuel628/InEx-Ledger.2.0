@@ -70,12 +70,14 @@ export async function loadBillingPricing() {
   return apiRequest<BillingPricing>('/api/billing/pricing')
 }
 
-export async function startCheckout(billingInterval: BillingInterval, additionalBusinesses = 0) {
+// Pro checkout is plan-only (one base price, monthly or yearly, no addon line
+// items). Extra business slots are purchased separately, after Pro is
+// active, via updateAdditionalBusinesses() or the Stripe billing portal.
+export async function startCheckout(billingInterval: BillingInterval) {
   const data = await apiRequest<{ url: string }>('/api/billing/checkout-session', {
     method: 'POST',
     body: JSON.stringify({
       billingInterval,
-      additionalBusinesses,
       returnPath: '/subscription',
     }),
   })

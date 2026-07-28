@@ -542,9 +542,13 @@ test("v3 subscription avoids checkout conflicts for existing Stripe subscription
   assert.match(source, /sessionStorage\.setItem\('inex-preferred-billing-interval', nextInterval\)/);
   assert.match(source, /handleAdditionalBusinessUpdate/);
   assert.match(source, /updateAdditionalBusinesses\(nextValue\)/);
-  assert.match(source, /checkoutAdditionalBusinessDraft/);
-  assert.match(source, /startCheckout\(interval, checkoutAdditionalBusinesses\)/);
-  assert.match(source, /Extra business slots in checkout/);
+  // Pro checkout is plan-only: no addon-slot picker on the pre-Pro checkout
+  // screen, and startCheckout is never called with an additionalBusinesses
+  // argument. Extra business slots are only purchasable after Pro is active.
+  assert.match(source, /await startCheckout\(interval\)/);
+  assert.doesNotMatch(source, /Extra business slots in checkout/);
+  assert.doesNotMatch(source, /startCheckout\(interval, checkoutAdditionalBusinesses\)/);
+  assert.match(source, /Start a Pro subscription first, then add extra business slots/);
   assert.match(source, /isAdditionalBusinessPaymentRequired/);
   assert.match(source, /onBuySlots/);
   assert.match(source, /ApiRequestError/);

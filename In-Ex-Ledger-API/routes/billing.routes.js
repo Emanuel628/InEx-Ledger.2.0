@@ -962,7 +962,12 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
     let subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
-    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+    // Pro checkout is plan-only: exactly one base Pro price, monthly or
+    // yearly, with no additional-business line item. Extra business slots
+    // are purchased separately via PATCH /additional-businesses, which
+    // requires an active Pro subscription to already exist. Any client-
+    // supplied additionalBusinesses value here is ignored.
+    const additionalBusinesses = 0;
 
     if (isTrialReupgradeAttempt(subscription)) {
       await pool.query(
