@@ -4,12 +4,18 @@ import type { PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
 import { loginUser } from '../lib/authApi'
 
+function getSignedOutReason() {
+  const reason = new URLSearchParams(window.location.search).get('reason')
+  return reason === 'inactive' || reason === 'expired' ? reason : null
+}
+
 function Login(props: PageProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [signedOutReason] = useState(getSignedOutReason)
 
   async function submitLogin() {
     setSubmitting(true)
@@ -37,6 +43,12 @@ function Login(props: PageProps) {
     >
       <h2>Sign in</h2>
       <p>Use the email and password attached to your InEx Ledger account.</p>
+      {signedOutReason === 'inactive' ? (
+        <p className="auth-success" role="status">You were signed out after 15 minutes of inactivity.</p>
+      ) : null}
+      {signedOutReason === 'expired' ? (
+        <p className="auth-success" role="status">Your session expired. Please sign in again.</p>
+      ) : null}
       <form className="auth-form" onSubmit={(event) => {
         event.preventDefault()
         void submitLogin()

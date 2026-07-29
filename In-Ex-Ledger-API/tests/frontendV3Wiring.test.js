@@ -542,25 +542,29 @@ test("v3 subscription avoids checkout conflicts for existing Stripe subscription
   assert.match(source, /shouldManageExistingSubscription/);
   assert.match(source, /needsBillingPortal/);
   assert.match(source, /await openBillingPortal\(\)/);
-  assert.match(source, /Open Stripe billing/);
   assert.match(source, /readPreferredBillingInterval/);
   assert.match(source, /chooseBillingInterval/);
   assert.match(source, /sessionStorage\.setItem\('inex-preferred-billing-interval', nextInterval\)/);
   // Pro checkout is plan-only: no addon-slot picker on the pre-Pro checkout
   // screen, and startCheckout is never called with an additionalBusinesses
   // argument. Extra business slots are purchased separately, after Pro is
-  // active, through the Add Business modal's own pricing-aware view.
+  // active, through the Business Workspaces page's own pricing-aware view.
   assert.match(source, /await startCheckout\(interval\)/);
   assert.doesNotMatch(source, /startCheckout\(interval, /);
+  assert.match(apiSource, /\/api\/billing\/additional-businesses\/checkout/);
+  assert.match(apiSource, /\/api\/billing\/additional-businesses/);
+  assert.match(apiSource, /method: 'PATCH'/);
+});
+
+test("v3 business workspaces page owns additional-business-slot checkout", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "pages", "BusinessWorkspaces.tsx"), "utf8");
+
   assert.match(source, /startAdditionalBusinessCheckout/);
   assert.match(source, /canPurchaseAdditionalBusiness/);
   assert.match(source, /hasAvailableBusinessSlot/);
   assert.match(source, /isCancellationPending/);
   assert.match(source, /Buy another business slot/);
   assert.match(source, /additionalBusinessPrice/);
-  assert.match(apiSource, /\/api\/billing\/additional-businesses\/checkout/);
-  assert.match(apiSource, /\/api\/billing\/additional-businesses/);
-  assert.match(apiSource, /method: 'PATCH'/);
 });
 
 test("v3 collapsed sidebar keeps the header visible", () => {

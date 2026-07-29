@@ -473,8 +473,11 @@ function BillingSettings({ onNavigate }: { onNavigate: PageProps['onNavigate'] }
       <SettingsRow icon={CreditCard} title="Stripe billing portal" description="Payment methods, invoices, cancellation, and reactivation belong in billing.">
         <button className="primary-button" type="button" onClick={() => onNavigate('Billing')}>Open billing</button>
       </SettingsRow>
-      <SettingsRow icon={Download} title="Subscription" description="Choose monthly or yearly checkout and review workspace capacity.">
+      <SettingsRow icon={Download} title="Subscription" description="Review your plan, usage, and billing.">
         <button className="secondary-button" type="button" onClick={() => onNavigate('Subscription')}>Manage plan</button>
+      </SettingsRow>
+      <SettingsRow icon={Building2} title="Business workspaces" description="Switch, add, or remove business workspaces.">
+        <button className="secondary-button" type="button" onClick={() => onNavigate('BusinessWorkspaces')}>Manage workspaces</button>
       </SettingsRow>
     </SettingsPanel>
   )

@@ -438,9 +438,7 @@ textarea:focus-visible {
 }
 
 .public-header {
-  position: sticky;
-  top: 0;
-  z-index: 30;
+  position: relative;
   min-height: 72px;
   padding: 0 28px;
   border: 1px solid var(--line);
@@ -777,6 +775,23 @@ textarea:focus-visible {
   gap: 8px;
   color: var(--muted);
   font-weight: 750;
+}
+
+.trial-plan-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.trial-plan-card h3 {
+  margin: 0;
+}
+
+.trial-plan-interval {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  display: grid;
+  gap: 6px;
 }
 
 .faq-item {
@@ -2039,6 +2054,29 @@ tbody tr:last-child td {
   color: var(--muted);
   font-size: 13px;
   max-width: 46ch;
+}
+
+.subscription-cancel-link {
+  margin-top: 8px;
+  color: var(--red) !important;
+  font-size: 12px;
+}
+
+.subscription-workspace-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.subscription-workspace-summary p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .subscription-renew-card {

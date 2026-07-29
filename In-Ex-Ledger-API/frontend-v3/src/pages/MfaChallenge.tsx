@@ -230,11 +230,7 @@ function MfaChallenge(props: PageProps) {
             {resending ? 'Sending...' : 'Resend code'}
           </button>
         ) : null}
-        {isSignup ? (
-          <button className="secondary-button" type="button" onClick={() => void props.onLogout()}>
-            Sign out
-          </button>
-        ) : (
+        {isSignup ? null : (
           <button className="secondary-button" type="button" onClick={() => props.onNavigate(isEmailChange ? 'Settings' : 'Login')}>
             {isEmailChange ? 'Back to Settings' : 'Back to sign in'}
           </button>
