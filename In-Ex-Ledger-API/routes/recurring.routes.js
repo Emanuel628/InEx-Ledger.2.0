@@ -10,6 +10,8 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const { requirePlanFeature } = require("../middleware/requirePlanFeature.js");
+const { FEATURE_KEYS } = require("../config/planCatalog.js");
 const { BasicPlanLimitError } = require("../services/basicPlanUsageService.js");
 const {
   RecurringTemplateValidationError,
@@ -37,21 +39,11 @@ function validateRecurringIdParam(id) {
   return UUID_RE.test(String(id || ""));
 }
 
-router.use(async (req, res, next) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "recurring_transactions")) {
-      return res.status(402).json({
-        error: "Recurring transactions are available on Pro.",
-        code: "recurring_requires_pro"
-      });
-    }
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
+// Recurring templates are a Pro feature to *create, edit, reactivate, and
+// execute*, but Basic can still see and delete/deactivate whatever it
+// already has from a prior Pro period -- so this is gated per-route below
+// instead of blocking the whole router (a downgraded user must not lose
+// visibility into their own templates).
 
 router.get("/", async (req, res) => {
   try {
@@ -76,7 +68,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async (req, res) => {
   const validation = normalizeRecurringPayload(req.body);
   if (!validation.valid) {
     return res.status(400).json({ error: validation.message });
@@ -138,7 +130,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async (req, res) => {
   if (!validateRecurringIdParam(req.params.id)) {
     return res.status(400).json({ error: "Invalid recurring transaction id." });
   }
@@ -242,6 +234,21 @@ router.patch("/:id/status", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    // Deactivating a template is always allowed (Basic must be able to pause
+    // what it already has); only reactivating requires Pro.
+    if (req.body.active) {
+      const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+      if (!hasFeatureAccess(subscription, FEATURE_KEYS.RECURRING_TRANSACTIONS)) {
+        return res.status(403).json({
+          error: "Reactivating recurring transactions is available on Pro.",
+          code: "feature_requires_plan",
+          feature: FEATURE_KEYS.RECURRING_TRANSACTIONS,
+          current_plan: subscription?.effectiveTier || "free",
+          required_plan: "v1",
+          required_plan_name: "Pro"
+        });
+      }
+    }
     const result = await pool.query(
        `UPDATE recurring_transactions
        SET active = $1, updated_at = NOW()
@@ -261,7 +268,7 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
-router.post("/:id/run", async (req, res) => {
+router.post("/:id/run", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async (req, res) => {
   if (!validateRecurringIdParam(req.params.id)) {
     return res.status(400).json({ error: "Invalid recurring transaction id." });
   }
@@ -335,7 +342,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-router.post("/undo-delete", async (req, res) => {
+router.post("/undo-delete", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(

@@ -8,10 +8,6 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError, logInfo } = require("../utils/logger.js");
-const {
-  getSubscriptionSnapshotForBusiness,
-  hasFeatureAccess
-} = require("../services/subscriptionService.js");
 const { sendInvoiceEmail } = require("../services/invoiceEmailService.js");
 const { sendInvoiceOwnerActivityEmail } = require("../services/invoiceOwnerEmailService.js");
 const {
@@ -108,15 +104,6 @@ function parseEmailList(value) {
   }
 
   return { ok: true, emails: normalized };
-}
-
-async function requireProPlan(businessId, res) {
-  const sub = await getSubscriptionSnapshotForBusiness(businessId);
-  if (!hasFeatureAccess(sub, "receipts")) {
-    res.status(402).json({ error: "Invoicing requires an active InEx Ledger Pro plan." });
-    return false;
-  }
-  return true;
 }
 
 function validateInvoicePayload(body) {
@@ -217,7 +204,6 @@ async function generateInvoiceNumber(businessId) {
 router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
 
     const status = req.query.status ? String(req.query.status).toLowerCase() : null;
     const params = [businessId];
@@ -253,7 +239,6 @@ if (status === "deleted") {
 router.post("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
 
     const validation = validateInvoicePayload(req.body);
     if (!validation.valid) {
@@ -311,7 +296,6 @@ router.get("/:id", async (req, res) => {
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
 
     const result = await pool.query(
       "SELECT * FROM invoices_v1 WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
@@ -333,7 +317,6 @@ router.put("/:id", async (req, res) => {
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
 
     const existing = await pool.query(
       "SELECT id, status FROM invoices_v1 WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
@@ -383,7 +366,6 @@ router.patch("/:id/status", async (req, res) => {
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
 
     const result = await pool.query(
       "UPDATE invoices_v1 SET status=$1, updated_at=now() WHERE id=$2 AND business_id=$3 AND deleted_at IS NULL RETURNING *",
@@ -405,7 +387,6 @@ router.post("/:id/send", invoiceAttachmentsUpload.array("attachments", MAX_INVOI
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
 
     const existing = await pool.query(
       `SELECT i.*, b.name AS business_name
@@ -553,7 +534,6 @@ router.delete("/:id", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
 
     const existing = await pool.query(
       "SELECT id, status, deleted_at FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
@@ -600,7 +580,6 @@ router.patch("/:id/restore", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
 
     const existing = await pool.query(
       "SELECT id, status, deleted_at FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",

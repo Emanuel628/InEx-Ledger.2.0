@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarClock, Check, CreditCard, Plus, ShieldAlert, X } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Check, CreditCard, Plus, ShieldAlert, Sparkles, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import UsageMeter from '../components/UsageMeter'
+import { usePlan } from '../context/PlanContext'
 import {
   cancelSubscription,
   formatSubscriptionDate,
@@ -30,6 +32,7 @@ type SubscriptionBusiness = { name: string; role: string; status: string }
 type SubscriptionModal = 'add-business' | 'manage-business' | null
 
 function Subscription(props: PageProps) {
+  const { plan: planContext, isPro, refreshPlanContext } = usePlan()
   const [interval, setBillingInterval] = useState<BillingInterval>(readPreferredBillingInterval)
   const [overview, setOverview] = useState<BillingOverview | null>(null)
   const [pricing, setPricing] = useState<BillingPricing | null>(null)
@@ -103,7 +106,11 @@ function Subscription(props: PageProps) {
   const planName = subscription?.effectiveTierName || 'Basic'
   const statusLabel = getSubscriptionStatus(subscription)
   const renewalLabel = buildRenewalLabel(subscription)
-  const isProActive = Boolean(subscription?.effectiveTier === 'v1' && (subscription?.isPaid || subscription?.isTrialing))
+  // Whether Pro is active is read from the shared plan/entitlement model
+  // (usePlan) rather than comparing subscription.effectiveTier === 'v1'
+  // directly, so this page can never drift from what the backend actually
+  // enforces.
+  const isProActive = Boolean(isPro && (subscription?.isPaid || subscription?.isTrialing))
   const canResume = Boolean(subscription?.cancelAtPeriodEnd || subscription?.isCanceledWithRemainingAccess || subscription?.isTrialDowngradedToFree)
   // Only route to "Open Stripe billing" when a real Stripe subscription (paid,
   // or already checked out and still within its Stripe trial window) exists.
@@ -211,6 +218,7 @@ function Subscription(props: PageProps) {
     try {
       const updated = await resumeSubscription(interval)
       setOverview((current) => current ? { ...current, subscription: updated } : current)
+      await refreshPlanContext()
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to keep Pro active.')
     } finally {
@@ -227,6 +235,7 @@ function Subscription(props: PageProps) {
     try {
       const updated = await cancelSubscription()
       setOverview((current) => current ? { ...current, subscription: updated } : current)
+      await refreshPlanContext()
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to cancel subscription.')
     } finally {
@@ -268,7 +277,7 @@ function Subscription(props: PageProps) {
           <div className="subscription-plan-copy">
             <span className={`status-pill ${isProActive ? 'status-income' : 'status-draft'}`}>Current plan</span>
             <h2>{loadingData ? 'Loading plan' : `${planName} access`}</h2>
-            <p>{buildPlanSummary(subscription)}</p>
+            <p>{buildPlanSummary(subscription, isProActive)}</p>
           </div>
           <div className="subscription-renew-card">
             <div className="subscription-interval-toggle" role="group" aria-label="Billing interval">
@@ -318,6 +327,45 @@ function Subscription(props: PageProps) {
             <p>{planName} plan</p>
           </article>
         </section>
+
+        {!isProActive ? (
+          <section className="table-panel">
+            <div className="table-panel-header">
+              <div>
+                <h2>Basic usage this month</h2>
+                <p>Your existing records always remain available, even after a monthly limit is reached.</p>
+              </div>
+            </div>
+            <div className="transaction-detail-body">
+              <UsageMeter label="Transactions" metric={planContext?.usage.transactions} />
+              <UsageMeter label="Receipt uploads" metric={planContext?.usage.receipts} />
+            </div>
+          </section>
+        ) : null}
+
+        {!isProActive ? (
+          <section className="table-panel">
+            <div className="table-panel-header">
+              <div>
+                <h2>What Pro adds</h2>
+                <p>Everything in Basic, plus:</p>
+              </div>
+              <button className="primary-button" type="button" onClick={() => props.onNavigate('Upgrade')}>
+                <Sparkles size={16} />Upgrade to Pro
+              </button>
+            </div>
+            <div className="transaction-detail-body">
+              <ul className="subscription-pro-benefits">
+                <li>No monthly transaction or receipt-upload limits -- subject to reasonable technical and abuse-prevention limits</li>
+                <li>Recurring transactions -- create, edit, and run them automatically</li>
+                <li>Tax estimates on your analytics</li>
+                <li>PDF accountant packets and full CPA/workpaper CSV exports</li>
+                <li>Advanced export and edge-case tools</li>
+                <li>Additional business workspaces (paid add-on)</li>
+              </ul>
+            </div>
+          </section>
+        ) : null}
 
         <section className="table-panel">
           <div className="table-panel-header">
@@ -877,12 +925,13 @@ function ManageBusinessModal({
   onActivate: (businessId: string) => Promise<void>
   onDelete: (businessId: string, password: string) => Promise<void>
 }) {
+  const { isPro } = usePlan()
   const [password, setPassword] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [error, setError] = useState('')
   const canDelete = businessCount > 1
   const isActive = business?.id === activeBusinessId
-  const hasBilling = Boolean(subscription?.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing))
+  const hasBilling = Boolean(isPro && (subscription?.isPaid || subscription?.isTrialing))
   const nextAdditionalBusinesses = Math.max(businessCount - 2, 0)
   const priceForInterval = pricing?.pricing?.[interval]
   const newTotal = priceForInterval
@@ -980,22 +1029,22 @@ function getSubscriptionStatus(subscription?: BillingSubscription | null) {
   if (subscription?.cancelAtPeriodEnd || subscription?.isTrialDowngradedToFree) return 'Canceling'
   if (subscription?.isTrialing) return 'Trial'
   if (status === 'active') return 'Active'
-  if (status === 'free') return 'Free tier'
+  if (status === 'free') return 'Basic'
   return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
-function buildPlanSummary(subscription?: BillingSubscription | null) {
-  if (!subscription) return 'Start checkout when you are ready to unlock Pro workflows.'
+function buildPlanSummary(subscription: BillingSubscription | null | undefined, isProActive: boolean) {
+  if (!subscription) return 'Basic includes 50 transactions and 25 receipt uploads a month. Upgrade to Pro to remove those limits and unlock recurring transactions, tax estimates, and full exports.'
   if (subscription.cancelAtPeriodEnd) {
     return `Pro access stays active until ${formatSubscriptionDate(subscription.currentPeriodEnd) || 'the end of the paid period'}.`
   }
   if (subscription.isTrialDowngradedToFree) {
     return `Canceling confirmed. Pro access stays active until ${formatSubscriptionDate(subscription.trialEndsAt) || 'the trial ends'}, then the account moves to Basic.`
   }
-  if (subscription.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing)) {
-    return 'Pro workflows are active for this workspace.'
+  if (isProActive) {
+    return 'Basic monthly limits are removed on Pro, subject to reasonable technical and abuse-prevention limits. Recurring transactions, tax estimates, and full exports are all active for this workspace.'
   }
-  return 'Free tier stays available. Start checkout when you are ready to unlock Pro workflows.'
+  return 'Basic includes 50 transactions and 25 receipt uploads a month. Upgrade to Pro to remove those limits and unlock recurring transactions, tax estimates, and full exports.'
 }
 
 function buildRenewalLabel(subscription?: BillingSubscription | null) {
@@ -1015,10 +1064,10 @@ function buildRenewalLabel(subscription?: BillingSubscription | null) {
 function buildStatusDetail(subscription?: BillingSubscription | null) {
   if (!subscription) return 'No subscription details loaded yet.'
   if (subscription.cancelAtPeriodEnd) {
-    return `Paid access ends ${formatSubscriptionDate(subscription.currentPeriodEnd) || 'at period end'}, then the account returns to Basic.`
+    return `Your Pro access ends on ${formatSubscriptionDate(subscription.currentPeriodEnd) || 'the current period end'}. After that, your account moves to Basic. Your existing records remain available.`
   }
   if (subscription.isTrialDowngradedToFree) {
-    return `Canceling confirmed. Access ends ${formatSubscriptionDate(subscription.trialEndsAt) || 'at the trial end date'}, then the account returns to Basic.`
+    return `Your Pro access ends on ${formatSubscriptionDate(subscription.trialEndsAt) || 'the trial end date'}. After that, your account moves to Basic. Your existing records remain available.`
   }
   if (subscription.isTrialing) {
     return `Trial access ends ${formatSubscriptionDate(subscription.trialEndsAt) || 'at the trial end date'}.`

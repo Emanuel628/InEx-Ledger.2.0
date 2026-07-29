@@ -41,7 +41,7 @@ function TrialSetup(props: PageProps) {
         <li><CheckCircle2 size={17} /><span>No monthly caps on transactions, receipts, or CSV imports</span></li>
         <li><CheckCircle2 size={17} /><span>Mileage tracking that turns trips into real deductions</span></li>
         <li><CheckCircle2 size={17} /><span>Professional invoices so clients pay you faster</span></li>
-        <li><CheckCircle2 size={17} /><span>Tax-ready PDF and CSV exports, plus built-in Tax ID safeguards</span></li>
+        <li><CheckCircle2 size={17} /><span>Tax-ready PDF accountant packets and full CPA/workpaper CSV exports</span></li>
       </ul>
       <form className="auth-form" onSubmit={(event) => event.preventDefault()}>
         <label>
@@ -65,7 +65,7 @@ function TrialSetup(props: PageProps) {
           {openingCheckout ? 'Opening checkout...' : 'Start Pro trial'}
         </button>
         <button className="secondary-button" type="button" disabled={openingCheckout} onClick={() => props.onNavigate(resolveStayPage())}>
-          Stay on free tier
+          Stay on Basic
         </button>
       </form>
     </AuthShell>

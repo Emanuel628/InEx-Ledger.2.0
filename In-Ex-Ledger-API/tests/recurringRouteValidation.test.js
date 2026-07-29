@@ -7,6 +7,7 @@ const express = require("express");
 const request = require("supertest");
 
 const ROUTE_PATH = require.resolve("../routes/recurring.routes.js");
+const REQUIRE_PLAN_FEATURE_PATH = require.resolve("../middleware/requirePlanFeature.js");
 
 function loadRecurringRouter(options = {}) {
   const originalLoad = Module._load.bind(Module);
@@ -45,7 +46,8 @@ function loadRecurringRouter(options = {}) {
     }
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
       return {
-        getSubscriptionSnapshotForBusiness: async () => ({ plan: "test" }),
+        PLAN_PRO: "v1",
+        getSubscriptionSnapshotForBusiness: async () => ({ plan: "test", effectiveTier: "free" }),
         hasFeatureAccess: options.hasFeatureAccess || (() => true)
       };
     }
@@ -198,6 +200,10 @@ function loadRecurringRouter(options = {}) {
   };
 
   delete require.cache[ROUTE_PATH];
+  // requirePlanFeature.js destructures hasFeatureAccess/getSubscriptionSnapshotForBusiness
+  // from subscriptionService.js at module-load time, so it must be re-required
+  // (not served from a stale cache) every time this fixture swaps that mock in.
+  delete require.cache[REQUIRE_PLAN_FEATURE_PATH];
 
   try {
     const router = require("../routes/recurring.routes.js");
@@ -209,6 +215,7 @@ function loadRecurringRouter(options = {}) {
       state,
       cleanup() {
         delete require.cache[ROUTE_PATH];
+        delete require.cache[REQUIRE_PLAN_FEATURE_PATH];
         Module._load = originalLoad;
       }
     };
@@ -277,15 +284,116 @@ test("recurring undo-delete restores the latest deleted template", async () => {
   }
 });
 
-test("recurring routes are gated for Basic with a recurring_requires_pro response", async () => {
+const VALID_TEMPLATE_ID = "00000000-0000-4000-8000-000000000799";
+
+test("Basic can still list previously-created recurring templates", async () => {
   const fixture = loadRecurringRouter({ hasFeatureAccess: () => false });
   try {
     const response = await request(fixture.app).get("/api/recurring");
 
-    assert.equal(response.status, 402);
-    assert.equal(response.body.code, "recurring_requires_pro");
-    assert.match(response.body.error, /available on Pro/i);
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, []);
+    assert.equal(fixture.state.dbTouched, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("Basic cannot create a recurring template (403 feature_requires_plan)", async () => {
+  const fixture = loadRecurringRouter({ hasFeatureAccess: () => false });
+  try {
+    const response = await request(fixture.app)
+      .post("/api/recurring")
+      .send({ amount: 1 });
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, "feature_requires_plan");
+    assert.equal(response.body.feature, "recurring_transactions");
+    assert.equal(response.body.required_plan, "v1");
+    assert.equal(response.body.required_plan_name, "Pro");
     assert.equal(fixture.state.dbTouched, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("Basic cannot edit a recurring template (403 feature_requires_plan)", async () => {
+  const fixture = loadRecurringRouter({ hasFeatureAccess: () => false });
+  try {
+    const response = await request(fixture.app)
+      .put(`/api/recurring/${VALID_TEMPLATE_ID}`)
+      .send({ amount: 1 });
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, "feature_requires_plan");
+    assert.equal(fixture.state.dbTouched, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("Basic cannot execute (run) a recurring template (403 feature_requires_plan)", async () => {
+  const fixture = loadRecurringRouter({ hasFeatureAccess: () => false });
+  try {
+    const response = await request(fixture.app).post(`/api/recurring/${VALID_TEMPLATE_ID}/run`);
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, "feature_requires_plan");
+    assert.equal(fixture.state.dbTouched, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("Basic cannot restore (undo-delete) a recurring template (403 feature_requires_plan)", async () => {
+  const fixture = loadRecurringRouter({ hasFeatureAccess: () => false });
+  try {
+    const response = await request(fixture.app)
+      .post("/api/recurring/undo-delete")
+      .send({});
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, "feature_requires_plan");
+    assert.equal(fixture.state.dbTouched, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("Basic can deactivate but not reactivate a recurring template", async () => {
+  const fixture = loadRecurringRouter({ hasFeatureAccess: () => false });
+  try {
+    const deactivate = await request(fixture.app)
+      .patch(`/api/recurring/${VALID_TEMPLATE_ID}/status`)
+      .send({ active: false });
+
+    // Not blocked by plan gating -- reaches the (mocked, empty) database and
+    // reports 404 for the not-found row rather than a 403 feature gate.
+    assert.equal(deactivate.status, 404);
+    assert.equal(fixture.state.dbTouched, true);
+
+    fixture.state.dbTouched = false;
+    const reactivate = await request(fixture.app)
+      .patch(`/api/recurring/${VALID_TEMPLATE_ID}/status`)
+      .send({ active: true });
+
+    assert.equal(reactivate.status, 403);
+    assert.equal(reactivate.body.code, "feature_requires_plan");
+    assert.equal(fixture.state.dbTouched, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("Basic can still delete a previously-created recurring template", async () => {
+  const fixture = loadRecurringRouter({ hasFeatureAccess: () => false });
+  try {
+    const response = await request(fixture.app).delete(`/api/recurring/${VALID_TEMPLATE_ID}`);
+
+    // Not blocked by plan gating -- reaches the (mocked, empty) database and
+    // reports 404 for the not-found row rather than a 403 feature gate.
+    assert.equal(response.status, 404);
+    assert.equal(fixture.state.dbTouched, true);
   } finally {
     fixture.cleanup();
   }

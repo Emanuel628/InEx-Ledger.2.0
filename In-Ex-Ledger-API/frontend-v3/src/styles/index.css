@@ -2200,6 +2200,104 @@ tbody tr:last-child td {
   }
 }
 
+/* Usage meters (Basic transaction/receipt allowances) + Pro plan gates. */
+.usage-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.usage-meter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.usage-meter-head span {
+  color: var(--muted);
+}
+
+.usage-meter-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.usage-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+  transition: width 0.3s ease;
+}
+
+.usage-meter-near-limit .usage-meter-fill {
+  background: var(--amber);
+}
+
+.usage-meter-at-limit .usage-meter-fill {
+  background: var(--red);
+}
+
+.usage-meter-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.usage-meter-unmetered .usage-meter-caption {
+  color: var(--teal);
+}
+
+.plan-gate-locked-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plan-gate-locked-button:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.upgrade-reassurance {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 10px 0 0;
+}
+
+.subscription-pro-benefits {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.upgrade-prompt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  margin-bottom: 8px;
+}
+
 .subscription-business-row {
   display: grid;
   grid-template-columns: 1fr auto auto;

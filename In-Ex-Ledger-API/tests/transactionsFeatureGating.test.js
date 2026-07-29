@@ -76,6 +76,7 @@ function loadRouter({ effectiveTier = "free" } = {}) {
       /subscriptionService\.js$/.test(requestName)
     ) {
       return {
+        PLAN_PRO: "v1",
         getSubscriptionSnapshotForBusiness: async () => ({ effectiveTier }),
         hasFeatureAccess: (subscription, feature) => {
           if (feature === "edge_case_tools") {
@@ -166,8 +167,10 @@ test("basic plan rejects advanced transaction payload fields", async () => {
         tax_treatment: "capital"
       });
 
-    assert.equal(res.status, 402);
-    assert.match(String(res.body?.error || ""), /Pro plan/i);
+    assert.equal(res.status, 403);
+    assert.equal(res.body?.code, "feature_requires_plan");
+    assert.equal(res.body?.feature, "edge_case_tools");
+    assert.match(String(res.body?.error || ""), /available on Pro/i);
   } finally {
     fixture.cleanup();
   }

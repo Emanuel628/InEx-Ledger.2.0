@@ -290,9 +290,17 @@
 }
 
 @media (max-width: 640px) {
-  .auth-form-grid,
-  .auth-code-row {
+  .auth-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .auth-code-row {
+    gap: 6px;
+  }
+
+  .auth-code-row input {
+    min-height: 44px;
+    font-size: 18px;
   }
 
   .auth-card {
