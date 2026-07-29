@@ -31,6 +31,7 @@ import Help from './pages/Help'
 import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
 import { applyV3PhraseTranslations, getStoredLanguage, getUserLanguage, observeV3PhraseTranslations, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
+import { PlanProvider } from './context/PlanContext'
 
 declare global {
   interface Window {
@@ -418,6 +419,7 @@ function App() {
     onLanguageChange: handleLanguageChange,
   }
 
+  function renderPage() {
   if (authLoading) {
     return (
       <div className="app-v3-loading" data-theme={theme} role="status" aria-live="polite">
@@ -546,6 +548,9 @@ function App() {
   }
 
   return <PlaceholderPage {...pageProps} />
+  }
+
+  return <PlanProvider authUser={authUser}>{renderPage()}</PlanProvider>
 }
 
 export default App

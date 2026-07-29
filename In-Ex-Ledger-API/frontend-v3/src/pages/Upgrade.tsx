@@ -21,7 +21,7 @@ function Upgrade(props: PageProps) {
       <section className="public-page-heading">
         <p className="eyebrow">Upgrade</p>
         <h1>Upgrade to Pro</h1>
-        <p>Unlock the core working app: receipts, mileage, invoices, exports, safeguards, and support messages.</p>
+        <p>Basic already covers transactions, receipts, mileage, invoicing, and support messages. Pro removes the Basic monthly limits and adds automation and tax-ready exports.</p>
       </section>
 
       <section className="upgrade-panel">
@@ -29,11 +29,13 @@ function Upgrade(props: PageProps) {
           <h2>Pro</h2>
           <strong>{price}<span> / month</span></strong>
           <ul>
-            <li><CheckCircle2 size={17} /> One business workspace</li>
-            <li><CheckCircle2 size={17} /> CSV and PDF exports</li>
-            <li><CheckCircle2 size={17} /> Receipt and Tax ID safeguards</li>
-            <li><CheckCircle2 size={17} /> Invoices, mileage, messages, and analytics</li>
+            <li><CheckCircle2 size={17} /> No monthly transaction or receipt-upload limits, subject to reasonable technical and abuse-prevention limits</li>
+            <li><CheckCircle2 size={17} /> Recurring transactions</li>
+            <li><CheckCircle2 size={17} /> Tax estimates</li>
+            <li><CheckCircle2 size={17} /> PDF accountant packets and full CPA/workpaper CSV exports</li>
+            <li><CheckCircle2 size={17} /> Advanced export and edge-case tools</li>
           </ul>
+          <p className="upgrade-reassurance">Your existing records remain available either way -- upgrading only unlocks new Pro capacity and tools.</p>
           <button className="primary-button" type="button" onClick={() => props.onNavigate(props.authUser ? 'Subscription' : 'Register')}>Continue</button>
         </article>
       </section>

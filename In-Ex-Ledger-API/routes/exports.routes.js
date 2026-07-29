@@ -38,6 +38,7 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const { buildFeatureRequiresPlanResponse } = require("../middleware/requirePlanFeature.js");
 const {
   AUDIT_ACTIONS,
   recordAuditEventForRequest
@@ -472,7 +473,7 @@ router.post("/history", exportGrantLimiter, async (req, res) => {
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "Export history requires an active Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
     }
     const format = String(req.body?.format || "").toLowerCase();
     const dateRange = validateDateRange(req.body);
@@ -601,7 +602,7 @@ router.post("/request-grant", exportGrantLimiter, async (req, res) => {
     }
 
     if (exportType !== "csv_basic" && !hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "Premium exports require an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
     }
 
     if (includeTaxId && exportType !== "pdf") {
@@ -1023,7 +1024,7 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "Export history requires an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
     }
     const result = await pool.query(
       `SELECT e.id,
@@ -1086,7 +1087,7 @@ router.get("/history/:id/diagnostics", exportGrantLimiter, async (req, res) => {
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "Export history requires an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
     }
 
     const { id } = req.params;
@@ -1206,7 +1207,7 @@ router.get("/history/:id/redacted", exportGrantLimiter, async (req, res) => {
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "Export history requires an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
     }
     const { id } = req.params;
     const { rows } = await pool.query(
@@ -1349,7 +1350,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
 
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "PDF exports require an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
     }
 
     const includeTaxId = Boolean(req.body?.includeTaxId);

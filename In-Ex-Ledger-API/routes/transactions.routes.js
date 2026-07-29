@@ -22,6 +22,7 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const { buildFeatureRequiresPlanResponse } = require("../middleware/requirePlanFeature.js");
 const {
   BasicPlanLimitError,
   assertCanCreateTransactions,
@@ -993,7 +994,7 @@ router.post("/", async (req, res) => {
       hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
       !hasFeatureAccess(subscription, "edge_case_tools")
     ) {
-      return res.status(402).json({ error: "Advanced transaction fields require an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "edge_case_tools"));
     }
 
     const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
@@ -1200,7 +1201,7 @@ router.put("/:id", async (req, res) => {
       hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
       !hasFeatureAccess(subscription, "edge_case_tools")
     ) {
-      return res.status(402).json({ error: "Advanced transaction fields require an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "edge_case_tools"));
     }
     const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
 

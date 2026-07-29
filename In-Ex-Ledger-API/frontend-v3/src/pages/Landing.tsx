@@ -101,12 +101,12 @@ function Landing(props: PageProps) {
         </div>
         <div className="pricing-grid landing-pricing-grid">
           <PlanCard
-            name="Free"
+            name="Basic"
             price="$0"
-            description="For getting organized."
+            description="For getting organized, with real monthly limits."
             action="Start free"
             onAction={() => props.onNavigate('Register')}
-            features={['Track income and expenses', 'Add accounts and categories', 'Store receipt details', 'Basic records view']}
+            features={['50 transactions and 25 receipts a month', 'Add accounts and categories', 'Mileage and basic invoicing', 'Basic CSV ledger export']}
           />
           <PlanCard
             name="Pro"
@@ -117,7 +117,7 @@ function Landing(props: PageProps) {
             highlighted
             onAction={() => props.onNavigate('Upgrade')}
             note="Billed monthly at $12."
-            features={['Everything in Free', 'CSV exports', 'Advanced receipt organization', 'Multiple business support', 'Priority support']}
+            features={['No monthly transaction or receipt limits', 'Recurring transactions and tax estimates', 'PDF and full CPA-ready CSV exports', 'Advanced export and edge-case tools']}
           />
         </div>
         <p className="price-note">No charge today. Upgrade only when you choose.</p>

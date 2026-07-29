@@ -1,9 +1,18 @@
 const { getSubscriptionSnapshotForBusiness } = require("./subscriptionService.js");
+const { PLAN_CODES, getPlanLimit } = require("../config/planCatalog.js");
 
 // ── Basic plan monthly caps ─────────────────────────────────────────────────
-const BASIC_MONTHLY_TRANSACTION_LIMIT = 50;
-const BASIC_MONTHLY_RECEIPT_LIMIT = 25;
-const BASIC_MONTHLY_CSV_IMPORT_LIMIT = 50;
+// Sourced from the canonical plan catalog so this file never drifts from the
+// entitlements/plan-context endpoint's numbers.
+const BASIC_MONTHLY_TRANSACTION_LIMIT = getPlanLimit(PLAN_CODES.BASIC, "transactions");
+const BASIC_MONTHLY_RECEIPT_LIMIT = getPlanLimit(PLAN_CODES.BASIC, "receipts");
+// CSV imports do not have an independent customer-facing cap -- they consume
+// the same monthly transaction allowance above. This constant only backs
+// internal row-level analytics/abuse-monitoring counters (see
+// countCsvImportRowsThisMonth) and is never the binding constraint in
+// assertCanImportCsvRows, since csvImportRowsRemaining >= transactionSlotsRemaining
+// always holds (every CSV row is also a transaction).
+const BASIC_MONTHLY_CSV_IMPORT_LIMIT = BASIC_MONTHLY_TRANSACTION_LIMIT;
 
 /**
  * Raised when a Basic-tier business would exceed one of its monthly caps.
