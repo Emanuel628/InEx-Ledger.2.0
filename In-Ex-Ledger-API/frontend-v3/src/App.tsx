@@ -11,6 +11,7 @@ import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import Billing from './pages/Billing'
 import Subscription from './pages/Subscription'
+import BusinessWorkspaces from './pages/BusinessWorkspaces'
 import Landing from './pages/Landing'
 import Pricing from './pages/Pricing'
 import Legal from './pages/Legal'
@@ -30,6 +31,7 @@ import Onboarding from './pages/Onboarding'
 import Help from './pages/Help'
 import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
+import { startInactivityMonitor } from './lib/inactivityMonitor'
 import { applyV3PhraseTranslations, getStoredLanguage, getUserLanguage, observeV3PhraseTranslations, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
 import { PlanProvider } from './context/PlanContext'
 
@@ -52,6 +54,7 @@ export type AppPage =
   | 'Settings'
   | 'Billing'
   | 'Subscription'
+  | 'BusinessWorkspaces'
   | 'Landing'
   | 'Pricing'
   | 'Legal'
@@ -124,6 +127,7 @@ const pageSlugByPage: Partial<Record<AppPage, string>> = {
   Settings: 'settings',
   Billing: 'billing',
   Subscription: 'subscription',
+  BusinessWorkspaces: 'workspaces',
   Landing: '',
   Pricing: 'pricing',
   Legal: 'legal',
@@ -403,6 +407,30 @@ function App() {
     handleAuthChange(null)
   }
 
+  // Signs the user out after 15 minutes with no activity in any tab, landing
+  // on Login with a reason so the sign-out isn't a silent surprise.
+  async function handleInactivityLogout() {
+    try {
+      await logoutUser()
+    } catch {
+      // Best-effort -- still clear local state and send the user to Login
+      // even if the network call fails (e.g. offline).
+    }
+    setAuthUser(null)
+    setCurrentPage('Login')
+    window.history.replaceState({}, '', '/login?reason=inactive')
+  }
+
+  // Only the identity of authUser should (re)arm the inactivity monitor.
+  const authUserId = authUser?.id
+  useEffect(() => {
+    if (!authUserId) return undefined
+    const stopMonitor = startInactivityMonitor(() => {
+      void handleInactivityLogout()
+    })
+    return () => stopMonitor()
+  }, [authUserId])
+
   const pageProps = {
     activePage: currentPage,
     onNavigate: navigate,
@@ -473,6 +501,10 @@ function App() {
 
   if (currentPage === 'Subscription') {
     return <Subscription {...pageProps} />
+  }
+
+  if (currentPage === 'BusinessWorkspaces') {
+    return <BusinessWorkspaces {...pageProps} />
   }
 
   if (currentPage === 'Landing') {
