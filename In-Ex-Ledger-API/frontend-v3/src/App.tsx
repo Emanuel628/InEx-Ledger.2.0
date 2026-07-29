@@ -74,6 +74,7 @@ export type ThemeMode = 'light' | 'dark'
 export type PageProps = {
   activePage: AppPage
   onNavigate: (page: AppPage) => void
+  onNavigateToPath: (path: string) => void
   authUser: AuthUser | null
   authLoading: boolean
   onAuthChange: (user: AuthUser | null) => void
@@ -198,14 +199,34 @@ function getNextPageFromQuery(): AppPage | null {
   return page && !authFlowPages.has(page) ? page : null
 }
 
+/** Resolves a raw app path (as returned by the backend's `redirect_to`, e.g.
+ *  `/trial-setup?next=%2Ftransactions`) to a known in-app page, defaulting to
+ *  Transactions for anything unrecognized. The query string is left in the
+ *  address bar for the destination page to read if it cares (see
+ *  navigateToPath). */
+function resolvePageFromRawPath(path: string): AppPage {
+  const normalized = String(path || '')
+    .toLowerCase()
+    .split(/[?#]/)[0]
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
+  return pageBySlug.get(normalized) || 'Transactions'
+}
+
 function chooseAuthenticatedPage(user: AuthUser) {
   // A placeholder business/account is auto-created the moment a session
   // exists (see resolveBusinessIdForUser), so currentBusinessId is set well
   // before onboarding runs and can't be used to detect "still onboarding"
-  // anymore. onboarding_completed is the real signal now, and email
-  // verification is itself one of the steps onboarding walks the user
-  // through, so an unverified user always lands back in Onboarding too.
-  if (!user.emailVerified || !user.onboardingCompleted) {
+  // anymore. onboarding_completed is the real signal now.
+  if (!user.emailVerified) {
+    // MfaChallenge reads its context from sessionStorage (same pattern used
+    // by the login and email-change challenges); it sends its own signup
+    // verification code on mount, so no token needs to be stashed here.
+    window.sessionStorage.setItem('inex-mfa-context', 'signup')
+    return 'MfaChallenge'
+  }
+
+  if (!user.onboardingCompleted) {
     return 'Onboarding'
   }
 
@@ -341,6 +362,19 @@ function App() {
     }
   }
 
+  // Navigates using a raw path (as returned by the backend's onboarding
+  // `redirect_to`, e.g. "/trial-setup?next=%2Ftransactions") instead of an
+  // AppPage enum value, preserving the query string so the destination page
+  // can read it (see getNextPageFromQuery's `?next=` convention).
+  const navigateToPath = (path: string) => {
+    const page = resolvePageFromRawPath(path)
+    setCurrentPage(page)
+    const fullPath = String(path || '').startsWith('/') ? path : `/${path || ''}`
+    if (`${window.location.pathname}${window.location.search}` !== fullPath) {
+      window.history.pushState({}, '', fullPath)
+    }
+  }
+
   const handleAuthChange = (user: AuthUser | null) => {
     setAuthUser(user)
     if (!user) {
@@ -371,6 +405,7 @@ function App() {
   const pageProps = {
     activePage: currentPage,
     onNavigate: navigate,
+    onNavigateToPath: navigateToPath,
     authUser,
     authLoading,
     onAuthChange: handleAuthChange,

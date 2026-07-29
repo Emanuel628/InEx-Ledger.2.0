@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react'
 import type { PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
-import { formatSubscriptionMoney, loadBillingPricing, type BillingInterval, type BillingPricing } from '../lib/billingApi'
+import { formatSubscriptionMoney, loadBillingPricing, startCheckout, type BillingInterval, type BillingPricing } from '../lib/billingApi'
+
+function readNextPath() {
+  const next = new URLSearchParams(window.location.search).get('next') || ''
+  return next.startsWith('/') && !next.startsWith('//') ? next : '/transactions'
+}
 
 function TrialSetup(props: PageProps) {
   const [interval, setInterval] = useState<BillingInterval>('monthly')
   const [pricing, setPricing] = useState<BillingPricing | null>(null)
+  const [error, setError] = useState('')
+  const [openingCheckout, setOpeningCheckout] = useState(false)
 
   useEffect(() => {
     loadBillingPricing()
@@ -13,10 +20,22 @@ function TrialSetup(props: PageProps) {
       .catch(() => setPricing(null))
   }, [])
 
+  async function beginCheckout() {
+    setOpeningCheckout(true)
+    setError('')
+    try {
+      window.sessionStorage.setItem('inex-preferred-billing-interval', interval)
+      await startCheckout(interval)
+    } catch (checkoutError) {
+      setError(checkoutError instanceof Error ? checkoutError.message : 'Unable to open Pro checkout.')
+      setOpeningCheckout(false)
+    }
+  }
+
   return (
     <AuthShell theme={props.theme} onNavigate={props.onNavigate}>
       <h2>Set up Pro</h2>
-      <p>Pick a billing cadence, then continue to Subscription to start Stripe checkout.</p>
+      <p>Pick a billing cadence to start your Pro trial. We'll collect a payment method now and start billing once the trial ends.</p>
       <form className="auth-form" onSubmit={(event) => event.preventDefault()}>
         <label>
           Business
@@ -29,20 +48,34 @@ function TrialSetup(props: PageProps) {
             <option value="yearly">Yearly - {formatPrice(pricing, 'yearly')}</option>
           </select>
         </label>
+        {error ? <p className="auth-error" role="alert">{error}</p> : null}
         <button
           className="primary-button"
           type="button"
-          onClick={() => {
-            window.sessionStorage.setItem('inex-preferred-billing-interval', interval)
-            props.onNavigate('Subscription')
-          }}
+          disabled={openingCheckout}
+          onClick={() => void beginCheckout()}
         >
-          Continue to Subscription
+          {openingCheckout ? 'Opening checkout...' : 'Start Pro trial'}
         </button>
-        <button className="secondary-button" type="button" onClick={() => props.onNavigate('Transactions')}>Stay on free tier</button>
+        <button className="secondary-button" type="button" disabled={openingCheckout} onClick={() => props.onNavigate(resolveStayPage())}>
+          Stay on free tier
+        </button>
       </form>
     </AuthShell>
   )
+}
+
+function resolveStayPage() {
+  // TrialSetup only ever navigates within the authenticated app, so mapping
+  // the "next" path straight to Transactions unless it's a known guided-setup
+  // destination keeps this simple without importing App's full slug table.
+  const next = readNextPath()
+  const guided: Record<string, 'Categories' | 'Accounts' | 'Transactions'> = {
+    '/categories': 'Categories',
+    '/accounts': 'Accounts',
+    '/transactions': 'Transactions',
+  }
+  return guided[next] || 'Transactions'
 }
 
 function formatPrice(pricing: BillingPricing | null, interval: BillingInterval) {

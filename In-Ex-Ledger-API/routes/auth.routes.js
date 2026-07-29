@@ -2127,13 +2127,12 @@ router.post("/mfa/resend", requireCsrfProtection, authLimiter, async (req, res) 
 });
 
 /**
- * POST /onboarding/send-verification-code
- * Sends the one-time email verification code used during onboarding. The
- * caller indicates whether the user also opted in to MFA on the same
- * onboarding screen; that choice rides along on the pending token so a
- * single code can both verify the email and (optionally) turn on MFA.
+ * POST /verify-email/send-code
+ * Sends the one-time email verification code shown right after registration,
+ * before onboarding or MFA enrollment. Pure email verification only -- MFA
+ * is opted into separately and later, in Settings.
  */
-router.post("/onboarding/send-verification-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+router.post("/verify-email/send-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
   try {
     const user = await findUserById(req.user.id);
     if (!user) {
@@ -2143,12 +2142,10 @@ router.post("/onboarding/send-verification-code", requireAuth, requireCsrfProtec
       return res.status(400).json({ error: "Email is already verified." });
     }
 
-    const wantsMfa = req.body?.wantsMfa === true;
     const userLang = await getPreferredLanguageForUser(user.id);
     const mfaToken = await createMfaEmailChallenge(user, req, {
       businessId: req.user?.business_id || null,
       tokenPurpose: "signup_email_verify",
-      tokenPayload: { wants_mfa: wantsMfa },
       lang: userLang,
       mfaContentKey: "signup",
       locationPath: "/onboarding"
@@ -2160,19 +2157,17 @@ router.post("/onboarding/send-verification-code", requireAuth, requireCsrfProtec
       message: "We emailed you a verification code."
     });
   } catch (err) {
-    logError("Onboarding verification code send error:", err);
+    logError("Signup verification code send error:", err);
     return res.status(500).json({ error: "Unable to send verification code." });
   }
 });
 
 /**
- * POST /onboarding/verify-code
- * Confirms the onboarding email-verification code. If the pending token
- * carries wants_mfa: true (set when the user opted in on the MFA step),
- * this same code also enables MFA -- no separate MFA verification round
- * is required.
+ * POST /verify-email/confirm-code
+ * Confirms the signup email-verification code. Only marks the email
+ * verified -- MFA enrollment is a separate, later step in Settings.
  */
-router.post("/onboarding/verify-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+router.post("/verify-email/confirm-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
 
@@ -2216,32 +2211,21 @@ router.post("/onboarding/verify-code", requireAuth, requireCsrfProtection, mfaVe
     }
 
     await consumeMfaEmailChallenge(challenge.id);
-    const wantsMfa = pending.wants_mfa === true;
-    await pool.query(
-      `UPDATE users
-          SET email_verified = true,
-              mfa_enabled = CASE WHEN $2 THEN true ELSE mfa_enabled END,
-              mfa_enabled_at = CASE WHEN $2 THEN COALESCE(mfa_enabled_at, NOW()) ELSE mfa_enabled_at END
-        WHERE id = $1`,
-      [user.id, wantsMfa]
-    );
+    await pool.query(`UPDATE users SET email_verified = true WHERE id = $1`, [user.id]);
 
     const refreshedUser = await findUserById(user.id);
     const session = await resetCurrentRefreshSession(res, refreshedUser, {
-      mfaAuthenticated: wantsMfa,
+      mfaAuthenticated: false,
       req
     });
-    logInfo("Onboarding email verified", {
-      userId: user.id,
-      mfaEnabled: wantsMfa
-    });
+    logInfo("Signup email verified", { userId: user.id });
 
     return res.status(200).json({
       success: true,
       ...buildPublicSessionPayload(session)
     });
   } catch (err) {
-    logError("Onboarding verify-code error:", err);
+    logError("Verify-email confirm-code error:", err);
     return res.status(500).json({ error: "Unable to verify code." });
   }
 });
