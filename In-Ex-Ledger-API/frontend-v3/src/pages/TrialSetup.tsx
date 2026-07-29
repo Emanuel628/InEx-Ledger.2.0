@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CheckCircle2 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
 import { formatSubscriptionMoney, loadBillingPricing, startCheckout, type BillingInterval, type BillingPricing } from '../lib/billingApi'
@@ -36,6 +37,12 @@ function TrialSetup(props: PageProps) {
     <AuthShell theme={props.theme} onNavigate={props.onNavigate}>
       <h2>Set up Pro</h2>
       <p>Pick a billing cadence to start your Pro trial. We'll collect a payment method now and start billing once the trial ends.</p>
+      <ul className="trial-value-list">
+        <li><CheckCircle2 size={17} /><span>No monthly caps on transactions, receipts, or CSV imports</span></li>
+        <li><CheckCircle2 size={17} /><span>Mileage tracking that turns trips into real deductions</span></li>
+        <li><CheckCircle2 size={17} /><span>Professional invoices so clients pay you faster</span></li>
+        <li><CheckCircle2 size={17} /><span>Tax-ready PDF and CSV exports, plus built-in Tax ID safeguards</span></li>
+      </ul>
       <form className="auth-form" onSubmit={(event) => event.preventDefault()}>
         <label>
           Business

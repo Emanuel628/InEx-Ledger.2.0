@@ -187,7 +187,7 @@ function Settings(props: PageProps) {
   }
 
   return (
-    <AppShell {...props} searchPlaceholder="Search settings, billing, security">
+    <AppShell {...props}>
       <main className="transactions-page settings-page-v3">
         <section className="page-heading">
           <div>

@@ -3,7 +3,7 @@ import type { PageProps } from '../App'
 
 function PlaceholderPage(props: PageProps) {
   return (
-    <AppShell {...props} searchPlaceholder={`Search ${props.activePage.toLowerCase()}`}>
+    <AppShell {...props}>
       <main className="transactions-page">
         <section className="page-heading">
           <div>

@@ -214,7 +214,6 @@ function Messages(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search messages, clients, invoices"
       overlay={
         <>
           {detailOpen && selectedThread ? (

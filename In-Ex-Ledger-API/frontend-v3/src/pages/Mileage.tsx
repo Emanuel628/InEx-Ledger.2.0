@@ -173,7 +173,6 @@ function Mileage(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search trips, vehicle expenses, maintenance"
       overlay={drawerOpen ? (
         <MileageDrawer
           entryMode={entryMode}

@@ -134,7 +134,7 @@ function Help(props: PageProps) {
   }, [category, searchTerm])
 
   return (
-    <AppShell {...props} searchPlaceholder="Search help, records, billing">
+    <AppShell {...props}>
       <main className="transactions-page help-page">
         <section className="page-heading">
           <div>

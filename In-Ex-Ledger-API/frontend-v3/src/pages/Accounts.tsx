@@ -81,7 +81,6 @@ function Accounts(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search accounts, types, transaction links"
       overlay={drawerOpen ? (
         <AccountDrawer
           account={editingAccount}

@@ -163,7 +163,6 @@ function Invoices(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search invoices, clients, invoice titles"
       overlay={drawerOpen ? <InvoiceDrawer invoice={editingInvoice} currency={getActiveCurrency()} onClose={closeDrawer} onSave={handleSave} /> : null}
     >
       <main className="transactions-page invoices-page">

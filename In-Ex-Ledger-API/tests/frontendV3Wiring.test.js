@@ -223,7 +223,7 @@ test("v3 shell has an SPA-owned i18n runtime wired to business language", () => 
   assert.doesNotMatch(shellSource, /data-i18n/);
 });
 
-test("v3 header business switcher and optional search are wired instead of decorative", () => {
+test("v3 header business switcher is wired instead of decorative, and the topbar search chrome is gone", () => {
   const shellSource = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
   const transactionsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
@@ -234,13 +234,18 @@ test("v3 header business switcher and optional search are wired instead of decor
   assert.match(shellSource, /window\.location\.reload\(\)/);
   assert.match(shellSource, /business-dropdown/);
   assert.match(shellSource, /aria-label=\{t\('shell\.business\.switch'\)\}/);
-  assert.match(shellSource, /\{onSearch \? \(/);
-  assert.match(shellSource, /onSearch\(event\.target\.value\)/);
+  // The topbar search box was deleted outright (owner decision) -- it never
+  // rendered in production anyway, since no page passed onSearch to AppShell.
+  assert.doesNotMatch(shellSource, /onSearch/);
+  assert.doesNotMatch(shellSource, /searchPlaceholder/);
+  assert.doesNotMatch(shellSource, /topbar-search/);
+  assert.doesNotMatch(transactionsSource, /searchPlaceholder=/);
   assert.doesNotMatch(transactionsSource, /searchValue=\{searchTerm\}/);
   assert.doesNotMatch(transactionsSource, /onSearch=\{\(value\) => updateFilter\(setSearchTerm, value\)\}/);
   assert.match(transactionsSource, /placeholder="Search transactions"[\s\S]*onChange=\{\(event\) => updateFilter\(setSearchTerm, event\.target\.value\)\}/);
   assert.match(cssSource, /\.business-dropdown/);
   assert.match(cssSource, /\.topbar-menus/);
+  assert.doesNotMatch(cssSource, /\.topbar-search/);
 });
 
 test("v3 money formatters use the active business currency on app pages", () => {
@@ -564,7 +569,7 @@ test("v3 collapsed sidebar keeps the header visible", () => {
   assert.match(cssSource, /\.sidebar-is-collapsed \.app-topbar[\s\S]*display: flex/);
   assert.match(cssSource, /\.sidebar-is-collapsed \.app-topbar[\s\S]*visibility: visible/);
   assert.match(cssSource, /\.app-topbar[\s\S]*z-index: 40/);
-  assert.match(cssSource, /grid-template-columns: minmax\(0, max-content\) minmax\(0, 1fr\) auto/);
+  assert.match(cssSource, /grid-template-columns: minmax\(0, max-content\) auto/);
   assert.match(cssSource, /\.topbar-actions\s*\{[\s\S]*min-width: max-content/);
 });
 
