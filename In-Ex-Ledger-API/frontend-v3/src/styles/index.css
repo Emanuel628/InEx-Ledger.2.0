@@ -885,7 +885,7 @@ textarea:focus-visible {
   flex: 1;
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, max-content) auto;
   align-items: center;
   gap: 14px;
 }
@@ -943,23 +943,6 @@ textarea:focus-visible {
   background: var(--surface-soft);
 }
 
-.topbar-search {
-  grid-column: 2;
-  width: min(540px, 42vw);
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-self: center;
-  margin: 0;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--muted);
-}
-
-.topbar-search input,
 .field input {
   width: 100%;
   border: 0;
@@ -969,7 +952,7 @@ textarea:focus-visible {
 }
 
 .topbar-actions {
-  grid-column: 3;
+  grid-column: 2;
   position: relative;
   margin-left: auto;
   min-width: max-content;
@@ -4750,10 +4733,6 @@ tbody tr:last-child td {
     flex: 1;
   }
 
-  .topbar-search {
-    width: min(460px, 48vw);
-  }
-
   .transactions-page {
     width: min(920px, 100%);
     padding-inline: 22px;
@@ -4921,10 +4900,6 @@ tbody tr:last-child td {
 
   .topbarless-mobile-menu {
     display: inline-flex;
-  }
-
-  .topbar-search {
-    display: none;
   }
 
   .business-button span {

@@ -168,18 +168,18 @@ export async function completeVerifiedSignup(signupBootstrapToken: string) {
   })
 }
 
-// Onboarding's one-time email verification code. The same code both verifies
-// the email and (if wantsMfa was true when it was requested) turns on MFA --
-// there is no separate MFA verification round during onboarding.
-export async function sendOnboardingVerificationCode(wantsMfa: boolean) {
-  return authRequest<{ mfa_token?: string; message?: string }>('/api/auth/onboarding/send-verification-code', {
+// One-time email verification code shown right after registration, before
+// onboarding or MFA enrollment. Pure email verification -- MFA is a separate,
+// later opt-in step in Settings.
+export async function sendSignupVerificationCode() {
+  return authRequest<{ mfa_token?: string; message?: string }>('/api/auth/verify-email/send-code', {
     method: 'POST',
-    body: JSON.stringify({ wantsMfa }),
+    body: JSON.stringify({}),
   })
 }
 
-export async function verifyOnboardingCode(mfaToken: string, code: string) {
-  return authRequest<{ email_verified?: boolean; mfa_enabled?: boolean }>('/api/auth/onboarding/verify-code', {
+export async function verifySignupCode(mfaToken: string, code: string) {
+  return authRequest<{ email_verified?: boolean }>('/api/auth/verify-email/confirm-code', {
     method: 'POST',
     body: JSON.stringify({ mfaToken, code }),
     skipAuthRedirect: true,

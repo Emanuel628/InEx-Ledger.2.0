@@ -236,7 +236,7 @@ function Subscription(props: PageProps) {
 
 
   return (
-    <AppShell {...props} searchPlaceholder="Search plans, businesses, billing">
+    <AppShell {...props}>
       <main className="transactions-page subscription-page-v3">
         <section className="page-heading">
           <div>

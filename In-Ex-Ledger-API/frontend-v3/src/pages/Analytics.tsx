@@ -62,7 +62,6 @@ function Analytics(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search analytics, categories, reports"
       overlay={
         <>
           {periodModalOpen ? <AnalyticsPeriodModal analytics={analytics} onClose={() => setPeriodModalOpen(false)} /> : null}

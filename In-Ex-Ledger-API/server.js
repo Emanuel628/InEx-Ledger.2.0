@@ -46,7 +46,10 @@ const htmlPageNames = fs.readdirSync(htmlDir)
   .filter((name) => name.toLowerCase().endsWith('.html'))
   .map((name) => path.basename(name, '.html'));
 const LEGACY_HTML_REDIRECTS = new Map([
+  ['/landing', '/'],
   ['/landing.html', '/'],
+  ['/html/landing', '/'],
+  ['/html/landing.html', '/'],
   ['/html/account-profile.html', '/settings#settings-business'],
   ['/account-profile.html', '/settings#settings-business'],
   ['/html/business-profile.html', '/settings#settings-business'],
@@ -104,6 +107,8 @@ const V3_APP_PAGES = new Set([
   "trial-setup",
   "privacy",
   "terms",
+  "legal",
+  "pricing",
   "login",
   "register",
   "forgot-password",
@@ -433,18 +438,6 @@ for (const pageName of htmlPageNames) {
     continue;
   }
   const canonicalPath = getCanonicalPagePath(pageName);
-  if (pageName === 'landing') {
-    app.get('/landing', (req, res) => {
-      res.redirect(301, '/');
-    });
-    app.get('/html/landing', (req, res) => {
-      res.redirect(301, '/');
-    });
-    app.get('/html/landing.html', (req, res) => {
-      res.redirect(301, '/');
-    });
-    continue;
-  }
 
   if (V3_APP_PAGES.has(pageName)) {
     continue;

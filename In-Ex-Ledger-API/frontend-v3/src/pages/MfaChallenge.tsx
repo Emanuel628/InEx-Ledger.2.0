@@ -1,12 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
-import { confirmEmailChange, getCurrentUser, resendLoginMfa, verifyLoginMfa } from '../lib/authApi'
+import {
+  confirmEmailChange,
+  getCurrentUser,
+  resendLoginMfa,
+  sendSignupVerificationCode,
+  verifyLoginMfa,
+  verifySignupCode,
+} from '../lib/authApi'
 
 function MfaChallenge(props: PageProps) {
   const context = useMemo(() => window.sessionStorage.getItem('inex-mfa-context'), [])
   const isEmailChange = context === 'email-change'
   const isLogin = context === 'login'
+  const isSignup = context === 'signup'
   const [mfaToken, setMfaToken] = useState(() => window.sessionStorage.getItem('inex-mfa-token') || '')
   const [digits, setDigits] = useState(Array<string>(6).fill(''))
   const [trustDevice, setTrustDevice] = useState(true)
@@ -14,11 +22,32 @@ function MfaChallenge(props: PageProps) {
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [resending, setResending] = useState(false)
+  const sentInitialSignupCode = useRef(false)
 
   function clearMfaSession() {
     window.sessionStorage.removeItem('inex-mfa-context')
     window.sessionStorage.removeItem('inex-mfa-token')
   }
+
+  // Signup verification has no prior "choose an option" screen -- the code
+  // is requested the moment the user lands here, rather than gated behind a
+  // button click.
+  useEffect(() => {
+    if (!isSignup || sentInitialSignupCode.current) return
+    sentInitialSignupCode.current = true
+    setSubmitting(true)
+    sendSignupVerificationCode()
+      .then((response) => {
+        if (response.mfa_token) {
+          setMfaToken(response.mfa_token)
+          window.sessionStorage.setItem('inex-mfa-token', response.mfa_token)
+        }
+      })
+      .catch((sendError) => {
+        setError(sendError instanceof Error ? sendError.message : 'Unable to send verification code.')
+      })
+      .finally(() => setSubmitting(false))
+  }, [isSignup])
 
   async function submitCode() {
     const code = digits.join('')
@@ -46,6 +75,14 @@ function MfaChallenge(props: PageProps) {
         return
       }
 
+      if (isSignup) {
+        await verifySignupCode(mfaToken, code)
+        clearMfaSession()
+        const { user } = await getCurrentUser()
+        props.onAuthChange(user)
+        return
+      }
+
       // No recognized challenge context (e.g. a stale/refreshed tab) — the
       // safest recovery is to restart from sign-in rather than guess.
       props.onNavigate('Login')
@@ -57,6 +94,25 @@ function MfaChallenge(props: PageProps) {
   }
 
   async function resendCode() {
+    if (isSignup) {
+      setResending(true)
+      setError('')
+      setMessage('')
+      try {
+        const response = await sendSignupVerificationCode()
+        if (response.mfa_token) {
+          setMfaToken(response.mfa_token)
+          window.sessionStorage.setItem('inex-mfa-token', response.mfa_token)
+        }
+        setMessage(response.message || 'We emailed you a new verification code.')
+      } catch (resendError) {
+        setError(resendError instanceof Error ? resendError.message : 'Unable to resend the code.')
+      } finally {
+        setResending(false)
+      }
+      return
+    }
+
     if (!isLogin || !mfaToken) return
     setResending(true)
     setError('')
@@ -86,8 +142,14 @@ function MfaChallenge(props: PageProps) {
       theme={props.theme}
       onNavigate={props.onNavigate}
     >
-      <h2>{isEmailChange ? 'Verify email change' : 'Enter security code'}</h2>
-      <p>{isEmailChange ? 'Use the code sent to your current email to finish changing your account email.' : 'Use the code sent to your email for this sign-in attempt.'}</p>
+      <h2>{isEmailChange ? 'Verify email change' : isSignup ? 'Verify your email' : 'Enter security code'}</h2>
+      <p>
+        {isEmailChange
+          ? 'Use the code sent to your current email to finish changing your account email.'
+          : isSignup
+            ? `Enter the 6-digit code we emailed to ${props.authUser?.email || 'your email'} to finish creating your account.`
+            : 'Use the code sent to your email for this sign-in attempt.'}
+      </p>
       <form className="auth-form" onSubmit={(event) => event.preventDefault()}>
         <div className="auth-code-row" aria-label="Security code">
           {Array.from({ length: 6 }).map((_, index) => (
@@ -101,23 +163,29 @@ function MfaChallenge(props: PageProps) {
             />
           ))}
         </div>
-        {isEmailChange ? null : <label className="auth-check">
+        {isLogin ? <label className="auth-check">
           <input type="checkbox" checked={trustDevice} onChange={(event) => setTrustDevice(event.target.checked)} />
           Trust this device
-        </label>}
+        </label> : null}
         {message ? <p className="auth-success" role="status">{message}</p> : null}
         {error ? <p className="auth-error" role="alert">{error}</p> : null}
-        <button className="primary-button" type="button" disabled={submitting} onClick={() => void submitCode()}>
-          {submitting ? 'Verifying...' : 'Continue'}
+        <button className="primary-button" type="button" disabled={submitting || (isSignup && !mfaToken)} onClick={() => void submitCode()}>
+          {submitting ? (isSignup && !mfaToken ? 'Sending code...' : 'Verifying...') : 'Continue'}
         </button>
-        {isLogin ? (
+        {isLogin || isSignup ? (
           <button className="auth-link" type="button" disabled={resending} onClick={() => void resendCode()}>
             {resending ? 'Sending...' : 'Resend code'}
           </button>
         ) : null}
-        <button className="secondary-button" type="button" onClick={() => props.onNavigate(isEmailChange ? 'Settings' : 'Login')}>
-          {isEmailChange ? 'Back to Settings' : 'Back to sign in'}
-        </button>
+        {isSignup ? (
+          <button className="secondary-button" type="button" onClick={() => void props.onLogout()}>
+            Sign out
+          </button>
+        ) : (
+          <button className="secondary-button" type="button" onClick={() => props.onNavigate(isEmailChange ? 'Settings' : 'Login')}>
+            {isEmailChange ? 'Back to Settings' : 'Back to sign in'}
+          </button>
+        )}
       </form>
     </AuthShell>
   )

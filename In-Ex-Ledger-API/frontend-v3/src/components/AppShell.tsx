@@ -15,7 +15,6 @@ import {
   Menu,
   MessageSquare,
   Receipt,
-  Search,
   Settings as SettingsIcon,
   Tags,
   X,
@@ -42,9 +41,6 @@ const navItems = [
 type AppNotification = { id: string; title: string; body: string; page: AppPage }
 
 type AppShellProps = PageProps & {
-  searchPlaceholder: string
-  searchValue?: string
-  onSearch?: (value: string) => void
   children: ReactNode
   overlay?: ReactNode
   hideTopbar?: boolean
@@ -60,9 +56,6 @@ function AppShell({
   setSidebarCollapsed,
   theme,
   language,
-  searchPlaceholder,
-  searchValue = '',
-  onSearch,
   children,
   overlay,
   hideTopbar = false,
@@ -290,27 +283,6 @@ function AppShell({
                 </div>
               ) : null}
             </div>
-
-            {onSearch ? (
-              <form
-                className="topbar-search"
-                role="search"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  const data = new FormData(event.currentTarget)
-                  onSearch(String(data.get('topbar-search') || ''))
-                }}
-              >
-                <Search size={18} />
-                <input
-                  name="topbar-search"
-                  type="search"
-                  placeholder={searchPlaceholder}
-                  value={searchValue}
-                  onChange={(event) => onSearch(event.target.value)}
-                />
-              </form>
-            ) : null}
 
           <div className="topbar-actions">
             <button

@@ -83,7 +83,6 @@ function Categories(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search categories, tax lines, transaction links"
       overlay={drawerOpen ? (
         <CategoryDrawer
           category={editingCategory}

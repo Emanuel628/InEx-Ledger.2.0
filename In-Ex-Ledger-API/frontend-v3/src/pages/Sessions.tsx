@@ -40,7 +40,7 @@ function Sessions(props: PageProps) {
   }
 
   return (
-    <AppShell {...props} searchPlaceholder="Search sessions, devices, locations">
+    <AppShell {...props}>
       <main className="transactions-page support-page">
         <section className="page-heading">
           <div>

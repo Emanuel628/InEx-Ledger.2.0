@@ -85,7 +85,6 @@ function Receipts(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search receipts, merchants, linked transactions"
       overlay={
         <>
           {drawerOpen ? (

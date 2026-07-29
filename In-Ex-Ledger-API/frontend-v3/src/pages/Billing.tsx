@@ -48,7 +48,7 @@ function Billing(props: PageProps) {
   const status = subscription?.effectiveStatus || subscription?.status || 'free'
 
   return (
-    <AppShell {...props} searchPlaceholder="Search billing, invoices, subscription">
+    <AppShell {...props}>
       <main className="transactions-page billing-page">
         <section className="page-heading">
           <div>

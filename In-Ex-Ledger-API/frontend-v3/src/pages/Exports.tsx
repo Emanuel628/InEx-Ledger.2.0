@@ -158,7 +158,6 @@ function Exports(props: PageProps) {
   return (
     <AppShell
       {...props}
-      searchPlaceholder="Search exports, reports, tax packages"
       overlay={
         pdfModalOpen ? (
           <GeneratePdfModal

@@ -10,7 +10,7 @@ function readHtml(relativePath) {
 }
 
 test("login page no longer uses inline focus handlers", () => {
-  const html = readHtml("public/html/login.html");
+  const html = readHtml("legacy/public-html/auth-public/login.html");
   assert.doesNotMatch(html, /\sonfocus=/i);
 });
 
