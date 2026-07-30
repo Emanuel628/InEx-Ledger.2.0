@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CreditCard, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CreditCard, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { usePlan } from '../context/PlanContext'
@@ -24,6 +24,7 @@ function Subscription(props: PageProps) {
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
   const [working, setWorking] = useState(false)
+  const [confirmingCheckout, setConfirmingCheckout] = useState(false)
 
   async function refreshSubscription() {
     setLoadingData(true)
@@ -45,6 +46,55 @@ function Subscription(props: PageProps) {
 
   useEffect(() => {
     void refreshSubscription()
+  }, [])
+
+  // Stripe's webhook can land a beat after the success redirect, so a plain
+  // "did it work?" reload right after checkout can still show Free/Trial and
+  // spook the user into refreshing. Poll briefly instead of trusting the very
+  // first read. This uses its own lightweight fetch (not refreshSubscription,
+  // which toggles loadingData and would flicker the plan cards every pass).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const checkoutState = params.get('checkout')
+    if (!checkoutState) return
+
+    const cleanUrl = new URL(window.location.href)
+    cleanUrl.searchParams.delete('checkout')
+    window.history.replaceState({}, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`)
+
+    if (checkoutState === 'cancel') {
+      setDataError('Checkout was canceled. No changes were made to your plan.')
+      return
+    }
+    if (checkoutState !== 'success') return
+
+    let cancelled = false
+    setConfirmingCheckout(true)
+    ;(async () => {
+      const maxAttempts = 6
+      for (let attempt = 0; attempt < maxAttempts && !cancelled; attempt += 1) {
+        try {
+          const nextOverview = await loadBillingOverview()
+          if (cancelled) return
+          setOverview(nextOverview)
+          await refreshPlanContext()
+          if (nextOverview?.subscription?.isPaid || nextOverview?.subscription?.isTrialing) {
+            break
+          }
+        } catch {
+          // Keep polling -- a transient failure here shouldn't cut the wait short.
+        }
+        if (cancelled) return
+        if (attempt < maxAttempts - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1500))
+        }
+      }
+      if (!cancelled) setConfirmingCheckout(false)
+    })()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const subscription = overview?.subscription
@@ -140,6 +190,16 @@ function Subscription(props: PageProps) {
           </div>
         </section>
 
+        {confirmingCheckout ? (
+          <section className="top-alert checkout-confirm-banner" role="status">
+            <CheckCircle2 size={18} />
+            <div>
+              <strong>Confirming your payment...</strong>
+              <span>This usually only takes a few seconds.</span>
+            </div>
+          </section>
+        ) : null}
+
         {dataError ? (
           <section className="top-alert" role="alert">
             <AlertTriangle size={18} />
@@ -187,6 +247,12 @@ function Subscription(props: PageProps) {
                   <strong>{formatIntervalPrice(pricing, 'yearly')}</strong>
                 </button>
               </div>
+            ) : null}
+
+            {canResume && subscription?.billingInterval && interval !== subscription.billingInterval ? (
+              <p className="subscription-interval-note">
+                Switching to {interval === 'monthly' ? 'monthly' : 'yearly'} billing takes effect immediately with no prorated credit or charge.
+              </p>
             ) : null}
 
             {canResume ? (

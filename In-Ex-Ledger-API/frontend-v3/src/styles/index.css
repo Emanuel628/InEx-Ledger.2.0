@@ -794,6 +794,13 @@ textarea:focus-visible {
   gap: 6px;
 }
 
+.trial-plan-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .faq-item {
   box-shadow: none;
 }
@@ -1690,6 +1697,18 @@ textarea:focus-visible {
   justify-content: center;
 }
 
+/* A "this is going fine, just wait a second" variant of .top-alert -- same
+   layout, but the blue/teal brand gradient instead of the amber warning
+   tint, so a normal checkout-confirmation wait doesn't read as a problem. */
+.checkout-confirm-banner {
+  border-color: rgba(23, 92, 255, 0.24);
+  background: linear-gradient(135deg, rgba(23, 92, 255, 0.08), rgba(9, 156, 150, 0.08));
+}
+
+.checkout-confirm-banner > svg {
+  color: var(--blue);
+}
+
 .table-toolbar {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) auto;
@@ -2101,6 +2120,13 @@ tbody tr:last-child td {
 
 .subscription-interval-toggle button.is-selected strong {
   color: var(--blue);
+}
+
+.subscription-interval-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .subscription-simple-card {

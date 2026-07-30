@@ -223,6 +223,17 @@
   color: #ffe1a3;
 }
 
+.ledger-shell[data-theme="dark"] .checkout-confirm-banner {
+  border-color: rgba(109, 162, 255, 0.32);
+  background:
+    linear-gradient(135deg, rgba(109, 162, 255, 0.14), rgba(15, 27, 45, 0.96)),
+    var(--surface);
+}
+
+.ledger-shell[data-theme="dark"] .checkout-confirm-banner svg {
+  color: var(--blue);
+}
+
 .ledger-shell[data-theme="dark"] .settings-field.is-invalid {
   border-color: rgba(255, 123, 123, 0.34);
   background: rgba(255, 123, 123, 0.1);

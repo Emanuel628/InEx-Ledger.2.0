@@ -593,8 +593,11 @@ test("billing portal sessions use a configuration with monthly and yearly plan c
       String(entry.url).endsWith("/billing_portal/sessions")
     );
     assert.equal(portalRequest.body.get("configuration"), "bpc_test_123");
-    assert.equal(portalRequest.body.get("flow_data[type]"), "subscription_update");
-    assert.equal(portalRequest.body.get("flow_data[subscription_update][subscription]"), "sub_test_update_123");
+    // "Manage billing" opens the portal's default home (invoices, payment
+    // method, cancel) instead of deep-linking straight into a plan-change
+    // flow -- no flow_data[type] means Stripe shows its own landing page.
+    assert.equal(portalRequest.body.get("flow_data[type]"), null);
+    assert.equal(portalRequest.body.get("flow_data[subscription_update][subscription]"), null);
   } finally {
     fixture.cleanup();
   }

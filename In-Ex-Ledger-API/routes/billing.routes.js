@@ -1165,18 +1165,15 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
     const portalCurrency = resolveCheckoutCurrency(subscription, billingContext);
     const configurationId = await buildBillingPortalConfiguration(portalCurrency);
     const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
+    // "Manage billing" opens the portal's default home (invoices, payment
+    // method, cancel) rather than deep-linking straight into a plan-change
+    // flow -- someone just checking their invoice or updating a card
+    // shouldn't be dropped into "change your plan" first.
     const sessionPayload = {
       customer: customerId,
       configuration: configurationId,
       return_url: buildAppUrl("/subscription")
     };
-
-    if (subscription?.stripeSubscriptionId) {
-      sessionPayload["flow_data[type]"] = "subscription_update";
-      sessionPayload["flow_data[subscription_update][subscription]"] = subscription.stripeSubscriptionId;
-      sessionPayload["flow_data[after_completion][type]"] = "redirect";
-      sessionPayload["flow_data[after_completion][redirect][return_url]"] = buildAppUrl("/subscription?billing=updated");
-    }
 
     const session = await stripeRequest("/billing_portal/sessions", sessionPayload);
     logInfo("Billing portal session created", {
@@ -1184,7 +1181,7 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
       businessId: billingBusinessId,
       currency: portalCurrency,
       configurationId,
-      hasSubscriptionUpdateFlow: Boolean(subscription?.stripeSubscriptionId)
+      hasStripeSubscription: Boolean(subscription?.stripeSubscriptionId)
     });
     res.status(200).json({ url: session.url });
   } catch (err) {

@@ -34,7 +34,7 @@ function Landing(props: PageProps) {
               See how it works
             </button>
           </div>
-          <p className="public-microcopy">No credit card required. Set up in minutes.</p>
+          <p className="public-microcopy">Set up in minutes.</p>
         </div>
       </section>
 

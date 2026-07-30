@@ -4,7 +4,9 @@ import type { PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
 import {
   cancelSubscription,
+  formatSubscriptionDate,
   formatSubscriptionMoney,
+  loadBillingOverview,
   loadBillingPricing,
   startCheckout,
   type BillingInterval,
@@ -38,6 +40,7 @@ function formatPrice(pricing: BillingPricing | null, interval: BillingInterval) 
 function TrialSetup(props: PageProps) {
   const [interval, setInterval] = useState<BillingInterval>('monthly')
   const [pricing, setPricing] = useState<BillingPricing | null>(null)
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [openingCheckout, setOpeningCheckout] = useState(false)
   const [showBasicConfirm, setShowBasicConfirm] = useState(false)
@@ -48,6 +51,13 @@ function TrialSetup(props: PageProps) {
     loadBillingPricing()
       .then(setPricing)
       .catch(() => setPricing(null))
+    // Checkout carries over this account's existing trial end date rather than
+    // starting a fresh 30 days, so show it here -- otherwise someone who
+    // reaches this screen days into their trial would reasonably expect
+    // "Start Pro trial" to mean a brand-new trial window.
+    loadBillingOverview()
+      .then((overview) => setTrialEndsAt(overview.subscription?.trialEndsAt || null))
+      .catch(() => setTrialEndsAt(null))
   }, [])
 
   async function beginCheckout() {
@@ -126,6 +136,9 @@ function TrialSetup(props: PageProps) {
               <option value="yearly">Yearly - {formatPrice(pricing, 'yearly')}</option>
             </select>
           </label>
+          {trialEndsAt ? (
+            <p className="trial-plan-note">Trial ends {formatSubscriptionDate(trialEndsAt)} -- entering a card now does not restart the clock.</p>
+          ) : null}
           <button
             className="primary-button"
             type="button"
