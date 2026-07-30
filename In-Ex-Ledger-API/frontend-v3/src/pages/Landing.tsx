@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   ArrowRight,
   Ban,
@@ -14,8 +15,25 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import PublicShell from '../components/PublicShell'
+import { loadBillingPricing, type BillingPricing } from '../lib/billingApi'
+import {
+  BASIC_FEATURES,
+  FAIR_USE_FOOTNOTE,
+  PAYMENT_METHOD_DISCLOSURE,
+  PRO_FEATURES,
+  formatPlanPeriod,
+  formatPlanPrice,
+} from '../lib/planContent'
 
 function Landing(props: PageProps) {
+  const [pricing, setPricing] = useState<BillingPricing | null>(null)
+
+  useEffect(() => {
+    loadBillingPricing()
+      .then(setPricing)
+      .catch(() => setPricing(null))
+  }, [])
+
   return (
     <PublicShell theme={props.theme} onNavigate={props.onNavigate}>
       <section className="public-hero">
@@ -39,7 +57,7 @@ function Landing(props: PageProps) {
       </section>
 
       <section className="landing-trust-strip" aria-label="Trust signals">
-        <span><ShieldCheck size={17} /> No bank credentials stored</span>
+        <span><ShieldCheck size={17} /> We never ask for or store your bank password</span>
         <span><Download size={17} /> Export anytime</span>
         <span><Globe2 size={17} /> US and Canada support</span>
         <span><CheckCircle2 size={17} /> Built for small business owners</span>
@@ -106,21 +124,22 @@ function Landing(props: PageProps) {
             description="For getting organized, with real monthly limits."
             action="Start free"
             onAction={() => props.onNavigate('Register')}
-            features={['50 transactions and 25 receipts a month', 'Add accounts and categories', 'Mileage and basic invoicing', 'Basic CSV ledger export']}
+            features={BASIC_FEATURES}
           />
           <PlanCard
             name="Pro"
-            price="$12"
-            period=" / month"
+            price={formatPlanPrice(pricing, 'monthly')}
+            period={formatPlanPeriod('monthly')}
             description="For cleaner records and easier handoff."
             action="Upgrade to Pro"
             highlighted
             onAction={() => props.onNavigate('Upgrade')}
-            note="Billed monthly at $12."
-            features={['No monthly transaction or receipt limits', 'Recurring transactions and tax estimates', 'PDF and full CPA-ready CSV exports', 'Advanced export and edge-case tools']}
+            note={`Or ${formatPlanPrice(pricing, 'yearly')}/year -- pick a cadence at checkout.`}
+            features={PRO_FEATURES}
           />
         </div>
-        <p className="price-note">No charge today. Upgrade only when you choose.</p>
+        <p className="price-note">{PAYMENT_METHOD_DISCLOSURE}</p>
+        <p className="price-note-footnote">{FAIR_USE_FOOTNOTE}</p>
       </section>
 
       <section className="public-section landing-section-tinted">
@@ -129,13 +148,13 @@ function Landing(props: PageProps) {
         </div>
         <div className="faq-list">
           <Faq question="Who is InEx Ledger for?" answer="InEx Ledger is for solo operators, freelancers, contractors, consultants, creators, and very small service businesses that want cleaner records without dragging around a full accounting suite." open />
-          <Faq question="Is this meant to replace QuickBooks?" answer="Not for every business. InEx Ledger is the better fit when you want a calmer recordkeeping tool with receipts, support files, invoice replies, warning flags, and review-ready exports." open />
-          <Faq question="Does InEx Ledger file my taxes?" answer="No. It helps you keep cleaner records, catch missing details early, and hand over a stronger package when it is time to work with a CPA or tax preparer." />
-          <Faq question="Can my CPA or tax preparer use the hand-off export?" answer="Yes. The export is built to be easier to review, with totals, category groupings, receipt and support coverage, blockers, warnings, excluded items, and review notes." open />
-          <Faq question="Does it support Schedule C and T2125/T4A?" answer="Yes. U.S. records can be kept in a Schedule C-friendly flow, and Canadian records can be kept in a T2125/T4A-friendly flow with GST/HST support, kilometre tracking, receipts, and export handoff." />
-          <Faq question="Can I attach receipts and support files?" answer="Yes. You can keep receipts, mileage or kilometre logs, allocation worksheets, home-office support, capital-asset support, tax-profile support, and review notes tied to the record they belong to." />
-          <Faq question="Can I send invoices?" answer="Yes. Simple invoice sending is included in Pro, and client replies come back into your account tied to the invoice history." />
-          <Faq question="Can I export my data?" answer="Yes. You can export PDF and CSV workpapers for cleanup, review, or handoff." />
+          <Faq question="Is this meant to replace QuickBooks?" answer="Not for every business. InEx Ledger is the better fit when you want a calmer recordkeeping tool for transactions, receipts, mileage, and invoicing instead of a full accounting suite." open />
+          <Faq question="Does InEx Ledger file my taxes?" answer="No. It helps you keep cleaner, better-organized records so it is easier to hand things over when it is time to work with a CPA or tax preparer." />
+          <Faq question="Can my CPA or tax preparer use the export?" answer="Yes. Pro's export includes a PDF summary and detailed CSV built to be easier to review, with totals and category groupings." open />
+          <Faq question="Does it support Schedule C and T2125?" answer="Yes. Categories map to Schedule C for U.S. businesses and to T2125 for Canadian businesses, so your records stay organized the way your return needs them." />
+          <Faq question="Can I attach receipts?" answer="Yes. You can upload receipts and mileage or kilometre logs and link them to the transaction they belong to." />
+          <Faq question="Can I send invoices?" answer="Yes. Invoice creation and sending is included in Basic, and client replies come back into your account tied to the invoice history." />
+          <Faq question="Can I export my data?" answer="Yes. Basic includes a standard ledger CSV export. Pro adds a PDF summary and full CSV export for your accountant." />
         </div>
       </section>
 

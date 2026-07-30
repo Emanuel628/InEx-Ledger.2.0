@@ -563,6 +563,13 @@ textarea:focus-visible {
   font-weight: 800;
 }
 
+.price-note-footnote {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .public-feature-card,
 .pricing-card,
 .support-card,
@@ -1562,6 +1569,16 @@ textarea:focus-visible {
   line-height: 1.04;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+}
+
+.summary-locked-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: clamp(4px, 1.8cqi, 7px);
+  color: var(--muted);
+  font-size: clamp(13px, 5cqi, 15px);
+  font-weight: 800;
 }
 
 .summary-icon {

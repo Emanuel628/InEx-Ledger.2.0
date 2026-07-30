@@ -271,7 +271,33 @@ function resolveCurrencyForCountry(countryCode) {
   return countryCode === "ca" ? "cad" : "usd";
 }
 
-async function resolveBillingContext(req) {
+// The business's own configured region (set once at onboarding and rarely
+// changed) is a much stronger signal for what currency a customer expects to
+// be billed in than the network they happen to be checking out from -- a
+// Canadian business owner on a US VPN, or a US business owner traveling in
+// Canada, should still see their business's own currency.
+async function resolveBusinessRegionCountryCode(businessId) {
+  if (!businessId) {
+    return null;
+  }
+  const result = await pool.query(
+    `SELECT region FROM businesses WHERE id = $1`,
+    [businessId]
+  );
+  return normalizeCountryCode(result.rows[0]?.region);
+}
+
+async function resolveBillingContext(req, businessId = null) {
+  const regionCountryCode = await resolveBusinessRegionCountryCode(businessId);
+  if (regionCountryCode) {
+    return {
+      ipAddress: getVerifiedClientIp(req) || null,
+      countryCode: regionCountryCode,
+      currency: resolveCurrencyForCountry(regionCountryCode),
+      source: "business_region"
+    };
+  }
+
   const ipAddress = getVerifiedClientIp(req);
   const location = await fetchIpLocation(ipAddress);
   const countryCode = normalizeCountryCode(location?.country);
@@ -1036,7 +1062,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       });
     }
 
-    const billingContext = await resolveBillingContext(req);
+    const billingContext = await resolveBillingContext(req, billingBusinessId);
     const requestedCurrency = String(req.body?.currency || "").trim().toLowerCase();
     if (
         requestedCurrency &&
@@ -1161,7 +1187,7 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
     const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
-    const billingContext = await resolveBillingContext(req);
+    const billingContext = await resolveBillingContext(req, billingBusinessId);
     const portalCurrency = resolveCheckoutCurrency(subscription, billingContext);
     const configurationId = await buildBillingPortalConfiguration(portalCurrency);
     const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
@@ -1308,17 +1334,11 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
 
     if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
+      // Nothing has ever been charged here -- this is someone declining the
+      // trial, not canceling a paid plan, so it does not get the "your
+      // subscription has been canceled" email below.
       await setTrialPlanSelectionForBusiness(billingBusinessId, "free");
       const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-      await sendBillingEmail({
-        businessId: billingBusinessId,
-        kind: "canceling",
-        details: [
-          { label: "Plan", value: updated.effectiveTierName || "Basic" },
-          { label: "Access through", value: formatDateLabel(updated.trialEndsAt || updated.currentPeriodEnd) }
-        ],
-        actionUrl: buildAppUrl("/subscription")
-      });
       return res.status(200).json({ subscription: updated });
     }
 

@@ -2,8 +2,16 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import type { PageProps } from '../App'
 import PublicShell from '../components/PublicShell'
-import { formatSubscriptionMoney, loadBillingPricing, type BillingPricing } from '../lib/billingApi'
+import { loadBillingPricing, type BillingPricing } from '../lib/billingApi'
 import { usePlan } from '../context/PlanContext'
+import {
+  BASIC_FEATURES,
+  BASIC_LIMITS_NOTE,
+  FAIR_USE_FOOTNOTE,
+  PRO_FEATURES,
+  formatPlanPeriod,
+  formatPlanPrice,
+} from '../lib/planContent'
 
 function Pricing(props: PageProps) {
   const [pricing, setPricing] = useState<BillingPricing | null>(null)
@@ -15,35 +23,21 @@ function Pricing(props: PageProps) {
       .catch(() => setPricing(null))
   }, [])
 
-  const proPrice = pricing?.pricing.monthly?.base
   const plans = [
     {
       name: 'Basic',
       price: '$0',
       period: '',
       description: 'Get your books started for free, with real monthly limits.',
-      features: [
-        '50 transactions and 25 receipt uploads per month',
-        'Manual transactions, accounts, and categories',
-        'Dashboard and basic analytics',
-        'Mileage tracking and basic invoicing',
-        'Basic CSV ledger export',
-        'Your records stay available even after a monthly limit is reached',
-      ],
+      features: [BASIC_LIMITS_NOTE, ...BASIC_FEATURES],
     },
     {
       name: 'Pro',
-      price: Number.isFinite(proPrice) ? formatSubscriptionMoney(Number(proPrice), pricing?.currency || 'usd') : '$12',
-      period: ' / month',
+      price: formatPlanPrice(pricing, 'monthly'),
+      period: formatPlanPeriod('monthly'),
       description: 'For active operators who need automation, tax prep, and full exports.',
-      features: [
-        'Basic monthly limits removed, subject to reasonable technical and abuse-prevention limits',
-        'Recurring transactions',
-        'Tax estimates',
-        'PDF accountant packets and full CPA/workpaper CSV exports',
-        'Advanced export and edge-case tools',
-        'Additional business workspaces (paid add-on)',
-      ],
+      note: `Or ${formatPlanPrice(pricing, 'yearly')}/year.`,
+      features: PRO_FEATURES,
       highlighted: true,
     },
   ]
@@ -81,9 +75,11 @@ function Pricing(props: PageProps) {
             >
               {plan.highlighted ? proButtonLabel() : 'Start free'}
             </button>
+            {plan.note ? <p className="price-note-inline">{plan.note}</p> : null}
           </article>
         ))}
       </section>
+      <p className="price-note-footnote">{FAIR_USE_FOOTNOTE}</p>
     </PublicShell>
   )
 }
