@@ -47,6 +47,27 @@ function Billing(props: PageProps) {
   const planName = subscription?.effectiveTierName || 'Basic'
   const status = subscription?.effectiveStatus || subscription?.status || 'free'
 
+  function downloadInvoicesCsv() {
+    const rows = [
+      ['Invoice', 'Date', 'Status', 'Total', 'Currency'],
+      ...invoices.map((invoice) => [
+        invoice.number || invoice.id,
+        formatBillingDateFromUnix(invoice.created),
+        invoice.status || 'paid',
+        String((Number(invoice.amount_paid ?? invoice.amount_due ?? 0) / 100).toFixed(2)),
+        (invoice.currency || 'usd').toUpperCase(),
+      ]),
+    ]
+    const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'inex-ledger-subscription-invoices.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <AppShell {...props}>
       <main className="transactions-page billing-page">
@@ -54,13 +75,13 @@ function Billing(props: PageProps) {
           <div>
             <p className="eyebrow">Billing</p>
             <h1>Billing</h1>
-            <p>Payment methods, invoices, and Stripe portal actions stay here. Plan changes live in Subscription.</p>
+            <p>View payment details and subscription invoices. Go to Manage Plan to upgrade or cancel.</p>
           </div>
           <div className="billing-heading-actions">
             <button className="secondary-button" type="button" onClick={() => props.onNavigate('Settings')}>Back to settings</button>
             <button className="primary-button" type="button" onClick={() => void handleOpenPortal()}>
               <ExternalLink size={18} />
-              Open Stripe
+              Manage billing
             </button>
           </div>
         </section>
@@ -70,7 +91,7 @@ function Billing(props: PageProps) {
             <AlertTriangle size={18} />
             <div>
               <strong>{dataError}</strong>
-              <span>Refresh billing or open Subscription to review your plan.</span>
+              <span>Refresh billing or open Manage Plan to review your plan.</span>
             </div>
             <button className="top-alert-close" type="button" aria-label="Dismiss billing warning" onClick={() => setDataError('')}>
               <X size={16} />
@@ -105,7 +126,7 @@ function Billing(props: PageProps) {
         <section className="billing-action-grid">
           <BillingAction icon={ExternalLink} title="Stripe portal" description="Update cards, download official invoices, or cancel in Stripe." action="Open portal" onClick={handleOpenPortal} />
           <BillingAction icon={ShieldCheck} title="Billing owner" description="The workspace owner controls Stripe billing for this business." action="Settings" onClick={() => props.onNavigate('Settings')} />
-          <BillingAction icon={FileText} title="Tax receipts" description="Keep subscription receipts separate from customer invoices." action="History" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })} />
+          <BillingAction icon={FileText} title="Billing history" description="Jump to your subscription invoices below." action="View" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })} />
         </section>
 
         <section className="table-panel">
@@ -114,7 +135,7 @@ function Billing(props: PageProps) {
               <h2>Invoice history</h2>
               <p>Recent subscription invoices and receipts.</p>
             </div>
-            <button className="secondary-button" type="button" disabled={!invoices.length}>
+            <button className="secondary-button" type="button" disabled={!invoices.length} onClick={downloadInvoicesCsv}>
               <Download size={17} />
               Export CSV
             </button>
@@ -222,6 +243,11 @@ function formatPaymentMethod(method?: { type?: string; brand?: string; bankName?
     return `${method.bankName || 'Bank account'} ending ${method.last4 || '----'}`
   }
   return method.type || 'Payment method'
+}
+
+function csvCell(value: string | number) {
+  const text = String(value)
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 export default Billing

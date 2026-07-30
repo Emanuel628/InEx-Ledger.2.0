@@ -15,7 +15,8 @@ function loadBillingRouter({
   searchedStripeCustomerId = null,
   missingSubscriptionRow = false,
   stripeSubscriptionResponse = null,
-  priceOverrides = {}
+  priceOverrides = {},
+  businessRegion = null
 } = {}) {
   const state = {
     stripeRequests: [],
@@ -34,6 +35,11 @@ function loadBillingRouter({
       return {
         pool: {
           async query(sql) {
+            if (/SELECT region FROM businesses/i.test(sql)) {
+              return businessRegion
+                ? { rows: [{ region: businessRegion }], rowCount: 1 }
+                : { rows: [], rowCount: 0 };
+            }
             if (/SELECT stripe_customer_id/i.test(sql)) {
               if (state.missingSubscriptionRow) {
                 return { rows: [], rowCount: 0 };
@@ -482,6 +488,62 @@ test("billing checkout ignores client currency and uses verified region currency
   }
 });
 
+test("billing checkout prefers the business's own region over IP geolocation for currency", async () => {
+  // A Canadian business owner checking out from a US IP (VPN, travel, CDN
+  // edge, ...) should still be billed in CAD -- their own business's
+  // configured region is a much stronger signal than the network they
+  // happen to be on.
+  const fixture = loadBillingRouter({ country: "United States", businessRegion: "CA" });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        checkoutAttemptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        billingInterval: "monthly"
+      });
+
+    assert.equal(res.status, 200);
+
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+    assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_cad");
+    assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
+    assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
+    assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "business_region");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout falls back to IP geolocation when the business has no region on file", async () => {
+  const fixture = loadBillingRouter({ country: "Canada", businessRegion: null });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        checkoutAttemptId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        billingInterval: "monthly"
+      });
+
+    assert.equal(res.status, 200);
+
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+    assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
+    assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("billing checkout rejects Stripe prices mapped to the wrong recurring interval", async () => {
   const fixture = loadBillingRouter({
     country: "United States",
@@ -593,8 +655,11 @@ test("billing portal sessions use a configuration with monthly and yearly plan c
       String(entry.url).endsWith("/billing_portal/sessions")
     );
     assert.equal(portalRequest.body.get("configuration"), "bpc_test_123");
-    assert.equal(portalRequest.body.get("flow_data[type]"), "subscription_update");
-    assert.equal(portalRequest.body.get("flow_data[subscription_update][subscription]"), "sub_test_update_123");
+    // "Manage billing" opens the portal's default home (invoices, payment
+    // method, cancel) instead of deep-linking straight into a plan-change
+    // flow -- no flow_data[type] means Stripe shows its own landing page.
+    assert.equal(portalRequest.body.get("flow_data[type]"), null);
+    assert.equal(portalRequest.body.get("flow_data[subscription_update][subscription]"), null);
   } finally {
     fixture.cleanup();
   }

@@ -4,6 +4,7 @@ import {
   Calendar,
   ChevronDown,
   Download,
+  Lock,
   ShieldCheck,
   TrendingDown,
   TrendingUp,
@@ -35,7 +36,6 @@ const emptyAnalytics: AnalyticsSummary = {
 }
 
 function Analytics(props: PageProps) {
-  const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [analytics, setAnalytics] = useState<AnalyticsSummary>(emptyAnalytics)
   const [categoryMode, setCategoryMode] = useState<'Income' | 'Expenses'>('Income')
   const [loadingData, setLoadingData] = useState(true)
@@ -93,7 +93,7 @@ function Analytics(props: PageProps) {
           <SummaryItem label="Income" value={formatMoney(analytics.income)} tone="income" icon={TrendingUp} />
           <SummaryItem label="Expenses" value={formatMoney(analytics.expenses)} tone="expense" icon={TrendingDown} />
           <SummaryItem label="Net profit" value={formatMoney(analytics.net)} tone="net" icon={Wallet} />
-          <SummaryItem label="Tax set-aside" value={analytics.taxSetAside === null ? 'Upgrade' : formatMoney(analytics.taxSetAside)} tone="review" icon={ShieldCheck} />
+          <SummaryItem label="Tax set-aside" value={analytics.taxSetAside === null ? null : formatMoney(analytics.taxSetAside)} tone="review" icon={ShieldCheck} />
         </section>
 
         {dataError ? (
@@ -159,8 +159,8 @@ function Analytics(props: PageProps) {
 
           <article className="export-card analytics-cash-card">
             <div className="analytics-card-head">
-              <h2>Cash flow outlook</h2>
-              <span className="analytics-muted">Next 3 months</span>
+              <h2>Estimated cash flow</h2>
+              <span className="analytics-muted">Next 3 months, based on your recent activity</span>
             </div>
             <div className="cash-flow-table">
               {analytics.cashFlow.length ? analytics.cashFlow.map((row) => (
@@ -174,35 +174,6 @@ function Analytics(props: PageProps) {
           </article>
         </section>
 
-        <section className="progressive-panels" aria-label="Advanced analytics">
-          <ProgressivePanel
-            id="monthly"
-            title="Monthly breakdown"
-            summary="Income, expenses, net"
-            expandedPanel={expandedPanel}
-            onToggle={setExpandedPanel}
-          >
-            Review trailing monthly detail after the chart points to a month worth investigating.
-          </ProgressivePanel>
-          <ProgressivePanel
-            id="seasonal"
-            title="Seasonal patterns"
-            summary="Income by calendar month"
-            expandedPanel={expandedPanel}
-            onToggle={setExpandedPanel}
-          >
-            Compare average income by month to spot repeat seasonal peaks and slow periods.
-          </ProgressivePanel>
-          <ProgressivePanel
-            id="whatif"
-            title="What-if planner"
-            summary="Scenario modeling"
-            expandedPanel={expandedPanel}
-            onToggle={setExpandedPanel}
-          >
-            Model income changes, cost cuts, weeks off, and custom monthly income without crowding the dashboard.
-          </ProgressivePanel>
-        </section>
       </main>
     </AppShell>
   )
@@ -248,7 +219,7 @@ function TrendChart({
   )
 }
 
-function SummaryItem({ label, value, tone, icon: Icon }: { label: string; value: string; tone: string; icon: LucideIcon }) {
+function SummaryItem({ label, value, tone, icon: Icon }: { label: string; value: string | null; tone: string; icon: LucideIcon }) {
   return (
     <article className={`summary-item tone-${tone}`}>
       <div className="summary-icon">
@@ -256,37 +227,14 @@ function SummaryItem({ label, value, tone, icon: Icon }: { label: string; value:
       </div>
       <div>
         <span>{label}</span>
-        <strong>{value}</strong>
+        {value === null ? (
+          <span className="summary-locked-value">
+            <Lock size={13} /> Pro feature
+          </span>
+        ) : (
+          <strong>{value}</strong>
+        )}
       </div>
-    </article>
-  )
-}
-
-function ProgressivePanel({
-  id,
-  title,
-  summary,
-  expandedPanel,
-  onToggle,
-  children,
-}: {
-  id: string
-  title: string
-  summary: string
-  expandedPanel: string | null
-  onToggle: (id: string | null) => void
-  children: string
-}) {
-  const isExpanded = expandedPanel === id
-
-  return (
-    <article className="progressive-panel">
-      <button type="button" onClick={() => onToggle(isExpanded ? null : id)} aria-expanded={isExpanded}>
-        <span>{title}</span>
-        <strong>{summary}</strong>
-        <ChevronDown size={17} />
-      </button>
-      {isExpanded ? <p>{children}</p> : null}
     </article>
   )
 }

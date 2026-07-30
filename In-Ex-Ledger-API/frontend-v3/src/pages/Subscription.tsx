@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CreditCard, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CreditCard, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { usePlan } from '../context/PlanContext'
 import {
   cancelSubscription,
-  formatSubscriptionMoney,
   loadBillingOverview,
   loadBillingPricing,
   openBillingPortal,
@@ -15,6 +14,7 @@ import {
   type BillingOverview,
   type BillingPricing,
 } from '../lib/billingApi'
+import { BASIC_LIMITS_NOTE, formatPlanPeriod, formatPlanPrice } from '../lib/planContent'
 
 function Subscription(props: PageProps) {
   const { isPro, refreshPlanContext } = usePlan()
@@ -24,6 +24,7 @@ function Subscription(props: PageProps) {
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
   const [working, setWorking] = useState(false)
+  const [confirmingCheckout, setConfirmingCheckout] = useState(false)
 
   async function refreshSubscription() {
     setLoadingData(true)
@@ -45,6 +46,55 @@ function Subscription(props: PageProps) {
 
   useEffect(() => {
     void refreshSubscription()
+  }, [])
+
+  // Stripe's webhook can land a beat after the success redirect, so a plain
+  // "did it work?" reload right after checkout can still show Free/Trial and
+  // spook the user into refreshing. Poll briefly instead of trusting the very
+  // first read. This uses its own lightweight fetch (not refreshSubscription,
+  // which toggles loadingData and would flicker the plan cards every pass).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const checkoutState = params.get('checkout')
+    if (!checkoutState) return
+
+    const cleanUrl = new URL(window.location.href)
+    cleanUrl.searchParams.delete('checkout')
+    window.history.replaceState({}, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`)
+
+    if (checkoutState === 'cancel') {
+      setDataError('Checkout was canceled. No changes were made to your plan.')
+      return
+    }
+    if (checkoutState !== 'success') return
+
+    let cancelled = false
+    setConfirmingCheckout(true)
+    ;(async () => {
+      const maxAttempts = 6
+      for (let attempt = 0; attempt < maxAttempts && !cancelled; attempt += 1) {
+        try {
+          const nextOverview = await loadBillingOverview()
+          if (cancelled) return
+          setOverview(nextOverview)
+          await refreshPlanContext()
+          if (nextOverview?.subscription?.isPaid || nextOverview?.subscription?.isTrialing) {
+            break
+          }
+        } catch {
+          // Keep polling -- a transient failure here shouldn't cut the wait short.
+        }
+        if (cancelled) return
+        if (attempt < maxAttempts - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1500))
+        }
+      }
+      if (!cancelled) setConfirmingCheckout(false)
+    })()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const subscription = overview?.subscription
@@ -138,12 +188,17 @@ function Subscription(props: PageProps) {
             <h1>Manage plan</h1>
             <p>Pick the plan that fits this workspace.</p>
           </div>
-          <div className="billing-heading-actions">
-            <button className="secondary-button" type="button" onClick={() => props.onNavigate('Billing')}>Billing history</button>
-            <button className="secondary-button" type="button" disabled={working || !overview?.portalAvailable} onClick={() => void openBillingPortal().catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to open Stripe billing.'))}>Manage billing</button>
-            <button className="secondary-button" type="button" onClick={() => props.onNavigate('Settings')}>Back to settings</button>
-          </div>
         </section>
+
+        {confirmingCheckout ? (
+          <section className="top-alert checkout-confirm-banner" role="status">
+            <CheckCircle2 size={18} />
+            <div>
+              <strong>Confirming your payment...</strong>
+              <span>This usually only takes a few seconds.</span>
+            </div>
+          </section>
+        ) : null}
 
         {dataError ? (
           <section className="top-alert" role="alert">
@@ -162,32 +217,42 @@ function Subscription(props: PageProps) {
           <article className="pricing-card">
             <div>
               <h2>Basic</h2>
-              <strong>Free</strong>
-              <p>50 transactions and 25 receipt uploads a month.</p>
+              <strong>$0</strong>
+              <p>{BASIC_LIMITS_NOTE}</p>
             </div>
-            {!loadingData && !isProActive ? <span className="status-pill status-income">Current plan</span> : null}
+            {loadingData ? null : !isProActive ? (
+              <span className="status-pill status-income">Current plan</span>
+            ) : !canResume ? (
+              <button className="secondary-button" type="button" disabled={working} onClick={() => void handleCancel()}>
+                Keep Basic
+              </button>
+            ) : null}
           </article>
 
           <article className="pricing-card is-highlighted">
             <div>
               <h2>Pro</h2>
-              <strong>{formatIntervalPrice(pricing, interval)}<span>{interval === 'monthly' ? ' / month' : ' / year'}</span></strong>
+              <strong>{formatPlanPrice(pricing, interval)}<span>{formatPlanPeriod(interval)}</span></strong>
               <p>No monthly limits, plus automation and tax-ready exports.</p>
             </div>
 
-            {!loadingData && isProActive ? (
-              <span className="status-pill status-income">Current plan</span>
-            ) : !loadingData ? (
+            {!loadingData ? (
               <div className="subscription-interval-toggle" role="group" aria-label="Billing interval">
                 <button className={interval === 'monthly' ? 'is-selected' : ''} type="button" onClick={() => chooseBillingInterval('monthly')}>
                   Monthly
-                  <strong>{formatIntervalPrice(pricing, 'monthly')}</strong>
+                  <strong>{formatPlanPrice(pricing, 'monthly')}</strong>
                 </button>
                 <button className={interval === 'yearly' ? 'is-selected' : ''} type="button" onClick={() => chooseBillingInterval('yearly')}>
                   Yearly
-                  <strong>{formatIntervalPrice(pricing, 'yearly')}</strong>
+                  <strong>{formatPlanPrice(pricing, 'yearly')}</strong>
                 </button>
               </div>
+            ) : null}
+
+            {canResume && subscription?.billingInterval && interval !== subscription.billingInterval ? (
+              <p className="subscription-interval-note">
+                Switching to {interval === 'monthly' ? 'monthly' : 'yearly'} billing takes effect immediately with no prorated credit or charge.
+              </p>
             ) : null}
 
             {canResume ? (
@@ -206,12 +271,6 @@ function Subscription(props: PageProps) {
                 {working ? 'Opening checkout' : 'Upgrade to Pro'}
               </button>
             ) : null}
-
-            {isProActive && !canResume ? (
-              <button className="auth-link subscription-cancel-link" type="button" disabled={working} onClick={() => void handleCancel()}>
-                Cancel subscription
-              </button>
-            ) : null}
           </article>
         </section>
       </main>
@@ -223,12 +282,6 @@ function readPreferredBillingInterval(): BillingInterval {
   if (typeof window === 'undefined') return 'monthly'
   const saved = window.sessionStorage.getItem('inex-preferred-billing-interval')
   return saved === 'yearly' ? 'yearly' : 'monthly'
-}
-
-function formatIntervalPrice(pricing: BillingPricing | null, interval: BillingInterval) {
-  const price = pricing?.pricing?.[interval]?.base
-  if (!Number.isFinite(price)) return interval === 'monthly' ? '$12' : '$122.40'
-  return formatSubscriptionMoney(Number(price), pricing?.currency || 'usd')
 }
 
 export default Subscription

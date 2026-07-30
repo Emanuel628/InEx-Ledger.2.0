@@ -563,6 +563,13 @@ textarea:focus-visible {
   font-weight: 800;
 }
 
+.price-note-footnote {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .public-feature-card,
 .pricing-card,
 .support-card,
@@ -792,6 +799,13 @@ textarea:focus-visible {
   color: var(--muted);
   display: grid;
   gap: 6px;
+}
+
+.trial-plan-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .faq-item {
@@ -1197,6 +1211,40 @@ textarea:focus-visible {
   background: linear-gradient(135deg, rgba(23, 92, 255, 0.08), rgba(9, 156, 150, 0.08));
 }
 
+/* Upsell prompt (upgrade to Pro / buy a business slot) -- an invitation to
+   act, not a warning, so it borrows the same brand gradient as
+   .settings-status-card instead of .settings-danger-zone's red. Flex (not
+   grid) so it holds up with either one or two children (a note instead of a
+   button while cancellation is pending). */
+.workspace-upsell-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(23, 92, 255, 0.18);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(23, 92, 255, 0.08), rgba(9, 156, 150, 0.08));
+}
+
+.workspace-upsell-card strong {
+  display: block;
+  font-size: 14px;
+}
+
+.workspace-upsell-card p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.workspace-upsell-card .primary-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .settings-danger-zone.settings-danger-form {
   display: flex;
   flex-direction: column;
@@ -1523,6 +1571,16 @@ textarea:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.summary-locked-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: clamp(4px, 1.8cqi, 7px);
+  color: var(--muted);
+  font-size: clamp(13px, 5cqi, 15px);
+  font-weight: 800;
+}
+
 .summary-icon {
   width: clamp(42px, 19cqi, 58px);
   height: clamp(42px, 19cqi, 58px);
@@ -1654,6 +1712,18 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* A "this is going fine, just wait a second" variant of .top-alert -- same
+   layout, but the blue/teal brand gradient instead of the amber warning
+   tint, so a normal checkout-confirmation wait doesn't read as a problem. */
+.checkout-confirm-banner {
+  border-color: rgba(23, 92, 255, 0.24);
+  background: linear-gradient(135deg, rgba(23, 92, 255, 0.08), rgba(9, 156, 150, 0.08));
+}
+
+.checkout-confirm-banner > svg {
+  color: var(--blue);
 }
 
 .table-toolbar {
@@ -2028,12 +2098,6 @@ tbody tr:last-child td {
   font: inherit;
 }
 
-.subscription-cancel-link {
-  margin-top: 8px;
-  color: var(--red) !important;
-  font-size: 12px;
-}
-
 .subscription-interval-toggle {
   display: flex;
   gap: 8px;
@@ -2073,6 +2137,13 @@ tbody tr:last-child td {
 
 .subscription-interval-toggle button.is-selected strong {
   color: var(--blue);
+}
+
+.subscription-interval-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .subscription-simple-card {

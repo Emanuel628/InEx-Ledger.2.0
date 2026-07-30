@@ -98,6 +98,7 @@
   .settings-field select,
   .settings-row,
   .settings-status-card,
+  .workspace-upsell-card,
   .drawer-form input,
   .drawer-form select,
   .drawer-form textarea,
@@ -128,6 +129,7 @@
   .settings-section-nav small,
   .settings-row p,
   .settings-status-card p,
+  .workspace-upsell-card p,
   .settings-danger-zone p,
   .drawer-header p,
   .export-modal-header p:not(.eyebrow),
@@ -219,6 +221,17 @@
   border-color: rgba(244, 182, 75, 0.36);
   background: rgba(244, 182, 75, 0.12);
   color: #ffe1a3;
+}
+
+.ledger-shell[data-theme="dark"] .checkout-confirm-banner {
+  border-color: rgba(109, 162, 255, 0.32);
+  background:
+    linear-gradient(135deg, rgba(109, 162, 255, 0.14), rgba(15, 27, 45, 0.96)),
+    var(--surface);
+}
+
+.ledger-shell[data-theme="dark"] .checkout-confirm-banner svg {
+  color: var(--blue);
 }
 
 .ledger-shell[data-theme="dark"] .settings-field.is-invalid {

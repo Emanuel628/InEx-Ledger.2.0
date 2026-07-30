@@ -44,15 +44,15 @@ const helpItems = [
   },
   {
     title: 'Mileage or kilometers',
-    body: 'Track business vehicle trips and vehicle expenses from the Mileage page.',
-    detail: 'US businesses see Mileage. Canadian businesses see Kilometers. Vehicle entries feed tax-ready records and respect accounting period locks.',
+    body: 'Track business trips on Basic. Vehicle-cost tools require Pro.',
+    detail: 'US businesses see Mileage. Canadian businesses see Kilometers. Trip logging is available on every plan; tracking fuel, maintenance, and other vehicle costs needs Pro. Vehicle entries feed tax-ready records and respect accounting period locks.',
     icon: Car,
     category: 'Tax',
   },
   {
     title: 'Export safeguards',
-    body: 'Generate CSV or PDF packages from Exports after review checks are complete.',
-    detail: 'PDF packages require explicit sensitive-data handling and certification. CSV exports are available for spreadsheet/accountant review and export history tracks generated packages.',
+    body: 'Basic can export the standard ledger CSV. Pro adds PDF accountant packages and full CSV exports.',
+    detail: 'PDF packages require explicit sensitive-data handling and certification before they generate.',
     icon: ShieldCheck,
     category: 'Tax',
   },
@@ -72,8 +72,8 @@ const helpItems = [
   },
   {
     title: 'Billing and subscription',
-    body: 'Use Subscription for plan status, monthly or yearly checkout, workspace capacity, added businesses, cancellation, and Stripe billing.',
-    detail: 'Use Billing for payment methods, invoices, and Stripe portal access. Canceled or expired paid access should fall back to free-tier access instead of blocking the app.',
+    body: 'Use Manage Plan to choose Basic or Pro, change billing cadence, or cancel Pro.',
+    detail: 'Use Business Workspaces to add, switch, or manage businesses. Use Billing to view payment details and subscription invoices. Canceled or expired paid access falls back to Basic instead of blocking the app.',
     icon: CreditCard,
     category: 'Billing',
   },
@@ -140,7 +140,7 @@ function Help(props: PageProps) {
           <div>
             <p className="eyebrow">Support</p>
             <h1>Help</h1>
-            <p>Current guidance for the v3 app, organized around the pages you use every day.</p>
+            <p>Guides for the pages and features you use every day.</p>
           </div>
           <button className="primary-button" type="button" onClick={() => props.onNavigate('Messages')}>
             <Mail size={18} />

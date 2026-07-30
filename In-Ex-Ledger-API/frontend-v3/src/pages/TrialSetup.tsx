@@ -4,12 +4,21 @@ import type { PageProps } from '../App'
 import AuthShell from '../components/AuthShell'
 import {
   cancelSubscription,
-  formatSubscriptionMoney,
+  formatSubscriptionDate,
+  loadBillingOverview,
   loadBillingPricing,
   startCheckout,
   type BillingInterval,
   type BillingPricing,
 } from '../lib/billingApi'
+import {
+  BASIC_FEATURES,
+  BASIC_LIMITS_NOTE,
+  PRO_FEATURES,
+  TRIAL_CARD_NOTE,
+  formatPlanPeriod,
+  formatPlanPrice,
+} from '../lib/planContent'
 
 function readNextPath() {
   const next = new URLSearchParams(window.location.search).get('next') || ''
@@ -29,15 +38,10 @@ function resolveStayPage() {
   return guided[next] || 'Transactions'
 }
 
-function formatPrice(pricing: BillingPricing | null, interval: BillingInterval) {
-  const price = pricing?.pricing?.[interval]?.base
-  if (!Number.isFinite(price)) return interval === 'monthly' ? '$12' : '$122.40'
-  return formatSubscriptionMoney(Number(price), pricing?.currency || 'usd')
-}
-
 function TrialSetup(props: PageProps) {
   const [interval, setInterval] = useState<BillingInterval>('monthly')
   const [pricing, setPricing] = useState<BillingPricing | null>(null)
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [openingCheckout, setOpeningCheckout] = useState(false)
   const [showBasicConfirm, setShowBasicConfirm] = useState(false)
@@ -48,6 +52,13 @@ function TrialSetup(props: PageProps) {
     loadBillingPricing()
       .then(setPricing)
       .catch(() => setPricing(null))
+    // Checkout carries over this account's existing trial end date rather than
+    // starting a fresh 30 days, so show it here -- otherwise someone who
+    // reaches this screen days into their trial would reasonably expect
+    // "Start Pro trial" to mean a brand-new trial window.
+    loadBillingOverview()
+      .then((overview) => setTrialEndsAt(overview.subscription?.trialEndsAt || null))
+      .catch(() => setTrialEndsAt(null))
   }, [])
 
   async function beginCheckout() {
@@ -62,7 +73,7 @@ function TrialSetup(props: PageProps) {
     }
   }
 
-  async function confirmStayOnBasic() {
+  async function confirmContinueWithBasic() {
     setConfirmingBasic(true)
     setConfirmError('')
     try {
@@ -81,7 +92,7 @@ function TrialSetup(props: PageProps) {
   return (
     <AuthShell theme={props.theme} onNavigate={props.onNavigate}>
       <h2>Choose your plan</h2>
-      <p>You can change this anytime from Settings.</p>
+      <p>You can change plans anytime under Manage Plan.</p>
       {error ? <p className="auth-error" role="alert">{error}</p> : null}
 
       <div className="trial-plan-grid">
@@ -89,13 +100,12 @@ function TrialSetup(props: PageProps) {
           <div>
             <h3>Basic</h3>
             <strong>$0</strong>
-            <p>Free, with real monthly limits.</p>
+            <p>{BASIC_LIMITS_NOTE}</p>
           </div>
           <ul>
-            <li><CheckCircle2 size={16} /><span>50 transactions and 25 receipts a month</span></li>
-            <li><CheckCircle2 size={16} /><span>Manual transactions, accounts, and categories</span></li>
-            <li><CheckCircle2 size={16} /><span>Mileage tracking and basic invoicing</span></li>
-            <li><CheckCircle2 size={16} /><span>Your records stay available if you upgrade later</span></li>
+            {BASIC_FEATURES.map((feature) => (
+              <li key={feature}><CheckCircle2 size={16} /><span>{feature}</span></li>
+            ))}
           </ul>
           <button
             className="secondary-button"
@@ -103,29 +113,31 @@ function TrialSetup(props: PageProps) {
             disabled={openingCheckout}
             onClick={() => setShowBasicConfirm(true)}
           >
-            Stay on Basic
+            Continue with Basic
           </button>
         </article>
 
         <article className="pricing-card is-highlighted trial-plan-card">
           <div>
             <h3>Pro</h3>
-            <strong>{formatPrice(pricing, interval)}<span>{interval === 'monthly' ? ' / month' : ' / year'}</span></strong>
+            <strong>{formatPlanPrice(pricing, interval)}<span>{formatPlanPeriod(interval)}</span></strong>
             <p>No monthly limits, plus automation and tax-ready exports.</p>
           </div>
           <ul>
-            <li><CheckCircle2 size={16} /><span>No monthly transaction or receipt limits</span></li>
-            <li><CheckCircle2 size={16} /><span>Recurring transactions and tax estimates</span></li>
-            <li><CheckCircle2 size={16} /><span>PDF accountant packets and full CPA-ready CSV exports</span></li>
-            <li><CheckCircle2 size={16} /><span>Advanced export and edge-case tools</span></li>
+            {PRO_FEATURES.map((feature) => (
+              <li key={feature}><CheckCircle2 size={16} /><span>{feature}</span></li>
+            ))}
           </ul>
           <label className="field trial-plan-interval">
             Billing cadence
             <select value={interval} onChange={(event) => setInterval(event.target.value as BillingInterval)}>
-              <option value="monthly">Monthly - {formatPrice(pricing, 'monthly')}</option>
-              <option value="yearly">Yearly - {formatPrice(pricing, 'yearly')}</option>
+              <option value="monthly">Monthly - {formatPlanPrice(pricing, 'monthly')}</option>
+              <option value="yearly">Yearly - {formatPlanPrice(pricing, 'yearly')}</option>
             </select>
           </label>
+          {trialEndsAt ? (
+            <p className="trial-plan-note">Trial ends {formatSubscriptionDate(trialEndsAt)} -- entering a card now does not restart the clock.</p>
+          ) : null}
           <button
             className="primary-button"
             type="button"
@@ -134,6 +146,7 @@ function TrialSetup(props: PageProps) {
           >
             {openingCheckout ? 'Opening checkout...' : 'Start Pro trial'}
           </button>
+          <p className="trial-plan-note">{TRIAL_CARD_NOTE}</p>
         </article>
       </div>
 
@@ -148,8 +161,8 @@ function TrialSetup(props: PageProps) {
           >
             <div className="drawer-header">
               <div>
-                <h2 id="stayOnBasicTitle">Stay on Basic?</h2>
-                <p>Basic includes 50 transactions and 25 receipt uploads a month. Your existing records always remain available, and you can upgrade to Pro anytime from Settings.</p>
+                <h2 id="stayOnBasicTitle">Use Basic?</h2>
+                <p>Basic includes 50 transactions and 25 receipt uploads a month. Your existing records always remain available, and you can upgrade to Pro anytime under Manage Plan.</p>
               </div>
               <button className="icon-button" type="button" aria-label="Close" disabled={confirmingBasic} onClick={() => setShowBasicConfirm(false)}>
                 <X size={18} />
@@ -160,8 +173,8 @@ function TrialSetup(props: PageProps) {
               <button className="secondary-button" type="button" disabled={confirmingBasic} onClick={() => props.onNavigate('Pricing')}>
                 Compare plans
               </button>
-              <button className="primary-button" type="button" disabled={confirmingBasic} onClick={() => void confirmStayOnBasic()}>
-                {confirmingBasic ? 'Switching...' : 'Stay on Basic'}
+              <button className="primary-button" type="button" disabled={confirmingBasic} onClick={() => void confirmContinueWithBasic()}>
+                {confirmingBasic ? 'Switching...' : 'Continue with Basic'}
               </button>
             </div>
           </section>

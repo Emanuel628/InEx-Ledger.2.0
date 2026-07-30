@@ -423,7 +423,7 @@ function AddBusinessModal({
           </div>
 
           {!isProActive ? (
-            <div className="settings-danger-zone">
+            <div className="workspace-upsell-card">
               <div>
                 <strong>Pro is required</strong>
                 <p>Upgrade to Pro before adding another business.</p>
@@ -434,7 +434,7 @@ function AddBusinessModal({
               </button>
             </div>
           ) : !hasAvailableBusinessSlot ? (
-            <div className="settings-danger-zone">
+            <div className="workspace-upsell-card">
               <div>
                 <strong>Add another business slot</strong>
                 {additionalBusinessPrice !== null ? (
@@ -454,7 +454,7 @@ function AddBusinessModal({
               ) : !hasStripeSubscription ? (
                 <button className="primary-button" type="button" disabled={saving || openingCheckout} onClick={() => void startProCheckout()}>
                   <CreditCard size={18} />
-                  {openingCheckout ? 'Opening checkout...' : 'Start Pro billing'}
+                  {openingCheckout ? 'Opening checkout...' : 'Add Business'}
                 </button>
               ) : (
                 <button

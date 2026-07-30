@@ -34,12 +34,12 @@ function Landing(props: PageProps) {
               See how it works
             </button>
           </div>
-          <p className="public-microcopy">No credit card required. Set up in minutes.</p>
+          <p className="public-microcopy">Set up in minutes.</p>
         </div>
       </section>
 
       <section className="landing-trust-strip" aria-label="Trust signals">
-        <span><ShieldCheck size={17} /> No bank credentials stored</span>
+        <span><ShieldCheck size={17} /> We never ask for or store your bank password</span>
         <span><Download size={17} /> Export anytime</span>
         <span><Globe2 size={17} /> US and Canada support</span>
         <span><CheckCircle2 size={17} /> Built for small business owners</span>
@@ -94,48 +94,19 @@ function Landing(props: PageProps) {
         </div>
       </section>
 
-      <section className="public-section">
-        <div className="public-section-head is-centered">
-          <h2>Start free. Upgrade when you need more.</h2>
-          <p>Begin with the basics, then upgrade when you want the full bookkeeping workflow.</p>
-        </div>
-        <div className="pricing-grid landing-pricing-grid">
-          <PlanCard
-            name="Basic"
-            price="$0"
-            description="For getting organized, with real monthly limits."
-            action="Start free"
-            onAction={() => props.onNavigate('Register')}
-            features={['50 transactions and 25 receipts a month', 'Add accounts and categories', 'Mileage and basic invoicing', 'Basic CSV ledger export']}
-          />
-          <PlanCard
-            name="Pro"
-            price="$12"
-            period=" / month"
-            description="For cleaner records and easier handoff."
-            action="Upgrade to Pro"
-            highlighted
-            onAction={() => props.onNavigate('Upgrade')}
-            note="Billed monthly at $12."
-            features={['No monthly transaction or receipt limits', 'Recurring transactions and tax estimates', 'PDF and full CPA-ready CSV exports', 'Advanced export and edge-case tools']}
-          />
-        </div>
-        <p className="price-note">No charge today. Upgrade only when you choose.</p>
-      </section>
-
       <section className="public-section landing-section-tinted">
         <div className="public-section-head is-centered">
           <h2>Questions, answered</h2>
         </div>
         <div className="faq-list">
           <Faq question="Who is InEx Ledger for?" answer="InEx Ledger is for solo operators, freelancers, contractors, consultants, creators, and very small service businesses that want cleaner records without dragging around a full accounting suite." open />
-          <Faq question="Is this meant to replace QuickBooks?" answer="Not for every business. InEx Ledger is the better fit when you want a calmer recordkeeping tool with receipts, support files, invoice replies, warning flags, and review-ready exports." open />
-          <Faq question="Does InEx Ledger file my taxes?" answer="No. It helps you keep cleaner records, catch missing details early, and hand over a stronger package when it is time to work with a CPA or tax preparer." />
-          <Faq question="Can my CPA or tax preparer use the hand-off export?" answer="Yes. The export is built to be easier to review, with totals, category groupings, receipt and support coverage, blockers, warnings, excluded items, and review notes." open />
-          <Faq question="Does it support Schedule C and T2125/T4A?" answer="Yes. U.S. records can be kept in a Schedule C-friendly flow, and Canadian records can be kept in a T2125/T4A-friendly flow with GST/HST support, kilometre tracking, receipts, and export handoff." />
-          <Faq question="Can I attach receipts and support files?" answer="Yes. You can keep receipts, mileage or kilometre logs, allocation worksheets, home-office support, capital-asset support, tax-profile support, and review notes tied to the record they belong to." />
-          <Faq question="Can I send invoices?" answer="Yes. Simple invoice sending is included in Pro, and client replies come back into your account tied to the invoice history." />
-          <Faq question="Can I export my data?" answer="Yes. You can export PDF and CSV workpapers for cleanup, review, or handoff." />
+          <Faq question="Is this meant to replace QuickBooks?" answer="Not for every business. InEx Ledger is the better fit when you want a calmer recordkeeping tool for transactions, receipts, mileage, and invoicing instead of a full accounting suite." open />
+          <Faq question="Does InEx Ledger file my taxes?" answer="No. It helps you keep cleaner, better-organized records so it is easier to hand things over when it is time to work with a CPA or tax preparer." />
+          <Faq question="Can my CPA or tax preparer use the export?" answer="Yes. Pro's export includes a PDF summary and detailed CSV built to be easier to review, with totals and category groupings." open />
+          <Faq question="Does it support Schedule C and T2125?" answer="Yes. Categories map to Schedule C for U.S. businesses and to T2125 for Canadian businesses, so your records stay organized the way your return needs them." />
+          <Faq question="Can I attach receipts?" answer="Yes. You can upload receipts and mileage or kilometre logs and link them to the transaction they belong to." />
+          <Faq question="Can I send invoices?" answer="Yes. Invoice creation and sending is included in Basic, and client replies come back into your account tied to the invoice history." />
+          <Faq question="Can I export my data?" answer="Yes. Basic includes a standard ledger CSV export. Pro adds a PDF summary and full CSV export for your accountant." />
         </div>
       </section>
 
@@ -191,46 +162,6 @@ function RegionCard({ region, title, text }: { region: string; title: string; te
       <span>{region}</span>
       <h3>{title}</h3>
       <p>{text}</p>
-    </article>
-  )
-}
-
-function PlanCard({
-  name,
-  price,
-  period = ' / month',
-  description,
-  features,
-  action,
-  onAction,
-  highlighted = false,
-  note,
-}: {
-  name: string
-  price: string
-  period?: string
-  description: string
-  features: string[]
-  action: string
-  onAction: () => void
-  highlighted?: boolean
-  note?: string
-}) {
-  return (
-    <article className={`pricing-card ${highlighted ? 'is-highlighted' : ''}`}>
-      {highlighted ? <span className="plan-badge">Most popular</span> : null}
-      <div>
-        <h2>{name}</h2>
-        <p>{description}</p>
-      </div>
-      <strong>{price}<span>{period}</span></strong>
-      <ul>
-        {features.map((feature) => (
-          <li key={feature}><CheckCircle2 size={17} /> {feature}</li>
-        ))}
-      </ul>
-      <button className={highlighted ? 'primary-button' : 'secondary-button'} type="button" onClick={onAction}>{action}</button>
-      {note ? <p className="price-note-inline">{note}</p> : null}
     </article>
   )
 }
