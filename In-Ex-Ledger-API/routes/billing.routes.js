@@ -545,48 +545,60 @@ function getStripeProductIdFromPrice(price, label) {
   return productId;
 }
 
-async function buildBillingPortalConfiguration(currency) {
+// `purpose` scopes both which Stripe prices this configuration needs (so an
+// unrelated misconfigured price can't 500 a flow that never uses it) and what
+// the Stripe-hosted portal lets the customer touch:
+//  - "general" (Manage billing): only the base Pro product, quantity locked
+//    out entirely -- one account keeps exactly one subscription, so switching
+//    monthly/yearly is allowed but there is nothing to select a quantity on.
+//  - "addon" (Buy another business slot): only the additional-business
+//    product, with quantity allowed -- this is the sole place +/- business
+//    slots can be purchased.
+async function buildBillingPortalConfiguration(currency, purpose = "general") {
   const normalizedCurrency = normalizeCurrency(currency);
-  const cacheKey = `portal-config:${normalizedCurrency}`;
+  const cacheKey = `portal-config:${purpose}:${normalizedCurrency}`;
   const cached = portalConfigurationCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  const priceSpecs = [
-    {
-      label: "Monthly base",
-      interval: "monthly",
-      priceId: getConfiguredPriceId(
-        BASE_PRICE_ENV.monthly?.[normalizedCurrency],
-        "Monthly pricing is not configured yet for the selected currency."
-      )
-    },
-    {
-      label: "Yearly base",
-      interval: "yearly",
-      priceId: getConfiguredPriceId(
-        BASE_PRICE_ENV.yearly?.[normalizedCurrency],
-        "Yearly pricing is not configured yet for the selected currency."
-      )
-    },
-    {
-      label: "Monthly additional business",
-      interval: "monthly",
-      priceId: getConfiguredPriceId(
-        ADDON_PRICE_ENV.monthly?.[normalizedCurrency],
-        "Monthly additional business pricing is not configured yet for the selected currency."
-      )
-    },
-    {
-      label: "Yearly additional business",
-      interval: "yearly",
-      priceId: getConfiguredPriceId(
-        ADDON_PRICE_ENV.yearly?.[normalizedCurrency],
-        "Yearly additional business pricing is not configured yet for the selected currency."
-      )
-    }
-  ];
+  const priceSpecs = purpose === "addon"
+    ? [
+      {
+        label: "Monthly additional business",
+        interval: "monthly",
+        priceId: getConfiguredPriceId(
+          ADDON_PRICE_ENV.monthly?.[normalizedCurrency],
+          "Monthly additional business pricing is not configured yet for the selected currency."
+        )
+      },
+      {
+        label: "Yearly additional business",
+        interval: "yearly",
+        priceId: getConfiguredPriceId(
+          ADDON_PRICE_ENV.yearly?.[normalizedCurrency],
+          "Yearly additional business pricing is not configured yet for the selected currency."
+        )
+      }
+    ]
+    : [
+      {
+        label: "Monthly base",
+        interval: "monthly",
+        priceId: getConfiguredPriceId(
+          BASE_PRICE_ENV.monthly?.[normalizedCurrency],
+          "Monthly pricing is not configured yet for the selected currency."
+        )
+      },
+      {
+        label: "Yearly base",
+        interval: "yearly",
+        priceId: getConfiguredPriceId(
+          BASE_PRICE_ENV.yearly?.[normalizedCurrency],
+          "Yearly pricing is not configured yet for the selected currency."
+        )
+      }
+    ];
 
   const prices = await Promise.all(priceSpecs.map((spec) => fetchStripePrice(spec.priceId)));
   const products = new Map();
@@ -611,7 +623,7 @@ async function buildBillingPortalConfiguration(currency) {
     "features[subscription_cancel][mode]": "at_period_end",
     "features[subscription_update][enabled]": true,
     "features[subscription_update][default_allowed_updates][0]": "price",
-    "features[subscription_update][default_allowed_updates][1]": "quantity",
+    ...(purpose === "addon" ? { "features[subscription_update][default_allowed_updates][1]": "quantity" } : {}),
     "features[subscription_update][proration_behavior]": "create_prorations"
   };
 
@@ -1488,7 +1500,7 @@ router.post("/additional-businesses/checkout", requireAuth, requireCsrfProtectio
     const addonPriceIds = getAddonPriceIds();
     const existingAddonItem = items.find((item) => addonPriceIds.has(item?.price?.id)) || null;
     const terms = resolveSubscriptionBillingTerms(subscription, stripeSub);
-    const configurationId = await buildBillingPortalConfiguration(terms.currency);
+    const configurationId = await buildBillingPortalConfiguration(terms.currency, "addon");
 
     const sessionPayload = {
       customer: subscription.stripeCustomerId,

@@ -2028,63 +2028,10 @@ tbody tr:last-child td {
   font: inherit;
 }
 
-/* Subscription page: give the plan/renew panel a clear "primary action"
-   identity so it reads as the main thing to do on this page, ahead of the
-   secondary business-capacity and danger-zone sections below it. */
-.subscription-plan-panel {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 22px 24px;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--blue);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.subscription-plan-copy h2 {
-  margin: 6px 0 4px;
-}
-
-.subscription-plan-copy p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  max-width: 46ch;
-}
-
 .subscription-cancel-link {
   margin-top: 8px;
   color: var(--red) !important;
   font-size: 12px;
-}
-
-.subscription-workspace-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.subscription-workspace-summary p {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.subscription-renew-card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
-  min-width: 260px;
 }
 
 .subscription-interval-toggle {
@@ -2126,13 +2073,6 @@ tbody tr:last-child td {
 
 .subscription-interval-toggle button.is-selected strong {
   color: var(--blue);
-}
-
-/* Status / renewal stat tiles */
-.subscription-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
 }
 
 .subscription-simple-card {
@@ -2393,64 +2333,7 @@ tbody tr:last-child td {
   font-size: 12px;
 }
 
-/* Add-business pricing summary -- current -> new totals, scannable at a glance */
-.subscription-price-summary {
-  display: grid;
-  gap: 10px;
-  margin: 14px 0;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface-soft);
-}
-
-.subscription-price-summary-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.subscription-price-summary-row span:first-child {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.subscription-price-summary-row strong {
-  font-size: 15px;
-}
-
-.subscription-price-summary-totals {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--line);
-  font-size: 14px;
-}
-
-.subscription-price-summary-totals .subscription-price-arrow {
-  color: var(--muted);
-}
-
-.subscription-price-summary-totals strong:last-child {
-  color: var(--blue);
-}
-
 @media (max-width: 720px) {
-  .subscription-plan-panel {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .subscription-renew-card {
-    width: 100%;
-  }
-
-  .subscription-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
   .subscription-danger-panel {
     flex-direction: column;
     align-items: flex-start;
