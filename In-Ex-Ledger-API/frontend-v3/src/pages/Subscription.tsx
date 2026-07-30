@@ -138,11 +138,6 @@ function Subscription(props: PageProps) {
             <h1>Manage plan</h1>
             <p>Pick the plan that fits this workspace.</p>
           </div>
-          <div className="billing-heading-actions">
-            <button className="secondary-button" type="button" onClick={() => props.onNavigate('Billing')}>Billing history</button>
-            <button className="secondary-button" type="button" disabled={working || !overview?.portalAvailable} onClick={() => void openBillingPortal().catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to open Stripe billing.'))}>Manage billing</button>
-            <button className="secondary-button" type="button" onClick={() => props.onNavigate('Settings')}>Back to settings</button>
-          </div>
         </section>
 
         {dataError ? (
@@ -165,7 +160,13 @@ function Subscription(props: PageProps) {
               <strong>Free</strong>
               <p>50 transactions and 25 receipt uploads a month.</p>
             </div>
-            {!loadingData && !isProActive ? <span className="status-pill status-income">Current plan</span> : null}
+            {loadingData ? null : !isProActive ? (
+              <span className="status-pill status-income">Current plan</span>
+            ) : !canResume ? (
+              <button className="secondary-button" type="button" disabled={working} onClick={() => void handleCancel()}>
+                Keep Basic
+              </button>
+            ) : null}
           </article>
 
           <article className="pricing-card is-highlighted">
@@ -204,12 +205,6 @@ function Subscription(props: PageProps) {
               <button className="primary-button" type="button" disabled={working || loadingData} onClick={() => void handleCheckout()}>
                 <CreditCard size={18} />
                 {working ? 'Opening checkout' : 'Upgrade to Pro'}
-              </button>
-            ) : null}
-
-            {isProActive && !canResume ? (
-              <button className="auth-link subscription-cancel-link" type="button" disabled={working} onClick={() => void handleCancel()}>
-                Cancel subscription
               </button>
             ) : null}
           </article>

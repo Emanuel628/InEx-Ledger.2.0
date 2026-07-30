@@ -1197,6 +1197,40 @@ textarea:focus-visible {
   background: linear-gradient(135deg, rgba(23, 92, 255, 0.08), rgba(9, 156, 150, 0.08));
 }
 
+/* Upsell prompt (upgrade to Pro / buy a business slot) -- an invitation to
+   act, not a warning, so it borrows the same brand gradient as
+   .settings-status-card instead of .settings-danger-zone's red. Flex (not
+   grid) so it holds up with either one or two children (a note instead of a
+   button while cancellation is pending). */
+.workspace-upsell-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(23, 92, 255, 0.18);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(23, 92, 255, 0.08), rgba(9, 156, 150, 0.08));
+}
+
+.workspace-upsell-card strong {
+  display: block;
+  font-size: 14px;
+}
+
+.workspace-upsell-card p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.workspace-upsell-card .primary-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .settings-danger-zone.settings-danger-form {
   display: flex;
   flex-direction: column;
@@ -2026,12 +2060,6 @@ tbody tr:last-child td {
   background: var(--surface);
   color: var(--ink);
   font: inherit;
-}
-
-.subscription-cancel-link {
-  margin-top: 8px;
-  color: var(--red) !important;
-  font-size: 12px;
 }
 
 .subscription-interval-toggle {
