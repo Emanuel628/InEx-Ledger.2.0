@@ -454,7 +454,7 @@ function AddBusinessModal({
               ) : !hasStripeSubscription ? (
                 <button className="primary-button" type="button" disabled={saving || openingCheckout} onClick={() => void startProCheckout()}>
                   <CreditCard size={18} />
-                  {openingCheckout ? 'Opening checkout...' : 'Upgrade to Pro'}
+                  {openingCheckout ? 'Opening checkout...' : 'Add Business'}
                 </button>
               ) : (
                 <button

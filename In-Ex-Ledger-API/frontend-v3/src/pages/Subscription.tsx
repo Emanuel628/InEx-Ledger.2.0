@@ -176,9 +176,7 @@ function Subscription(props: PageProps) {
               <p>No monthly limits, plus automation and tax-ready exports.</p>
             </div>
 
-            {!loadingData && isProActive ? (
-              <span className="status-pill status-income">Current plan</span>
-            ) : !loadingData ? (
+            {!loadingData ? (
               <div className="subscription-interval-toggle" role="group" aria-label="Billing interval">
                 <button className={interval === 'monthly' ? 'is-selected' : ''} type="button" onClick={() => chooseBillingInterval('monthly')}>
                   Monthly
