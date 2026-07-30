@@ -14,7 +14,6 @@
 .billing-hero-card,
 .billing-side-card,
 .billing-action-card,
-.subscription-plan-panel,
 .subscription-simple-card,
 .subscription-danger-panel {
   border: 1px solid var(--line);
@@ -32,8 +31,7 @@
   padding: 24px;
 }
 
-.billing-hero-card h2,
-.subscription-plan-panel h2 {
+.billing-hero-card h2 {
   margin: 0;
   font-size: 28px;
   line-height: 1.1;
@@ -42,7 +40,6 @@
 .billing-hero-card p:not(.eyebrow),
 .billing-side-card p,
 .billing-action-card p,
-.subscription-plan-panel p,
 .subscription-simple-card p,
 .subscription-business-row p,
 .subscription-danger-panel p {
@@ -116,27 +113,6 @@
   line-height: 1.45;
 }
 
-.subscription-plan-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 390px;
-  gap: 22px;
-  align-items: center;
-  padding: 26px;
-}
-
-.subscription-plan-copy {
-  max-width: 560px;
-}
-
-.subscription-renew-card {
-  display: grid;
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface-soft);
-}
-
 .subscription-interval-toggle {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -165,26 +141,6 @@
 
 .subscription-interval-toggle strong {
   font-size: 20px;
-}
-
-.subscription-price-line {
-  display: grid;
-  gap: 3px;
-}
-
-.subscription-price-line strong {
-  font-size: 24px;
-}
-
-.subscription-price-line span {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.subscription-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
 }
 
 .subscription-simple-card {
@@ -238,20 +194,17 @@
 }
 
 @media (max-width: 1100px) {
-  .billing-focus-grid,
-  .subscription-plan-panel {
+  .billing-focus-grid {
     grid-template-columns: 1fr;
   }
 
-  .billing-action-grid,
-  .subscription-detail-grid {
+  .billing-action-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 721px) and (max-width: 900px) {
-  .billing-action-grid,
-  .subscription-detail-grid {
+  .billing-action-grid {
     grid-template-columns: 1fr;
   }
 
@@ -279,15 +232,12 @@
   .billing-heading-actions .primary-button,
   .billing-heading-actions .secondary-button,
   .billing-hero-card .secondary-button,
-  .billing-action-card .secondary-button,
-  .subscription-renew-card .primary-button {
+  .billing-action-card .secondary-button {
     width: 100%;
   }
 
   .billing-focus-grid,
   .billing-action-grid,
-  .subscription-plan-panel,
-  .subscription-detail-grid,
   .subscription-business-row,
   .subscription-danger-panel {
     grid-template-columns: 1fr;
@@ -310,10 +260,6 @@
     padding: 18px;
   }
 
-  .subscription-plan-panel {
-    padding: 18px;
-  }
-
   .subscription-interval-toggle {
     grid-template-columns: 1fr;
   }
@@ -328,7 +274,6 @@
   .billing-hero-card,
   .billing-side-card,
   .billing-action-card,
-  .subscription-plan-panel,
   .subscription-simple-card,
   .subscription-danger-panel
 ) {
@@ -339,7 +284,6 @@
 
 .ledger-shell[data-theme="dark"] :is(
   .billing-card-icon,
-  .subscription-renew-card,
   .subscription-business-row
 ) {
   border-color: var(--line);
@@ -351,8 +295,6 @@
   .billing-hero-card p:not(.eyebrow),
   .billing-side-card p,
   .billing-action-card p,
-  .subscription-plan-panel p,
-  .subscription-price-line span,
   .subscription-simple-card p,
   .subscription-simple-card span,
   .subscription-business-row p,

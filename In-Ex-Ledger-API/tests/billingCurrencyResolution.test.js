@@ -579,12 +579,15 @@ test("billing portal sessions use a configuration with monthly and yearly plan c
     assert.ok(configRequest, "Stripe portal configuration should be created by the app");
     assert.equal(configRequest.body.get("features[subscription_update][enabled]"), "true");
     assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][0]"), "price");
+    // The general "Manage billing" portal must never expose quantity or the
+    // additional-business product -- one account keeps exactly one
+    // subscription, and business slots are only purchasable via the
+    // dedicated "addon" confirm flow below.
+    assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][1]"), null);
     assert.equal(configRequest.body.get("features[subscription_update][products][0][product]"), "prod_base_usd");
     assert.equal(configRequest.body.get("features[subscription_update][products][0][prices][0]"), "price_month_usd");
     assert.equal(configRequest.body.get("features[subscription_update][products][0][prices][1]"), "price_year_usd");
-    assert.equal(configRequest.body.get("features[subscription_update][products][1][product]"), "prod_addon_usd");
-    assert.equal(configRequest.body.get("features[subscription_update][products][1][prices][0]"), "price_addon_month_usd");
-    assert.equal(configRequest.body.get("features[subscription_update][products][1][prices][1]"), "price_addon_year_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][1][product]"), null);
 
     const portalRequest = fixture.state.stripeRequests.find((entry) =>
       String(entry.url).endsWith("/billing_portal/sessions")
@@ -624,6 +627,23 @@ test("additional-business slot checkout sends the user to a Stripe subscription_
 
     assert.equal(res.status, 200);
     assert.equal(res.body.url, "https://billing.stripe.com/p/session/test_123");
+
+    // This flow must only ever fetch/verify the additional-business prices --
+    // never the base Pro prices -- so a misconfigured base price can't 500 a
+    // business-slot purchase that has nothing to do with it.
+    const priceRequests = fixture.state.stripeRequests
+      .filter((entry) => String(entry.url).includes("/prices/"))
+      .map((entry) => String(entry.url).split("/prices/")[1]);
+    assert.deepEqual(priceRequests.sort(), ["price_addon_month_usd", "price_addon_year_usd"]);
+
+    const configRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/configurations")
+    );
+    assert.ok(configRequest, "Stripe portal configuration should be created by the app");
+    assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][0]"), "price");
+    assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][1]"), "quantity");
+    assert.equal(configRequest.body.get("features[subscription_update][products][0][product]"), "prod_addon_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][1][product]"), null);
 
     const portalRequest = fixture.state.stripeRequests.find((entry) =>
       String(entry.url).endsWith("/billing_portal/sessions")

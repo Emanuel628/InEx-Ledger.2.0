@@ -389,6 +389,9 @@ function Mileage(props: PageProps) {
           </div>
 
           <div className="table-footer">
+            <span>
+              Showing {filteredRows.length ? pageStart + 1 : 0} to {Math.min(pageStart + visibleRows.length, filteredRows.length)} of {filteredRows.length} trips
+            </span>
             <div className="pagination" aria-label="Mileage pages">
               <button type="button" aria-label="Previous page" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
                 <ChevronLeft size={16} />

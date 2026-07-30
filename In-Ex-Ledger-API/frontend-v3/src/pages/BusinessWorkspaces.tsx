@@ -117,7 +117,6 @@ function BusinessWorkspaces(props: PageProps) {
   const activePricing = pricing?.pricing?.[activeBillingInterval] || null
   const currentAdditionalBusinesses = Math.max(Number(subscription?.additionalBusinesses || 0), 0)
   const nextAdditionalBusinesses = currentAdditionalBusinesses + 1
-  const currentSubscriptionTotal = activePricing ? activePricing.base + activePricing.addon * currentAdditionalBusinesses : null
   const nextSubscriptionTotal = activePricing ? activePricing.base + activePricing.addon * nextAdditionalBusinesses : null
   const additionalBusinessPrice = activePricing?.addon ?? null
   const hasAvailableBusinessSlot = capacity.active < capacity.max
@@ -256,9 +255,7 @@ function BusinessWorkspaces(props: PageProps) {
             billingInterval={activeBillingInterval}
             currency={pricing?.currency || subscription?.currency || 'usd'}
             additionalBusinessPrice={additionalBusinessPrice}
-            currentSubscriptionTotal={currentSubscriptionTotal}
             nextSubscriptionTotal={nextSubscriptionTotal}
-            nextAdditionalBusinesses={nextAdditionalBusinesses}
             saving={working}
           />
         ) : null}
@@ -332,9 +329,7 @@ function AddBusinessModal({
   billingInterval,
   currency,
   additionalBusinessPrice,
-  currentSubscriptionTotal,
   nextSubscriptionTotal,
-  nextAdditionalBusinesses,
   saving,
 }: {
   onClose: () => void
@@ -351,9 +346,7 @@ function AddBusinessModal({
   billingInterval: BillingInterval
   currency: string
   additionalBusinessPrice: number | null
-  currentSubscriptionTotal: number | null
   nextSubscriptionTotal: number | null
-  nextAdditionalBusinesses: number
   saving: boolean
 }) {
   const [name, setName] = useState('')
@@ -445,28 +438,13 @@ function AddBusinessModal({
               <div>
                 <strong>Add another business slot</strong>
                 {additionalBusinessPrice !== null ? (
-                  <p>One additional business costs {formatSubscriptionMoney(additionalBusinessPrice, currency)}{billingSuffix}.</p>
+                  <p>
+                    Adds 1 slot for {formatSubscriptionMoney(additionalBusinessPrice, currency)}{billingSuffix}
+                    {nextSubscriptionTotal !== null ? <> — new total {formatSubscriptionMoney(nextSubscriptionTotal, currency)}{billingSuffix}</> : null}.
+                  </p>
                 ) : (
                   <p>Purchase another slot before creating this business.</p>
                 )}
-                {currentSubscriptionTotal !== null && nextSubscriptionTotal !== null ? (
-                  <div className="subscription-price-summary">
-                    <div className="subscription-price-summary-row">
-                      <span>Current subscription</span>
-                      <strong>{formatSubscriptionMoney(currentSubscriptionTotal, currency)}{billingSuffix}</strong>
-                    </div>
-                    <div className="subscription-price-summary-row">
-                      <span>New subscription</span>
-                      <strong>{formatSubscriptionMoney(nextSubscriptionTotal, currency)}{billingSuffix}</strong>
-                    </div>
-                    <p className="subscription-price-summary-totals">
-                      Your subscription will change from {formatSubscriptionMoney(currentSubscriptionTotal, currency)}{billingSuffix}
-                      <span className="subscription-price-arrow"> {'->'} </span>
-                      {formatSubscriptionMoney(nextSubscriptionTotal, currency)}{billingSuffix}.
-                    </p>
-                  </div>
-                ) : null}
-                <p>Your plan will include {nextAdditionalBusinesses} additional business {nextAdditionalBusinesses === 1 ? 'slot' : 'slots'}.</p>
               </div>
 
               {isCancellationPending ? (

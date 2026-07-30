@@ -304,6 +304,9 @@ function Invoices(props: PageProps) {
           </div>
 
           <div className="table-footer">
+            <span>
+              Showing {filteredInvoices.length ? pageStart + 1 : 0} to {Math.min(pageStart + visibleInvoices.length, filteredInvoices.length)} of {filteredInvoices.length} invoices
+            </span>
             <div className="pagination" aria-label="Invoice pages">
               <button type="button" aria-label="Previous page" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}>
                 <ChevronLeft size={16} />
