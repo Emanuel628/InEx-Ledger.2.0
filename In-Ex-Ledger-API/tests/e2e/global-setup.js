@@ -1,5 +1,4 @@
 // @ts-check
-const { chromium } = require("@playwright/test");
 const { Pool } = require("pg");
 const http = require("http");
 const crypto = require("crypto");
@@ -7,6 +6,7 @@ const path = require("path");
 const fs = require("fs");
 require("dotenv").config();
 const { seedDefaultCategoriesForBusiness } = require("../../api/utils/seedDefaultsForBusiness");
+const { generateCsrfToken } = require("../../middleware/csrf.middleware.js");
 
 const BASE = "http://localhost:8080";
 const SS_PATH = path.join(__dirname, "screenshots", "auth.json");
@@ -25,15 +25,18 @@ function httpPost(urlPath, body) {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(payload),
         "Origin": BASE,
-        "Referer": `${BASE}/`,
-      },
+        "Referer": `${BASE}/`
+      }
     };
     const req = http.request(options, (res) => {
       let data = "";
       res.on("data", (chunk) => (data += chunk));
       res.on("end", () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-        catch { resolve({ status: res.statusCode, body: {} }); }
+        try {
+          resolve({ status: res.statusCode, body: JSON.parse(data), headers: res.headers });
+        } catch {
+          resolve({ status: res.statusCode, body: {}, headers: res.headers });
+        }
       });
     });
     req.on("error", reject);
@@ -44,12 +47,83 @@ function httpPost(urlPath, body) {
 
 const DEFAULT_TRIAL_DAYS = 30;
 
+function parseSetCookieHeader(setCookieHeader) {
+  const headers = Array.isArray(setCookieHeader)
+    ? setCookieHeader
+    : (setCookieHeader ? [setCookieHeader] : []);
+
+  return headers.map((header) => {
+    const parts = String(header).split(";").map((part) => part.trim()).filter(Boolean);
+    const [nameValue, ...attrs] = parts;
+    const separatorIndex = nameValue.indexOf("=");
+    const name = separatorIndex >= 0 ? nameValue.slice(0, separatorIndex) : nameValue;
+    const value = separatorIndex >= 0 ? nameValue.slice(separatorIndex + 1) : "";
+    const cookie = {
+      name,
+      value,
+      domain: "localhost",
+      path: "/",
+      expires: -1,
+      httpOnly: false,
+      secure: false,
+      sameSite: "Lax"
+    };
+
+    for (const attr of attrs) {
+      const [rawKey, ...rawValueParts] = attr.split("=");
+      const key = rawKey.toLowerCase();
+      const attrValue = rawValueParts.join("=");
+      if (key === "path" && attrValue) cookie.path = attrValue;
+      if (key === "expires" && attrValue) {
+        const expiresAt = Date.parse(attrValue);
+        if (!Number.isNaN(expiresAt)) cookie.expires = Math.floor(expiresAt / 1000);
+      }
+      if (key === "httponly") cookie.httpOnly = true;
+      if (key === "secure") cookie.secure = true;
+      if (key === "samesite" && attrValue) {
+        const normalized = attrValue.toLowerCase();
+        cookie.sameSite = normalized === "strict" ? "Strict" : normalized === "none" ? "None" : "Lax";
+      }
+    }
+
+    return cookie;
+  }).filter((cookie) => cookie.name);
+}
+
+function writeStorageState({ authCookies }) {
+  fs.writeFileSync(SS_PATH, JSON.stringify({
+    cookies: [
+      ...authCookies.filter((cookie) => cookie.name !== "csrf_token"),
+      {
+        name: "csrf_token",
+        value: generateCsrfToken(),
+        domain: "localhost",
+        path: "/",
+        expires: -1,
+        httpOnly: false,
+        secure: false,
+        sameSite: "Strict"
+      }
+    ],
+    origins: [{
+      origin: BASE,
+      localStorage: [{
+        name: "lb_cookie_consent",
+        value: JSON.stringify({
+          decision: "accepted",
+          version: "1",
+          at: Date.now()
+        })
+      }]
+    }]
+  }, null, 2));
+}
+
 module.exports = async function globalSetup() {
   const ts = Date.now();
   const email = `e2e+${ts}@test.inexledger.local`;
   const password = "E2eTest!9x";
 
-  // 1. Register via HTTP
   console.log(`\n[setup] Registering ${email}`);
   const reg = await httpPost("/api/auth/register", {
     first_name: "E2E",
@@ -58,29 +132,25 @@ module.exports = async function globalSetup() {
     password,
     country: "US",
     tos_consent: true,
-    language: "en",
+    language: "en"
   });
-  console.log(`[setup] Register → ${reg.status}`, JSON.stringify(reg.body).slice(0, 120));
+  console.log(`[setup] Register -> ${reg.status}`, JSON.stringify(reg.body).slice(0, 120));
   if (![201, 409].includes(reg.status)) {
     throw new Error(`Registration failed: ${reg.status} ${JSON.stringify(reg.body)}`);
   }
 
-  // 2. Set up account state directly in DB (bypass browser-based onboarding/trial-setup)
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ssl: { rejectUnauthorized: false }
   });
 
-  // Verify email
   await pool.query("UPDATE users SET email_verified = true WHERE email = $1", [email]);
   console.log("[setup] Email verified in DB");
 
-  // Get user ID
   const userRow = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
   const userId = userRow.rows[0]?.id;
   if (!userId) throw new Error("User not found after registration");
 
-  // Create business
   const businessId = crypto.randomUUID();
   await pool.query(
     `INSERT INTO businesses (
@@ -102,7 +172,6 @@ module.exports = async function globalSetup() {
     ]
   );
 
-  // Set active business and mark onboarding complete
   const onboardingData = JSON.stringify({
     business_name: "Acme Consulting LLC",
     starter_account_type: "checking",
@@ -113,7 +182,7 @@ module.exports = async function globalSetup() {
     business_activity_code: "541511",
     accounting_method: "cash",
     guided_setup_active: false,
-    guided_setup_step: "complete",
+    guided_setup_step: "complete"
   });
   await pool.query(
     `UPDATE users
@@ -126,8 +195,6 @@ module.exports = async function globalSetup() {
   );
   console.log("[setup] Business + onboarding set up in DB");
 
-  // Create trial subscription (30 days) with trial_plan_selection=free so
-  // shouldRedirectToTrialSetup returns false and login goes straight to /transactions
   const now = new Date();
   const trialEndsAt = new Date(now.getTime() + DEFAULT_TRIAL_DAYS * 24 * 60 * 60 * 1000);
   const subMetadata = JSON.stringify({ trial_plan_selection: "free" });
@@ -140,73 +207,27 @@ module.exports = async function globalSetup() {
   );
   console.log("[setup] Trial subscription created in DB (Basic plan selection)");
 
-  // Seed default categories so the transaction drawer has options to pick from
   const seeded = await seedDefaultCategoriesForBusiness(pool, businessId);
-  console.log(`[setup] Default categories seeded → ${seeded.length} categories`);
-
+  console.log(`[setup] Default categories seeded -> ${seeded.length} categories`);
   await pool.end();
 
-  // 3. Browser login — should go straight to /transactions now
   fs.mkdirSync(path.dirname(SS_PATH), { recursive: true });
-  const browser = await chromium.launch({ headless: true });
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-
-  await page.goto(`${BASE}/login`);
-  // Fields start as readonly — focus removes readonly per login.js
-  await page.locator("#email").click();
-  await page.locator("#email").fill(email);
-  await page.locator("#password").click();
-  await page.locator("#password").fill(password);
-  await page.locator(".auth-submit").click();
-
-  // Wait for URL to settle — should land on /transactions
-  await page.waitForURL(/\/(onboarding|trial-setup|transactions)/, { timeout: 20_000 });
-  await page.waitForTimeout(2000);
-  console.log("[setup] Logged in →", page.url());
-
-  // Fallback: handle onboarding if it appears (shouldn't, but just in case)
-  if (page.url().includes("onboarding")) {
-    console.warn("[setup] Unexpectedly on onboarding — completing via UI");
-    await page.waitForSelector("#onboardingBusinessName", { timeout: 10_000 });
-    await page.locator("#onboardingBusinessName").fill("Acme Consulting LLC");
-    await page.locator("#onboardingRegion").selectOption("US");
-    await page.locator("#onboardingNextBtn").click();
-    await page.waitForSelector("#onboardingScreen2:not([hidden])", { timeout: 10_000 });
-    await page.locator('[data-goal="transactions"]').click();
-    await page.locator("#onboardingSubmitBtn").click();
-    await page.waitForURL(/\/(trial-setup|transactions)/, { timeout: 30_000 });
-    await page.waitForTimeout(2000);
-    console.log("[setup] Onboarding complete →", page.url());
+  const login = await httpPost("/api/auth/login", { email, password });
+  console.log(`[setup] Login -> ${login.status}`, JSON.stringify(login.body).slice(0, 120));
+  if (login.status !== 200 || login.body?.mfa_required) {
+    throw new Error(`Login failed during setup: ${login.status} ${JSON.stringify(login.body)}`);
   }
 
-  if (page.url().includes("trial-setup")) {
-    await page.waitForSelector("#trialSetupBasicBtn:not([disabled])", { timeout: 10_000 });
-    await page.locator("#trialSetupBasicBtn").click();
-    await page.waitForURL(/\/transactions/, { timeout: 15_000 });
-    console.log("[setup] Trial setup → Basic selected");
+  const authCookies = parseSetCookieHeader(login.headers?.["set-cookie"]);
+  const authCookieNames = new Set(authCookies.map((cookie) => cookie.name));
+  if (!authCookieNames.has("access_token") || !authCookieNames.has("refresh_token")) {
+    throw new Error(`Login did not return required auth cookies: ${[...authCookieNames].join(", ") || "none"}`);
   }
 
-  // Save the access token from sessionStorage so tests can inject it directly
-  // (avoiding the single-use refresh token rotation problem)
-  const sessionToken = await page.evaluate(() => sessionStorage.getItem("token") || "").catch(() => "");
-  console.log("[setup] Session token captured:", sessionToken ? "yes" : "no");
+  writeStorageState({ authCookies });
+  console.log("[setup] Auth state saved ->", SS_PATH);
 
-  // Pre-accept cookie consent so the banner never blocks form buttons during tests
-  await page.evaluate(() => {
-    localStorage.setItem("lb_cookie_consent", JSON.stringify({
-      decision: "accepted",
-      version: "1",
-      at: Date.now(),
-    }));
-  }).catch(() => {});
-  console.log("[setup] Cookie consent pre-accepted");
-
-  await ctx.storageState({ path: SS_PATH });
-  await browser.close();
-  console.log("[setup] Auth state saved →", SS_PATH);
-
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token: sessionToken }));
+  fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token: "" }));
   fs.writeFileSync(STATE_FILE, JSON.stringify({ email, password }));
   console.log("[setup] Done\n");
 };

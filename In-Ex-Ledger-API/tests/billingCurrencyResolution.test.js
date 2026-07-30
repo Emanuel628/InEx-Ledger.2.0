@@ -13,7 +13,10 @@ function loadBillingRouter({
   existingStripeSubscription = null,
   subscriptionSnapshots = null,
   searchedStripeCustomerId = null,
-  missingSubscriptionRow = false
+  missingSubscriptionRow = false,
+  stripeSubscriptionResponse = null,
+  priceOverrides = {},
+  businessRegion = null
 } = {}) {
   const state = {
     stripeRequests: [],
@@ -32,6 +35,11 @@ function loadBillingRouter({
       return {
         pool: {
           async query(sql) {
+            if (/SELECT region FROM businesses/i.test(sql)) {
+              return businessRegion
+                ? { rows: [{ region: businessRegion }], rowCount: 1 }
+                : { rows: [], rowCount: 0 };
+            }
             if (/SELECT stripe_customer_id/i.test(sql)) {
               if (state.missingSubscriptionRow) {
                 return { rows: [], rowCount: 0 };
@@ -278,14 +286,15 @@ function loadBillingRouter({
     if (String(url).includes("/prices/")) {
       const priceId = String(url).split("/prices/")[1];
       const catalog = {
-        price_month_usd: { id: "price_month_usd", unit_amount: 1200 },
-        price_month_cad: { id: "price_month_cad", unit_amount: 1700 },
-        price_year_usd: { id: "price_year_usd", unit_amount: 12240 },
-        price_year_cad: { id: "price_year_cad", unit_amount: 17500 },
-        price_addon_month_usd: { id: "price_addon_month_usd", unit_amount: 500 },
-        price_addon_month_cad: { id: "price_addon_month_cad", unit_amount: 700 },
-        price_addon_year_usd: { id: "price_addon_year_usd", unit_amount: 5100 },
-        price_addon_year_cad: { id: "price_addon_year_cad", unit_amount: 7200 }
+        price_month_usd: { id: "price_month_usd", product: "prod_base_usd", unit_amount: 1200, recurring: { interval: "month" } },
+        price_month_cad: { id: "price_month_cad", product: "prod_base_cad", unit_amount: 1700, recurring: { interval: "month" } },
+        price_year_usd: { id: "price_year_usd", product: "prod_base_usd", unit_amount: 12240, recurring: { interval: "year" } },
+        price_year_cad: { id: "price_year_cad", product: "prod_base_cad", unit_amount: 17500, recurring: { interval: "year" } },
+        price_addon_month_usd: { id: "price_addon_month_usd", product: "prod_addon_usd", unit_amount: 500, recurring: { interval: "month" } },
+        price_addon_month_cad: { id: "price_addon_month_cad", product: "prod_addon_cad", unit_amount: 700, recurring: { interval: "month" } },
+        price_addon_year_usd: { id: "price_addon_year_usd", product: "prod_addon_usd", unit_amount: 5100, recurring: { interval: "year" } },
+        price_addon_year_cad: { id: "price_addon_year_cad", product: "prod_addon_cad", unit_amount: 7200, recurring: { interval: "year" } },
+        ...priceOverrides
       };
       const price = catalog[priceId];
       if (!price) {
@@ -322,22 +331,23 @@ function loadBillingRouter({
 
     if (/\/subscriptions\/[^/?]+$/.test(String(url))) {
       const subscriptionId = String(url).split("/subscriptions/")[1];
+      const defaultSubscription = {
+        id: subscriptionId,
+        status: "active",
+        cancel_at_period_end: false,
+        current_period_start: Math.floor(Date.now() / 1000) - 86400,
+        current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
+        customer: "cus_test_123",
+        metadata: {
+          billing_interval: "monthly",
+          currency: "usd",
+          additional_businesses: "0"
+        },
+        items: { data: [] }
+      };
       return {
         ok: true,
-        json: async () => ({
-          id: subscriptionId,
-          status: "active",
-          cancel_at_period_end: false,
-          current_period_start: Math.floor(Date.now() / 1000) - 86400,
-          current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
-          customer: "cus_test_123",
-          metadata: {
-            billing_interval: "monthly",
-            currency: "usd",
-            additional_businesses: "0"
-          },
-          items: { data: [] }
-        })
+        json: async () => ({ ...defaultSubscription, ...(stripeSubscriptionResponse || {}) })
       };
     }
 
@@ -347,6 +357,15 @@ function loadBillingRouter({
         json: async () => ({
           id: "cs_test_123",
           url: "https://checkout.stripe.com/pay/cs_test_123"
+        })
+      };
+    }
+
+    if (String(url).endsWith("/billing_portal/configurations")) {
+      return {
+        ok: true,
+        json: async () => ({
+          id: "bpc_test_123"
         })
       };
     }
@@ -437,6 +456,7 @@ test("billing checkout ignores client currency and uses verified region currency
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         currency: "usd",
         additionalBusinesses: 2
@@ -451,8 +471,15 @@ test("billing checkout ignores client currency and uses verified region currency
 
     assert.ok(checkoutRequest, "Stripe checkout request should be created");
     assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_cad");
-    assert.equal(checkoutRequest.body.get("line_items[1][price]"), "price_addon_month_cad");
+    assert.equal(checkoutRequest.body.get("line_items[0][quantity]"), "1");
+    // Pro checkout is plan-only: a client-supplied additionalBusinesses is
+    // ignored, so no addon line item is ever added to this session.
+    assert.equal(checkoutRequest.body.get("line_items[1][price]"), null);
     assert.equal(checkoutRequest.body.get("allow_promotion_codes"), "true");
+    assert.equal(checkoutRequest.body.get("metadata[billing_interval]"), "monthly");
+    assert.equal(checkoutRequest.body.get("metadata[additional_businesses]"), "0");
+    assert.equal(checkoutRequest.body.get("subscription_data[metadata][billing_interval]"), "monthly");
+    assert.equal(checkoutRequest.body.get("subscription_data[metadata][additional_businesses]"), "0");
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
     assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
     assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
@@ -461,16 +488,107 @@ test("billing checkout ignores client currency and uses verified region currency
   }
 });
 
-test("billing cancel portal deep link redirects back to subscription after completion", async () => {
+test("billing checkout prefers the business's own region over IP geolocation for currency", async () => {
+  // A Canadian business owner checking out from a US IP (VPN, travel, CDN
+  // edge, ...) should still be billed in CAD -- their own business's
+  // configured region is a much stronger signal than the network they
+  // happen to be on.
+  const fixture = loadBillingRouter({ country: "United States", businessRegion: "CA" });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        checkoutAttemptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        billingInterval: "monthly"
+      });
+
+    assert.equal(res.status, 200);
+
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+    assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_cad");
+    assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
+    assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
+    assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "business_region");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout falls back to IP geolocation when the business has no region on file", async () => {
+  const fixture = loadBillingRouter({ country: "Canada", businessRegion: null });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        checkoutAttemptId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        billingInterval: "monthly"
+      });
+
+    assert.equal(res.status, 200);
+
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+    assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
+    assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout rejects Stripe prices mapped to the wrong recurring interval", async () => {
   const fixture = loadBillingRouter({
     country: "United States",
-    subscriptionSnapshots: [{
-      stripeSubscriptionId: "sub_test_cancel_123",
-      stripeCustomerId: "cus_test_123",
-      effectiveTier: "v1",
-      isPaid: true,
-      isTrialing: false
-    }]
+    priceOverrides: {
+      price_month_usd: { id: "price_month_usd", unit_amount: 1200, recurring: { interval: "year" } }
+    }
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({ checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", billingInterval: "monthly" });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error || "", /Monthly base Stripe Price is configured for year, not month/);
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+    assert.equal(checkoutRequest, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("legacy billing cancel portal endpoint schedules cancellation directly", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_cancel_123",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false
+      },
+      {
+        stripeSubscriptionId: "sub_test_cancel_123",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: true
+      }
+    ]
   });
 
   try {
@@ -479,20 +597,259 @@ test("billing cancel portal deep link redirects back to subscription after compl
       .send({});
 
     assert.equal(res.status, 200);
+    assert.equal(res.body.subscription.cancelAtPeriodEnd, true);
+
+    const cancelRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/subscriptions/sub_test_cancel_123") &&
+      entry.body?.get("cancel_at_period_end") === "true"
+    );
+
+    assert.ok(cancelRequest, "Stripe subscription should be scheduled to cancel in place");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing portal sessions use a configuration with monthly and yearly plan choices", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_update_123",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: true,
+        billingInterval: "yearly",
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/customer-portal")
+      .send({});
+
+    assert.equal(res.status, 200);
     assert.equal(res.body.url, "https://billing.stripe.com/p/session/test_123");
+
+    const configRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/configurations")
+    );
+    assert.ok(configRequest, "Stripe portal configuration should be created by the app");
+    assert.equal(configRequest.body.get("features[subscription_update][enabled]"), "true");
+    assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][0]"), "price");
+    // The general "Manage billing" portal must never expose quantity or the
+    // additional-business product -- one account keeps exactly one
+    // subscription, and business slots are only purchasable via the
+    // dedicated "addon" confirm flow below.
+    assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][1]"), null);
+    assert.equal(configRequest.body.get("features[subscription_update][products][0][product]"), "prod_base_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][0][prices][0]"), "price_month_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][0][prices][1]"), "price_year_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][1][product]"), null);
 
     const portalRequest = fixture.state.stripeRequests.find((entry) =>
       String(entry.url).endsWith("/billing_portal/sessions")
     );
+    assert.equal(portalRequest.body.get("configuration"), "bpc_test_123");
+    // "Manage billing" opens the portal's default home (invoices, payment
+    // method, cancel) instead of deep-linking straight into a plan-change
+    // flow -- no flow_data[type] means Stripe shows its own landing page.
+    assert.equal(portalRequest.body.get("flow_data[type]"), null);
+    assert.equal(portalRequest.body.get("flow_data[subscription_update][subscription]"), null);
+  } finally {
+    fixture.cleanup();
+  }
+});
 
-    assert.ok(portalRequest, "Stripe billing portal request should be created");
-    assert.equal(portalRequest.body.get("flow_data[type]"), "subscription_cancel");
-    assert.equal(portalRequest.body.get("flow_data[subscription_cancel][subscription]"), "sub_test_cancel_123");
-    assert.equal(portalRequest.body.get("flow_data[after_completion][type]"), "redirect");
-    assert.equal(
-      portalRequest.body.get("flow_data[after_completion][redirect][return_url]"),
-      "https://app.inexledger.test/subscription?portal=cancelled"
+test("additional-business slot checkout sends the user to a Stripe subscription_update_confirm session for a new addon item", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_update_123",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ],
+    stripeSubscriptionResponse: {
+      items: { data: [] }
+    }
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/additional-businesses/checkout")
+      .send({ additionalBusinesses: 2 });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.url, "https://billing.stripe.com/p/session/test_123");
+
+    // This flow must only ever fetch/verify the additional-business prices --
+    // never the base Pro prices -- so a misconfigured base price can't 500 a
+    // business-slot purchase that has nothing to do with it.
+    const priceRequests = fixture.state.stripeRequests
+      .filter((entry) => String(entry.url).includes("/prices/"))
+      .map((entry) => String(entry.url).split("/prices/")[1]);
+    assert.deepEqual(priceRequests.sort(), ["price_addon_month_usd", "price_addon_year_usd"]);
+
+    const configRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/configurations")
     );
+    assert.ok(configRequest, "Stripe portal configuration should be created by the app");
+    assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][0]"), "price");
+    assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][1]"), "quantity");
+    assert.equal(configRequest.body.get("features[subscription_update][products][0][product]"), "prod_addon_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][1][product]"), null);
+
+    const portalRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/sessions")
+    );
+    assert.ok(portalRequest, "should create a billing portal session");
+    assert.equal(portalRequest.body.get("configuration"), "bpc_test_123");
+    assert.equal(portalRequest.body.get("flow_data[type]"), "subscription_update_confirm");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][subscription]"), "sub_test_update_123");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][price]"), "price_addon_month_usd");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][quantity]"), "2");
+    assert.equal(portalRequest.body.get("return_url"), "https://app.inexledger.test/subscription?billing=updated");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("additional-business slot checkout reuses the existing addon subscription item by id when one already exists", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_update_456",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ],
+    stripeSubscriptionResponse: {
+      items: {
+        data: [
+          { id: "si_base_123", price: { id: "price_month_usd" } },
+          { id: "si_addon_123", price: { id: "price_addon_month_usd" } }
+        ]
+      }
+    }
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/additional-businesses/checkout")
+      .send({ additionalBusinesses: 3 });
+
+    assert.equal(res.status, 200);
+
+    const portalRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/sessions")
+    );
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][id]"), "si_addon_123");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][quantity]"), "3");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][price]"), null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("additional-business slot checkout rejects a non-positive quantity", async () => {
+  const fixture = loadBillingRouter({
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_update_789",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/additional-businesses/checkout")
+      .send({ additionalBusinesses: 0 });
+
+    assert.equal(res.status, 400);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("additional-business slot checkout requires an existing Stripe subscription", async () => {
+  const fixture = loadBillingRouter({
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        effectiveTier: "v1",
+        isPaid: false,
+        isTrialing: true,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/additional-businesses/checkout")
+      .send({ additionalBusinesses: 1 });
+
+    assert.equal(res.status, 409);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing overview still returns the subscription status when the Stripe payment-method/invoice lookup fails", async () => {
+  // The fixture's mocked fetch has no case for GET /customers/:id?expand=..., so
+  // it throws "Unexpected fetch URL" -- simulating a live Stripe hiccup fetching
+  // supplementary payment-method/invoice display data. The overview must still
+  // succeed with the already-resolved subscription snapshot instead of 500ing.
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_overview_123",
+        stripeCustomerId: "cus_test_overview_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        billingInterval: "monthly",
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app).get("/api/billing/overview");
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.subscription?.stripeCustomerId, "cus_test_overview_123");
+    assert.equal(res.body.paymentMethod, null);
+    assert.deepEqual(res.body.invoices, []);
   } finally {
     fixture.cleanup();
   }
@@ -528,6 +885,7 @@ test("billing checkout reuses an existing Stripe customer found by metadata sear
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -562,6 +920,7 @@ test("billing checkout persists a created Stripe customer even when the subscrip
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -585,6 +944,7 @@ test("billing checkout records an audit event with resolved checkout metadata", 
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 2,
         returnPath: "/trial-setup?next=%2Ftransactions"
@@ -596,7 +956,8 @@ test("billing checkout records an audit event with resolved checkout metadata", 
     assert.equal(fixture.state.auditCalls[0].businessId, "22222222-2222-4222-8222-222222222222");
     assert.equal(fixture.state.auditCalls[0].metadata.billingInterval, "monthly");
     assert.equal(fixture.state.auditCalls[0].metadata.currency, "cad");
-    assert.equal(fixture.state.auditCalls[0].metadata.additionalBusinesses, 2);
+    // Pro checkout is plan-only; a client-supplied additionalBusinesses is ignored.
+    assert.equal(fixture.state.auditCalls[0].metadata.additionalBusinesses, 0);
   } finally {
     fixture.cleanup();
   }
@@ -619,6 +980,7 @@ test("billing checkout keeps the existing subscription currency when trial metad
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 1
       });
@@ -631,7 +993,8 @@ test("billing checkout keeps the existing subscription currency when trial metad
 
     assert.ok(checkoutRequest, "Stripe checkout request should be created");
     assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_usd");
-    assert.equal(checkoutRequest.body.get("line_items[1][price]"), "price_addon_month_usd");
+    // Pro checkout is plan-only; a client-supplied additionalBusinesses is ignored.
+    assert.equal(checkoutRequest.body.get("line_items[1][price]"), null);
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "usd");
   } finally {
     fixture.cleanup();
@@ -648,6 +1011,7 @@ test("billing checkout rejects insecure APP_BASE_URL values", async () => {
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -674,6 +1038,7 @@ test("billing checkout blocks duplicate subscription creation when Stripe alread
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 1
       });
@@ -692,12 +1057,14 @@ test("billing checkout reuses a deterministic Stripe idempotency key for identic
     const first = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         billingInterval: "monthly",
         additionalBusinesses: 1
       });
     const second = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         billingInterval: "monthly",
         additionalBusinesses: 1
       });
@@ -738,6 +1105,7 @@ test("billing checkout blocks new sessions for past-due subscriptions", async ()
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -768,6 +1136,7 @@ test("billing checkout blocks unpaid subscriptions with a targeted payment-updat
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -801,6 +1170,7 @@ test("billing checkout allows a fresh checkout after Stripe has already canceled
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -825,6 +1195,7 @@ test("billing checkout returns a validation error when pricing is not configured
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -868,6 +1239,7 @@ test("billing checkout normalizes downgraded trial state before creating Stripe 
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -893,6 +1265,7 @@ test("billing checkout enables Stripe automatic tax by default", async () => {
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -917,6 +1290,7 @@ test("billing checkout can disable Stripe automatic tax with env flag", async ()
     const res = await request(fixture.app)
       .post("/api/billing/checkout-session")
       .send({
+        checkoutAttemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         billingInterval: "monthly",
         additionalBusinesses: 0
       });
@@ -970,6 +1344,77 @@ test("billing resume clears cancel_at_period_end on the existing Stripe subscrip
     );
 
     assert.ok(resumeRequest, "Stripe subscription should be resumed in place");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing resume can switch a canceling yearly subscription to monthly", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    stripeSubscriptionResponse: {
+      metadata: {
+        billing_interval: "yearly",
+        currency: "usd",
+        additional_businesses: "1"
+      },
+      items: {
+        data: [
+          {
+            id: "si_base_yearly",
+            quantity: 1,
+            price: { id: "price_year_usd" }
+          },
+          {
+            id: "si_addon_yearly",
+            quantity: 1,
+            price: { id: "price_addon_year_usd" }
+          }
+        ]
+      }
+    },
+    subscriptionSnapshots: [
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: true,
+        stripeSubscriptionId: "sub_resume_123",
+        billingInterval: "yearly",
+        currency: "usd",
+        additionalBusinesses: 1
+      },
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        stripeSubscriptionId: "sub_resume_123",
+        billingInterval: "monthly",
+        currency: "usd",
+        additionalBusinesses: 1
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/resume")
+      .send({ billingInterval: "monthly" });
+
+    assert.equal(res.status, 200);
+
+    const resumeRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/subscriptions/sub_resume_123") &&
+      entry.body?.get("cancel_at_period_end") === "false" &&
+      entry.body?.get("items[0][id]") === "si_base_yearly"
+    );
+
+    assert.ok(resumeRequest, "Stripe subscription should be resumed with an item price update");
+    assert.equal(resumeRequest.body.get("items[0][price]"), "price_month_usd");
+    assert.equal(resumeRequest.body.get("items[1][id]"), "si_addon_yearly");
+    assert.equal(resumeRequest.body.get("items[1][price]"), "price_addon_month_usd");
+    assert.equal(resumeRequest.body.get("metadata[billing_interval]"), "monthly");
   } finally {
     fixture.cleanup();
   }

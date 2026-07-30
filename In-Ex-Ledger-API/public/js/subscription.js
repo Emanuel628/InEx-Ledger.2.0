@@ -7,6 +7,7 @@ const SUBSCRIPTION_ACTIVATION_POLL_INTERVAL_MS = 1_500;
 let currentSubscription = null;
 let currentBillingPricing = null;
 let pendingDeleteBusinessId = null;
+let selectedRenewalInterval = "monthly";
 let subscriptionBusinessesState = {
   isLoaded: false,
   error: "",
@@ -580,31 +581,111 @@ function renderStatusActionArea(sub) {
   container.classList.add("hidden");
 }
 
-async function openCancelPortalOrCancelSubscription() {
-  if (currentSubscription?.stripeSubscriptionId) {
-    try {
-      const res = await apiFetch("/api/billing/customer-portal/cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      if (!res) return;
-      const payload = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(payload?.error || tx("settings_cancel_sub_error"));
-      if (payload?.url) {
-        if (!isAllowedBillingRedirect(payload.url)) {
-          throw new Error(tx("subscription_portal_error"));
-        }
-        window.location.href = payload.url;
-      }
-      return;
-    } catch (err) {
-      showSubToast(err.message || tx("settings_cancel_sub_error"));
-      return;
-    }
-  }
-
+async function openCancelSubscriptionModal() {
   const cancelModal = document.getElementById("subCancelModal");
   cancelModal?.classList.remove("hidden");
+}
+
+function getRenewalAdditionalBusinesses() {
+  const activeBusinesses = Array.isArray(subscriptionBusinessesState.items)
+    ? subscriptionBusinessesState.items.length
+    : 0;
+  const requiredSlots = Math.max(activeBusinesses - 1, 0);
+  const existingSlots = Math.max(Number(currentSubscription?.additionalBusinesses || 0), 0);
+  return Math.max(requiredSlots, existingSlots);
+}
+
+function updateRenewalIntervalUi() {
+  const additionalBusinesses = getRenewalAdditionalBusinesses();
+  const currency = currentSubscription?.currency || currentBillingPricing?.currency || "usd";
+  const monthlySummary = getSubscriptionPriceSummary(currentSubscription, {
+    billingInterval: "monthly",
+    currency,
+    additionalBusinesses
+  });
+  const yearlySummary = getSubscriptionPriceSummary(currentSubscription, {
+    billingInterval: "yearly",
+    currency,
+    additionalBusinesses
+  });
+
+  document.querySelectorAll("[data-renewal-interval]").forEach((button) => {
+    const isActive = button.getAttribute("data-renewal-interval") === selectedRenewalInterval;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+
+  const monthlyPrice = document.getElementById("subRenewMonthlyPrice");
+  const yearlyPrice = document.getElementById("subRenewYearlyPrice");
+  const summary = document.getElementById("subRenewalSummary");
+  if (monthlyPrice) monthlyPrice.textContent = `${fmtMoney(monthlySummary.cycleTotal, monthlySummary.currency)}/mo`;
+  if (yearlyPrice) yearlyPrice.textContent = `${fmtMoney(yearlySummary.cycleTotal, yearlySummary.currency)}/yr`;
+  if (summary) {
+    const selectedSummary = selectedRenewalInterval === "yearly" ? yearlySummary : monthlySummary;
+    summary.textContent = selectedRenewalInterval === "yearly"
+      ? `${fmtMoney(selectedSummary.monthlyEquivalent, selectedSummary.currency)}/mo equivalent, billed yearly.`
+      : `${fmtMoney(selectedSummary.cycleTotal, selectedSummary.currency)} billed monthly.`;
+  }
+}
+
+function setRenewalInterval(interval) {
+  selectedRenewalInterval = normalizeBillingInterval(interval);
+  updateRenewalIntervalUi();
+}
+
+async function startRenewalCheckout() {
+  const button = document.getElementById("subRenewCheckoutBtn");
+  const originalText = button?.textContent || "";
+  const resumesExistingSubscription = Boolean(
+    currentSubscription?.cancelAtPeriodEnd &&
+    currentSubscription?.stripeSubscriptionId &&
+    !currentSubscription?.isTrialing
+  );
+  if (button) {
+    button.disabled = true;
+    button.textContent = resumesExistingSubscription ? "Updating subscription..." : "Opening secure checkout...";
+  }
+
+  try {
+    const res = await apiFetch(
+      resumesExistingSubscription ? "/api/billing/resume" : "/api/billing/checkout-session",
+      {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        billingInterval: selectedRenewalInterval,
+        additionalBusinesses: getRenewalAdditionalBusinesses(),
+        returnPath: "/subscription"
+      })
+      }
+    );
+    const payload = await res?.json()?.catch(() => null);
+    if (!res || !res.ok) {
+      throw new Error(payload?.error || tx("subscription_checkout_error"));
+    }
+    if (resumesExistingSubscription) {
+      if (payload?.subscription && typeof applySubscriptionState === "function") {
+        applySubscriptionState(payload.subscription);
+      }
+      showSubToast(tx("subscription_update_success"));
+      currentSubscription = await loadSubscription();
+      return;
+    }
+    if (payload?.url) {
+      if (!isAllowedBillingRedirect(payload.url)) {
+        throw new Error(tx("subscription_portal_error"));
+      }
+      window.location.href = payload.url;
+      return;
+    }
+    throw new Error(tx("subscription_checkout_error"));
+  } catch (err) {
+    showSubToast(err.message || tx("subscription_checkout_error"));
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
 }
 
 // ─── Business Delete Modal ────────────────────────────────────────────────────
@@ -725,6 +806,7 @@ async function loadSubscription() {
   const statusBlock = document.getElementById("subStatusBlock");
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   const cancelBtn = document.getElementById("subCancelBtn");
+  const renewalSection = document.getElementById("sub-renewal-section");
   const cancelModalBody = document.getElementById("subCancelModalBody");
 
   try {
@@ -781,6 +863,23 @@ async function loadSubscription() {
       cancelBtn.classList.toggle("hidden", !(sub.isPaid && !sub.cancelAtPeriodEnd));
     }
 
+    const canRenewWithCheckout = Boolean(
+      !sub.isTrialing &&
+      (!sub.isPaid || sub.isCanceledWithRemainingAccess || (sub.cancelAtPeriodEnd && sub.stripeSubscriptionId))
+    );
+    if (renewalSection) {
+      renewalSection.classList.toggle("hidden", !canRenewWithCheckout);
+      if (canRenewWithCheckout) {
+        updateRenewalIntervalUi();
+        const checkoutButton = document.getElementById("subRenewCheckoutBtn");
+        if (checkoutButton) {
+          checkoutButton.textContent = sub.cancelAtPeriodEnd && sub.stripeSubscriptionId
+            ? tx("subscription_update_button")
+            : tx("html_subscription_text_continue_to_secure_checkout");
+        }
+      }
+    }
+
     if (typeof applySubscriptionState === "function") {
       applySubscriptionState(sub);
     }
@@ -826,12 +925,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("subManageBillingBtn")?.addEventListener("click", openCustomerPortal);
   document.getElementById("subHistoryPortalBtn")?.addEventListener("click", openCustomerPortal);
+  document.querySelectorAll("[data-renewal-interval]").forEach((button) => {
+    button.addEventListener("click", () => setRenewalInterval(button.getAttribute("data-renewal-interval")));
+  });
+  document.getElementById("subRenewCheckoutBtn")?.addEventListener("click", startRenewalCheckout);
 
   const cancelModal = document.getElementById("subCancelModal");
   const cancelModalCancel = document.getElementById("subCancelModalCancel");
   const cancelModalConfirm = document.getElementById("subCancelModalConfirm");
 
-  document.getElementById("subCancelBtn")?.addEventListener("click", openCancelPortalOrCancelSubscription);
+  document.getElementById("subCancelBtn")?.addEventListener("click", openCancelSubscriptionModal);
   cancelModalCancel?.addEventListener("click", () => cancelModal?.classList.add("hidden"));
   cancelModal?.addEventListener("click", (e) => { if (e.target === cancelModal) cancelModal.classList.add("hidden"); });
 

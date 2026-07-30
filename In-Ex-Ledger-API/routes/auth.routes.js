@@ -104,7 +104,7 @@ const GLOBAL_MFA_TRUST_EXPIRY_SECONDS = Number(process.env.GLOBAL_MFA_TRUST_EXPI
 const MFA_EMAIL_CODE_EXPIRY_MINUTES = Number(process.env.MFA_EMAIL_CODE_EXPIRY_MINUTES) || 15;
 const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
-const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
+const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 60 * 60;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
 const MAX_MFA_ATTEMPTS = Math.max(3, Number(process.env.MAX_MFA_ATTEMPTS) || 8);
 const MFA_REAUTH_TOKEN_EXPIRY_SECONDS = Number(process.env.MFA_REAUTH_TOKEN_EXPIRY_SECONDS) || 5 * 60;
@@ -247,8 +247,8 @@ async function consumeRecoveryEmailToken(token) {
   return result.rows[0] || null;
 }
 
-async function createEmailChangeToken(userId, email) {
-  const token = crypto.randomBytes(32).toString("hex");
+async function createEmailChangeToken(userId, email, options = {}) {
+  const token = options.token || crypto.randomBytes(32).toString("hex");
   const tokenHash = hashValue(token);
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
@@ -276,6 +276,26 @@ async function consumeEmailChangeToken(token) {
         AND expires_at > NOW()
       RETURNING user_id, new_email`,
     [tokenHash, rawToken]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function consumeEmailChangeTokenForUser(token, userId) {
+  const rawToken = String(token || "").trim();
+  if (!rawToken || !userId) {
+    return null;
+  }
+
+  const tokenHash = hashValue(rawToken);
+  await pool.query("DELETE FROM email_change_requests WHERE expires_at <= NOW()");
+  const result = await pool.query(
+    `DELETE FROM email_change_requests
+      WHERE user_id = $2
+        AND (token_hash = $1 OR token::text = $3)
+        AND expires_at > NOW()
+      RETURNING user_id, new_email`,
+    [tokenHash, userId, rawToken]
   );
 
   return result.rows[0] || null;
@@ -496,9 +516,9 @@ async function revokeAllRefreshTokensForUser(userId) {
   ]);
 }
 
-async function buildAuthenticatedAccessPayload(user, businessIdOverride = null, { mfaAuthenticated = false } = {}) {
+async function buildAuthenticatedAccessPayload(user, businessIdOverride = null, { mfaAuthenticated = false, allowUnverified = false } = {}) {
   const verified = Boolean(user.email_verified);
-  if (!verified) {
+  if (!verified && !allowUnverified) {
     throw new EmailNotVerifiedError();
   }
 
@@ -532,10 +552,11 @@ async function issueAuthenticatedSession(
   res,
   user,
   businessIdOverride = null,
-  { mfaAuthenticated = false, req = null } = {}
+  { mfaAuthenticated = false, req = null, allowUnverified = false } = {}
 ) {
   const accessPayload = await buildAuthenticatedAccessPayload(user, businessIdOverride, {
-    mfaAuthenticated
+    mfaAuthenticated,
+    allowUnverified
   });
   setAccessCookie(res, accessPayload.token);
 
@@ -700,11 +721,17 @@ async function createMfaEmailChallenge(user, req, options = {}) {
 
   // Localised page label for the footer line
   const locationLabelFr = {
-    "/login":    "Page de connexion",
-    "/settings": "Paramètres"
+    "/login":      "Page de connexion",
+    "/settings":   "Paramètres",
+    "/onboarding": "Configuration du compte"
+  };
+  const locationLabelEn = {
+    "/login":      "Sign-in page",
+    "/settings":   "Settings",
+    "/onboarding": "Onboarding"
   };
   const locationLabel = options.locationLabel
-    ?? (lang === "fr" ? (locationLabelFr[locationPath] ?? "InEx Ledger") : (mfaContentKey === "signin" ? "Sign-in page" : "Settings"));
+    ?? (lang === "fr" ? (locationLabelFr[locationPath] ?? "InEx Ledger") : (locationLabelEn[locationPath] ?? "Settings"));
 
   const expiryLine =
     lang === "fr"
@@ -1121,28 +1148,30 @@ await client.query(
     await client.query("COMMIT");
     committed = true;
 
-    // --- START OF EMAIL LOGIC ---
-    try {
-      const { token } = await createVerificationToken(email);
-      const verificationLink = buildVerificationLink(req, token);
-      // For new registrations the business language hasn't been set yet via
-      // onboarding, so we infer language from province: QC defaults to French.
-      const registrationLang = (country === "CA" && province === "QC") ? "fr" : "en";
-      const emailContent = buildWelcomeVerificationEmail(registrationLang, verificationLink);
-      await sendAppEmail({ to: email, ...emailContent });
-    } catch (emailErr) {
-      logError("Email failed to send, but account was created:", emailErr);
-    }
-    // --- END OF EMAIL LOGIC ---
+    // Log the user straight into an authenticated session so they land on
+    // Onboarding immediately. Email verification is now a 6-digit code
+    // completed later, inside Onboarding, rather than a magic link that
+    // gates access before the user ever sees the app.
+    const sessionUser = {
+      id: newUserId,
+      email,
+      email_verified: false,
+      mfa_enabled: false,
+      role: "user"
+    };
+    const session = await issueAuthenticatedSession(res, sessionUser, null, {
+      req,
+      allowUnverified: true
+    });
 
     return res.status(201).json({
       success: true,
       message: reopenedWithoutTrial
-        ? "Account reopened. Check your email to continue. A new free trial is not available on reopened accounts."
-        : "Account created. Check your email!",
+        ? "Account reopened. A new free trial is not available on reopened accounts."
+        : "Account created.",
       reactivated_without_trial: reopenedWithoutTrial,
-      verification_state: createVerificationStatusToken(email),
-      signup_bootstrap_token: createVerifiedSignupBootstrapToken({ id: newUserId, email }, req)
+      next: "/onboarding",
+      ...buildPublicSessionPayload(session)
     });
   } catch (err) {
     if (!committed) {
@@ -1262,7 +1291,9 @@ router.post("/complete-verified-signup", requireCsrfProtection, authLimiter, asy
 
 /**
  * POST /login
- * Requires verified email before issuing a session.
+ * Issues a session even for unverified accounts so users can resume
+ * onboarding; email verification happens via a 6-digit code inside
+ * onboarding rather than gating sign-in itself.
  */
 router.post("/login", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
@@ -1362,12 +1393,15 @@ router.post("/login", authLimiter, async (req, res) => {
 
     const verified = Boolean(user.email_verified);
     if (!verified) {
-      clearRefreshCookie(res);
-      clearAccessCookie(res);
-      clearMfaTrustCookie(res);
-      return res.status(403).json({
-        error: "Please verify your email address before signing in. Check your inbox for a verification link.",
-        code: "email_not_verified"
+      // Unverified accounts can no longer have MFA enabled (MFA is only ever
+      // turned on together with email verification, see the onboarding
+      // verify-code endpoint below), so it's safe to sign them straight in
+      // and let onboarding pick up the verification step where they left off,
+      // instead of hard-blocking sign-in behind a magic-link email.
+      const session = await issueAuthenticatedSession(res, user, null, { req, allowUnverified: true });
+      return res.status(200).json({
+        ...buildPublicSessionPayload(session),
+        next: "/onboarding"
       });
     }
     const businessId = await resolveBusinessIdForUser(user);
@@ -2093,6 +2127,110 @@ router.post("/mfa/resend", requireCsrfProtection, authLimiter, async (req, res) 
 });
 
 /**
+ * POST /verify-email/send-code
+ * Sends the one-time email verification code shown right after registration,
+ * before onboarding or MFA enrollment. Pure email verification only -- MFA
+ * is opted into separately and later, in Settings.
+ */
+router.post("/verify-email/send-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (user.email_verified) {
+      return res.status(400).json({ error: "Email is already verified." });
+    }
+
+    const userLang = await getPreferredLanguageForUser(user.id);
+    const mfaToken = await createMfaEmailChallenge(user, req, {
+      businessId: req.user?.business_id || null,
+      tokenPurpose: "signup_email_verify",
+      lang: userLang,
+      mfaContentKey: "signup",
+      locationPath: "/onboarding"
+    });
+
+    return res.status(200).json({
+      success: true,
+      mfa_token: mfaToken,
+      message: "We emailed you a verification code."
+    });
+  } catch (err) {
+    logError("Signup verification code send error:", err);
+    return res.status(500).json({ error: "Unable to send verification code." });
+  }
+});
+
+/**
+ * POST /verify-email/confirm-code
+ * Confirms the signup email-verification code. Only marks the email
+ * verified -- MFA enrollment is a separate, later step in Settings.
+ */
+router.post("/verify-email/confirm-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  const code = String(req.body?.code || "").trim();
+  const mfaToken = String(req.body?.mfaToken || "").trim();
+
+  if (!code || !mfaToken) {
+    return res.status(400).json({ error: "Verification code and token are required." });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    let pending;
+    try {
+      pending = verifyToken(mfaToken);
+    } catch (error) {
+      return res.status(401).json({ error: "Verification session expired. Request a new code." });
+    }
+
+    if (pending.purpose !== "signup_email_verify" || pending.id !== user.id || pending.email !== user.email) {
+      return res.status(401).json({ error: "Verification session expired. Request a new code." });
+    }
+
+    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+    if (!challenge) {
+      return res.status(401).json({ error: "Verification code expired. Request a new code." });
+    }
+
+    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
+      return res.status(429).json({ error: "Too many invalid attempts. Request a new code." });
+    }
+
+    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
+      await recordFailedMfaEmailAttempt(challenge.id);
+      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
+        return res.status(429).json({ error: "Too many invalid attempts. Request a new code." });
+      }
+      return res.status(401).json({ error: "Invalid verification code." });
+    }
+
+    await consumeMfaEmailChallenge(challenge.id);
+    await pool.query(`UPDATE users SET email_verified = true WHERE id = $1`, [user.id]);
+
+    const refreshedUser = await findUserById(user.id);
+    const session = await resetCurrentRefreshSession(res, refreshedUser, {
+      mfaAuthenticated: false,
+      req
+    });
+    logInfo("Signup email verified", { userId: user.id });
+
+    return res.status(200).json({
+      success: true,
+      ...buildPublicSessionPayload(session)
+    });
+  } catch (err) {
+    logError("Verify-email confirm-code error:", err);
+    return res.status(500).json({ error: "Unable to verify code." });
+  }
+});
+
+/**
  * POST /forgot-password
  */
 router.post("/forgot-password", passwordLimiter, async (req, res) => {
@@ -2306,6 +2444,7 @@ router.post("/recovery-email/request", requireAuth, requireCsrfProtection, authL
 router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, requireMfaIfEnabled, async (req, res) => {
   const { newEmail, currentPassword } = req.body ?? {};
   const email = normalizeEmail(newEmail);
+  const wantsCodeFlow = req.body?.verificationMode === "mfa_code";
 
   if (!email || !currentPassword) {
     return res.status(400).json({ error: "newEmail and currentPassword are required" });
@@ -2327,20 +2466,91 @@ router.post("/request-email-change", requireAuth, requireCsrfProtection, authLim
       return res.status(409).json({ error: "Email already in use" });
     }
 
-    const { token } = await createEmailChangeToken(req.user.id, email);
-
-    const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
     const lang = await getPreferredLanguageForUser(req.user.id);
-    const emailContent = buildEmailChangeEmail(lang, confirmLink);
+    let emailContent;
+
+    if (wantsCodeFlow) {
+      const code = generateMfaEmailCode();
+      await createEmailChangeToken(req.user.id, email, { token: code });
+      const expires = `${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes`;
+      emailContent = {
+        subject: "Confirm your email change",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+            <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+              <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
+              <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Confirm your email change</h1>
+            </div>
+            <div style="padding: 28px;">
+              <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">Use this code to finish changing your account email.</p>
+              <div style="font-size: 32px; letter-spacing: 0.28em; font-weight: 800; color: #0f172a; margin: 18px 0;">${code}</div>
+              <p style="margin: 0; color: #64748b; font-size: 13px;">This code expires in ${expires}. If you did not request this, change your password and contact support.</p>
+            </div>
+          </div>
+        `,
+        text: `Use this code to finish changing your InEx Ledger account email: ${code}\n\nThis code expires in ${expires}. If you did not request this, change your password and contact support.`
+      };
+    } else {
+      const { token } = await createEmailChangeToken(req.user.id, email);
+      const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
+      emailContent = buildEmailChangeEmail(lang, confirmLink);
+    }
     // Send to the CURRENT address so only the real account owner can approve
     // the change. Sending to the new address would let an attacker who stole
     // a session redirect the account to their own email.
     await sendAppEmail({ to: user.email, ...emailContent });
 
-    res.json({ message: "A confirmation link has been sent to your current email address." });
+    res.json({
+      message: wantsCodeFlow
+        ? "A verification code has been sent to your current email address."
+        : "A confirmation link has been sent to your current email address.",
+      verification_mode: wantsCodeFlow ? "mfa_code" : "link"
+    });
   } catch (err) {
     logError("Request email change error:", err);
     res.status(500).json({ error: "Failed to initiate email change." });
+  }
+});
+
+router.post("/confirm-email-change", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
+  const code = String(req.body?.code || "").trim();
+  if (!/^\d{6}$/.test(code)) {
+    return res.status(400).json({ error: "A valid 6-digit code is required." });
+  }
+
+  try {
+    const result = await consumeEmailChangeTokenForUser(code, req.user.id);
+    if (!result?.user_id || !result?.new_email) {
+      return res.status(400).json({ error: "Invalid or expired code." });
+    }
+
+    const { user_id, new_email } = result;
+    const currentUserResult = await pool.query("SELECT email FROM users WHERE id = $1 LIMIT 1", [user_id]);
+    const oldEmail = normalizeEmail(currentUserResult.rows[0]?.email);
+    await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
+    await revokeAllRefreshTokensForUser(user_id);
+    await revokeTrustedMfaDevicesForUser(user_id);
+    clearRefreshCookie(res);
+    clearAccessCookie(res);
+    clearMfaTrustCookie(res);
+    await recordAuditEvent(pool, {
+      userId: user_id,
+      action: AUDIT_ACTIONS.EMAIL_CHANGE_COMPLETE,
+      metadata: {
+        old_email_mask: maskEmail(oldEmail),
+        new_email_mask: maskEmail(new_email)
+      }
+    });
+    await sendEmailChangedConfirmationEmails({
+      userId: user_id,
+      oldEmail,
+      newEmail: new_email
+    });
+
+    res.json({ success: true, message: "Email updated. Please sign in with your new address." });
+  } catch (err) {
+    logError("Confirm email change code error:", err);
+    res.status(500).json({ error: "Email change failed." });
   }
 });
 

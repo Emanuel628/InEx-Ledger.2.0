@@ -31,6 +31,7 @@ const app = express();
 app.disable('x-powered-by');
 const publicDir = path.join(__dirname, 'public');
 const htmlDir = path.join(publicDir, 'html');
+const frontendV3Dir = path.join(publicDir, 'app-v3');
 let globalLimiter = null;
 const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
 const V2_HTML_PAGES = new Set([
@@ -45,7 +46,10 @@ const htmlPageNames = fs.readdirSync(htmlDir)
   .filter((name) => name.toLowerCase().endsWith('.html'))
   .map((name) => path.basename(name, '.html'));
 const LEGACY_HTML_REDIRECTS = new Map([
+  ['/landing', '/'],
   ['/landing.html', '/'],
+  ['/html/landing', '/'],
+  ['/html/landing.html', '/'],
   ['/html/account-profile.html', '/settings#settings-business'],
   ['/account-profile.html', '/settings#settings-business'],
   ['/html/business-profile.html', '/settings#settings-business'],
@@ -56,8 +60,6 @@ const LEGACY_HTML_REDIRECTS = new Map([
   ['/region-settings.html', '/settings#settings-preferences'],
   ['/html/security.html', '/settings#settings-security'],
   ['/security.html', '/settings#settings-security'],
-  ['/html/sessions.html', '/sessions'],
-  ['/sessions.html', '/sessions'],
   ['/html/mfa.html', '/settings#settings-security'],
   ['/mfa.html', '/settings#settings-security'],
   ['/business-settings-cpa', '/settings'],
@@ -84,6 +86,36 @@ const INDEXABLE_PUBLIC_PAGES = new Set([
   "invoice-replies-bookkeeping",
   "estimated-tax-reminders"
 ]);
+const V3_APP_PAGES = new Set([
+  "transactions",
+  "accounts",
+  "categories",
+  "receipts",
+  "mileage",
+  "exports",
+  "invoices",
+  "analytics",
+  "messages",
+  "settings",
+  "billing",
+  "subscription",
+  "sessions",
+  "change-email",
+  "onboarding",
+  "help",
+  "upgrade",
+  "trial-setup",
+  "privacy",
+  "terms",
+  "legal",
+  "pricing",
+  "login",
+  "register",
+  "forgot-password",
+  "reset-password",
+  "verify-email",
+  "mfa-challenge"
+]);
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
   "/api/billing/webhook",
@@ -93,13 +125,18 @@ const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
 
 function setStaticAssetCacheHeaders(res, filePath) {
   const normalizedPath = String(filePath || '').toLowerCase();
-  const shouldBypassCache =
-    normalizedPath.endsWith('.html')
-    || normalizedPath.endsWith('.css')
-    || normalizedPath.endsWith('.js')
-    || normalizedPath.endsWith('.mjs');
+  const requestQuery = res.req?.query || {};
+  const isHtml = normalizedPath.endsWith('.html');
+  const isVersionedStaticAsset =
+    (normalizedPath.endsWith('.css') || normalizedPath.endsWith('.js') || normalizedPath.endsWith('.mjs'))
+    && Object.prototype.hasOwnProperty.call(requestQuery, 'v');
 
-  if (!shouldBypassCache) {
+  if (isVersionedStaticAsset) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return;
+  }
+
+  if (!isHtml && !normalizedPath.endsWith('.css') && !normalizedPath.endsWith('.js') && !normalizedPath.endsWith('.mjs')) {
     return;
   }
 
@@ -110,6 +147,31 @@ function setStaticAssetCacheHeaders(res, filePath) {
 
 function getCanonicalPagePath(pageName) {
   return pageName === 'landing' ? '/' : `/${pageName}`;
+}
+
+/** Map deprecated /app-v3 page URLs to bare canonical paths. Assets stay under /app-v3/assets. */
+function getLegacyV3RedirectPath(req) {
+  const requestPath = String(req.path || '').toLowerCase().replace(/\/+$/, '') || '/';
+  if (requestPath === '/app-v3') {
+    return '/transactions';
+  }
+
+  if (!requestPath.startsWith('/app-v3/') || requestPath.startsWith('/app-v3/assets')) {
+    return null;
+  }
+
+  const rest = requestPath.slice('/app-v3/'.length);
+  if (!rest) {
+    return '/transactions';
+  }
+
+  const requestedPageName = resolveRequestedPageName(`/${rest}`);
+  if (requestedPageName) {
+    return getCanonicalPagePath(requestedPageName);
+  }
+
+  // Unknown /app-v3/* page slug: still strip the prefix rather than 404 under the dual host.
+  return `/${rest}`;
 }
 
 function resolveCanonicalAppOrigin() {
@@ -147,7 +209,7 @@ function resolveRequestedPageName(requestPath) {
     ? candidate.slice(0, -'.html'.length)
     : candidate;
 
-  return htmlPageNames.includes(pageName) ? pageName : null;
+  return htmlPageNames.includes(pageName) || V3_APP_PAGES.has(pageName) ? pageName : null;
 }
 
 function getNormalizedRequestHost(req) {
@@ -218,6 +280,15 @@ function sendCanonicalPage(pageName, req, res) {
   const filePath = path.join(htmlDir, fileName);
   setStaticAssetCacheHeaders(res, filePath);
   res.sendFile(filePath);
+}
+
+function sendFrontendV3App(_req, res, next) {
+  const indexPath = path.join(frontendV3Dir, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    return next();
+  }
+  setStaticAssetCacheHeaders(res, indexPath);
+  return res.sendFile(indexPath);
 }
 
 /* =========================================================
@@ -303,6 +374,17 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
+    const legacyV3RedirectPath = getLegacyV3RedirectPath(req);
+    if (legacyV3RedirectPath) {
+      const queryIndex = String(req.originalUrl || '').indexOf('?');
+      const query = queryIndex >= 0 ? String(req.originalUrl).slice(queryIndex) : '';
+      return res.redirect(301, `${legacyV3RedirectPath}${query}`);
+    }
+
+    if (req.path === '/app-v3' || req.path.startsWith('/app-v3/')) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
     const pageName = resolveRequestedPageName(req.path);
     if (pageName && !INDEXABLE_PUBLIC_PAGES.has(pageName)) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -324,21 +406,40 @@ app.use((req, res, next) => {
   next();
 });
 
+for (const pageName of V3_APP_PAGES) {
+  const canonicalPath = getCanonicalPagePath(pageName);
+  app.get(canonicalPath, sendFrontendV3App);
+  app.get(`/html/${pageName}`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+  app.get(`/html/${pageName}.html`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+  app.get(`/${pageName}.html`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+}
+
+app.get('/settings-mobile', (req, res) => {
+  res.redirect(301, '/settings');
+});
+app.get('/html/settings-mobile', (req, res) => {
+  res.redirect(301, '/settings');
+});
+app.get('/html/settings-mobile.html', (req, res) => {
+  res.redirect(301, '/settings');
+});
+app.get('/settings-mobile.html', (req, res) => {
+  res.redirect(301, '/settings');
+});
+
 for (const pageName of htmlPageNames) {
   if (!ENABLE_V2_BUSINESS && V2_HTML_PAGES.has(pageName)) {
     continue;
   }
   const canonicalPath = getCanonicalPagePath(pageName);
-  if (pageName === 'landing') {
-    app.get('/landing', (req, res) => {
-      res.redirect(301, '/');
-    });
-    app.get('/html/landing', (req, res) => {
-      res.redirect(301, '/');
-    });
-    app.get('/html/landing.html', (req, res) => {
-      res.redirect(301, '/');
-    });
+
+  if (V3_APP_PAGES.has(pageName)) {
     continue;
   }
 
@@ -366,6 +467,7 @@ app.use(express.static(publicDir, {
   index: false,
   setHeaders: setStaticAssetCacheHeaders
 }));
+// /app-v3 page hosts are redirected in middleware above; static still serves /app-v3/assets.
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', (req, res, next) => {
@@ -410,16 +512,14 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/favicon.ico', (req, res) => {
-  res.redirect(301, '/favicon.svg');
+  res.redirect(301, '/brand/inex-mark-color.svg?v=20260726a');
 });
 
 app.get('/favicon.svg', (req, res) => {
-  res.sendFile(path.join(publicDir, 'favicon.svg'));
+  res.redirect(301, '/brand/inex-mark-color.svg?v=20260726a');
 });
 
-app.get('/', (req, res) => {
-  sendCanonicalPage('landing', req, res);
-});
+app.get('/', sendFrontendV3App);
 
 app.get('/index.html', (req, res) => {
   res.redirect(301, '/');
@@ -454,7 +554,7 @@ app.use((req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Page not found | InEx Ledger</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="stylesheet" href="/css/app.css?v=20260508a" />
+  <link rel="stylesheet" href="/css/app.css?v=20260725d" />
 </head>
 <body>
   <main class="auth-page">

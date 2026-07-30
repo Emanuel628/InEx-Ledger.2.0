@@ -50,32 +50,12 @@
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  background: linear-gradient(135deg, rgba(12, 57, 95, 0.12), rgba(31, 122, 122, 0.16));
-  color: var(--accent2);
+  background: #16263F url("/brand/inex-mark-onnavy.svg") center / 24px 24px no-repeat;
 }
 
 .pricing-brand-mark::before,
 .pricing-brand-mark::after {
-  content: "";
-  position: absolute;
-  border-radius: 999px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(12, 57, 95, 0.92), rgba(31, 122, 122, 0.72));
-}
-
-.pricing-brand-mark::before {
-  width: 34%;
-  height: 78%;
-  left: 25%;
-  top: 10%;
-  transform: rotate(33deg);
-}
-
-.pricing-brand-mark::after {
-  width: 22%;
-  height: 42%;
-  right: 19%;
-  bottom: 18%;
+  content: none;
 }
 
 .pricing-brand-mark svg {

@@ -82,6 +82,7 @@ function loadTransactionsRouterWithState() {
           amount: params[4],
           type: params[5],
           description: params[6],
+          description_encrypted: params[7],
           date: params[8],
           merchant_name: params[9],
           category_guess: params[10],
@@ -310,7 +311,7 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
         categoryId: categoryIdByName.get("Software & Subscriptions"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "medium"
       },
       {
         merchant: "Uber* Eats",
@@ -345,7 +346,7 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
         categoryId: categoryIdByName.get("Advertising & Marketing"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "medium"
+        confidence: "low"
       },
       {
         merchant: "Amazon.com",
@@ -366,4 +367,28 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
     }
   });
   assert.equal(state.emailed, true);
+});
+
+test("POST /api/transactions/import/csv uses split bank descriptions for live category mapping", async () => {
+  const { app, state, categories, accountId } = loadTransactionsRouterWithState();
+  const categoryIdByName = new Map(categories.map((category) => [category.name, category.id]));
+  const csv = [
+    "Date,Description_1,Description_2,Amount",
+    "2026-05-01,POS PURCHASE,MICROSOFT 365 ANNUAL SUBSCRIPTION,-129.00"
+  ].join("\n");
+
+  const response = await request(app)
+    .post("/api/transactions/import/csv")
+    .field("account_id", accountId)
+    .field("skip_duplicates", "false")
+    .attach("file", Buffer.from(csv, "utf8"), "split-description.csv");
+
+  assert.equal(response.status, 200, JSON.stringify({
+    body: response.body,
+    loggedErrors: state.loggedErrors
+  }));
+  assert.equal(response.body.imported, 1);
+  assert.equal(state.insertedTransactions[0].description_encrypted, "POS PURCHASE MICROSOFT 365 ANNUAL SUBSCRIPTION");
+  assert.equal(state.insertedTransactions[0].category_id, categoryIdByName.get("Software & Subscriptions"));
+  assert.equal(state.insertedTransactions[0].category_mapping_reason, "canonical_rule");
 });

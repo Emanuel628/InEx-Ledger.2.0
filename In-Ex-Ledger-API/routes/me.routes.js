@@ -424,19 +424,21 @@ router.put("/onboarding", async (req, res) => {
 
       await seedDefaultCategoriesForBusiness(client, businessId);
 
-      if (!alreadyCompleted) {
-        const existingAccounts = await client.query(
-          "SELECT id FROM accounts WHERE business_id = $1 LIMIT 1",
-          [businessId]
-        );
+      // Gate on whether THIS business already has an account, not on whether
+      // the user has ever completed onboarding before (e.g. for another,
+      // possibly now-deleted, business) -- otherwise a business with zero
+      // accounts never gets its starter account created.
+      const existingAccounts = await client.query(
+        "SELECT id FROM accounts WHERE business_id = $1 LIMIT 1",
+        [businessId]
+      );
 
-        if (existingAccounts.rowCount === 0) {
-          await client.query(
-            `INSERT INTO accounts (id, business_id, name, type)
-            VALUES ($1, $2, $3, $4)`,
-            [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
-          );
-        }
+      if (existingAccounts.rowCount === 0) {
+        await client.query(
+          `INSERT INTO accounts (id, business_id, name, type)
+          VALUES ($1, $2, $3, $4)`,
+          [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
+        );
       }
 
       const guidedSetupAnchor = guidedSetupActive

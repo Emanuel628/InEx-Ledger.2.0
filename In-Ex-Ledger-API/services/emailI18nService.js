@@ -537,6 +537,20 @@ const MFA_CONTENT = {
       body: "Nous avons reçu une demande de désactivation de l'authentification à deux facteurs pour votre compte. Entrez ce code dans les Paramètres pour confirmer qu'il s'agissait bien de vous.",
       footer: "Si vous n'avez pas demandé ce changement, n'entrez pas le code."
     }
+  },
+  signup: {
+    en: {
+      subject: "Your InEx Ledger verification code",
+      heading: "Verify your email",
+      body: "Enter this code to verify your email and continue setting up your account.",
+      footer: "If you did not create this account, you can ignore this email."
+    },
+    fr: {
+      subject: "Votre code de vérification InEx Ledger",
+      heading: "Vérifiez votre adresse courriel",
+      body: "Entrez ce code pour vérifier votre adresse courriel et continuer la configuration de votre compte.",
+      footer: "Si vous n'avez pas créé ce compte, vous pouvez ignorer ce courriel."
+    }
   }
 };
 
@@ -544,7 +558,7 @@ const MFA_CONTENT = {
  * Returns localised text pieces used by createMfaEmailChallenge.
  *
  * @param {string} lang   - 'en' or 'fr'
- * @param {'signin'|'mfa_enable'|'mfa_disable'} purpose
+ * @param {'signin'|'mfa_enable'|'mfa_disable'|'signup'} purpose
  * @returns {{ subject, heading, body, footer }}
  */
 function buildMfaEmailContent(lang, purpose = "signin") {

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title data-i18n="html_invoices_text_invoices_inex_ledger">Invoices | InEx Ledger</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="/css/app.css?v=20260725d" />
+  <link rel="stylesheet" href="/css/pages/invoices.css?v=20260615a" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link"><span data-i18n="html_invoices_text_skip_to_main_content">Skip to main content</span></a>
+
+  <header class="app-topbar">
+    <div class="topbar-left">
+      <a class="topbar-brand" href="transactions" aria-label="InEx Ledger home" data-i18n-aria-label="html_invoices_a_aria_label_inex_ledger_home">
+        <span class="brand-mark brand-mark-topbar" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+            <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+            <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+            <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+          </svg>
+        </span>
+        <span class="topbar-brand-text"><span data-i18n="html_invoices_text_inex_ledger">InEx Ledger</span></span>
+      </a>
+      <nav class="topbar-nav" aria-label="Primary" data-i18n-aria-label="html_invoices_nav_aria_label_primary">
+        <a href="transactions"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span><span data-i18n="html_invoices_text_transactions">Transactions</span></span></a>
+        <a href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span><span data-i18n="html_invoices_text_accounts">Accounts</span></span></a>
+        <a href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span><span data-i18n="html_invoices_text_receipts">Receipts</span></span></a>
+        <a href="invoices" class="is-active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span><span><span data-i18n="html_invoices_text_invoices">Invoices</span></span></a>
+        <a href="analytics"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span><span data-i18n="html_invoices_text_analytics">Analytics</span></span></a>
+              <a data-i18n="nav_messages" href="messages"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5 8 9l5.5-4.5"/><rect x="2" y="3" width="12" height="10" rx="1.5"/></svg></span><span>Messages</span></a>
+      </nav>
+    </div>
+    <div class="user-pill"><span class="user-avatar" id="topbarAvatar">U</span><span class="user-name" id="topbarName"><span data-i18n="html_invoices_text_inex_ledger">InEx Ledger</span></span></div>
+  </header>
+
+  <main id="main-content" class="app-shell">
+    <aside class="app-sidebar" aria-label="Sidebar" data-i18n-aria-label="html_invoices_aside_aria_label_sidebar">
+      <div class="sidebar-section-label"><span data-i18n="html_invoices_text_invoices">Invoices</span></div>
+      <nav class="sidebar-nav">
+        <a href="invoices" class="sidebar-link is-active" id="sidebarAll">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span>
+          <span><span data-i18n="html_invoices_text_all_invoices">All invoices</span></span>
+        </a>
+        <a href="invoices?status=draft" class="sidebar-link" id="sidebarDraft">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2"/></svg></span>
+          <span><span data-i18n="html_invoices_text_drafts">Drafts</span></span>
+        </a>
+        <a href="invoices?status=sent" class="sidebar-link" id="sidebarSent">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 8l10-6-4 6 4 6z"/></svg></span>
+          <span><span data-i18n="html_invoices_text_sent">Sent</span></span>
+        </a>
+        <a href="invoices?status=paid" class="sidebar-link" id="sidebarPaid">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-6"/></svg></span>
+          <span><span data-i18n="html_invoices_text_paid">Paid</span></span>
+        </a>
+        <a href="invoices?status=deleted" class="sidebar-link" id="sidebarDeleted">
+          <span class="sidebar-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none">
+              <path d="M3 4h10"></path>
+              <path d="M6 4V3h4v1"></path>
+              <path d="M5 6v7h6V6"></path>
+              <path d="M7 8v3M9 8v3"></path>
+            </svg>
+          </span>
+          <span><span data-i18n="html_invoices_text_deleted">Deleted</span></span>
+        </a>
+      </nav>
+      <div class="sidebar-section-label"><span data-i18n="html_invoices_text_reports">Reports</span></div>
+      <nav class="sidebar-nav">
+        <a href="analytics" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span><span data-i18n="html_invoices_text_analytics">Analytics</span></span></a>
+        <a href="exports" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span><span data-i18n="html_invoices_text_exports">Exports</span></span></a>
+      </nav>
+    </aside>
+
+    <div class="app-content">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title"><span data-i18n="html_invoices_text_invoices">Invoices</span></h1>
+          <p class="page-subtitle"><span data-i18n="html_invoices_text_create_and_send_invoices_to_your_clients">Create and send invoices to your clients</span></p>
+        </div>
+        <div class="page-header-actions">
+          <button id="newInvoiceBtn" class="page-add-button" type="button"><span data-i18n="html_invoices_text_new_invoice">+ New invoice</span></button>
+        </div>
+      </div>
+
+      <!-- Summary stats -->
+      <section class="stats-row" id="invoiceStats">
+        <article class="stat-card">
+          <span class="stat-card-ic c1" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.8"></circle><path d="M10 6.4v3.8l2.4 1.6"></path></svg></span>
+          <div class="stat-label"><span data-i18n="html_invoices_text_outstanding">Outstanding</span></div>
+          <div class="stat-value stat-value-income" id="statOutstanding">$0.00</div>
+          <div class="stat-delta"><span data-i18n="html_invoices_text_sent_awaiting_payment">Sent, awaiting payment</span></div>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card-ic c2" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.8"></circle><path d="m7.2 10.2 1.9 1.9 3.7-4"></path></svg></span>
+          <div class="stat-label"><span data-i18n="html_invoices_text_paid_30_days">Paid (30 days)</span></div>
+          <div class="stat-value" id="statPaid30">$0.00</div>
+          <div class="stat-delta"><span data-i18n="html_invoices_text_last_30_days">Last 30 days</span></div>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card-ic c3" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M12.5 3.5 16 7l-8.5 8.5H4v-3.5L12.5 3.5Z"></path><path d="M11 5l3.5 3.5"></path></svg></span>
+          <div class="stat-label"><span data-i18n="html_invoices_text_drafts">Drafts</span></div>
+          <div class="stat-value" id="statDrafts">0</div>
+          <div class="stat-delta"><span data-i18n="html_invoices_text_not_yet_sent">Not yet sent</span></div>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card-ic c4" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="4" y="3" width="12" height="14" rx="2.2"></rect><path d="M7 7h6M7 10h6M7 13h4"></path></svg></span>
+          <div class="stat-label"><span data-i18n="html_invoices_text_total_invoices">Total invoices</span></div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-delta" id="statOverdue"></div>
+        </article>
+      </section>
+
+      <!-- Invoice list -->
+      <section class="transactions-panel">
+        <div class="transactions-toolbar">
+          <h2 class="transactions-panel-title"><span data-i18n="html_invoices_text_invoice_list">Invoice list</span></h2>
+          <select id="invoiceStatusFilter" class="toolbar-select">
+            <option value="" data-i18n="html_invoices_text_all_statuses">All statuses</option>
+            <option value="draft" data-i18n="html_invoices_text_draft">Draft</option>
+            <option value="sent" data-i18n="html_invoices_text_sent">Sent</option>
+            <option value="paid" data-i18n="html_invoices_text_paid">Paid</option>
+            <option value="void" data-i18n="html_invoices_text_void">Void</option>
+            <option value="deleted" data-i18n="html_invoices_text_deleted">Deleted</option>
+          </select>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="transactions-table invoices-table">
+            <thead>
+              <tr>
+                <th><span data-i18n="html_invoices_text_invoice">Invoice #</span></th>
+                <th><span data-i18n="html_invoices_text_client">Client</span></th>
+                <th><span data-i18n="html_invoices_text_issue_date">Issue date</span></th>
+                <th><span data-i18n="html_invoices_text_due_date">Due date</span></th>
+                <th><span data-i18n="html_invoices_text_status">Status</span></th>
+                <th class="col-amount"><span data-i18n="html_invoices_text_amount">Amount</span></th>
+                <th class="col-actions"><span data-i18n="html_invoices_text_actions">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="invoiceTableBody">
+              <tr><td colspan="7" class="placeholder"><span data-i18n="html_invoices_text_loading_invoices">Loading invoices...</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Invoice Create/Edit Panel (slide-in) -->
+  <div id="invoicePanel" class="invoice-panel" hidden aria-label="Invoice editor" data-i18n-aria-label="html_invoices_div_aria_label_invoice_editor">
+    <div class="invoice-panel-inner">
+      <div class="invoice-panel-header">
+        <h2 id="invoicePanelTitle" class="invoice-panel-title"><span data-i18n="html_invoices_text_new_invoice_2">New Invoice</span></h2>
+        <button type="button" id="invoicePanelClose" class="invoice-panel-close" aria-label="Close" data-i18n-aria-label="html_invoices_button_aria_label_close">&times;</button>
+      </div>
+
+      <form id="invoiceForm" novalidate>
+        <div class="invoice-form-grid">
+          <div class="form-field">
+            <label for="invClientName" class="form-label"><span data-i18n="html_invoices_text_client_name">Client name</span> <span class="required">*</span></label>
+            <input id="invClientName" type="text" class="form-control" placeholder="e.g. Smith Renovations" required data-i18n-placeholder="html_invoices_input_placeholder_e_g_smith_renovations" />
+          </div>
+          <div class="form-field">
+            <label for="invClientEmail" class="form-label"><span data-i18n="html_invoices_text_client_email">Client email</span></label>
+            <input id="invClientEmail" type="text" class="form-control" placeholder="client@example.com, billing@example.com" data-i18n-placeholder="html_invoices_input_placeholder_client_example_com_billing_example_com" />
+          </div>
+          <div class="form-field">
+            <label for="invIssueDate" class="form-label"><span data-i18n="html_invoices_text_issue_date">Issue date</span> <span class="required">*</span></label>
+            <input id="invIssueDate" type="date" class="form-control" required />
+          </div>
+          <div class="form-field">
+            <label for="invDueDate" class="form-label"><span data-i18n="html_invoices_text_due_date">Due date</span></label>
+            <!-- A due date is normally in the future (issue today, due later), so
+                 exempt it from the global "max = today" date-input constraint. -->
+            <input id="invDueDate" type="date" class="form-control" data-allow-future-date />
+          </div>
+          <div class="form-field">
+            <label for="invCurrency" class="form-label"><span data-i18n="html_invoices_text_currency">Currency</span></label>
+            <select id="invCurrency" class="form-control">
+              <option value="CAD">CAD</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="invTaxRate" class="form-label"><span data-i18n="html_invoices_text_tax_rate">Tax rate (%)</span></label>
+            <input id="invTaxRate" type="number" class="form-control" placeholder="e.g. 13 for 13% HST" min="0" max="100" step="0.001" value="0" data-i18n-placeholder="html_invoices_input_placeholder_e_g_13_for_13_hst" />
+          </div>
+        </div>
+
+        <!-- Line items -->
+        <div class="invoice-line-items">
+          <div class="invoice-line-header">
+            <span class="line-col-desc"><span data-i18n="html_invoices_text_description">Description</span></span>
+            <span class="line-col-qty"><span data-i18n="html_invoices_text_qty">Qty</span></span>
+            <span class="line-col-rate"><span data-i18n="html_invoices_text_unit_price">Unit price</span></span>
+            <span class="line-col-amt"><span data-i18n="html_invoices_text_amount">Amount</span></span>
+            <span class="line-col-del"></span>
+          </div>
+          <div id="lineItemRows"></div>
+          <button type="button" id="addLineItemBtn" class="invoice-add-line"><span data-i18n="html_invoices_text_add_line_item">+ Add line item</span></button>
+        </div>
+
+        <!-- Totals -->
+        <div class="invoice-totals">
+          <div class="invoice-total-row">
+            <span><span data-i18n="html_invoices_text_subtotal">Subtotal</span></span>
+            <span id="invSubtotal">$0.00</span>
+          </div>
+          <div class="invoice-total-row">
+            <span id="invTaxLabel"><span data-i18n="html_invoices_text_tax_0">Tax (0%)</span></span>
+            <span id="invTaxAmount">$0.00</span>
+          </div>
+          <div class="invoice-total-row invoice-total-row--grand">
+            <span><span data-i18n="html_invoices_text_total">Total</span></span>
+            <span id="invTotal">$0.00</span>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="invNotes" class="form-label"><span data-i18n="html_invoices_text_notes">Notes</span></label>
+          <textarea id="invNotes" class="form-control" rows="3" placeholder="Payment terms, bank details, thank you message..." data-i18n-placeholder="html_invoices_textarea_placeholder_payment_terms_bank_details_thank_you_message"></textarea>
+        </div>
+
+        <p id="invoiceFormError" class="error-text" hidden></p>
+
+        <div class="tx-actions invoice-form-actions">
+          <button type="button" id="invoiceSaveDraft" class="modal-cancel"><span data-i18n="html_invoices_text_save_as_draft">Save as draft</span></button>
+          <button type="submit" id="invoiceSubmit" class="drawer-submit"><span data-i18n="html_invoices_text_save_send">Save &amp; send</span></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Email invoice modal -->
+  <div id="invoiceEmailModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="invoiceEmailModalTitle">
+    <div class="transaction-modal-content">
+      <h3 id="invoiceEmailModalTitle"><span data-i18n="html_invoices_text_email_invoice">Email invoice</span></h3>
+      <p class="invoice-email-meta">
+        <span data-i18n="html_invoices_text_sending">Sending</span> <strong id="invoiceEmailNumber"></strong> <span data-i18n="html_invoices_text_to">to</span> <span id="invoiceEmailCustomer"></span>.
+      </p>
+      <div class="form-field">
+        <label for="invoiceEmailTo" class="form-label"><span data-i18n="html_invoices_text_recipient_email">Recipient email</span></label>
+        <input type="text" id="invoiceEmailTo" class="form-control" placeholder="client@example.com, billing@example.com" data-i18n-placeholder="html_invoices_input_placeholder_client_example_com_billing_example_com" />
+      </div>
+      <div class="form-field">
+        <label for="invoiceEmailCc" class="form-label"><span data-i18n="html_invoices_text_cc_optional">CC (optional)</span></label>
+        <input type="text" id="invoiceEmailCc" class="form-control" placeholder="owner@example.com, bookkeeper@example.com" data-i18n-placeholder="html_invoices_input_placeholder_owner_example_com_bookkeeper_example_com" />
+      </div>
+      <div class="form-field">
+        <label for="invoiceEmailMessage" class="form-label"><span data-i18n="html_invoices_text_message_optional">Message (optional)</span></label>
+        <textarea id="invoiceEmailMessage" class="form-control" rows="4"
+          placeholder="Hi — invoice attached, let me know if you have any questions." data-i18n-placeholder="html_invoices_textarea_placeholder_hi_invoice_attached_let_me_know_if_you_have_any_questions"></textarea>
+      </div>
+      <p id="invoiceEmailError" class="error-text" hidden></p>
+      <p class="invoice-email-hint">
+        <span data-i18n="html_invoices_text_replies_to_this_email_will_appear_on_your">Replies to this email will appear on your</span> <a href="messages"><span data-i18n="html_invoices_text_messages">Messages</span></a> <span data-i18n="html_invoices_text_page">page.</span>
+      </p>
+      <div class="modal-actions">
+        <button type="button" id="invoiceEmailCancel" class="modal-cancel"><span data-i18n="html_invoices_text_cancel">Cancel</span></button>
+        <button type="button" id="invoiceEmailSend" class="drawer-submit"><span data-i18n="html_invoices_text_send_email">Send email</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div id="invoiceDeleteModal" class="transaction-modal hidden" role="dialog" aria-modal="true">
+    <div class="transaction-modal-content danger-modal">
+      <div class="danger-modal-icon" aria-hidden="true">!</div>
+      <h3><span data-i18n="html_invoices_text_delete_this_invoice">Delete this invoice?</span></h3>
+      <p><span data-i18n="html_invoices_text_only_draft_invoices_can_be_deleted_this_cannot_be_undone">Only draft invoices can be deleted. This cannot be undone.</span></p>
+      <div class="modal-actions danger-actions">
+        <button type="button" id="invoiceDeleteCancel" class="modal-cancel"><span data-i18n="html_invoices_text_cancel">Cancel</span></button>
+        <button type="button" id="invoiceDeleteConfirm" class="modal-delete"><span data-i18n="html_invoices_text_delete">Delete</span></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/escape-html.js?v=20260410a"></script>
+  <script src="/js/global.js?v=20260601b"></script>
+  <script src="/js/i18n.js?v=20260725b"></script>
+  <script src="/js/auth.js?v=20260527c"></script>
+  <script src="/js/trial.js?v=20260408a"></script>
+  <script src="/js/invoices.js?v=20260612b"></script>
+</body>
+</html>
+
+
+
+

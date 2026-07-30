@@ -82,9 +82,17 @@ router.get("/", async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const result = await pool.query(
       `SELECT a.*,
-              b.name AS business_name
+              b.name AS business_name,
+              COALESCE(tx.transaction_count, 0)::int AS transaction_count
        FROM accounts a
        JOIN businesses b ON b.id = a.business_id
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*)::int AS transaction_count
+           FROM transactions t
+          WHERE t.account_id = a.id
+            AND t.business_id = a.business_id
+            AND t.deleted_at IS NULL
+       ) tx ON true
        WHERE a.business_id = ANY($1::uuid[])
        ORDER BY b.name ASC, a.created_at DESC
        LIMIT $2 OFFSET $3`,

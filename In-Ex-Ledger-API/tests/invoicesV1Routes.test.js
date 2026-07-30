@@ -8,11 +8,12 @@ const request = require("supertest");
 
 const ROUTE_PATH = require.resolve("../routes/invoices-v1.routes.js");
 
-function loadInvoicesRouter() {
+function loadInvoicesRouter({ effectiveTier = "v1" } = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
     insertAttempts: 0,
-    invoiceNumbersTried: []
+    invoiceNumbersTried: [],
+    listQueried: false
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -37,9 +38,13 @@ function loadInvoicesRouter() {
       };
     }
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
+      // Invoices are intentionally NOT gated by plan at all (Basic and Pro
+      // both get full invoicing) -- this mock reports Basic/no-feature-access
+      // by default in some tests specifically to prove the route never
+      // consults it.
       return {
-        getSubscriptionSnapshotForBusiness: async () => ({ plan: "pro" }),
-        hasFeatureAccess: () => true
+        getSubscriptionSnapshotForBusiness: async () => ({ plan: effectiveTier === "free" ? "free" : "pro", effectiveTier }),
+        hasFeatureAccess: () => false
       };
     }
     if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
@@ -51,6 +56,11 @@ function loadInvoicesRouter() {
       return {
         pool: {
           async query(sql, params = []) {
+            if (/SELECT id, title, invoice_number/i.test(sql) && /FROM invoices_v1/i.test(sql)) {
+              state.listQueried = true;
+              return { rows: [], rowCount: 0 };
+            }
+
             if (/SELECT COALESCE\(/i.test(sql) && /FROM invoices_v1/i.test(sql)) {
               if (state.insertAttempts === 0) {
                 return { rows: [{ max_number: 1 }], rowCount: 1 };
@@ -60,7 +70,7 @@ function loadInvoicesRouter() {
 
             if (/INSERT INTO invoices_v1/i.test(sql)) {
               state.insertAttempts += 1;
-              state.invoiceNumbersTried.push(params[2]);
+              state.invoiceNumbersTried.push(params[3]);
               if (state.insertAttempts === 1) {
                 const err = new Error("duplicate key value violates unique constraint");
                 err.code = "23505";
@@ -70,12 +80,13 @@ function loadInvoicesRouter() {
                 rows: [{
                   id: params[0],
                   business_id: params[1],
-                  invoice_number: params[2],
-                  customer_name: params[3],
-                  status: params[7],
-                  currency: params[8],
-                  line_items: JSON.parse(params[9]),
-                  total_amount: params[13]
+                  title: params[2],
+                  invoice_number: params[3],
+                  customer_name: params[4],
+                  status: params[8],
+                  currency: params[9],
+                  line_items: JSON.parse(params[10]),
+                  total_amount: params[14]
                 }],
                 rowCount: 1
               };
@@ -125,6 +136,7 @@ test("invoice creation retries with a fresh invoice number after a uniqueness co
     const response = await request(app)
       .post("/api/invoices-v1")
       .send({
+        title: "April consulting invoice",
         customer_name: "Client A",
         issue_date: "2026-04-25",
         due_date: "2026-05-25",
@@ -142,6 +154,47 @@ test("invoice creation retries with a fresh invoice number after a uniqueness co
       `INV-${new Date().getFullYear()}-0003`
     ]);
     assert.equal(response.body.invoice_number, `INV-${new Date().getFullYear()}-0003`);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("Basic (free tier) can list invoices -- invoicing is not plan-gated", async () => {
+  const fixture = loadInvoicesRouter({ effectiveTier: "free" });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app).get("/api/invoices-v1");
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, []);
+    assert.equal(fixture.state.listQueried, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("Basic (free tier) can create an invoice -- invoicing is not plan-gated", async () => {
+  const fixture = loadInvoicesRouter({ effectiveTier: "free" });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/invoices-v1")
+      .send({
+        title: "Basic tier invoice",
+        customer_name: "Client B",
+        issue_date: "2026-04-25",
+        due_date: "2026-05-25",
+        currency: "USD",
+        tax_rate: 0,
+        line_items: [
+          { description: "Consulting", quantity: 1, unit_price: 50 }
+        ]
+      });
+
+    assert.equal(response.status, 201);
+    assert.ok(fixture.state.insertAttempts >= 1);
   } finally {
     fixture.cleanup();
   }

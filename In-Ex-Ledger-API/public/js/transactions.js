@@ -1695,6 +1695,18 @@ function setupTransactionDrawer() {
     return;
   }
 
+  transactionDrawerElement.addEventListener("click", (event) => {
+    if (event.target === transactionDrawerElement) {
+      closeTransactionDrawer();
+    }
+  });
+
+  transactionDrawerElement.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeTransactionDrawer();
+    }
+  });
+
   transactionToggleElement?.addEventListener("click", () => {
     void toggleTransactionDrawer();
   });
@@ -3137,6 +3149,7 @@ function resetTransactionForm() {
   setEditingMode(false);
   clearCustomCategoryField("category", "customCategoryName");
   setTransactionAdvancedDefaults();
+  document.getElementById("transactionAdvancedDetails")?.removeAttribute("open");
   transactionFxReferenceDismissed = false;
   clearTransactionFxReferenceBox();
   syncTransactionReceiptManagerButton();

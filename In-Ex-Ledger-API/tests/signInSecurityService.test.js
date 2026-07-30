@@ -16,21 +16,7 @@ test.afterEach(() => {
   delete process.env.GEOLOCATION_ALLOWED_HOSTS;
 });
 
-test("buildDeviceFingerprint is stable for same user-agent and IP", () => {
-  const first = buildDeviceFingerprint({
-    userId: "user_1",
-    userAgent: "Mozilla/5.0",
-    ipAddress: "203.0.113.42"
-  });
-  const second = buildDeviceFingerprint({
-    userId: "user_1",
-    userAgent: "Mozilla/5.0",
-    ipAddress: "203.0.113.42"
-  });
-  assert.equal(first, second);
-});
-
-test("buildDeviceFingerprint changes when IP changes", () => {
+test("buildDeviceFingerprint is stable for same user-agent when IP changes", () => {
   const first = buildDeviceFingerprint({
     userId: "user_1",
     userAgent: "Mozilla/5.0",
@@ -40,6 +26,20 @@ test("buildDeviceFingerprint changes when IP changes", () => {
     userId: "user_1",
     userAgent: "Mozilla/5.0",
     ipAddress: "203.0.113.99"
+  });
+  assert.equal(first, second);
+});
+
+test("buildDeviceFingerprint changes when user-agent changes", () => {
+  const first = buildDeviceFingerprint({
+    userId: "user_1",
+    userAgent: "Mozilla/5.0 Safari/605.1.15",
+    ipAddress: "203.0.113.42"
+  });
+  const second = buildDeviceFingerprint({
+    userId: "user_1",
+    userAgent: "Mozilla/5.0 Firefox/120.0",
+    ipAddress: "203.0.113.42"
   });
   assert.notEqual(first, second);
 });

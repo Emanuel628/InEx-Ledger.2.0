@@ -1,0 +1,142 @@
+"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const request = require("supertest");
+
+process.env.NODE_ENV = "test";
+process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret";
+process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret";
+
+const apiRoot = path.resolve(__dirname, "..");
+const publicHtmlDir = path.join(apiRoot, "public", "html");
+const archivedHtmlDir = path.join(apiRoot, "legacy", "public-html", "app-core");
+const archivedAuthPublicDir = path.join(apiRoot, "legacy", "public-html", "auth-public");
+const { app } = require("../server.js");
+
+const retiredAppHtmlPages = [
+  "accounts",
+  "analytics",
+  "categories",
+  "change-email",
+  "exports",
+  "help",
+  "invoices",
+  "messages",
+  "mileage",
+  "onboarding",
+  "receipts",
+  "sessions",
+  "settings",
+  "settings-mobile",
+  "subscription",
+  "transactions",
+  "trial-setup",
+  "upgrade"
+];
+
+const retiredAppAssets = [
+  "accounts",
+  "analytics",
+  "categories",
+  "change-email",
+  "exports",
+  "help",
+  "invoices",
+  "messages",
+  "mileage",
+  "onboarding",
+  "receipts",
+  "sessions",
+  "settings",
+  "settings-mobile",
+  "subscription",
+  "transactions",
+  "trial-setup",
+  "upgrade"
+];
+
+test("Phase 2 retired app HTML is archived outside active public/html", () => {
+  for (const page of retiredAppHtmlPages) {
+    assert.equal(fs.existsSync(path.join(publicHtmlDir, `${page}.html`)), false, `${page}.html should not be active legacy HTML`);
+    assert.equal(fs.existsSync(path.join(archivedHtmlDir, `${page}.html`)), true, `${page}.html should be archived`);
+  }
+});
+
+test("Phase 2 retired app HTML URLs redirect to v3 canonical routes", async () => {
+  for (const page of ["transactions", "accounts", "settings", "subscription", "trial-setup"]) {
+    const canonical = `/${page}`;
+
+    await request(app).get(`/${page}.html`).expect(301).expect("Location", canonical);
+    await request(app).get(`/html/${page}`).expect(301).expect("Location", canonical);
+    await request(app).get(`/html/${page}.html`).expect(301).expect("Location", canonical);
+  }
+
+  await request(app).get("/settings-mobile").expect(301).expect("Location", "/settings");
+  await request(app).get("/html/settings-mobile.html").expect(301).expect("Location", "/settings");
+});
+
+const retiredAuthAndPublicPages = [
+  "landing",
+  "login",
+  "register",
+  "forgot-password",
+  "reset-password",
+  "verify-email",
+  "mfa-challenge",
+  "privacy",
+  "terms",
+  "legal",
+  "pricing",
+  "business-settings-cpa",
+  "compliance-dashboard"
+];
+
+test("Phase 3 retired auth/public HTML is archived outside active public/html", () => {
+  for (const page of retiredAuthAndPublicPages) {
+    assert.equal(fs.existsSync(path.join(publicHtmlDir, `${page}.html`)), false, `${page}.html should not be active legacy HTML`);
+    assert.equal(fs.existsSync(path.join(archivedAuthPublicDir, `${page}.html`)), true, `${page}.html should be archived`);
+  }
+});
+
+test("Phase 3 retired auth/public HTML URLs redirect to v3 canonical routes", async () => {
+  for (const page of ["login", "register", "forgot-password", "reset-password", "verify-email", "mfa-challenge", "privacy", "terms", "legal", "pricing"]) {
+    const canonical = `/${page}`;
+
+    await request(app).get(`/${page}.html`).expect(301).expect("Location", canonical);
+    await request(app).get(`/html/${page}`).expect(301).expect("Location", canonical);
+    await request(app).get(`/html/${page}.html`).expect(301).expect("Location", canonical);
+  }
+
+  await request(app).get("/landing").expect(302).expect("Location", "/");
+  await request(app).get("/landing.html").expect(302).expect("Location", "/");
+  await request(app).get("/html/landing").expect(302).expect("Location", "/");
+  await request(app).get("/html/landing.html").expect(302).expect("Location", "/");
+
+  // business-settings-cpa and compliance-dashboard were never in V3_APP_PAGES --
+  // they already redirected to /settings via LEGACY_HTML_REDIRECTS before this
+  // archival, and that redirect doesn't depend on the underlying file existing.
+  await request(app).get("/business-settings-cpa").expect(302).expect("Location", "/settings");
+  await request(app).get("/compliance-dashboard").expect(302).expect("Location", "/settings");
+});
+
+test("Phase 8 active HTML does not reference retired core app JS or CSS", () => {
+  const activeHtmlFiles = fs.readdirSync(publicHtmlDir)
+    .filter((name) => name.endsWith(".html"))
+    .map((name) => path.join(publicHtmlDir, name));
+  const offenders = [];
+
+  for (const file of activeHtmlFiles) {
+    const source = fs.readFileSync(file, "utf8");
+    for (const assetName of retiredAppAssets) {
+      const assetPattern = new RegExp(`/(?:js|css/pages)/${assetName}\\.(?:js|css)(?:[?"#]|$)`);
+      if (assetPattern.test(source)) {
+        offenders.push(`${path.relative(apiRoot, file)} references retired ${assetName} asset`);
+      }
+    }
+  }
+
+  assert.deepEqual(offenders, []);
+});

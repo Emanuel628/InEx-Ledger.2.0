@@ -9,6 +9,19 @@
   margin: 16px auto 0;
   min-height: auto;
   padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.auth-header .brand-mark {
+  background: url("/brand/inex-mark-color.svg") center / 28px 28px no-repeat !important;
+  border-radius: 0 !important;
+}
+
+.auth-header .brand-mark::before,
+.auth-header .brand-mark::after {
+  content: none !important;
 }
 
 .auth-header nav a {
@@ -31,8 +44,7 @@
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: linear-gradient(135deg, rgba(12, 57, 95, 0.14), rgba(31, 122, 122, 0.18));
-  color: var(--accent);
+  background: #16263F url("/brand/inex-mark-onnavy.svg") center / 20px 20px no-repeat;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -43,26 +55,7 @@
 
 .brand-mark::before,
 .brand-mark::after {
-  content: "";
-  position: absolute;
-  border-radius: 999px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(12, 57, 95, 0.92), rgba(31, 122, 122, 0.72));
-}
-
-.brand-mark::before {
-  width: 34%;
-  height: 78%;
-  left: 25%;
-  top: 10%;
-  transform: rotate(33deg);
-}
-
-.brand-mark::after {
-  width: 22%;
-  height: 42%;
-  right: 19%;
-  bottom: 18%;
+  content: none;
 }
 
 .brand-mark svg {
@@ -96,7 +89,7 @@ body {
   margin-bottom: 0;
 }
 
-.auth-form :is(input, select) {
+.auth-form :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 40px;
 }
 
@@ -148,37 +141,38 @@ body {
 .show-password-toggle {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 8px;
   align-self: flex-start;
   width: auto;
   max-width: 100%;
+  margin: 0;
+  padding: 0;
   font-size: 13px;
-  color: var(--ink2);
+  font-weight: 400;
   line-height: 1.3;
+  color: var(--ink2);
   text-transform: none;
   letter-spacing: 0;
-  font-weight: 400;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  flex-wrap: nowrap;
+  cursor: pointer;
 }
 
-.show-password-toggle input {
-  flex: 0 0 auto;
+.show-password-toggle input[type="checkbox"] {
+  flex: 0 0 14px;
   width: 14px !important;
-  min-width: 14px;
-  max-width: 14px;
-  min-height: 14px;
-  max-height: 14px;
-  width: 14px;
-  height: 14px;
-  margin: 0;
+  min-width: 14px !important;
+  max-width: 14px !important;
+  height: 14px !important;
+  min-height: 14px !important;
+  max-height: 14px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 3px;
+  accent-color: var(--accent2);
 }
 
 .show-password-toggle span {
   display: inline-block;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .auth-submit {
@@ -320,14 +314,13 @@ main {
   font-size: 13px;
 }
 
-.auth-form label,
-.show-password-toggle {
+.auth-form label {
   color: #6a7684;
   font-size: 12px;
   font-weight: 700;
 }
 
-.auth-form :is(input, select) {
+.auth-form :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 48px;
   border-radius: 12px;
   border: 1px solid rgba(15, 25, 35, 0.1);
@@ -336,8 +329,8 @@ main {
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
-.auth-form :is(input, select):focus,
-.auth-form :is(input, select):focus-visible {
+.auth-form :is(input:not([type="checkbox"]):not([type="radio"]), select):focus,
+.auth-form :is(input:not([type="checkbox"]):not([type="radio"]), select):focus-visible {
   border-color: rgba(36, 109, 187, 0.52);
   box-shadow: 0 0 0 4px rgba(36, 109, 187, 0.14);
   background: #ffffff;

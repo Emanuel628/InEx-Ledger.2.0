@@ -72,7 +72,7 @@ function translate(key, fallback = "") {
 // Default support contact. The in-app message store only routes to registered
 // users, so "contact support" is handled over email to this address. It is
 // surfaced as the default option in the compose recipient dropdown.
-const SUPPORT_EMAIL = "support@inexledger.com";
+const SUPPORT_EMAIL = "support.inex@gmail.com";
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();

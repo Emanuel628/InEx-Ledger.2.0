@@ -2,7 +2,7 @@
    Register Page — Redesigned
    ========================= */
 
-@import url("/css/pages/login.css?v=20260623b");
+@import url("/css/pages/login.css?v=20260725b");
 
 body {
   background:
@@ -347,6 +347,22 @@ main {
   font-size: 11.5px;
   color: var(--ink3);
   font-weight: 500;
+}
+
+.auth-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.auth-header .brand-mark {
+  background: url("/brand/inex-mark-color.svg") center / 28px 28px no-repeat !important;
+  border-radius: 0 !important;
+}
+
+.auth-header .brand-mark::before,
+.auth-header .brand-mark::after {
+  content: none !important;
 }
 
 @media (max-width: 860px) {

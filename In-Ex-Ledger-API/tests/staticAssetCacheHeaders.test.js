@@ -24,14 +24,81 @@ test("JavaScript assets disable browser caching", async () => {
   assertNoStore(response);
 });
 
-test("CSS assets disable browser caching", async () => {
+test("CSS assets disable browser caching without a version query", async () => {
   const response = await request(app).get("/css/app.css").expect(200);
   assertNoStore(response);
+});
+
+test("versioned JavaScript assets use long immutable caching", async () => {
+  const response = await request(app).get("/js/global.js?v=20260725a").expect(200);
+
+  assert.strictEqual(response.headers["cache-control"], "public, max-age=31536000, immutable");
+  assert.ok(!response.headers.pragma);
+  assert.ok(!response.headers.expires);
+});
+
+test("versioned CSS assets use long immutable caching", async () => {
+  const response = await request(app).get("/css/app.css?v=20260725a").expect(200);
+
+  assert.strictEqual(response.headers["cache-control"], "public, max-age=31536000, immutable");
+  assert.ok(!response.headers.pragma);
+  assert.ok(!response.headers.expires);
 });
 
 test("private app pages send noindex headers", async () => {
   const response = await request(app).get("/transactions").expect(200);
   assert.strictEqual(response.headers["x-robots-tag"], "noindex, nofollow");
+});
+
+test("core app routes serve the v3 frontend shell", async () => {
+  for (const route of ["/transactions", "/billing"]) {
+    const response = await request(app).get(route).expect(200);
+
+    assert.match(response.text, /\/app-v3\/assets\//);
+    assert.strictEqual(response.headers["x-robots-tag"], "noindex, nofollow");
+    assertNoStore(response);
+  }
+});
+
+test("root landing serves the v3 frontend shell", async () => {
+  const response = await request(app).get("/").expect(200);
+
+  assert.match(response.text, /\/app-v3\/assets\//);
+  assert.match(response.text, /\/brand\/inex-mark-color\.svg\?v=20260726a/);
+  assert.ok(!response.headers["x-robots-tag"]);
+  assertNoStore(response);
+});
+
+test("legacy app-v3 page routes redirect to canonical bare app routes", async () => {
+  const nested = await request(app)
+    .get("/app-v3/transactions?type=income")
+    .expect(301);
+  assert.strictEqual(nested.headers.location, "/transactions?type=income");
+
+  const settings = await request(app).get("/app-v3/settings?tab=security").expect(301);
+  assert.strictEqual(settings.headers.location, "/settings?tab=security");
+});
+
+test("legacy app-v3 root redirects to canonical transactions route", async () => {
+  const response = await request(app).get("/app-v3").expect(301);
+
+  assert.strictEqual(response.headers.location, "/transactions");
+
+  const trailingSlashResponse = await request(app).get("/app-v3/").expect(301);
+
+  assert.strictEqual(trailingSlashResponse.headers.location, "/transactions");
+});
+
+test("v3 frontend static assets are served from the side-by-side build", async () => {
+  const index = await request(app).get("/transactions").expect(200);
+  const assetPath = index.text.match(/\/app-v3\/assets\/[^"]+\.js/)?.[0];
+  assert.ok(assetPath, "expected v3 JavaScript asset path in index");
+
+  const response = await request(app)
+    .get(assetPath)
+    .expect(200);
+
+  assert.match(response.headers["content-type"] || "", /javascript/i);
 });
 
 test("public legal pages remain indexable", async () => {

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title data-i18n="html_register_text_inex_ledger_create_account">InEx Ledger - Create Account</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta
+    name="description"
+    content="Create your InEx Ledger account, finish onboarding, and confirm Pro trial billing for solo-business bookkeeping."
+  />
+  <link rel="canonical" href="https://www.inexledger.com/register" />
+  <meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260616z">
+<link rel="stylesheet" href="/css/app.css?v=20260725d">
+<link rel="stylesheet" href="/css/pages/register.css?v=20260725b">
+</head>
+
+<body>
+  <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
+  <header class="marketing-header auth-header">
+    <a class="brand" href="/" aria-label="InEx Ledger home" data-i18n-aria-label="html_register_a_aria_label_inex_ledger_home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+          <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+        </svg>
+      </span>
+      <span class="brand-text"><span data-i18n="html_register_text_inex_ledger">InEx Ledger</span></span>
+    </a>
+  </header>
+
+  <main id="main-content" class="register-main">
+    <section class="register-layout">
+
+      <!-- LEFT: Value / trial panel -->
+      <aside class="register-value-col" aria-label="Trial details" data-i18n-aria-label="html_register_aside_aria_label_trial_details">
+        <div class="register-value-inner">
+          <div class="register-trial-kicker"><span data-i18n="html_register_text_30_day_pro_trial_middot_secure_billing_after_setup">30-day Pro trial &middot; Secure billing after setup</span></div>
+          <h2 class="register-value-headline"><span data-i18n="html_register_text_everything_included_from_day_one">Everything included from day one.</span></h2>
+          <p class="register-value-lede"><span data-i18n="html_register_text_start_with_the_full_workflow_after_onboarding_confirm_billing_de">Start with the full workflow. After onboarding, confirm billing details to keep Pro ready when the 30-day trial ends.</span></p>
+
+          <ul class="register-trial-points">
+            <li>
+              <span class="register-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12 13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <span><span data-i18n="html_register_text_track_income_and_expenses_from_day_one">Track income and expenses from day one</span></span>
+            </li>
+            <li>
+              <span class="register-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12 13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <span><span data-i18n="html_register_text_receipts_mileage_and_export_tools_included">Receipts, mileage, and export tools included</span></span>
+            </li>
+            <li>
+              <span class="register-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12 13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <span><span data-i18n="html_register_text_estimated_set_aside_tracking_updates_as_you_work">Estimated set-aside tracking updates as you work</span></span>
+            </li>
+            <li>
+              <span class="register-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12 13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <span><span data-i18n="html_register_text_built_for_freelancers_contractors_and_solo_operators">Built for freelancers, contractors, and solo operators</span></span>
+            </li>
+          </ul>
+
+          <div class="register-trust-bar">
+            <span><span data-i18n="html_register_text_no_charge_today">No charge today.</span></span>
+            <span><span data-i18n="html_register_text_keep_basic_after_trial">Keep Basic after trial.</span></span>
+            <span><span data-i18n="html_register_text_cancel_before_billing_starts">Cancel before billing starts.</span></span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- RIGHT: Form column -->
+      <div class="register-form-col">
+        <div class="register-form-header">
+          <h1 class="register-headline"><span data-i18n="html_register_text_set_up_your_account">Set up your account.</span></h1>
+          <p class="register-intro"><span data-i18n="html_register_text_one_email_one_password_you_ll_confirm_before_setup_begins">One email, one password. You'll confirm before setup begins.</span></p>
+        </div>
+
+          <form id="registerForm" class="auth-form register-form" method="post" action="/api/auth/register">
+            <div class="form-field">
+              <label for="firstName" data-i18n="register_first_name_label">First name</label>
+              <input type="text" id="firstName" name="first_name" required autocomplete="given-name" maxlength="80" />
+            </div>
+            
+            <div class="form-field">
+              <label for="lastName" data-i18n="register_last_name_label">Last name</label>
+              <input type="text" id="lastName" name="last_name" required autocomplete="family-name" maxlength="80" />
+            </div>
+            
+            <div class="form-field">
+              <label for="email" data-i18n="register_email_label">Email address</label>
+              <input type="email" id="email" name="email" required autocomplete="email" />
+            </div>
+
+          <div class="password-block">
+            <div class="form-field">
+              <label for="password" data-i18n="register_password_label">Password</label>
+              <input type="password" id="password" name="password" required autocomplete="new-password" aria-describedby="passwordStrengthText" />
+            </div>
+
+            <div class="form-field">
+              <label for="confirm-password" data-i18n="register_confirm_password_label">Confirm password</label>
+              <input type="password" id="confirm-password" name="confirm_password" required autocomplete="new-password" aria-describedby="passwordMatchMessage"/>
+            </div>
+
+            <p id="passwordMatchMessage" class="password-match-message"></p>
+
+            <div class="password-meter-row">
+              <div class="password-meter" aria-hidden="true">
+                <div class="meter-segment" data-segment="1"></div>
+                <div class="meter-segment" data-segment="2"></div>
+                <div class="meter-segment" data-segment="3"></div>
+              </div>
+              <p id="passwordStrengthText" class="password-strength-text"></p>
+            </div>
+
+            <ul class="password-requirements" aria-label="Password requirements" data-i18n-aria-label="html_register_ul_aria_label_password_requirements">
+              <li data-requirement="length" data-i18n="settings_password_rule_length">At least 8 characters</li>
+              <li data-requirement="uppercase" data-i18n="settings_password_rule_uppercase">Includes an uppercase letter</li>
+              <li data-requirement="number" data-i18n="settings_password_rule_number">Includes a number</li>
+              <li data-requirement="special" data-i18n="settings_password_rule_special">Includes a symbol</li>
+            </ul>
+
+            <label class="show-password-toggle">
+              <input type="checkbox" id="togglePassword" />
+              <span data-i18n="register_show_password">Show password</span>
+            </label>
+          </div>
+
+          <div class="language-field form-field">
+            <label for="languageSelectRegister" data-i18n="register_language_label">Language</label>
+            <select id="languageSelectRegister" name="language" data-language-select></select>
+          </div>
+
+          <div class="form-field">
+            <label for="registerCountry" data-i18n="register_country_label">Country</label>
+            <select id="registerCountry" name="country" required>
+              <option value="US" data-i18n="register_country_us">United States</option>
+              <option value="CA" data-i18n="register_country_ca">Canada</option>
+            </select>
+          </div>
+
+          <div class="consent-section">
+            <div class="consent-field consent-field-required">
+              <input type="checkbox" id="tosConsent" class="consent-checkbox" required aria-describedby="consentRequiredHint tosConsentMessage" />
+              <label for="tosConsent">
+                <span data-i18n="register_consent_prefix">I agree to the </span>
+                <a href="terms" data-i18n="register_consent_terms">Terms</a>
+                <span data-i18n="register_consent_and"> and </span>
+                <a href="privacy" data-i18n="register_consent_privacy">Privacy Policy</a><span data-i18n="register_consent_suffix">.</span>
+              </label>
+            </div>
+            <p class="consent-required-hint" id="consentRequiredHint" data-i18n="register_consent_required" hidden>Required: You must accept the Terms and Privacy Policy.</p>
+            <p id="tosConsentMessage" class="consent-error" aria-live="polite"></p>
+
+            <div class="consent-field consent-field-optional">
+              <input type="checkbox" id="caslConsent" class="consent-checkbox" />
+              <label for="caslConsent" data-i18n="register_casl_label">I agree to receive occasional product updates and tips from InEx Ledger by email. You can unsubscribe at any time.</label>
+            </div>
+          </div>
+
+          <p id="registerError" class="auth-error" role="alert" aria-live="polite" hidden></p>
+
+          <div class="register-cta-area">
+            <button type="submit" class="auth-submit" data-i18n="register_submit">Create account</button>
+            <p class="register-submit-note"><span data-i18n="html_register_text_30_day_pro_trial_billing_confirmation_happens_after_onboarding">30-day Pro trial. Billing confirmation happens after onboarding.</span></p>
+          </div>
+        </form>
+
+        <p class="register-signin-line">
+          <span data-i18n="register_existing_account">Already have an account?</span>
+          <a href="login" data-i18n="register_sign_in">Sign in</a>
+        </p>
+      </div>
+
+    </section>
+  </main>
+
+  <footer>
+    <p><span data-i18n="html_register_text_copyright_2026_mejor_tech_llc_inex_ledger_is_a_product_of_mejor_">&copy; 2026 Mejor Tech LLC. InEx Ledger is a product of Mejor Tech LLC.</span></p>
+  </footer>
+<script src="../js/escape-html.js?v=20260410a"></script>
+<script src="../js/global.js?v=20260601b"></script>
+<script src="../js/i18n.js?v=20260725b"></script>
+<script src="../js/auth.js?v=20260527c"></script>
+<script src="../js/privacyService.js?v=20260514a"></script>
+<script src="../js/register.js?v=20260518a"></script>
+</body>
+</html>
+

@@ -97,7 +97,7 @@ function buildUsageEmailCopy(resource, threshold, metric) {
     }
     return {
       subject: "A heads-up on your InEx Ledger transactions",
-      body: `You've used ${used} of your ${limit} Basic transactions this month. This is just a heads-up so your recordkeeping does not get interrupted. If your business activity is growing, Pro gives you higher limits, receipt-backed records, mileage tools, imports, and tax-ready exports.`
+      body: `You've used ${used} of your ${limit} Basic transactions this month. No action is needed yet. This is just a heads-up so your recordkeeping does not get interrupted. If your business activity is growing, Pro gives you higher limits, receipt-backed records, mileage tools, imports, and tax-ready exports.`
     };
   }
 

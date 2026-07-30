@@ -1,19 +1,18 @@
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { buildStripePriceLookup } = require("./stripePriceConfig.js");
+const { PLAN_CODES, planHasFeature, getPlanLimit, getPlanDefinition } = require("../config/planCatalog.js");
 
 const DEFAULT_TRIAL_DAYS = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
 const BILLING_PAST_DUE_GRACE_DAYS = Number(process.env.BILLING_PAST_DUE_GRACE_DAYS || 7);
-const PLAN_FREE = "free";
-const PLAN_V1 = "v1";
+const PLAN_FREE = PLAN_CODES.BASIC;
+const PLAN_V1 = PLAN_CODES.PRO;
 const PLAN_BASIC = PLAN_FREE;
 const PLAN_PRO = PLAN_V1;
-const PLAN_BUSINESS = "business";
+const PLAN_BUSINESS = PLAN_CODES.BUSINESS;
 
 function getPlanDisplayName(tier) {
-  if (tier === PLAN_V1) return "Pro";
-  if (tier === PLAN_BUSINESS) return "Pro";
-  return "Basic";
+  return getPlanDefinition(tier).name;
 }
 
 
@@ -166,7 +165,10 @@ function deriveEffectiveState(row) {
     effectiveStatus = "unpaid";
   } else if (row?.status === "trialing" && resolvedTrialEndsAt && resolvedTrialEndsAt.getTime() <= now) {
     effectiveTier = PLAN_FREE;
-    effectiveStatus = "trial_expired";
+    effectiveStatus = "free";
+  } else if (row?.plan_code === PLAN_V1 && row?.status === "canceled") {
+    effectiveTier = PLAN_FREE;
+    effectiveStatus = "free";
   } else if (row?.plan_code === PLAN_FREE) {
     effectiveTier = PLAN_FREE;
     effectiveStatus = row?.status || "free";
@@ -401,19 +403,12 @@ async function setFreePlanForBusiness(businessId) {
 
 function hasFeatureAccess(subscription, feature) {
   const tier = subscription?.effectiveTier || PLAN_FREE;
-  const v1Features = new Set([
-    "pdf_exports",
-    "advanced_exports",
-    "edge_case_tools",
-    "tax_estimates",
-    "recurring_transactions"
-  ]);
+  return planHasFeature(tier, feature);
+}
 
-  if (!v1Features.has(feature)) {
-    return true;
-  }
-
-  return tier === PLAN_V1;
+function getFeatureLimit(subscription, limitKey) {
+  const tier = subscription?.effectiveTier || PLAN_FREE;
+  return getPlanLimit(tier, limitKey);
 }
 
 module.exports = {
@@ -432,5 +427,6 @@ module.exports = {
   setTrialPlanSelectionForBusiness,
   setFreePlanForBusiness,
   hasFeatureAccess,
+  getFeatureLimit,
   getPlanDisplayName
 };

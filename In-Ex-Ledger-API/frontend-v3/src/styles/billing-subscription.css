@@ -1,0 +1,315 @@
+.billing-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.billing-focus-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 16px;
+}
+
+.billing-hero-card,
+.billing-side-card,
+.billing-action-card,
+.subscription-simple-card,
+.subscription-danger-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.billing-hero-card {
+  min-height: 188px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+}
+
+.billing-hero-card h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.billing-hero-card p:not(.eyebrow),
+.billing-side-card p,
+.billing-action-card p,
+.subscription-simple-card p,
+.subscription-business-row p,
+.subscription-danger-panel p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.billing-card-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef4ff;
+  color: var(--blue);
+}
+
+.billing-side-card {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: 22px;
+}
+
+.billing-side-card strong,
+.billing-action-card strong,
+.subscription-simple-card strong,
+.subscription-danger-panel strong {
+  font-size: 16px;
+}
+
+.billing-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.billing-action-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 13px;
+  padding: 18px;
+}
+
+.billing-action-card .secondary-button {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.table-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.table-panel-header h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.table-panel-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.subscription-interval-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.subscription-interval-toggle button {
+  min-height: 76px;
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+  text-align: left;
+}
+
+.subscription-interval-toggle button.is-selected {
+  border-color: rgba(23, 92, 255, 0.42);
+  background: #eef4ff;
+  color: var(--blue);
+}
+
+.subscription-interval-toggle strong {
+  font-size: 20px;
+}
+
+.subscription-simple-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.subscription-simple-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.subscription-simple-card strong {
+  font-size: 24px;
+}
+
+.subscription-business-list {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.subscription-business-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.subscription-danger-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-color: rgba(216, 59, 59, 0.22);
+  background: rgba(216, 59, 59, 0.05);
+}
+
+.danger-icon {
+  background: rgba(216, 59, 59, 0.1);
+  color: var(--red);
+}
+
+@media (max-width: 1100px) {
+  .billing-focus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 721px) and (max-width: 900px) {
+  .billing-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-hero-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .billing-hero-card .secondary-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .subscription-business-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .subscription-business-row .compact-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 720px) {
+  .billing-heading-actions,
+  .billing-heading-actions .primary-button,
+  .billing-heading-actions .secondary-button,
+  .billing-hero-card .secondary-button,
+  .billing-action-card .secondary-button {
+    width: 100%;
+  }
+
+  .billing-focus-grid,
+  .billing-action-grid,
+  .subscription-business-row,
+  .subscription-danger-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-hero-card {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .billing-hero-card .secondary-button,
+  .billing-action-card .secondary-button,
+  .subscription-business-row .compact-button {
+    grid-column: auto;
+  }
+
+  .table-panel-header {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .subscription-interval-toggle {
+    grid-template-columns: 1fr;
+  }
+
+  .subscription-business-row .status-pill,
+  .subscription-danger-panel .danger-button {
+    justify-self: start;
+  }
+}
+
+.ledger-shell[data-theme="dark"] :is(
+  .billing-hero-card,
+  .billing-side-card,
+  .billing-action-card,
+  .subscription-simple-card,
+  .subscription-danger-panel
+) {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.ledger-shell[data-theme="dark"] :is(
+  .billing-card-icon,
+  .subscription-business-row
+) {
+  border-color: var(--line);
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.ledger-shell[data-theme="dark"] :is(
+  .billing-hero-card p:not(.eyebrow),
+  .billing-side-card p,
+  .billing-action-card p,
+  .subscription-simple-card p,
+  .subscription-simple-card span,
+  .subscription-business-row p,
+  .subscription-danger-panel p,
+  .table-panel-header p
+) {
+  color: var(--muted);
+}
+
+.ledger-shell[data-theme="dark"] .subscription-interval-toggle button.is-selected {
+  background: rgba(109, 162, 255, 0.14);
+  color: var(--blue);
+}
+
+.ledger-shell[data-theme="dark"] .danger-icon {
+  background: rgba(255, 123, 123, 0.14);
+  color: var(--red);
+}

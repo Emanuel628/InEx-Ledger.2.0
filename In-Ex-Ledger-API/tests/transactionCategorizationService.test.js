@@ -20,7 +20,12 @@ function makeCategories(region = "US") {
       { id: "c6", name: "Meals & Entertainment", kind: "expense" },
       { id: "c7", name: "Phone & Internet", kind: "expense" },
       { id: "c8", name: "Advertising", kind: "expense" },
-      { id: "c9", name: "Sales Revenue", kind: "income" }
+      { id: "c9", name: "Sales Revenue", kind: "income" },
+      { id: "c10", name: "Interest & Bank Charges", kind: "expense" },
+      { id: "c11", name: "Delivery & Freight", kind: "expense" },
+      { id: "c12", name: "Legal & Accounting Fees", kind: "expense" },
+      { id: "c13", name: "Business Tax & Licenses", kind: "expense" },
+      { id: "c14", name: "Utilities", kind: "expense" }
     ];
   }
   return [
@@ -32,7 +37,12 @@ function makeCategories(region = "US") {
     { id: "u6", name: "Meals", kind: "expense" },
     { id: "u7", name: "Phone & Internet", kind: "expense" },
     { id: "u8", name: "Advertising & Marketing", kind: "expense" },
-    { id: "u9", name: "Sales Revenue", kind: "income" }
+    { id: "u9", name: "Sales Revenue", kind: "income" },
+    { id: "u10", name: "Bank Fees", kind: "expense" },
+    { id: "u11", name: "Supplies", kind: "expense" },
+    { id: "u12", name: "Legal & Professional", kind: "expense" },
+    { id: "u13", name: "Sales Tax", kind: "expense" },
+    { id: "u14", name: "Utilities", kind: "expense" }
   ];
 }
 
@@ -229,5 +239,20 @@ test("categorizer still maps 'Facebook Ads - Campaign 1' to Advertising & Market
   const result = categorize({ type: "expense", merchantName: "Facebook", description: "Ads - Campaign 1" });
   assert.equal(result.categoryName, "Advertising & Marketing");
   assert.equal(result.reason, "canonical_rule");
-  assert.equal(result.confidence, "medium");
+  // Only a description-field hit (no merchant-field match), which clears the
+  // minimum score to auto-map but is correctly labeled "low" confidence —
+  // weaker evidence than an actual merchant-name hit.
+  assert.equal(result.confidence, "low");
+});
+
+test("categorizer carries legacy CSV merchant coverage into the active import mapper", () => {
+  const usCategorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
+  const caCategorize = createTransactionCategorizer({ categories: makeCategories("CA"), region: "CA" });
+
+  assert.equal(usCategorize({ type: "expense", merchantName: "FedEx", description: "Courier service" }).categoryName, "Supplies");
+  assert.equal(caCategorize({ type: "expense", merchantName: "Canada Post", description: "Postage" }).categoryName, "Delivery & Freight");
+  assert.equal(usCategorize({ type: "expense", merchantName: "Monthly Banking", description: "Account service fee" }).categoryName, "Bank Fees");
+  assert.equal(caCategorize({ type: "expense", merchantName: "Revenue Canada", description: "Business license" }).categoryName, "Business Tax & Licenses");
+  assert.equal(usCategorize({ type: "expense", merchantName: "Microsoft 365", description: "Annual subscription" }).categoryName, "Software & Subscriptions");
+  assert.equal(caCategorize({ type: "expense", merchantName: "Bell Canada", description: "Business internet" }).categoryName, "Phone & Internet");
 });

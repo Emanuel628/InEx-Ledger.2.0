@@ -22,6 +22,7 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const { buildFeatureRequiresPlanResponse } = require("../middleware/requirePlanFeature.js");
 const {
   BasicPlanLimitError,
   assertCanCreateTransactions,
@@ -617,8 +618,13 @@ function buildTransactionListFilters(query, now = new Date()) {
   const offset = Math.max(parseInt(query.offset, 10) || 0, 0);
   const accountId = String(query.account_id || "").trim();
   const categoryId = String(query.category_id || "").trim();
+  const accountName = String(query.account_name || "").trim();
+  const categoryName = String(query.category_name || "").trim();
   const type = String(query.type || "").trim().toLowerCase();
   const period = String(query.period || "all").trim().toLowerCase() || "all";
+  const startDate = String(query.start_date || "").trim();
+  const endDate = String(query.end_date || "").trim();
+  const v3Status = String(query.v3_status || "").trim().toLowerCase();
 
   if (accountId && !UUID_REGEX.test(accountId)) {
     return { valid: false, error: "Invalid account_id." };
@@ -632,6 +638,18 @@ function buildTransactionListFilters(query, now = new Date()) {
   if (!VALID_TRANSACTION_PERIODS.has(period)) {
     return { valid: false, error: "Invalid period filter." };
   }
+  if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    return { valid: false, error: "Invalid start_date." };
+  }
+  if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    return { valid: false, error: "Invalid end_date." };
+  }
+  if (startDate && endDate && startDate > endDate) {
+    return { valid: false, error: "start_date must be on or before end_date." };
+  }
+  if (v3Status && !["cleared", "draft"].includes(v3Status)) {
+    return { valid: false, error: "Invalid v3_status filter." };
+  }
 
   const reviewStatus = String(query.review_status || "").trim().toLowerCase();
   if (reviewStatus && !VALID_REVIEW_STATUSES.has(reviewStatus)) {
@@ -644,11 +662,16 @@ function buildTransactionListFilters(query, now = new Date()) {
     limit,
     offset,
     accountId,
+    accountName,
     categoryId,
+    categoryName,
     type: type || "",
     search: String(query.search || "").trim(),
     period,
     periodBounds: getTransactionPeriodBounds(period, now),
+    startDate,
+    endDate,
+    v3Status,
     reviewStatus: reviewStatus || "", 
     review: normalizeReviewFilter(query.review)
   };
@@ -666,11 +689,17 @@ function buildTransactionListWhereClause(scopeBusinessIds, filters) {
   if (filters.accountId) {
     params.push(filters.accountId);
     clauses.push(`t.account_id = $${params.length}::uuid`);
+  } else if (filters.accountName) {
+    params.push(filters.accountName);
+    clauses.push(`LOWER(COALESCE(a.name, '')) = LOWER($${params.length})`);
   }
 
   if (filters.categoryId) {
     params.push(filters.categoryId);
     clauses.push(`t.category_id = $${params.length}::uuid`);
+  } else if (filters.categoryName) {
+    params.push(filters.categoryName);
+    clauses.push(`LOWER(COALESCE(c.name, '')) = LOWER($${params.length})`);
   }
 
   if (filters.type) {
@@ -685,9 +714,26 @@ function buildTransactionListWhereClause(scopeBusinessIds, filters) {
     clauses.push(`t.date < $${params.length}`);
   }
 
+  if (filters.startDate) {
+    params.push(filters.startDate);
+    clauses.push(`t.date >= $${params.length}`);
+  }
+
+  if (filters.endDate) {
+    params.push(filters.endDate);
+    clauses.push(`t.date <= $${params.length}`);
+  }
+
   if (filters.reviewStatus) {
     params.push(filters.reviewStatus);
     clauses.push(`t.review_status = $${params.length}`);
+  }
+
+  if (filters.v3Status === "cleared") {
+    clauses.push("t.cleared = true");
+  } else if (filters.v3Status === "draft") {
+    clauses.push("COALESCE(t.cleared, false) = false");
+    clauses.push("(t.review_status IS NULL OR t.review_status NOT IN ('needs_review'))");
   }
 
   if (filters.search) {
@@ -948,7 +994,7 @@ router.post("/", async (req, res) => {
       hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
       !hasFeatureAccess(subscription, "edge_case_tools")
     ) {
-      return res.status(402).json({ error: "Advanced transaction fields require an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "edge_case_tools"));
     }
 
     const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
@@ -1155,7 +1201,7 @@ router.put("/:id", async (req, res) => {
       hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
       !hasFeatureAccess(subscription, "edge_case_tools")
     ) {
-      return res.status(402).json({ error: "Advanced transaction fields require an active InEx Ledger Pro plan." });
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "edge_case_tools"));
     }
     const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
 
@@ -1323,9 +1369,23 @@ router.delete("/bulk-delete-all", async (req, res) => {
     }
     const result = await pool.query(
       `UPDATE transactions
-          SET deleted_at = now(), is_void = true, voided_at = now()
+          SET deleted_at = now(), is_void = true, voided_at = now(), deleted_reason = 'bulk_delete_all'
         WHERE business_id = $1
           AND deleted_at IS NULL`,
+      [businessId]
+    );
+    // Delete All is a hard reset: any transaction that was already
+    // soft-deleted (and still undo-eligible) before this run must also be
+    // excluded, or its pre-existing undo entry would keep the Undo Delete
+    // button visible after the reset.
+    await pool.query(
+      `UPDATE transactions
+          SET deleted_reason = 'bulk_delete_all'
+        WHERE business_id = $1
+          AND deleted_at IS NOT NULL
+          AND (is_void = true OR is_void IS NULL)
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_reason IS DISTINCT FROM 'bulk_delete_all'`,
       [businessId]
     );
     void invalidateSnapshotsForBusiness({
@@ -1388,6 +1448,7 @@ router.post("/undo-delete", async (req, res) => {
           AND deleted_at IS NOT NULL
           AND (is_void = true OR is_void IS NULL)
           AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_reason IS DISTINCT FROM 'bulk_delete_all'
         ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
         LIMIT $2`,
       [businessId, TRANSACTION_UNDO_STACK_LIMIT]
@@ -1798,6 +1859,18 @@ function derivePseudoMerchant(description) {
   return cleaned.split(" ").filter(Boolean).slice(0, 3).join(" ");
 }
 
+function collectCsvTextFields(row, fields) {
+  const seen = new Set();
+  const values = [];
+  for (const field of fields) {
+    if (!field || seen.has(field)) continue;
+    seen.add(field);
+    const value = String(row[field] || "").trim();
+    if (value) values.push(value);
+  }
+  return values;
+}
+
 function extractRowData(row, cols) {
   let amount = null;
   let type = null;
@@ -1823,13 +1896,17 @@ function extractRowData(row, cols) {
     }
   }
 
-  const description = String(
-    row[cols.descCol] ||
-    row["transaction_description_1"] ||
-    row["description_1"] ||
-    row["details"] ||
-    ""
-  ).trim().slice(0, 500);
+  const description = collectCsvTextFields(row, [
+    cols.descCol,
+    "transaction_description_1",
+    "transaction_description_2",
+    "description_1",
+    "description_2",
+    "details",
+    "memo",
+    "narrative",
+    "particulars"
+  ]).join(" ").trim().slice(0, 500);
   const merchantName = (String(
     row[cols.merchantCol] ||
     row["merchant_name"] ||

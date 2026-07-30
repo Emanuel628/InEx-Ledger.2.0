@@ -157,6 +157,24 @@ test("detectColumns and extractRowData preserve merchant and provider hint field
   assert.equal(parsed.categoryGuess, "INTERNET_SOFTWARE");
 });
 
+test("extractRowData combines split bank description fields before categorization", () => {
+  const routeModule = loadTransactionRouteModule();
+  const { detectColumns, extractRowData } = routeModule.__private;
+  const headers = ["Date", "Description_1", "Description_2", "Amount"];
+  const cols = detectColumns(headers);
+  const row = {
+    date: "2026-05-01",
+    description_1: "POS PURCHASE",
+    description_2: "MICROSOFT 365 ANNUAL SUBSCRIPTION",
+    amount: "-129.00"
+  };
+
+  const parsed = extractRowData(row, cols);
+
+  assert.equal(parsed.description, "POS PURCHASE MICROSOFT 365 ANNUAL SUBSCRIPTION");
+  assert.equal(parsed.merchantName, "microsoft annual subscription");
+});
+
 test("resolveCsvCategoryTemplate uses seeded tax maps for known US categories", () => {
   const { resolveCsvCategoryTemplate } = loadTransactionRouteModule().__private;
   const template = resolveCsvCategoryTemplate("Office Supplies", "expense", "US");

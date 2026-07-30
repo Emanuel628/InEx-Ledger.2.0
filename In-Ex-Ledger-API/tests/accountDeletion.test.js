@@ -56,11 +56,14 @@ function loadMeRouter(options = {}) {
                     rowCount: 1
                   };
                 }
-                if (/SELECT id, email, password_hash, mfa_enabled FROM users/i.test(sql)) {
+                if (/SELECT id, email,.*password_hash, mfa_enabled FROM users/i.test(sql)) {
                   return {
                     rows: [{
                       id: state.userId,
                       email: state.email,
+                      full_name: "Delete Me",
+                      country: "US",
+                      province: null,
                       password_hash: state.passwordHash,
                       mfa_enabled: state.dbMfaEnabled
                     }],

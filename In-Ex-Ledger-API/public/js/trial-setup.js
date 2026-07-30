@@ -219,6 +219,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           billingInterval: state.billingInterval,
+          checkoutAttemptId: crypto.randomUUID(),
           additionalBusinesses: 0,
           returnPath: buildReturnPath()
         })

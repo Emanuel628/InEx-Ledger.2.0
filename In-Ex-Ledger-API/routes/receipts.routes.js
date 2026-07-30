@@ -225,21 +225,34 @@ async function ensureReceiptListSchema() {
 }
 
 function buildReceiptListSql() {
+  // Transaction deletion is a soft delete (deleted_at), so the FK's
+  // ON DELETE SET NULL never fires and r.transaction_id keeps pointing at
+  // the deleted row. Only join a transaction that isn't soft-deleted, and
+  // report transaction_id as null when it isn't, so a receipt whose
+  // transaction was deleted (or is still awaiting undo) shows as unlinked
+  // rather than silently staying "Linked" to a row the user can no longer
+  // see. This intentionally leaves the underlying r.transaction_id column
+  // untouched, so restoring the transaction via Undo Delete re-links it.
   return `
     SELECT
       r.id,
       r.business_id,
       b.name AS business_name,
-      r.transaction_id,
+      CASE WHEN t.id IS NOT NULL THEN r.transaction_id ELSE NULL END AS transaction_id,
       r.filename,
       r.mime_type,
       r.storage_path,
       r.uploaded_at,
       r.uploaded_at AS created_at,
       r.file_hash,
+      t.description AS transaction_description,
+      t.amount AS transaction_amount,
+      t.type AS transaction_type,
+      t.date AS transaction_date,
       (r.file_bytes IS NOT NULL) AS has_file_bytes
     FROM receipts r
     JOIN businesses b ON b.id = r.business_id
+    LEFT JOIN transactions t ON t.id = r.transaction_id AND t.deleted_at IS NULL
     WHERE r.business_id = ANY($1::uuid[])
     ORDER BY b.name ASC, r.uploaded_at DESC NULLS LAST
     LIMIT 500

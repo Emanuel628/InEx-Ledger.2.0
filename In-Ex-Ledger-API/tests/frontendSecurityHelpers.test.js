@@ -389,6 +389,40 @@ test("trial.js ignores stored subscription fallback and does not mint a syntheti
   assert.equal(context.formatTrialRemaining(), "Trial status unavailable.");
 });
 
+test("trial guard allows Basic and expired-trial accounts into the app", () => {
+  const basicContext = loadScript("public/js/trial.js", {
+    window: {
+      location: { href: "/transactions", pathname: "/transactions" },
+      __LUNA_ME__: {
+        subscription: {
+          effectiveTier: "free",
+          effectiveStatus: "active"
+        }
+      }
+    }
+  });
+
+  assert.equal(basicContext.isTrialExpired(), false);
+  basicContext.enforceTrial();
+  assert.equal(basicContext.window.location.href, "/transactions");
+
+  const expiredTrialContext = loadScript("public/js/trial.js", {
+    window: {
+      location: { href: "/transactions", pathname: "/transactions" },
+      __LUNA_ME__: {
+        subscription: {
+          effectiveTier: "free",
+          effectiveStatus: "trial_expired"
+        }
+      }
+    }
+  });
+
+  assert.equal(expiredTrialContext.isTrialExpired(), false);
+  expiredTrialContext.enforceTrial();
+  assert.equal(expiredTrialContext.window.location.href, "/transactions");
+});
+
 test("accounts ghost suggestions tolerate corrupted dismissed-suggestions storage", () => {
   const localStorage = {
     _store: new Map([["lb_account_suggestions_dismissed", "{bad json"]]),

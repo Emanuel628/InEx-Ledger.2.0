@@ -200,6 +200,7 @@ async function launchCheckout() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         billingInterval: pricingState.interval,
+        checkoutAttemptId: crypto.randomUUID(),
         additionalBusinesses: pricingState.additionalBusinesses
       })
     });

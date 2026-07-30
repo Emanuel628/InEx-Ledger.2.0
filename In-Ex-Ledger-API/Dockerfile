@@ -5,9 +5,13 @@ WORKDIR /app
 # Install deps first (better caching)
 COPY package*.json ./
 RUN npm install --omit=dev
+COPY frontend-v3/package*.json ./frontend-v3/
+RUN npm --prefix frontend-v3 install
 
 # Copy rest of API
 COPY . .
+RUN npm run build:frontend-v3 \
+  && node -e "const fs=require('fs'); if (!fs.existsSync('public/app-v3/index.html')) process.exit(1)"
 
 ENV NODE_ENV=production
 ENV PORT=8080

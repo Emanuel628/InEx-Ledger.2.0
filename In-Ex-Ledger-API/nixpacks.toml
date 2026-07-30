@@ -2,7 +2,13 @@
 nixPkgs = ["nodejs"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install", "npm --prefix frontend-v3 install"]
+
+[phases.build]
+cmds = [
+  "npm run build:frontend-v3",
+  "node -e \"const fs=require('fs'); if (!fs.existsSync('public/app-v3/index.html')) process.exit(1)\""
+]
 
 [start]
 cmd = "npm start"

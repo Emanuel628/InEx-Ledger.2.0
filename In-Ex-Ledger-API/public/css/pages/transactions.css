@@ -5236,3 +5236,319 @@ body:has(.transactions-page) .app-content {
   position: relative;
   z-index: 0;
 }
+
+/* 2026-07-25: list-first transaction workspace */
+body.transactions-page {
+  background: #f6f8fb;
+}
+
+.transactions-page .app-content {
+  gap: 22px;
+  padding-top: 28px;
+  padding-bottom: 40px;
+}
+
+.transactions-page .page-header {
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 2px;
+}
+
+.transactions-page .page-title {
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.05;
+}
+
+.transactions-page .page-subtitle,
+.transactions-page .transactions-toolbar-subtitle {
+  display: none;
+}
+
+.transactions-page .page-header-actions {
+  align-items: center;
+  gap: 12px;
+}
+
+.transactions-page .page-add-button,
+.transactions-page .btn-secondary,
+.transactions-page .scope-select,
+.transactions-page .tx-period-chip {
+  min-height: 40px;
+}
+
+.transactions-page .stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.transactions-page .stat-card {
+  min-width: 0;
+  min-height: 84px;
+  padding: 16px 18px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(15, 25, 35, 0.035);
+}
+
+.transactions-page .stat-card-icon,
+.transactions-page .stat-delta {
+  display: none;
+}
+
+.transactions-page .stat-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.transactions-page .stat-value {
+  margin-top: 7px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.transactions-page .tax-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin: 0;
+  padding: 18px 20px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  color: #102236;
+  box-shadow: none;
+}
+
+.transactions-page .tax-banner-main,
+.transactions-page .tax-banner-side {
+  padding: 0;
+  background: transparent;
+}
+
+.transactions-page .tax-banner-label,
+.transactions-page .tax-side-label,
+.transactions-page .tax-banner-note,
+.transactions-page .tax-side-meta {
+  color: #64748b;
+}
+
+.transactions-page .tax-banner-label-secondary,
+.transactions-page .tax-banner-note,
+.transactions-page .tax-side-meta {
+  display: none;
+}
+
+.transactions-page .tax-banner-amount,
+.transactions-page .tax-side-value {
+  color: #102236;
+  margin-top: 8px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.transactions-page .transactions-panel {
+  padding: 0 0 14px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 25, 35, 0.04);
+}
+
+.transactions-page .transactions-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(15, 25, 35, 0.08);
+  background: #fff;
+}
+
+.transactions-page .transactions-panel-title {
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.transactions-page .transactions-toolbar-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.transactions-page .transactions-toolbar-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.transactions-page .toolbar-search,
+.transactions-page .toolbar-select {
+  min-height: 40px;
+  border-radius: 7px;
+}
+
+.transactions-page .toolbar-search input,
+.transactions-page .toolbar-select {
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.transactions-page .tx-review-panel {
+  margin: 0;
+  padding: 14px 20px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: #fff8eb;
+  box-shadow: none;
+}
+
+.transactions-page .tx-review-panel-header {
+  gap: 10px;
+}
+
+.transactions-page .tx-review-panel-title {
+  font-size: 13px;
+}
+
+.transactions-page .tx-review-stat-grid {
+  margin-top: 8px;
+}
+
+.transactions-page .bulk-action-bar {
+  margin: 14px 20px 0;
+}
+
+.transactions-page .table-wrapper {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.transactions-page .transactions-table th,
+.transactions-page .transactions-table td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.transactions-page .recurring-panel {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border-radius: 8px;
+}
+
+.transactions-page .recurring-subtitle {
+  display: none;
+}
+
+.transactions-page .recurring-panel #recurringPanelBody[hidden] {
+  display: none !important;
+}
+
+.transactions-page #txDrawer {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0;
+  background: rgba(15, 25, 35, 0.34);
+}
+
+.transactions-page #txDrawer[hidden] {
+  display: none !important;
+}
+
+.transactions-page #txDrawer form {
+  width: min(100vw, 520px);
+  height: 100%;
+  margin: 0;
+  background: #fff;
+  box-shadow: -18px 0 36px rgba(15, 25, 35, 0.18);
+}
+
+.transactions-page #txDrawer .transaction-drawer-card {
+  height: 100%;
+  overflow-y: auto;
+  padding: 28px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+.transactions-page #txDrawer .transaction-drawer-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -28px -28px 24px;
+  padding: 22px 28px;
+  background: #fff;
+  border-bottom: 1px solid rgba(15, 25, 35, 0.08);
+}
+
+.transactions-page #txDrawer .drawer-title {
+  font-size: 18px;
+}
+
+.transactions-page #txDrawer .transaction-form-grid {
+  gap: 16px;
+}
+
+.transactions-page #txDrawer .transaction-advanced-details {
+  margin-top: 22px;
+}
+
+@media (max-width: 1180px) {
+  .transactions-page .page-header,
+  .transactions-page .page-header-actions,
+  .transactions-page .transactions-toolbar,
+  .transactions-page .transactions-toolbar-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .transactions-page .page-header-actions,
+  .transactions-page .transactions-toolbar-controls {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 760px) {
+  .transactions-page .app-content {
+    gap: 16px;
+    padding-top: 16px;
+    padding-bottom: 28px;
+  }
+
+  .transactions-page .stats-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .transactions-page .tax-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .transactions-page .transactions-toolbar-tools,
+  .transactions-page .transactions-toolbar-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .transactions-page #txDrawer form {
+    width: 100vw;
+  }
+
+  .transactions-page #txDrawer .transaction-drawer-head {
+    align-items: flex-start;
+  }
+}

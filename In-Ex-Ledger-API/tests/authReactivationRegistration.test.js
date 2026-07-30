@@ -10,11 +10,15 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-auth-reactivation-secre
 
 const AUTH_ROUTE_PATH = require.resolve("../routes/auth.routes.js");
 
-function loadAuthRouterFixture() {
+function loadAuthRouterFixture(options = {}) {
   const originalLoad = Module._load.bind(Module);
+  const originalResendKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = "re_test_auth_reactivation";
   const state = {
     insertedUserParams: null,
-    markReactivatedCalls: []
+    markReactivatedCalls: [],
+    passwordResetTokenInserts: 0,
+    sentEmails: []
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -24,7 +28,10 @@ function loadAuthRouterFixture() {
           constructor() {}
           get emails() {
             return {
-              send: async () => ({ id: "email_test" })
+              send: async (payload) => {
+                state.sentEmails.push(payload);
+                return { id: "email_test" };
+              }
             };
           }
         }
@@ -41,6 +48,9 @@ function loadAuthRouterFixture() {
                   return { rows: [], rowCount: 0 };
                 }
                 if (/SELECT id FROM users WHERE email = \$1/i.test(sql)) {
+                  if (options.existingUser) {
+                    return { rows: [{ id: "existing-user-1" }], rowCount: 1 };
+                  }
                   return { rows: [], rowCount: 0 };
                 }
                 if (/INSERT INTO users .*trial_eligible/i.test(sql)) {
@@ -69,6 +79,16 @@ function loadAuthRouterFixture() {
               return { rows: [], rowCount: 0 };
             }
             if (/INSERT INTO verification_tokens/i.test(sql)) {
+              return { rows: [], rowCount: 1 };
+            }
+            if (/DELETE FROM password_reset_tokens WHERE email = \$1/i.test(sql)) {
+              return { rows: [], rowCount: 0 };
+            }
+            if (/INSERT INTO password_reset_tokens/i.test(sql)) {
+              state.passwordResetTokenInserts += 1;
+              return { rows: [], rowCount: 1 };
+            }
+            if (/INSERT INTO refresh_tokens/i.test(sql)) {
               return { rows: [], rowCount: 1 };
             }
             throw new Error(`Unhandled pool SQL: ${sql}`);
@@ -171,6 +191,7 @@ function loadAuthRouterFixture() {
         buildVerificationEmail: () => ({ subject: "verify", html: "", text: "" }),
         buildPasswordResetEmail: () => ({ subject: "reset", html: "", text: "" }),
         buildPasswordChangedEmail: () => ({ subject: "password", html: "", text: "" }),
+        buildDuplicateSignupNoticeEmail: () => ({ subject: "duplicate", html: "", text: "" }),
         buildNewSignInAlertEmail: () => ({ subject: "signin", html: "", text: "" }),
         buildEmailChangeEmail: () => ({ subject: "change", html: "", text: "" }),
         buildEmailChangedConfirmationEmail: () => ({ subject: "changed", html: "", text: "" }),
@@ -214,10 +235,20 @@ function loadAuthRouterFixture() {
       cleanup() {
         delete require.cache[AUTH_ROUTE_PATH];
         Module._load = originalLoad;
+        if (originalResendKey === undefined) {
+          delete process.env.RESEND_API_KEY;
+        } else {
+          process.env.RESEND_API_KEY = originalResendKey;
+        }
       }
     };
   } catch (error) {
     Module._load = originalLoad;
+    if (originalResendKey === undefined) {
+      delete process.env.RESEND_API_KEY;
+    } else {
+      process.env.RESEND_API_KEY = originalResendKey;
+    }
     throw error;
   }
 }
@@ -254,6 +285,36 @@ test("POST /api/auth/register reopens a deleted account without granting a new t
     assert.equal(fixture.state.insertedUserParams?.[7], false);
     assert.equal(fixture.state.markReactivatedCalls.length, 1);
     assert.equal(fixture.state.markReactivatedCalls[0]?.email, "returning@example.com");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("POST /api/auth/register does not reveal existing account emails", async () => {
+  const fixture = loadAuthRouterFixture({ existingUser: true });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/auth/register")
+      .send({
+        email: "existing@example.com",
+        password: "StrongPass1!",
+        first_name: "Existing",
+        last_name: "User",
+        country: "US",
+        tos_consent: true
+      });
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body?.success, true);
+    assert.equal(response.body?.message, "Account created. Check your email!");
+    assert.equal(response.body?.verification_state, undefined);
+    assert.equal(response.body?.signup_bootstrap_token, undefined);
+    assert.equal(fixture.state.insertedUserParams, null);
+    assert.equal(fixture.state.passwordResetTokenInserts, 1);
+    assert.equal(fixture.state.sentEmails.length, 1);
+    assert.deepEqual(fixture.state.sentEmails[0]?.to, ["existing@example.com"]);
   } finally {
     fixture.cleanup();
   }

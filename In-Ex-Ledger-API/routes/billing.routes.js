@@ -42,8 +42,13 @@ const MAX_ADDITIONAL_BUSINESSES = 100;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
 const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
-const { addonPriceIds: STRIPE_ADDON_PRICE_IDS, metadataByPriceId: STRIPE_PRICE_METADATA_BY_ID } = buildStripePriceLookup();
+const {
+  basePriceIds: STRIPE_BASE_PRICE_IDS,
+  addonPriceIds: STRIPE_ADDON_PRICE_IDS,
+  metadataByPriceId: STRIPE_PRICE_METADATA_BY_ID
+} = buildStripePriceLookup();
 let resendClient = null;
+const portalConfigurationCache = new Map();
 
 class BillingValidationError extends Error {
   constructor(message) {
@@ -266,7 +271,33 @@ function resolveCurrencyForCountry(countryCode) {
   return countryCode === "ca" ? "cad" : "usd";
 }
 
-async function resolveBillingContext(req) {
+// The business's own configured region (set once at onboarding and rarely
+// changed) is a much stronger signal for what currency a customer expects to
+// be billed in than the network they happen to be checking out from -- a
+// Canadian business owner on a US VPN, or a US business owner traveling in
+// Canada, should still see their business's own currency.
+async function resolveBusinessRegionCountryCode(businessId) {
+  if (!businessId) {
+    return null;
+  }
+  const result = await pool.query(
+    `SELECT region FROM businesses WHERE id = $1`,
+    [businessId]
+  );
+  return normalizeCountryCode(result.rows[0]?.region);
+}
+
+async function resolveBillingContext(req, businessId = null) {
+  const regionCountryCode = await resolveBusinessRegionCountryCode(businessId);
+  if (regionCountryCode) {
+    return {
+      ipAddress: getVerifiedClientIp(req) || null,
+      countryCode: regionCountryCode,
+      currency: resolveCurrencyForCountry(regionCountryCode),
+      source: "business_region"
+    };
+  }
+
   const ipAddress = getVerifiedClientIp(req);
   const location = await fetchIpLocation(ipAddress);
   const countryCode = normalizeCountryCode(location?.country);
@@ -331,6 +362,20 @@ function parseStripeUnitAmount(price) {
   return numeric / 100;
 }
 
+function expectedStripeRecurringInterval(billingInterval) {
+  return normalizeBillingInterval(billingInterval) === "yearly" ? "year" : "month";
+}
+
+function assertStripePriceMatchesBillingInterval(price, billingInterval, label) {
+  const expectedInterval = expectedStripeRecurringInterval(billingInterval);
+  const actualInterval = String(price?.recurring?.interval || "").toLowerCase();
+  if (actualInterval !== expectedInterval) {
+    throw new BillingValidationError(
+      `${label} Stripe Price is configured for ${actualInterval || "a non-recurring interval"}, not ${expectedInterval}.`
+    );
+  }
+}
+
 async function fetchStripePrice(priceId) {
   return stripeGet(`/prices/${encodeURIComponent(priceId)}`);
 }
@@ -348,6 +393,11 @@ async function buildVerifiedPricingTable(currency) {
     fetchStripePrice(requireEnvValue(monthlyAddonEnv)),
     fetchStripePrice(requireEnvValue(yearlyAddonEnv))
   ]);
+
+  assertStripePriceMatchesBillingInterval(monthlyBasePrice, "monthly", "Monthly base");
+  assertStripePriceMatchesBillingInterval(monthlyAddonPrice, "monthly", "Monthly additional business");
+  assertStripePriceMatchesBillingInterval(yearlyBasePrice, "yearly", "Yearly base");
+  assertStripePriceMatchesBillingInterval(yearlyAddonPrice, "yearly", "Yearly additional business");
 
   return {
     monthly: {
@@ -500,6 +550,180 @@ async function findBlockingStripeSubscriptionForCustomer(stripeCustomerId) {
   return subscriptions.find((item) => hasBlockingStripeSubscription(item)) || null;
 }
 
+async function verifyStripePriceSelection(priceSelection) {
+  const intervalLabel = priceSelection.billingInterval === "yearly" ? "Yearly" : "Monthly";
+  const checks = [
+    [`${intervalLabel} base`, priceSelection.basePriceId],
+    priceSelection.addonPriceId ? [`${intervalLabel} additional business`, priceSelection.addonPriceId] : null
+  ].filter(Boolean);
+
+  const prices = await Promise.all(checks.map(([, priceId]) => fetchStripePrice(priceId)));
+  prices.forEach((price, index) => {
+    assertStripePriceMatchesBillingInterval(price, priceSelection.billingInterval, checks[index][0]);
+  });
+}
+
+function getStripeProductIdFromPrice(price, label) {
+  const productId = typeof price?.product === "string" ? price.product : price?.product?.id;
+  if (!productId) {
+    throw new BillingValidationError(`${label} Stripe Price is missing a product.`);
+  }
+  return productId;
+}
+
+// `purpose` scopes both which Stripe prices this configuration needs (so an
+// unrelated misconfigured price can't 500 a flow that never uses it) and what
+// the Stripe-hosted portal lets the customer touch:
+//  - "general" (Manage billing): only the base Pro product, quantity locked
+//    out entirely -- one account keeps exactly one subscription, so switching
+//    monthly/yearly is allowed but there is nothing to select a quantity on.
+//  - "addon" (Buy another business slot): only the additional-business
+//    product, with quantity allowed -- this is the sole place +/- business
+//    slots can be purchased.
+async function buildBillingPortalConfiguration(currency, purpose = "general") {
+  const normalizedCurrency = normalizeCurrency(currency);
+  const cacheKey = `portal-config:${purpose}:${normalizedCurrency}`;
+  const cached = portalConfigurationCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const priceSpecs = purpose === "addon"
+    ? [
+      {
+        label: "Monthly additional business",
+        interval: "monthly",
+        priceId: getConfiguredPriceId(
+          ADDON_PRICE_ENV.monthly?.[normalizedCurrency],
+          "Monthly additional business pricing is not configured yet for the selected currency."
+        )
+      },
+      {
+        label: "Yearly additional business",
+        interval: "yearly",
+        priceId: getConfiguredPriceId(
+          ADDON_PRICE_ENV.yearly?.[normalizedCurrency],
+          "Yearly additional business pricing is not configured yet for the selected currency."
+        )
+      }
+    ]
+    : [
+      {
+        label: "Monthly base",
+        interval: "monthly",
+        priceId: getConfiguredPriceId(
+          BASE_PRICE_ENV.monthly?.[normalizedCurrency],
+          "Monthly pricing is not configured yet for the selected currency."
+        )
+      },
+      {
+        label: "Yearly base",
+        interval: "yearly",
+        priceId: getConfiguredPriceId(
+          BASE_PRICE_ENV.yearly?.[normalizedCurrency],
+          "Yearly pricing is not configured yet for the selected currency."
+        )
+      }
+    ];
+
+  const prices = await Promise.all(priceSpecs.map((spec) => fetchStripePrice(spec.priceId)));
+  const products = new Map();
+  prices.forEach((price, index) => {
+    const spec = priceSpecs[index];
+    assertStripePriceMatchesBillingInterval(price, spec.interval, spec.label);
+    const productId = getStripeProductIdFromPrice(price, spec.label);
+    if (!products.has(productId)) {
+      products.set(productId, []);
+    }
+    products.get(productId).push(spec.priceId);
+  });
+
+  const payload = {
+    "business_profile[headline]": "Manage InEx Ledger billing",
+    "features[customer_update][enabled]": true,
+    "features[customer_update][allowed_updates][0]": "email",
+    "features[customer_update][allowed_updates][1]": "tax_id",
+    "features[invoice_history][enabled]": true,
+    "features[payment_method_update][enabled]": true,
+    "features[subscription_cancel][enabled]": true,
+    "features[subscription_cancel][mode]": "at_period_end",
+    "features[subscription_update][enabled]": true,
+    "features[subscription_update][default_allowed_updates][0]": "price",
+    ...(purpose === "addon" ? { "features[subscription_update][default_allowed_updates][1]": "quantity" } : {}),
+    "features[subscription_update][proration_behavior]": "create_prorations"
+  };
+
+  Array.from(products.entries()).forEach(([productId, priceIds], productIndex) => {
+    payload[`features[subscription_update][products][${productIndex}][product]`] = productId;
+    priceIds.forEach((priceId, priceIndex) => {
+      payload[`features[subscription_update][products][${productIndex}][prices][${priceIndex}]`] = priceId;
+    });
+  });
+
+  const configuration = await stripeRequest("/billing_portal/configurations", payload);
+  if (!configuration?.id) {
+    throw new Error("Stripe Billing Portal configuration was not created.");
+  }
+  portalConfigurationCache.set(cacheKey, configuration.id);
+  return configuration.id;
+}
+
+function shouldVerifyStripeSubscriptionSnapshot(subscription) {
+  if (!subscription?.stripeCustomerId && !subscription?.stripeSubscriptionId) {
+    return false;
+  }
+
+  const status = String(subscription.status || subscription.effectiveStatus || "").toLowerCase();
+  return (
+    !subscription.isPaid ||
+    subscription.cancelAtPeriodEnd ||
+    subscription.isCanceledWithRemainingAccess ||
+    ["canceled", "incomplete", "incomplete_expired"].includes(status)
+  );
+}
+
+async function findRecoverableStripeSubscription(subscription) {
+  if (subscription?.stripeCustomerId) {
+    const customerSubscription = await findBlockingStripeSubscriptionForCustomer(subscription.stripeCustomerId);
+    if (customerSubscription) {
+      return customerSubscription;
+    }
+  }
+
+  if (!subscription?.stripeSubscriptionId) {
+    return null;
+  }
+
+  const stripeSubscription = await stripeGet(
+    `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+  );
+  return hasBlockingStripeSubscription(stripeSubscription) ? stripeSubscription : null;
+}
+
+async function refreshStripeBackedSubscriptionSnapshot(billingBusinessId) {
+  let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+
+  if (!shouldVerifyStripeSubscriptionSnapshot(subscription)) {
+    return subscription;
+  }
+
+  try {
+    const stripeSubscription = await findRecoverableStripeSubscription(subscription);
+
+    if (stripeSubscription) {
+      await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSubscription);
+      subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    }
+  } catch (syncErr) {
+    logWarn("Billing subscription self-heal sync skipped:", {
+      businessId: billingBusinessId,
+      err: syncErr.message
+    });
+  }
+
+  return subscription;
+}
+
 function buildAppUrl(path) {
   const base = (process.env.APP_BASE_URL || "").trim();
   if (!base) {
@@ -622,17 +846,27 @@ async function fetchBillingInvoicesForCustomer(stripeCustomerId, limit = 24) {
 }
 
 async function fetchBillingOverviewForBusiness(billingBusinessId) {
-  const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+  const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
   const stripeCustomerId = subscription?.stripeCustomerId || null;
   let paymentMethod = null;
   let invoices = [];
 
   if (stripeCustomerId) {
-    const customer = await stripeGet(
-      `/customers/${encodeURIComponent(stripeCustomerId)}?expand[]=invoice_settings.default_payment_method`
-    );
-    paymentMethod = summarizeDefaultPaymentMethod(customer?.invoice_settings?.default_payment_method || null);
-    invoices = await fetchBillingInvoicesForCustomer(stripeCustomerId, 24);
+    // Payment-method/invoice-history display is supplementary -- a Stripe
+    // hiccup fetching it must not take down the whole overview and hide the
+    // subscription status/plan that were already resolved above.
+    try {
+      const customer = await stripeGet(
+        `/customers/${encodeURIComponent(stripeCustomerId)}?expand[]=invoice_settings.default_payment_method`
+      );
+      paymentMethod = summarizeDefaultPaymentMethod(customer?.invoice_settings?.default_payment_method || null);
+      invoices = await fetchBillingInvoicesForCustomer(stripeCustomerId, 24);
+    } catch (err) {
+      logWarn("Billing overview: payment method/invoice fetch failed, showing subscription status only", {
+        businessId: billingBusinessId,
+        err: err.message
+      });
+    }
   }
 
   return {
@@ -677,23 +911,7 @@ async function sendBillingEmail({ businessId, kind, details, actionUrl, invoiceU
 router.get("/subscription", requireAuth, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-
-    if (!subscription.isPaid && subscription.stripeCustomerId) {
-      try {
-        const stripeSubscription = await findBlockingStripeSubscriptionForCustomer(subscription.stripeCustomerId);
-
-        if (stripeSubscription) {
-          await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSubscription);
-          subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-        }
-      } catch (syncErr) {
-        logWarn("GET /api/billing/subscription self-heal sync skipped:", {
-          businessId: billingBusinessId,
-          err: syncErr.message
-        });
-      }
-    }
+    const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
 
     res.json({ subscription });
   } catch (err) {
@@ -789,9 +1007,20 @@ router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => 
 
 router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
+    const checkoutAttemptId = String(req.body?.checkoutAttemptId || "").trim();
+    
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(checkoutAttemptId)) {
+      throw new BillingValidationError("A valid checkout attempt ID is required.");
+    }
+    
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+    let subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
+    // Pro checkout is plan-only: exactly one base Pro price, monthly or
+    // yearly, with no additional-business line item. Extra business slots
+    // are purchased separately via PATCH /additional-businesses, which
+    // requires an active Pro subscription to already exist. Any client-
+    // supplied additionalBusinesses value here is ignored.
+    const additionalBusinesses = 0;
 
     if (isTrialReupgradeAttempt(subscription)) {
       await pool.query(
@@ -833,7 +1062,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       });
     }
 
-    const billingContext = await resolveBillingContext(req);
+    const billingContext = await resolveBillingContext(req, billingBusinessId);
     const requestedCurrency = String(req.body?.currency || "").trim().toLowerCase();
     if (
         requestedCurrency &&
@@ -863,6 +1092,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       currency: checkoutCurrency,
       additionalBusinesses
     });
+    await verifyStripePriceSelection(priceSelection);
 
     const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
     const blockingSubscription = await findBlockingStripeSubscriptionForCustomer(customerId);
@@ -896,11 +1126,14 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       "subscription_data[metadata][currency]": priceSelection.currency,
       "subscription_data[metadata][currency_source]": billingContext.source,
       "subscription_data[metadata][country_code]": billingContext.countryCode || "unknown",
-      "subscription_data[metadata][additional_businesses]": additionalBusinesses
+      "subscription_data[metadata][additional_businesses]": additionalBusinesses,
+      "metadata[checkout_attempt_id]": checkoutAttemptId,
+      "subscription_data[metadata][checkout_attempt_id]": checkoutAttemptId
     };
 
     if (isEnvFlagEnabled("STRIPE_AUTOMATIC_TAX_ENABLED", true)) {
       sessionPayload["automatic_tax[enabled]"] = true;
+      sessionPayload["customer_update[address]"] = "auto";
     }
 
     if (priceSelection.addonPriceId) {
@@ -918,14 +1151,9 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     }
 
     const session = await stripeRequest("/checkout/sessions", sessionPayload, {
-      idempotencyKey: buildCheckoutIdempotencyKey({
-        businessId: billingBusinessId,
-        billingInterval: priceSelection.billingInterval,
-        currency: priceSelection.currency,
-        additionalBusinesses,
-        userId: req.user?.id
-      })
+      idempotencyKey: `checkout:${billingBusinessId}:${checkoutAttemptId}`
     });
+
     logInfo("Billing checkout session created", {
       userId: req.user?.id,
       businessId: billingBusinessId,
@@ -958,14 +1186,28 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
 router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
+    const billingContext = await resolveBillingContext(req, billingBusinessId);
+    const portalCurrency = resolveCheckoutCurrency(subscription, billingContext);
+    const configurationId = await buildBillingPortalConfiguration(portalCurrency);
     const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
-    const session = await stripeRequest("/billing_portal/sessions", {
+    // "Manage billing" opens the portal's default home (invoices, payment
+    // method, cancel) rather than deep-linking straight into a plan-change
+    // flow -- someone just checking their invoice or updating a card
+    // shouldn't be dropped into "change your plan" first.
+    const sessionPayload = {
       customer: customerId,
+      configuration: configurationId,
       return_url: buildAppUrl("/subscription")
-    });
+    };
+
+    const session = await stripeRequest("/billing_portal/sessions", sessionPayload);
     logInfo("Billing portal session created", {
       userId: req.user?.id,
-      businessId: billingBusinessId
+      businessId: billingBusinessId,
+      currency: portalCurrency,
+      configurationId,
+      hasStripeSubscription: Boolean(subscription?.stripeSubscriptionId)
     });
     res.status(200).json({ url: session.url });
   } catch (err) {
@@ -977,30 +1219,30 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
 router.post("/customer-portal/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
 
     if (!subscription?.stripeSubscriptionId) {
       return res.status(409).json({ error: "No active Stripe subscription found." });
     }
 
-    const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
-    const session = await stripeRequest("/billing_portal/sessions", {
-      customer: customerId,
-      "flow_data[type]": "subscription_cancel",
-      "flow_data[subscription_cancel][subscription]": subscription.stripeSubscriptionId,
-      "flow_data[after_completion][type]": "redirect",
-      "flow_data[after_completion][redirect][return_url]": buildAppUrl("/subscription?portal=cancelled")
+    await stripeRequest(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`, {
+      cancel_at_period_end: true
     });
+    const stripeSub = await stripeGet(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`).catch(() => null);
+    if (stripeSub && !stripeSub.error) {
+      await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSub);
+    }
+    const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
 
-    logInfo("Billing cancel portal session created", {
+    logInfo("Billing cancellation scheduled from legacy cancel portal endpoint", {
       userId: req.user?.id,
       businessId: billingBusinessId,
       stripeSubscriptionId: subscription.stripeSubscriptionId
     });
-    res.status(200).json({ url: session.url });
+    res.status(200).json({ subscription: updated });
   } catch (err) {
     logError("POST /api/billing/customer-portal/cancel error:", err.message);
-    res.status(500).json({ error: "Failed to open cancellation flow." });
+    res.status(500).json({ error: "Failed to cancel subscription." });
   }
 });
 
@@ -1008,6 +1250,9 @@ router.post("/resume", requireAuth, requireCsrfProtection, billingMutationLimite
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
     let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    const requestedBillingInterval = req.body?.billingInterval
+      ? normalizeBillingInterval(req.body.billingInterval)
+      : null;
 
     if (subscription.isTrialing) {
       await setTrialPlanSelectionForBusiness(
@@ -1036,14 +1281,45 @@ router.post("/resume", requireAuth, requireCsrfProtection, billingMutationLimite
       return res.status(200).json({ subscription });
     }
 
-    await stripeRequest(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`, {
-      cancel_at_period_end: false,
-      proration_behavior: "none"
-    });
     const stripeSubscription = await stripeGet(
       `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
     );
-    await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSubscription);
+    const stripeItems = Array.isArray(stripeSubscription?.items?.data) ? stripeSubscription.items.data : [];
+    const baseItem = stripeItems.find((item) => STRIPE_BASE_PRICE_IDS.has(item?.price?.id)) ||
+      stripeItems.find((item) => !STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) ||
+      null;
+    const addonItem = stripeItems.find((item) => STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
+    const currentTerms = resolveSubscriptionBillingTerms(subscription, stripeSubscription);
+    const targetBillingInterval = requestedBillingInterval || currentTerms.billingInterval;
+    const targetCurrency = currentTerms.currency || subscription.currency || "usd";
+    const updatePayload = {
+      cancel_at_period_end: false,
+      proration_behavior: "none"
+    };
+
+    if (requestedBillingInterval && requestedBillingInterval !== currentTerms.billingInterval) {
+      if (!baseItem?.id) {
+        return res.status(409).json({ error: "No active Stripe base subscription item found." });
+      }
+      updatePayload["items[0][id]"] = baseItem.id;
+      updatePayload["items[0][price]"] = resolveBasePriceIdForTerms(targetBillingInterval, targetCurrency);
+      updatePayload["items[0][quantity]"] = baseItem.quantity || 1;
+
+      if (addonItem?.id) {
+        updatePayload["items[1][id]"] = addonItem.id;
+        updatePayload["items[1][price]"] = resolveAddonPriceIdForTerms(targetBillingInterval, targetCurrency);
+        updatePayload["items[1][quantity]"] = addonItem.quantity || normalizeAdditionalBusinesses(subscription.additionalBusinesses);
+      }
+
+      updatePayload["metadata[billing_interval]"] = targetBillingInterval;
+      updatePayload["metadata[currency]"] = targetCurrency;
+    }
+
+    await stripeRequest(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`, updatePayload);
+    const updatedStripeSubscription = await stripeGet(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+    );
+    await syncStripeSubscriptionForBusiness(billingBusinessId, updatedStripeSubscription);
     subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     res.status(200).json({ subscription });
   } catch (err) {
@@ -1055,20 +1331,14 @@ router.post("/resume", requireAuth, requireCsrfProtection, billingMutationLimite
 router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
 
     if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
+      // Nothing has ever been charged here -- this is someone declining the
+      // trial, not canceling a paid plan, so it does not get the "your
+      // subscription has been canceled" email below.
       await setTrialPlanSelectionForBusiness(billingBusinessId, "free");
       const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-      await sendBillingEmail({
-        businessId: billingBusinessId,
-        kind: "canceling",
-        details: [
-          { label: "Plan", value: updated.effectiveTierName || "Basic" },
-          { label: "Access through", value: formatDateLabel(updated.trialEndsAt || updated.currentPeriodEnd) }
-        ],
-        actionUrl: buildAppUrl("/subscription")
-      });
       return res.status(200).json({ subscription: updated });
     }
 
@@ -1089,7 +1359,7 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     }
 
     // Cancel at period end via Stripe
-    await stripeRequest(`/subscriptions/${subscription.stripeSubscriptionId}`, {
+    await stripeRequest(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`, {
       cancel_at_period_end: true
     });
 
@@ -1156,6 +1426,26 @@ function resolveAddonPriceIdForSubscription(subscription, stripeSub) {
   );
 }
 
+function resolveBasePriceIdForTerms(billingInterval, currency) {
+  const interval = normalizeBillingInterval(billingInterval);
+  const normalizedCurrency = normalizeCurrency(currency);
+  const baseEnv = BASE_PRICE_ENV[interval]?.[normalizedCurrency];
+  return getConfiguredPriceId(
+    baseEnv,
+    "Pricing is not configured yet for the selected billing interval and currency."
+  );
+}
+
+function resolveAddonPriceIdForTerms(billingInterval, currency) {
+  const interval = normalizeBillingInterval(billingInterval);
+  const normalizedCurrency = normalizeCurrency(currency);
+  const addonEnv = ADDON_PRICE_ENV[interval]?.[normalizedCurrency];
+  return getConfiguredPriceId(
+    addonEnv,
+    "Additional business pricing is not configured yet for the selected billing interval and currency."
+  );
+}
+
 function resolveCheckoutCurrency(subscription, billingContext) {
   const subscriptionCurrency = normalizeOptionalCurrency(subscription?.currency);
   if (subscriptionCurrency) {
@@ -1185,13 +1475,98 @@ function buildCheckoutIdempotencyKey({ businessId, billingInterval, currency, ad
   return `checkout:${businessId}:${digest}`;
 }
 
+// Sends an existing Stripe subscriber to a Stripe-hosted confirmation page
+// for a specific addon-quantity change (adding business slots), instead of
+// silently updating the subscription in the background. Only applies once a
+// real Stripe subscription exists -- a trialing business with no Stripe
+// subscription yet has nothing to confirm against and keeps using the
+// direct PATCH /additional-businesses update below.
+router.post("/additional-businesses/checkout", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
+  try {
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    let hasActiveProAccess =
+      subscription.effectiveTier === "v1" &&
+      (subscription.isPaid || subscription.isTrialing);
+
+    if (!hasActiveProAccess || (subscription.cancelAtPeriodEnd && !subscription.isTrialing) || subscription.isCanceledWithRemainingAccess) {
+      subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
+      hasActiveProAccess =
+        subscription.effectiveTier === "v1" &&
+        (subscription.isPaid || subscription.isTrialing);
+    }
+
+    if (!hasActiveProAccess) {
+      return res.status(403).json({
+        error: "Additional business slots require an active Pro subscription."
+      });
+    }
+    if (!subscription.stripeSubscriptionId || !subscription.stripeCustomerId) {
+      return res.status(409).json({ error: "No active Stripe subscription found." });
+    }
+
+    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+    if (additionalBusinesses <= 0) {
+      return res.status(400).json({ error: "additionalBusinesses must be a positive whole number." });
+    }
+
+    const stripeSub = await stripeGet(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+    );
+    const items = Array.isArray(stripeSub.items?.data) ? stripeSub.items.data : [];
+    const addonPriceIds = getAddonPriceIds();
+    const existingAddonItem = items.find((item) => addonPriceIds.has(item?.price?.id)) || null;
+    const terms = resolveSubscriptionBillingTerms(subscription, stripeSub);
+    const configurationId = await buildBillingPortalConfiguration(terms.currency, "addon");
+
+    const sessionPayload = {
+      customer: subscription.stripeCustomerId,
+      configuration: configurationId,
+      return_url: buildAppUrl("/subscription?billing=updated"),
+      "flow_data[type]": "subscription_update_confirm",
+      "flow_data[subscription_update_confirm][subscription]": subscription.stripeSubscriptionId,
+      "flow_data[after_completion][type]": "redirect",
+      "flow_data[after_completion][redirect][return_url]": buildAppUrl("/subscription?billing=updated")
+    };
+    if (existingAddonItem) {
+      sessionPayload["flow_data[subscription_update_confirm][items][0][id]"] = existingAddonItem.id;
+      sessionPayload["flow_data[subscription_update_confirm][items][0][quantity]"] = additionalBusinesses;
+    } else {
+      sessionPayload["flow_data[subscription_update_confirm][items][0][price]"] =
+        resolveAddonPriceIdForSubscription(subscription, stripeSub);
+      sessionPayload["flow_data[subscription_update_confirm][items][0][quantity]"] = additionalBusinesses;
+    }
+
+    const session = await stripeRequest("/billing_portal/sessions", sessionPayload);
+    logInfo("Additional-business slot checkout session created", {
+      userId: req.user?.id,
+      businessId: billingBusinessId,
+      additionalBusinesses
+    });
+    res.status(200).json({ url: session.url });
+  } catch (err) {
+    logError("POST /api/billing/additional-businesses/checkout error:", err.message);
+    const status = err instanceof BillingValidationError ? 400 : 500;
+    res.status(status).json({
+      error: status === 400 ? err.message : "Failed to start business slot checkout."
+    });
+  }
+});
+
 router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-    const hasActiveProAccess =
+    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    let hasActiveProAccess =
       subscription.effectiveTier === "v1" &&
       (subscription.isPaid || subscription.isTrialing);
+
+    if (!hasActiveProAccess || (subscription.cancelAtPeriodEnd && !subscription.isTrialing) || subscription.isCanceledWithRemainingAccess) {
+      subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
+      hasActiveProAccess =
+        subscription.effectiveTier === "v1" &&
+        (subscription.isPaid || subscription.isTrialing);
+    }
 
     if (!hasActiveProAccess) {
       return res.status(403).json({
@@ -1525,6 +1900,27 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
             invoiceUrl: object?.hosted_invoice_url || object?.invoice_pdf || ""
           });
           logInfo("Stripe invoice.payment_succeeded synced for business:", businessId);
+        }
+      }
+    } else if (event.type === "invoice.paid") {
+      // invoice.payment_succeeded (above) already syncs and emails for every
+      // ordinary paid invoice. invoice.paid additionally fires for invoices
+      // Stripe never runs a charge for at all -- e.g. a $0 invoice from a
+      // 100%-off coupon or a trial transition -- where payment_succeeded
+      // never fires. Only act on those here so a normal payment doesn't get
+      // synced (and emailed) twice.
+      const amountPaid = Number(object?.amount_paid ?? object?.total ?? 0);
+      if (amountPaid === 0) {
+        const subscriptionId = object?.subscription;
+        const businessId = object?.customer
+          ? await findBusinessByStripeCustomerId(object.customer)
+          : null;
+        if (subscriptionId && businessId) {
+          const sub = await stripeGet(`/subscriptions/${encodeURIComponent(subscriptionId)}`).catch(() => null);
+          if (sub && !sub.error) {
+            await syncStripeSubscriptionForBusiness(businessId, sub);
+            logInfo("Stripe invoice.paid ($0 invoice) synced for business:", businessId);
+          }
         }
       }
     } else if (event.type === "invoice.payment_failed") {

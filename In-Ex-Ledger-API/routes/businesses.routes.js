@@ -113,7 +113,10 @@ function getStripeBaseItem(subscription) {
 
 function getStripeAddonItem(subscription) {
   const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
-  return items.find((item) => STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
+  return items.find((item) => {
+    const priceId = item?.price?.id;
+    return (
+      priceId && STRIPE_ADDON_PRICE_IDS.has(priceId) && !STRIPE_BASE_PRICE_IDS.has(priceId)); }) || null;
 }
 
 function resolveStripeAdditionalBusinesses(subscription) {
@@ -1263,18 +1266,28 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
 
       if (nextBillingBusinessId && subscription?.effectiveTier === PLAN_V1) {
         if (subscription?.stripeSubscriptionId) {
-          const stripeMutation = await applyStripeBusinessSlotState({
-            subscription,
-            businessId: nextBillingBusinessId,
-            additionalBusinesses: nextAdditionalBusinesses
-          });
-          stripeCompensation = stripeMutation.rollback;
-          if (stripeMutation.updatedSub) {
-            await syncStripeSubscriptionForBusinessInTransaction(
-              client,
-              nextBillingBusinessId,
-              stripeMutation.updatedSub
-            );
+          // A Stripe outage or API error must not block deleting the business locally --
+          // the Stripe subscription slot count will simply be reconciled on its next sync.
+          try {
+            const stripeMutation = await applyStripeBusinessSlotState({
+              subscription,
+              businessId: nextBillingBusinessId,
+              additionalBusinesses: nextAdditionalBusinesses
+            });
+            stripeCompensation = stripeMutation.rollback;
+            if (stripeMutation.updatedSub) {
+              await syncStripeSubscriptionForBusinessInTransaction(
+                client,
+                nextBillingBusinessId,
+                stripeMutation.updatedSub
+              );
+            }
+          } catch (stripeSyncErr) {
+            logError("DELETE /businesses/:id: Stripe business slot sync failed, deleting business anyway", {
+              businessId,
+              userId: req.user?.id,
+              err: stripeSyncErr.message
+            });
           }
         } else if (nextBillingBusinessId !== billingBusinessId) {
           await updateAnchorAdditionalBusinesses(client, nextBillingBusinessId, nextAdditionalBusinesses);

@@ -236,3 +236,47 @@ test("GET /api/transactions threads type, category, search, and period filters i
   assert.ok(mainQuery.params.includes("income"));
   assert.ok(mainQuery.params.includes("%stripe%"));
 });
+
+test("GET /api/transactions threads v3 name, date range, and status filters into the SQL", async () => {
+  const { router, stubbedPool } = loadTransactionsRouterWithStubs();
+  const app = buildApp(router);
+  const csrf = "csrf-v3-filters";
+  const auth = makeToken();
+  const res = await request(app)
+    .get("/api/transactions?account_name=Primary%20Checking&category_name=Meals&start_date=2026-01-01&end_date=2026-01-31&v3_status=cleared")
+    .set("Authorization", `Bearer ${auth}`)
+    .set(csrfHeaders(csrf));
+
+  assert.equal(res.status, 200);
+  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql) && c.params.includes("Primary Checking"));
+  assert.ok(mainQuery, "main SELECT should include v3 filters");
+  assert.match(mainQuery.sql, /LOWER\(COALESCE\(a\.name, ''\)\) = LOWER/i);
+  assert.match(mainQuery.sql, /LOWER\(COALESCE\(c\.name, ''\)\) = LOWER/i);
+  assert.match(mainQuery.sql, /t\.date >=/i);
+  assert.match(mainQuery.sql, /t\.date <=/i);
+  assert.match(mainQuery.sql, /t\.cleared = true/i);
+  assert.ok(mainQuery.params.includes("Meals"));
+  assert.ok(mainQuery.params.includes("2026-01-01"));
+  assert.ok(mainQuery.params.includes("2026-01-31"));
+});
+
+test("GET /api/transactions rejects invalid v3 date and status filters", async () => {
+  const { router } = loadTransactionsRouterWithStubs();
+  const app = buildApp(router);
+  const csrf = "csrf-bad-v3-filters";
+  const auth = makeToken();
+
+  const badDate = await request(app)
+    .get("/api/transactions?start_date=01-01")
+    .set("Authorization", `Bearer ${auth}`)
+    .set(csrfHeaders(csrf));
+  assert.equal(badDate.status, 400);
+  assert.match(badDate.body.error || "", /start_date/i);
+
+  const badStatus = await request(app)
+    .get("/api/transactions?v3_status=weird")
+    .set("Authorization", `Bearer ${auth}`)
+    .set(csrfHeaders(csrf));
+  assert.equal(badStatus.status, 400);
+  assert.match(badStatus.body.error || "", /v3_status/i);
+});

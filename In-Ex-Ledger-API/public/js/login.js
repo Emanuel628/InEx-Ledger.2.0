@@ -78,6 +78,13 @@ function resolveSafePostLoginPath() {
   if (!next || !next.startsWith("/") || next.startsWith("//") || /[\r\n]/.test(next)) {
     return POST_LOGIN_DEFAULT_PATH;
   }
+  if (next === "/app-v3") {
+    return POST_LOGIN_DEFAULT_PATH;
+  }
+  if (next.startsWith("/app-v3/")) {
+    const barePath = next.slice("/app-v3".length) || POST_LOGIN_DEFAULT_PATH;
+    return barePath === "/" ? POST_LOGIN_DEFAULT_PATH : barePath;
+  }
   return next;
 }
 

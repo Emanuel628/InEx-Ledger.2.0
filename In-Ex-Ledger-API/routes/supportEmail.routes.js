@@ -405,7 +405,7 @@ router.post("/inbound", async (req, res) => {
 
   try {
     const originalResult = await pool.query(
-      `SELECT id, sender_id, subject
+      `SELECT id, sender_id, subject, business_id
          FROM messages
         WHERE id = $1
           AND message_type = 'support_request'
@@ -451,8 +451,8 @@ router.post("/inbound", async (req, res) => {
          (id, sender_id, receiver_id, message_type, subject, body,
           is_read, parent_id,
           external_sender_email, external_sender_name,
-          external_message_id, external_references, external_in_reply_to)
-       VALUES ($1, NULL, $2, 'it_support', $3, $4, FALSE, $5, $6, $7, $8, $9, $10)`,
+          external_message_id, external_references, external_in_reply_to, business_id)
+       VALUES ($1, NULL, $2, 'it_support', $3, $4, FALSE, $5, $6, $7, $8, $9, $10, $11)`,
       [
         messageId,
         ownerId,
@@ -463,7 +463,8 @@ router.post("/inbound", async (req, res) => {
         from.name,
         receivedEmail?.message_id || payload?.data?.message_id || null,
         receivedEmail?.headers?.references || receivedEmail?.headers?.References || null,
-        receivedEmail?.headers?.in_reply_to || receivedEmail?.headers?.["In-Reply-To"] || null
+        receivedEmail?.headers?.in_reply_to || receivedEmail?.headers?.["In-Reply-To"] || null,
+        original.business_id || null
       ]
     );
 

@@ -172,7 +172,7 @@ function clearIdleLogoutTimer() {
 }
 
 function getIdleRedirectPath() {
-  return `${LOGIN_PAGE}?reason=idle`;
+  return buildLoginRedirectPath("idle");
 }
 
 async function forceIdleLogout() {
@@ -531,6 +531,43 @@ function getNormalizedPathname() {
   return path;
 }
 
+function normalizeCanonicalAppPath(path = "/transactions") {
+  const rawPath = String(path || "/transactions").trim();
+  if (!rawPath || !rawPath.startsWith("/") || rawPath.startsWith("//") || /[\r\n]/.test(rawPath)) {
+    return "/transactions";
+  }
+
+  if (rawPath === "/app-v3") {
+    return "/transactions";
+  }
+
+  if (rawPath.startsWith("/app-v3/")) {
+    const barePath = rawPath.slice("/app-v3".length) || "/transactions";
+    return barePath === "/" ? "/transactions" : barePath;
+  }
+
+  return rawPath;
+}
+
+function getCurrentCanonicalPath() {
+  const path = normalizeCanonicalAppPath(getNormalizedPathname());
+  const search = String(window.location.search || "");
+  const hash = String(window.location.hash || "");
+  if (path === LOGIN_PAGE || path === "/register" || path === "/forgot-password" || path === "/reset-password" || path === "/mfa-challenge" || path === "/verify-email") {
+    return "/transactions";
+  }
+  return `${path}${search}${hash}`;
+}
+
+function buildLoginRedirectPath(reason = "") {
+  const params = new URLSearchParams();
+  if (reason) {
+    params.set("reason", reason);
+  }
+  params.set("next", getCurrentCanonicalPath());
+  return `${LOGIN_PAGE}?${params.toString()}`;
+}
+
 function isOnboardingRoute(pathname = getNormalizedPathname()) {
   return pathname === ONBOARDING_PAGE;
 }
@@ -561,7 +598,7 @@ function shouldRedirectToTrialSetup(profile = {}, pathname = getNormalizedPathna
 }
 
 function buildTrialSetupPath(nextPath = "/transactions") {
-  const normalized = String(nextPath || "/transactions").trim();
+  const normalized = normalizeCanonicalAppPath(nextPath);
   if (!normalized.startsWith("/") || normalized.startsWith("//") || /[\r\n]/.test(normalized)) {
     return TRIAL_SETUP_PAGE;
   }
@@ -573,11 +610,11 @@ function resolveSafeNextPathFromLocation(defaultPath = "/transactions") {
     const params = new URLSearchParams(window.location.search);
     const nextPath = String(params.get("next") || "").trim();
     if (!nextPath || !nextPath.startsWith("/") || nextPath.startsWith("//") || /[\r\n]/.test(nextPath)) {
-      return defaultPath;
+      return normalizeCanonicalAppPath(defaultPath);
     }
-    return nextPath;
+    return normalizeCanonicalAppPath(nextPath);
   } catch (_) {
-    return defaultPath;
+    return normalizeCanonicalAppPath(defaultPath);
   }
 }
 
@@ -854,18 +891,18 @@ async function requireValidSessionOrRedirect() {
       clearToken();
       window.__AUTH_GUARD_STATE__.running = false;
       window.__AUTH_GUARD_STATE__.lastError = "expired";
-      window.location.href = `${LOGIN_PAGE}?reason=expired`;
+      window.location.href = buildLoginRedirectPath("expired");
       return;
     }
 
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = `me_${response.status}`;
-    window.location.href = `${LOGIN_PAGE}?reason=error`;
+    window.location.href = buildLoginRedirectPath("error");
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("[AUTH] Session validation failed:", err); }
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = "network";
-    window.location.href = `${LOGIN_PAGE}?reason=network`;
+    window.location.href = buildLoginRedirectPath("network");
   }
 }
 
@@ -956,7 +993,7 @@ async function apiFetch(url, options = {}) {
   if (response.status === 401 && !allowUnauthorizedResponse) {
     markLoginReset();
     clearToken();
-    window.location.href = LOGIN_PAGE;
+    window.location.href = buildLoginRedirectPath("expired");
     return null;
   }
 
@@ -995,7 +1032,7 @@ function isAuthenticated() {
 
 function requireAuth() {
   if (!isAuthenticated()) {
-    window.location.href = LOGIN_PAGE;
+    window.location.href = buildLoginRedirectPath("expired");
   }
 }
 

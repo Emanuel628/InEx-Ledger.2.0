@@ -87,7 +87,7 @@ Landing page needs another content/UX pass before heavier promotion.
 - Confirm pricing/plan messaging matches the actual Stripe/app behavior.
 
 #### Files to audit
-- `In-Ex-Ledger-API/public/html/landing.html`
+- `In-Ex-Ledger-API/legacy/public-html/auth-public/landing.html`
 - `In-Ex-Ledger-API/public/css/pages/landing.css`
 - `In-Ex-Ledger-API/public/js/landing.js`
 - `In-Ex-Ledger-API/public/js/i18n.js`
