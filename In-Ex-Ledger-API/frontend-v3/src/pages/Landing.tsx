@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import {
   ArrowRight,
   Ban,
@@ -15,25 +14,8 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import PublicShell from '../components/PublicShell'
-import { loadBillingPricing, type BillingPricing } from '../lib/billingApi'
-import {
-  BASIC_FEATURES,
-  FAIR_USE_FOOTNOTE,
-  PAYMENT_METHOD_DISCLOSURE,
-  PRO_FEATURES,
-  formatPlanPeriod,
-  formatPlanPrice,
-} from '../lib/planContent'
 
 function Landing(props: PageProps) {
-  const [pricing, setPricing] = useState<BillingPricing | null>(null)
-
-  useEffect(() => {
-    loadBillingPricing()
-      .then(setPricing)
-      .catch(() => setPricing(null))
-  }, [])
-
   return (
     <PublicShell theme={props.theme} onNavigate={props.onNavigate}>
       <section className="public-hero">
@@ -112,36 +94,6 @@ function Landing(props: PageProps) {
         </div>
       </section>
 
-      <section className="public-section">
-        <div className="public-section-head is-centered">
-          <h2>Start free. Upgrade when you need more.</h2>
-          <p>Begin with the basics, then upgrade when you want the full bookkeeping workflow.</p>
-        </div>
-        <div className="pricing-grid landing-pricing-grid">
-          <PlanCard
-            name="Basic"
-            price="$0"
-            description="For getting organized, with real monthly limits."
-            action="Start free"
-            onAction={() => props.onNavigate('Register')}
-            features={BASIC_FEATURES}
-          />
-          <PlanCard
-            name="Pro"
-            price={formatPlanPrice(pricing, 'monthly')}
-            period={formatPlanPeriod('monthly')}
-            description="For cleaner records and easier handoff."
-            action="Upgrade to Pro"
-            highlighted
-            onAction={() => props.onNavigate('Upgrade')}
-            note={`Or ${formatPlanPrice(pricing, 'yearly')}/year -- pick a cadence at checkout.`}
-            features={PRO_FEATURES}
-          />
-        </div>
-        <p className="price-note">{PAYMENT_METHOD_DISCLOSURE}</p>
-        <p className="price-note-footnote">{FAIR_USE_FOOTNOTE}</p>
-      </section>
-
       <section className="public-section landing-section-tinted">
         <div className="public-section-head is-centered">
           <h2>Questions, answered</h2>
@@ -210,46 +162,6 @@ function RegionCard({ region, title, text }: { region: string; title: string; te
       <span>{region}</span>
       <h3>{title}</h3>
       <p>{text}</p>
-    </article>
-  )
-}
-
-function PlanCard({
-  name,
-  price,
-  period = ' / month',
-  description,
-  features,
-  action,
-  onAction,
-  highlighted = false,
-  note,
-}: {
-  name: string
-  price: string
-  period?: string
-  description: string
-  features: string[]
-  action: string
-  onAction: () => void
-  highlighted?: boolean
-  note?: string
-}) {
-  return (
-    <article className={`pricing-card ${highlighted ? 'is-highlighted' : ''}`}>
-      {highlighted ? <span className="plan-badge">Most popular</span> : null}
-      <div>
-        <h2>{name}</h2>
-        <p>{description}</p>
-      </div>
-      <strong>{price}<span>{period}</span></strong>
-      <ul>
-        {features.map((feature) => (
-          <li key={feature}><CheckCircle2 size={17} /> {feature}</li>
-        ))}
-      </ul>
-      <button className={highlighted ? 'primary-button' : 'secondary-button'} type="button" onClick={onAction}>{action}</button>
-      {note ? <p className="price-note-inline">{note}</p> : null}
     </article>
   )
 }
