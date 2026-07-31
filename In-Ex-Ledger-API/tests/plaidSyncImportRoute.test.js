@@ -271,7 +271,7 @@ test("POST /api/plaid/connections/:id/sync applies categorization and mapping me
     merchant_name: "OpenAI",
     category_guess: "INTERNET_SOFTWARE",
     category_mapping_reason: "canonical_rule",
-    category_mapping_confidence: "high",
+    category_mapping_confidence: "medium",
     category_mapping_rule_id: null
   }]);
 

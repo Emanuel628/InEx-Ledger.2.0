@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const { isAmbiguousRetailerText } = require("./merchantCategorizationBlocklists.js");
 
 const VALID_MATCH_FIELDS = new Set(["merchant_name", "category_guess", "description"]);
 
@@ -18,9 +19,20 @@ function buildCandidateRulesFromTransaction(txn, { categoryId, userId }) {
   const kind = String(txn?.type || "").toLowerCase();
   if ((kind !== "income" && kind !== "expense") || !categoryId) return [];
 
+  // Ambiguous multi-product retailers (Walmart, Target, Costco, 7-Eleven,
+  // etc.) never get a silently-learned rule from a single transaction edit --
+  // that single edit would otherwise permanently reroute every future import
+  // of that merchant. An explicit, deliberate mapping rule is still the way
+  // to override these merchants on purpose (see the shared blocklist module).
+  if (isAmbiguousRetailerText(txn?.merchant_name, txn?.description)) return [];
+
   const candidates = [
     { field: "merchant_name", value: txn?.merchant_name, confidence: "confirmed", minLength: 4 },
-    { field: "category_guess", value: txn?.category_guess, confidence: "learned", minLength: 4 },
+    // "category_guess" is deliberately NOT learned: it's the bank/Plaid raw
+    // guess field, not something the merchant chose. If that raw guess is
+    // wrong for many different merchants, saving a rule keyed to its text
+    // would silently re-apply the user's one-time fix to every unrelated
+    // merchant that happens to share the same bad bank guess.
     { field: "description", value: txn?.description, confidence: "learned", minLength: 8 }
   ];
 

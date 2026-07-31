@@ -304,42 +304,42 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
         categoryId: categoryIdByName.get("Software & Subscriptions"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "medium"
       },
       {
         merchant: "OpenAI",
         categoryId: categoryIdByName.get("Software & Subscriptions"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "medium"
+        confidence: "low"
       },
       {
         merchant: "Uber* Eats",
         categoryId: categoryIdByName.get("Meals"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "medium"
       },
       {
         merchant: "Shell Oil 48293",
         categoryId: categoryIdByName.get("Car & Truck Expenses"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "medium"
       },
       {
         merchant: "Stripe",
         categoryId: categoryIdByName.get("Sales Revenue"),
         type: "income",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "low"
       },
       {
         merchant: "Comcast Business",
         categoryId: categoryIdByName.get("Phone & Internet"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "low"
       },
       {
         merchant: "Facebook",

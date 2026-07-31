@@ -2,6 +2,7 @@
 
 const { findDefaultCategoryForRegion } = require("../api/utils/seedDefaultsForBusiness.js");
 const { normalizeRuleValue } = require("./transactionMappingRuleService.js");
+const { isAmbiguousRetailerText } = require("./merchantCategorizationBlocklists.js");
 
 const MAX_HISTORY_ROWS = 4000;
 
@@ -53,15 +54,75 @@ const REVIEW_ONLY_PATTERNS = [
   /\bredemption\b/i
 ];
 
+// A card issuer's name on a bank feed is virtually always a payment *to* the
+// card (a transfer, not an expense), an interest/fee line, or -- rarely -- a
+// branded café. None of those are Car & Truck, Software, or any other
+// expense category, which is exactly how "Capital One Mobile Payment" used
+// to score Car & Truck (see the `mobil` substring fix above): the issuer name
+// alone shouldn't compete in keyword scoring at all. Require the issuer name
+// AND a payment/autopay idiom together (rather than the issuer name alone)
+// so this never hijacks a genuinely different rule, like "TD Insurance" /
+// "RBC Insurance" / "BMO Insurance" business insurance products sold by the
+// same banks' insurance arms.
+const CARD_ISSUER_PATTERNS = [
+  /\bcapital one\b/i,
+  /\bchase\b/i,
+  /\bamerican express\b/i,
+  /\bamex\b/i,
+  /\bciti(bank)?\b/i,
+  /\bbank of america\b/i,
+  /\bwells fargo\b/i,
+  /\bdiscover card\b/i,
+  /\bbarclaycard\b/i,
+  /\bsynchrony\b/i,
+  /\btd bank\b/i,
+  /\btd canada trust\b/i,
+  /\brbc royal bank\b/i,
+  /\bscotiabank\b/i,
+  /\bbmo bank of montreal\b/i,
+  /\bcibc\b/i,
+  /\bus bank\b/i,
+  /\bpnc bank\b/i
+];
+
+const CARD_PAYMENT_IDIOM_PATTERNS = [
+  /\bautopay\b/i,
+  /\bmobile payment\b/i,
+  /\be ?payment\b/i,
+  /\bcrd (cr )?payment\b/i,
+  /\bcredit crd\b/i,
+  /\bonline banking payment\b/i,
+  /\bthank you for your payment\b/i,
+  /\bcard payment\b/i,
+  /\bpayment thank you\b/i
+];
+
+// P2P transfers (Interac e-Transfer, Zelle, Venmo) are frequently owner
+// transfers, family/friends money, or unverified client payments on a small
+// business feed -- not confirmed service revenue. Auto-posting them as
+// Service Income inflates revenue, which is a real books error, not a
+// convenience. Route them to review instead of guessing.
+const INCOME_REVIEW_ONLY_PATTERNS = [
+  /\binterac e ?transfer\b/i,
+  /\bzelle\b/i,
+  /\bvenmo\b/i,
+  /\bsettlement deposit\b/i
+];
+
 const CATEGORY_RULES = [
   {
+    // Deliberately excludes bare processor names ("stripe", "paypal",
+    // "square") and "billable" -- a payment processor's name alone doesn't
+    // say whether the line is revenue, a processing fee, or a payout; the
+    // more specific "X payout" keywords under Sales Revenue below carry the
+    // real signal. "Billable" is generic invoice/memo language, not a
+    // reliable income signal on its own.
     kind: "income",
     usCategory: "Service Income",
     caCategory: "Service Income",
     keywords: [
       "consulting fee", "consultant fee", "service fee", "freelance fee", "retainer fee",
-      "project fee",
-      "stripe", "paypal", "square", "direct deposit client", "billable"
+      "project fee", "direct deposit client"
     ],
     providerHints: ["income", "service", "professional_services", "business_services"]
   },
@@ -73,7 +134,7 @@ const CATEGORY_RULES = [
       "shopify", "amazon seller", "etsy", "ebay sale", "point of sale", "store sale",
       "retail sale", "sales receipt", "product sale", "merchant payout",
       "stripe payout", "square payout", "paypal payout", "sq payout",
-      "bulk sales", "sales payout", "order payout", "shop payout", "payout"
+      "bulk sales", "sales payout", "order payout", "shop payout"
     ],
     providerHints: ["general_merchandise", "shopping", "retail", "sales"]
   },
@@ -91,7 +152,7 @@ const CATEGORY_RULES = [
     keywords: [
       "google ads", "google adwords", "facebook ads", "meta ads", "instagram ads",
       "tiktok ads", "linkedin ads", "bing ads", "mailchimp", "klaviyo",
-      "activecampaign", "ad spend", "marketing"
+      "activecampaign", "ad spend"
     ],
     providerHints: ["advertising", "marketing"]
   },
@@ -103,7 +164,7 @@ const CATEGORY_RULES = [
       "adobe", "adobe systems", "photoshop", "github", "slack", "zoom", "dropbox",
       "google workspace", "notion", "figma", "canva", "aws", "digitalocean",
       "cloudflare", "twilio", "sendgrid", "openai", "chatgpt", "anthropic",
-      "subscription", "saas", "software", "shopify"
+      "shopify"
     ],
     providerHints: ["software", "internet_software", "digital_goods"]
   },
@@ -115,7 +176,7 @@ const CATEGORY_RULES = [
       "rogers", "bell canada", "telus", "fido", "koodo", "shaw", "videotron",
       "at&t", "att wireless", "verizon", "t-mobile", "tmobile", "comcast",
       "xfinity", "spectrum", "cox communication", "google fi", "internet service",
-      "wireless service", "cell phone", "phone", "internet"
+      "wireless service", "cell phone"
     ],
     providerHints: ["telecom", "utilities"]
   },
@@ -147,7 +208,7 @@ const CATEGORY_RULES = [
       "staples", "office depot", "officemax", "uline", "printer ink", "printer paper",
       "stationery", "toner cartridge", "office supplies"
     ],
-    providerHints: ["office_supplies", "general_merchandise"]
+    providerHints: ["office_supplies"]
   },
   {
     kind: "expense",
@@ -156,7 +217,7 @@ const CATEGORY_RULES = [
     keywords: [
       "restaurant", "coffee", "cafe", "pizza", "burger",
       "uber eats", "ubereats", "doordash", "skip the dishes", "grubhub",
-      "client lunch", "business lunch", "meal", "food", "dining"
+      "client lunch", "business lunch", "meal", "dining"
     ],
     providerHints: ["food", "restaurant", "dining"]
   },
@@ -178,7 +239,7 @@ const CATEGORY_RULES = [
     keywords: [
       "shell", "shell oil", "chevron", "esso", "petro canada", "gas station", "fuel", "gas",
       "jiffy lube", "valvoline", "autozone", "napa auto", "parking meter", "parking lot",
-      "auto repair", "oil change", "vehicle"
+      "auto repair", "oil change"
     ],
     providerHints: ["automotive", "gas", "fuel", "vehicle"]
   },
@@ -193,9 +254,14 @@ const CATEGORY_RULES = [
     providerHints: ["legal", "accounting", "professional_services"]
   },
   {
+    // CA has no dedicated subcontract-labour line in the seeded chart, and
+    // filing Upwork/Fiverr-style contractor payments under "Legal &
+    // Accounting Fees" is a false categorization for T2125-style reporting.
+    // "Other Expense" is the closest correct seeded bucket until a dedicated
+    // category exists.
     kind: "expense",
     usCategory: "Contract Labor",
-    caCategory: "Legal & Accounting Fees",
+    caCategory: "Other Expense",
     keywords: [
       "upwork", "toptal", "99designs", "freelance payment", "contractor payment",
       "subcontractor", "contract labor"
@@ -243,17 +309,21 @@ const CATEGORY_RULES = [
 
 const CATEGORY_RULE_EXPANSIONS = [
   {
+    // Interac e-Transfer / Zelle / Venmo / settlement deposits are handled by
+    // INCOME_REVIEW_ONLY_PATTERNS above (routed to review, not auto-mapped
+    // here as Service Income) -- see that constant's comment for why.
     usCategory: "Service Income",
     caCategory: "Service Income",
-    keywords: [
-      "professional service income", "service income", "client fee",
-      "interac e-transfer", "interac etransfer", "zelle", "venmo", "settlement deposit"
-    ]
+    keywords: ["professional service income", "service income", "client fee"]
   },
   {
+    // Bare "square" and the "sq " stub were dropped: fragile single-token
+    // matches on a payment processor's name alone don't say whether a line is
+    // revenue, a fee, or a subscription charge. "square payout" above already
+    // covers the case that actually means revenue.
     usCategory: "Sales Revenue",
     caCategory: "Sales Revenue",
-    keywords: ["shopify payments", "payment processor deposit", "square", "sq "]
+    keywords: ["shopify payments", "payment processor deposit"]
   },
   {
     usCategory: "Advertising & Marketing",
@@ -320,12 +390,17 @@ const CATEGORY_RULE_EXPANSIONS = [
     ]
   },
   {
+    // "circle k", "wawa", and "kwik trip" removed -- convenience-store chains
+    // where gas (if sold at all) is secondary; see AMBIGUOUS_RETAILERS. "mobil"
+    // stays a real fuel-brand keyword, but only ever matches as an exact
+    // token (see COMPACT_MATCH_DENYLIST) so it can't fire on "mobile"/
+    // "T-Mobile"/"Capital One Mobile Payment".
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
     keywords: [
       "bp gas station", "exxon", "mobil", "sunoco", "marathon gas", "speedway gas",
-      "circle k", "wawa", "pilot flying", "loves travel stop", "petrocan",
-      "husky gas", "ultramar", "irving oil", "kwik trip", "advance auto",
+      "pilot flying", "loves travel stop", "petrocan",
+      "husky gas", "ultramar", "irving oil", "advance auto",
       "o'reilly auto", "oreilly auto", "midas", "meineke", "firestone", "goodyear",
       "pep boys", "car wash"
     ]
@@ -341,7 +416,7 @@ const CATEGORY_RULE_EXPANSIONS = [
   },
   {
     usCategory: "Contract Labor",
-    caCategory: "Legal & Accounting Fees",
+    caCategory: "Other Expense",
     keywords: ["fiverr"]
   },
   {
@@ -414,9 +489,9 @@ const MAJOR_BRAND_EXPANSIONS = [
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
     keywords: [
-      "76 gas station", "arco", "valero", "quiktrip", "caseys",
-      "maverik", "sams club fuel", "costco gas", "sinclair oil", "conoco", "phillips 66 gas",
-      "co op gas", "coop gas", "mohawk gas", "fas gas", "car wash", "canadian tire gas"
+      "76 gas station", "arco", "valero",
+      "sams club fuel", "costco gas", "sinclair oil", "conoco", "phillips 66 gas",
+      "co op gas", "coop gas", "mohawk gas", "fas gas", "canadian tire gas"
     ]
   },
   {
@@ -478,7 +553,7 @@ const MAJOR_BRAND_EXPANSIONS = [
   },
   {
     usCategory: "Contract Labor",
-    caCategory: "Legal & Accounting Fees",
+    caCategory: "Other Expense",
     keywords: ["freelancer.com", "guru.com"]
   }
 ];
@@ -514,7 +589,8 @@ CATEGORY_RULES.push({
   keywords: [
     "home depot", "lowes", "rona", "home hardware", "ace hardware",
     "true value hardware", "menards", "do it best", "harbor freight tools",
-    "princess auto", "tsc stores", "repair service", "maintenance fee", "handyman service"
+    "princess auto", "tsc stores", "repair service", "maintenance fee", "handyman service",
+    "grainger", "global industrial", "msc industrial", "fastenal", "mcmaster carr"
   ],
   providerHints: ["repair", "maintenance", "hardware"]
 });
@@ -547,8 +623,7 @@ const EXTENDED_BRAND_EXPANSIONS = [
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
     keywords: [
-      "7 eleven", "kum go", "racetrac", "sheetz", "getgo", "stewarts shops",
-      "cumberland farms", "kwik star", "citgo", "murphy usa", "murphy express",
+      "citgo",
       "discount tire", "big o tires", "les schwab", "mavis tire",
       "christian brothers automotive", "monro auto", "tires plus", "brakes plus",
       "tuffy auto", "grease monkey", "take 5 oil change", "kal tire", "ok tire",
@@ -582,8 +657,12 @@ const EXTENDED_BRAND_EXPANSIONS = [
       "grammarly", "envato", "shutterstock", "getty images", "adobe stock", "istock",
       "bluehost", "hostgator", "siteground", "dreamhost", "wp engine", "kinsta",
       "vercel", "netlify", "render.com", "linode", "vultr", "google cloud platform",
-      "ibm cloud", "bench accounting", "pilot.com bookkeeping", "bill.com",
-      "expensify", "ramp card", "brex", "divvy card", "airbase"
+      "ibm cloud", "bench accounting", "pilot.com bookkeeping"
+      // Fintech expense-card/spend-management brands (Ramp, Brex, Divvy,
+      // Bill.com, Expensify, Airbase) deliberately excluded: the card network
+      // or platform name on a line doesn't say what was actually purchased --
+      // same false-confidence problem as mapping "Capital One" to a spending
+      // category.
     ]
   },
   {
@@ -618,12 +697,12 @@ const EXTENDED_BRAND_EXPANSIONS = [
     ]
   },
   {
+    // Grainger/Fastenal/MSC Industrial/McMaster-Carr/Global Industrial moved
+    // to Repairs & Maintenance below -- industrial MRO suppliers, not office
+    // stationery (Schedule C "Office expense" is the wrong line for them).
     usCategory: "Office Supplies",
     caCategory: "Office Supplies",
-    keywords: [
-      "grainger", "quill.com", "global industrial", "msc industrial", "fastenal",
-      "mcmaster carr"
-    ]
+    keywords: ["quill.com"]
   },
   {
     usCategory: "Utilities",
@@ -641,7 +720,7 @@ const EXTENDED_BRAND_EXPANSIONS = [
   },
   {
     usCategory: "Contract Labor",
-    caCategory: "Legal & Accounting Fees",
+    caCategory: "Other Expense",
     keywords: ["peopleperhour", "workmarket", "contra.com", "braintrust"]
   },
   {
@@ -668,8 +747,8 @@ const EXTENDED_BRAND_EXPANSIONS = [
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
     keywords: [
-      "loves country store", "flying j travel", "ta travel centers", "petro stopping center",
-      "wilco hess", "rutters", "sheetz fuel", "royal farms"
+      "flying j travel", "ta travel centers", "petro stopping center",
+      "wilco hess", "sheetz fuel"
     ]
   },
   {
@@ -775,12 +854,19 @@ function recordHistorySignal(targetMap, key, categoryName, kind) {
   targetMap.set(scopedKey, bucket);
 }
 
+// A single past transaction is not a pattern -- it's one guess (possibly the
+// user's own mistake, or a bad auto-map they never noticed) getting replayed
+// forever on every future import of that merchant/description. Require at
+// least two consistent prior assignments before history is trusted enough to
+// drive a new categorization.
+const MIN_HISTORY_WINNER_COUNT = 2;
+
 function selectHistoryWinner(bucket) {
   if (!bucket || bucket.size === 0) return null;
   const ranked = [...bucket.entries()].sort((a, b) => b[1] - a[1]);
   const [winnerName, winnerCount] = ranked[0];
+  if (winnerCount < MIN_HISTORY_WINNER_COUNT) return null;
   const runnerUpCount = ranked[1]?.[1] || 0;
-  if (winnerCount === 1 && ranked.length > 1) return null;
   if (runnerUpCount > 0 && winnerCount < runnerUpCount * 1.5) return null;
   return winnerName;
 }
@@ -795,10 +881,16 @@ function buildHistoryIndex(rows = []) {
     if (kind !== "income" && kind !== "expense") continue;
     const merchantKey = normalizeMappingText(row.merchant_name);
     const descriptionKey = normalizeMappingText(row.description);
-    if (!isLowSignalHistoryKey(merchantKey)) {
+    // Ambiguous multi-product retailers never get to teach the categorizer
+    // through history either -- otherwise one wrong (or merely convenient)
+    // save on a Walmart/Costco/7-Eleven-class merchant would silently
+    // reinforce itself on every later import. An explicit saved mapping rule
+    // is still the way to override these merchants on purpose.
+    const isAmbiguousRetailer = isAmbiguousRetailerText(row.merchant_name, row.description);
+    if (!isAmbiguousRetailer && !isLowSignalHistoryKey(merchantKey)) {
       recordHistorySignal(merchantHistory, merchantKey, row.category_name, kind);
     }
-    if (!isLowSignalHistoryKey(descriptionKey)) {
+    if (!isAmbiguousRetailer && !isLowSignalHistoryKey(descriptionKey)) {
       recordHistorySignal(descriptionHistory, descriptionKey, row.category_name, kind);
     }
   }
@@ -851,6 +943,15 @@ function categoryExists(categoryLookup, kind, name) {
 // trust without word boundaries.
 const COMPACT_MATCH_MIN_LENGTH = 5;
 
+// Single-word keywords whose despaced form is at or above
+// COMPACT_MATCH_MIN_LENGTH but is still dangerously likely to appear inside
+// an unrelated compound word -- "mobil" (meant for Exxon Mobil) is exactly
+// 5 letters, so it slips through the compact-match floor and matches inside
+// "mobile"/"T-Mobile"/"Capital One Mobile Payment". These keywords are only
+// ever allowed to match as an exact whole token (see containsTokenPhrase),
+// never via the no-space substring fallback.
+const COMPACT_MATCH_DENYLIST = new Set(["mobil"]);
+
 function tokenize(normalizedText) {
   return normalizedText ? normalizedText.split(" ").filter(Boolean) : [];
 }
@@ -873,25 +974,39 @@ function containsTokenPhrase(textTokens, keywordTokens) {
 function normalizedContains(textTokens, compactText, keyword) {
   const normalizedKw = normalizeMappingText(keyword);
   if (!normalizedKw) return false;
-  if (containsTokenPhrase(textTokens, normalizedKw.split(" ").filter(Boolean))) return true;
+  const keywordTokens = normalizedKw.split(" ").filter(Boolean);
+  if (containsTokenPhrase(textTokens, keywordTokens)) return true;
+  if (keywordTokens.length === 1 && COMPACT_MATCH_DENYLIST.has(keywordTokens[0])) return false;
   const compactKw = normalizedKw.replace(/\s+/g, "");
   return compactKw.length >= COMPACT_MATCH_MIN_LENGTH && compactText.includes(compactKw);
 }
 
+// A rule's score is the strongest single keyword hit it earns (plus at most
+// one provider-hint bonus), not the sum of every keyword that happens to
+// match. Summing let a handful of soft, unrelated words each add their own
+// points and rack up a confidently-wrong score (e.g. a description containing
+// "food", "meal", and "dining" separately used to out-score a real brand
+// match) -- taking the max means a rule needs one genuinely strong signal,
+// not a pile of weak ones.
 function scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactDescFull, providerHintText }) {
-  let score = 0;
+  let merchantBest = 0;
+  let descBest = 0;
   let merchantStrong = false;
 
   for (const keyword of rule.keywords || []) {
     const isMultiWord = keyword.includes(" ");
     const merchantHit = normalizedContains(merchantTokens, compactMerchant, keyword);
     if (merchantHit) {
-      score += isMultiWord ? 4 : 3;
+      merchantBest = Math.max(merchantBest, isMultiWord ? 4 : 3);
       merchantStrong = true;
-    } else if (normalizedContains(descTokens, compactDescFull, keyword)) {
-      score += isMultiWord ? 3 : 2;
+      continue;
+    }
+    if (normalizedContains(descTokens, compactDescFull, keyword)) {
+      descBest = Math.max(descBest, isMultiWord ? 3 : 2);
     }
   }
+
+  let score = Math.max(merchantBest, descBest);
 
   for (const hint of rule.providerHints || []) {
     if (providerHintText.includes(hint)) score += 2;
@@ -923,7 +1038,13 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
     const normalizedMerchant = normalizeMappingText(rawMerchant);
     const compactMerchant = normalizedMerchant.replace(/\s+/g, "");
     const merchantTokens = tokenize(normalizedMerchant);
-    const normalizedDescFull = normalizeMappingText(`${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`);
+    // Keyword matching only ever looks at the merchant and description fields
+    // -- never categoryGuess. That field carries the bank/Plaid raw guess,
+    // which is meant to inform providerHintText (below) through a dedicated,
+    // narrower hint check; feeding its free text into the same keyword
+    // matcher as the description let a bank label like "Food and Drink" fire
+    // the same noisy single-word keywords a real description would.
+    const normalizedDescFull = normalizeMappingText(`${rawMerchant} ${rawDescription}`);
     const compactDescFull = normalizedDescFull.replace(/\s+/g, "");
     const descTokens = tokenize(normalizedDescFull);
     const providerHintText = normalizeMappingText(categoryGuess);
@@ -943,6 +1064,22 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
       };
     }
 
+    // Ambiguous multi-product retailers (Walmart, Target, Costco, Sam's,
+    // Canadian Tire, Best Buy, IKEA, and convenience-store/fuel hybrids like
+    // 7-Eleven, Circle K, Wawa) never get an auto-mapped category or a
+    // learned-history category -- only an explicit saved mapping rule (above)
+    // can route them anywhere but Imported. A purchase at any of these is as
+    // likely to be personal as business, so guessing is a confidently wrong
+    // answer. The exception is an unambiguous fuel purchase (e.g. "Costco
+    // Gas", "Sheetz Fuel"), which is allowed to fall through to normal scoring.
+    if (kind === "expense" && isAmbiguousRetailerText(rawMerchant, rawDescription)) {
+      return {
+        categoryName: getImportedFallbackCategoryName(kind),
+        reason: "ambiguous_retailer",
+        confidence: "low"
+      };
+    }
+
     const learnedMerchantCategory = selectHistoryWinner(merchantHistory.get(`${kind}::${merchantKey}`));
     if (learnedMerchantCategory && categoryExists(categoryLookup, kind, learnedMerchantCategory)) {
       return { categoryName: learnedMerchantCategory, reason: "merchant_history", confidence: "high" };
@@ -957,6 +1094,26 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
       return {
         categoryName: getImportedFallbackCategoryName(kind),
         reason: "review_only_pattern",
+        confidence: "low"
+      };
+    }
+
+    if (
+      kind === "expense"
+      && CARD_ISSUER_PATTERNS.some((pattern) => pattern.test(haystack))
+      && CARD_PAYMENT_IDIOM_PATTERNS.some((pattern) => pattern.test(haystack))
+    ) {
+      return {
+        categoryName: getImportedFallbackCategoryName(kind),
+        reason: "card_issuer_payment",
+        confidence: "low"
+      };
+    }
+
+    if (kind === "income" && INCOME_REVIEW_ONLY_PATTERNS.some((pattern) => pattern.test(haystack))) {
+      return {
+        categoryName: getImportedFallbackCategoryName(kind),
+        reason: "p2p_review_pattern",
         confidence: "low"
       };
     }
@@ -985,6 +1142,19 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
 
     if (meetsConfidenceThreshold) {
       const categoryName = pickRuleCategoryName(best.rule, region);
+      // A canonical rule's category name has to actually exist on this
+      // business before it's applied. Categories are seeded once at signup;
+      // if the business renamed or deleted the seeded category since then,
+      // blindly returning the canonical name would either resurrect a
+      // deleted category via auto-create or collide with a renamed chart of
+      // accounts. Fall back to Imported instead.
+      if (!categoryExists(categoryLookup, kind, categoryName)) {
+        return {
+          categoryName: getImportedFallbackCategoryName(kind),
+          reason: "fallback_imported",
+          confidence: "low"
+        };
+      }
       return {
         categoryName,
         reason: "canonical_rule",

@@ -58,10 +58,6 @@ const US_CASES = [
   { merchant: "HARBOR FREIGHT TOOLS #341", description: "HARBOR FREIGHT TOOLS #341", expected: "Repairs & Maintenance" },
   { merchant: "SHELL OIL 48293", description: "SHELL OIL 48293 NEW JERSEY", expected: "Car & Truck Expenses" },
   { merchant: "CHEVRON 00934581", description: "CHEVRON 00934581", expected: "Car & Truck Expenses" },
-  { merchant: "CIRCLE K #2734", description: "CIRCLE K #2734", expected: "Car & Truck Expenses" },
-  { merchant: "WAWA #123", description: "WAWA #123", expected: "Car & Truck Expenses" },
-  { merchant: "CASEYS #4471", description: "CASEYS GEN STORE #4471", expected: "Car & Truck Expenses" },
-  { merchant: "7-ELEVEN #4471", description: "7-ELEVEN #4471", expected: "Car & Truck Expenses" },
   { merchant: "SHEETZ #00341", description: "SHEETZ #00341 FUEL", expected: "Car & Truck Expenses" },
   { merchant: "JIFFY LUBE #3341", description: "JIFFY LUBE #3341 OIL CHANGE", expected: "Car & Truck Expenses" },
   { merchant: "DISCOUNT TIRE #341", description: "DISCOUNT TIRE #341", expected: "Car & Truck Expenses" },
@@ -148,6 +144,15 @@ const SHOULD_NOT_AUTO_MAP_CASES = [
   // could buy" case as the big-box retailers above.
   { merchant: "WHOLE FOODS MARKET", description: "WHOLE FOODS MARKET #123" },
   { merchant: "TRADER JOES #456", description: "TRADER JOES #456" },
+  // Convenience-store/fuel-hybrid chains: gas (if sold at all) is secondary
+  // to the convenience-retail business, so these must NOT get a confident
+  // "Car & Truck Expenses" guess. A merchant/description that clearly says
+  // fuel (e.g. "Sheetz Fuel", "Costco Gas") is the one exception -- see
+  // US_CASES above for that control case.
+  { merchant: "CIRCLE K #2734", description: "CIRCLE K #2734" },
+  { merchant: "WAWA #123", description: "WAWA #123" },
+  { merchant: "CASEYS #4471", description: "CASEYS GEN STORE #4471" },
+  { merchant: "7-ELEVEN #4471", description: "7-ELEVEN #4471" },
   // Capital One (and card issuers generally) show up in bank text either as
   // a credit-card statement payment/autopay or an account-to-account
   // transfer — never a real expense category — so these must stay unmapped

@@ -111,6 +111,9 @@ const CATEGORY_REASON_LABELS = {
   description_history: "Learned from similar past descriptions",
   canonical_rule: "Matched a built-in merchant keyword rule",
   review_only_pattern: "Matched a pattern that always needs a human check",
+  ambiguous_retailer: "This merchant sells too many different things to guess a category",
+  card_issuer_payment: "Looks like a card payment or bank transfer, not an expense",
+  p2p_review_pattern: "Looks like a peer-to-peer transfer, not confirmed revenue",
   fallback_imported: "No confident match was found, so it was left as an import placeholder",
   manual: "You set this category by hand"
 };
