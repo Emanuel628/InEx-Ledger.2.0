@@ -261,7 +261,7 @@ test("categorizer carries legacy CSV merchant coverage into the active import ma
   assert.equal(usCategorize({ type: "expense", merchantName: "FedEx", description: "Courier service" }).categoryName, "Supplies");
   assert.equal(caCategorize({ type: "expense", merchantName: "Canada Post", description: "Postage" }).categoryName, "Delivery & Freight");
   assert.equal(usCategorize({ type: "expense", merchantName: "Monthly Banking", description: "Account service fee" }).categoryName, "Bank Fees");
-  assert.equal(caCategorize({ type: "expense", merchantName: "Revenue Canada", description: "Business license" }).categoryName, "Business Tax & Licenses");
+  assert.equal(caCategorize({ type: "expense", merchantName: "Service Ontario", description: "Business license renewal" }).categoryName, "Business Tax & Licenses");
   assert.equal(usCategorize({ type: "expense", merchantName: "Microsoft 365", description: "Annual subscription" }).categoryName, "Software & Subscriptions");
   assert.equal(caCategorize({ type: "expense", merchantName: "Bell Canada", description: "Business internet" }).categoryName, "Phone & Internet");
 });
@@ -291,6 +291,18 @@ test("categorizer maps 'Mint Mobile' to Phone & Internet, never Car & Truck Expe
 test("categorizer still maps a real standalone 'Mobil' gas station to Car & Truck Expenses (control — no regression)", () => {
   const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
   const result = categorize({ type: "expense", merchantName: "Mobil", description: "Mobil 12345 Gas Station" });
+  assert.equal(result.categoryName, "Car & Truck Expenses");
+});
+
+test("categorizer does not let a 'mobile payment' description match the 'Mobil' gas station keyword", () => {
+  const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
+  const result = categorize({ type: "expense", merchantName: "T-Mobile", description: "Mobile payment received" });
+  assert.notEqual(result.categoryName, "Car & Truck Expenses");
+});
+
+test("categorizer maps 'Circle K Gas' to Car & Truck Expenses (fuel-qualified, no regression)", () => {
+  const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
+  const result = categorize({ type: "expense", merchantName: "Circle K Gas", description: "Fuel purchase" });
   assert.equal(result.categoryName, "Car & Truck Expenses");
 });
 

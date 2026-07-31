@@ -175,34 +175,34 @@ test("extractRowData combines split bank description fields before categorizatio
   assert.equal(parsed.merchantName, "microsoft annual subscription");
 });
 
-test("resolveCsvCategoryTemplate uses seeded tax maps for known US categories", () => {
-  const { resolveCsvCategoryTemplate } = loadTransactionRouteModule().__private;
-  const template = resolveCsvCategoryTemplate("Office Supplies", "expense", "US");
+test("resolveCanonicalCategoryTemplate uses seeded tax maps for known US categories", () => {
+  const { resolveCanonicalCategoryTemplate } = require("../services/transactionCategorizationService.js");
+  const template = resolveCanonicalCategoryTemplate("Office Supplies", "expense", "US");
 
   assert.equal(template.tax_map_us, "office_expense");
   assert.equal(template.tax_map_ca, null);
   assert.equal(template.color, "blue");
 });
 
-test("resolveCsvCategoryTemplate uses seeded tax maps for known Canada categories", () => {
-  const { resolveCsvCategoryTemplate } = loadTransactionRouteModule().__private;
-  const template = resolveCsvCategoryTemplate("Motor Vehicle", "expense", "CA");
+test("resolveCanonicalCategoryTemplate uses seeded tax maps for known Canada categories", () => {
+  const { resolveCanonicalCategoryTemplate } = require("../services/transactionCategorizationService.js");
+  const template = resolveCanonicalCategoryTemplate("Motor Vehicle", "expense", "CA");
 
   assert.equal(template.tax_map_us, null);
   assert.equal(template.tax_map_ca, "motor_vehicle");
   assert.equal(template.color, "amber");
 });
 
-test("resolveCsvCategoryTemplate falls back to other income and expense maps when no seeded match exists", () => {
-  const { resolveCsvCategoryTemplate } = loadTransactionRouteModule().__private;
+test("resolveCanonicalCategoryTemplate falls back to other income and expense maps when no seeded match exists", () => {
+  const { resolveCanonicalCategoryTemplate } = require("../services/transactionCategorizationService.js");
 
-  assert.deepEqual(resolveCsvCategoryTemplate("Imported Income", "income", "US"), {
+  assert.deepEqual(resolveCanonicalCategoryTemplate("Imported Income", "income", "US"), {
     color: "slate",
     tax_map_us: "other_income",
     tax_map_ca: null
   });
 
-  assert.deepEqual(resolveCsvCategoryTemplate("Imported Expense", "expense", "CA"), {
+  assert.deepEqual(resolveCanonicalCategoryTemplate("Imported Expense", "expense", "CA"), {
     color: "slate",
     tax_map_us: null,
     tax_map_ca: "other_expense"

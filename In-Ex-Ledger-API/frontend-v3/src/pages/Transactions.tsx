@@ -39,6 +39,7 @@ import {
   saveTransactionDraft,
   undoDeletedTransaction,
   updateRecurringTemplateStatus,
+  updateTransactionReceiptStatus,
   type AccountOption,
   type BusinessTaxProfile,
   type CategoryOption,
@@ -74,6 +75,7 @@ function Transactions(props: PageProps) {
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([])
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [receiptTransaction, setReceiptTransaction] = useState<Transaction | null>(null)
+  const [receiptStatusTransaction, setReceiptStatusTransaction] = useState<Transaction | null>(null)
   const [recurringEditorTemplate, setRecurringEditorTemplate] = useState<RecurringTemplate | null | 'new'>(null)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [loadingData, setLoadingData] = useState(true)
@@ -186,11 +188,11 @@ function Transactions(props: PageProps) {
   useEffect(() => {
     document.body.classList.toggle(
       'modal-is-open',
-      drawerOpen || Boolean(selectedTransaction) || Boolean(receiptTransaction) || Boolean(recurringEditorTemplate) || filtersOpen || csvImportOpen,
+      drawerOpen || Boolean(selectedTransaction) || Boolean(receiptTransaction) || Boolean(receiptStatusTransaction) || Boolean(recurringEditorTemplate) || filtersOpen || csvImportOpen,
     )
 
     return () => document.body.classList.remove('modal-is-open')
-  }, [csvImportOpen, drawerOpen, filtersOpen, receiptTransaction, recurringEditorTemplate, selectedTransaction])
+  }, [csvImportOpen, drawerOpen, filtersOpen, receiptTransaction, receiptStatusTransaction, recurringEditorTemplate, selectedTransaction])
 
   return (
     <AppShell
@@ -299,6 +301,13 @@ function Transactions(props: PageProps) {
                 }
                 setReceiptTransaction(selectedTransaction)
               }}
+              onManageReceiptStatus={() => {
+                if (isTransactionLocked(selectedTransaction, accountingLock)) {
+                  setDataError(`This transaction is locked through ${formatIsoDate(accountingLock?.lockedThroughDate || '')}.`)
+                  return
+                }
+                setReceiptStatusTransaction(selectedTransaction)
+              }}
               onEdit={() => {
                 if (isTransactionLocked(selectedTransaction, accountingLock)) {
                   setDataError(`This transaction is locked through ${formatIsoDate(accountingLock?.lockedThroughDate || '')}.`)
@@ -338,6 +347,17 @@ function Transactions(props: PageProps) {
                 await refreshPageData()
                 setReceiptTransaction(null)
                 setSelectedTransaction(null)
+              }}
+            />
+          ) : null}
+          {receiptStatusTransaction ? (
+            <ReceiptStatusModal
+              transaction={receiptStatusTransaction}
+              onClose={() => setReceiptStatusTransaction(null)}
+              onUpdated={(updated) => {
+                setTransactionRows((rows) => rows.map((row) => (row.id === updated.id ? updated : row)))
+                setReceiptStatusTransaction(null)
+                setSelectedTransaction((current) => (current && current.id === updated.id ? updated : current))
               }}
             />
           ) : null}
@@ -1487,6 +1507,7 @@ function TransactionDetailsModal({
   onClose,
   onUpdate,
   onAttachReceipt,
+  onManageReceiptStatus,
   onEdit,
   onManageCategories,
   onDelete,
@@ -1497,6 +1518,7 @@ function TransactionDetailsModal({
   onClose: () => void
   onUpdate: (transaction: Transaction) => void
   onAttachReceipt: () => void
+  onManageReceiptStatus: () => void
   onEdit: () => void
   onManageCategories: () => void
   onDelete: () => void
@@ -1539,8 +1561,15 @@ function TransactionDetailsModal({
           <dl className="transaction-detail-list">
             <div><dt>Category</dt><dd>{transaction.category}</dd></div>
             <div><dt>Receipt</dt><dd>{transaction.receipt}</dd></div>
+            <div><dt>Receipt evidence</dt><dd>{receiptStatusLabel(transaction.receiptStatus)}</dd></div>
             <div><dt>Status</dt><dd><StatusPill status={transaction.status} /></dd></div>
           </dl>
+          {transaction.receiptStatus === 'missing' && transaction.receiptMissingReason ? (
+            <p className="transaction-detail-note">Reason: {transaction.receiptMissingReason}</p>
+          ) : null}
+          {transaction.receiptStatus === 'not_required' && transaction.businessPurpose ? (
+            <p className="transaction-detail-note">Business purpose: {transaction.businessPurpose}</p>
+          ) : null}
           {reviewItem ? (
             <section className="transaction-review-detail">
               <h3>Needs review</h3>
@@ -1575,8 +1604,131 @@ function TransactionDetailsModal({
               <ReceiptText size={17} />
               Attach receipt
             </button>
+            <button className="secondary-button" type="button" disabled={isLocked} onClick={onManageReceiptStatus}>
+              No receipt / not required
+            </button>
             <button className="secondary-button danger-button" type="button" disabled={isLocked} onClick={onDelete}>Delete</button>
           </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function receiptStatusLabel(status: Transaction['receiptStatus']): string {
+  switch (status) {
+    case 'attached':
+      return 'Attached'
+    case 'missing':
+      return 'Confirmed missing'
+    case 'not_required':
+      return 'Not required'
+    default:
+      return 'Pending decision'
+  }
+}
+
+function ReceiptStatusModal({
+  transaction,
+  onClose,
+  onUpdated,
+}: {
+  transaction: Transaction
+  onClose: () => void
+  onUpdated: (transaction: Transaction) => void
+}) {
+  const [choice, setChoice] = useState<'missing' | 'not_required' | 'pending'>(
+    transaction.receiptStatus === 'missing' || transaction.receiptStatus === 'not_required'
+      ? transaction.receiptStatus
+      : 'missing',
+  )
+  const [reason, setReason] = useState(transaction.receiptMissingReason)
+  const [purpose, setPurpose] = useState(transaction.businessPurpose)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function submit() {
+    setError('')
+    if (choice === 'missing' && !reason.trim()) {
+      setError('Add a short reason the receipt is missing.')
+      return
+    }
+    if (choice === 'not_required' && !purpose.trim()) {
+      setError('Add a short business-purpose note.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const updated = await updateTransactionReceiptStatus(transaction.id, {
+        receiptStatus: choice,
+        receiptMissingReason: choice === 'missing' ? reason.trim() : '',
+        businessPurpose: choice === 'not_required' ? purpose.trim() : '',
+      })
+      onUpdated(updated)
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Unable to update receipt status.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="transaction-detail-modal receipt-status-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="receiptStatusTitle"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="drawer-header">
+          <div>
+            <h2 id="receiptStatusTitle">Receipt evidence status</h2>
+            <p>{transaction.description} - {formatMoney(transaction.amount)}</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close receipt status" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <form className="drawer-form" onSubmit={(event) => event.preventDefault()}>
+          <label>
+            <span>This transaction's receipt is</span>
+            <select value={choice} onChange={(event) => setChoice(event.target.value as typeof choice)}>
+              <option value="missing">No receipt available</option>
+              <option value="not_required">Not required for this transaction</option>
+              <option value="pending">Decide later (reset to pending)</option>
+            </select>
+          </label>
+          {choice === 'missing' ? (
+            <label>
+              <span>Why is the receipt missing?</span>
+              <textarea
+                rows={3}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="e.g. Cash purchase, receipt not printed"
+              />
+            </label>
+          ) : null}
+          {choice === 'not_required' ? (
+            <label>
+              <span>Business purpose (attestation)</span>
+              <textarea
+                rows={3}
+                value={purpose}
+                onChange={(event) => setPurpose(event.target.value)}
+                placeholder="e.g. Bank-assessed fee, no receipt is issued for this charge"
+              />
+            </label>
+          ) : null}
+          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+        </form>
+        <div className="drawer-actions">
+          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+          <button className="primary-button" type="button" disabled={saving} onClick={() => void submit()}>
+            {saving ? <>Saving<LoadingDots /></> : 'Save receipt status'}
+          </button>
         </div>
       </section>
     </div>

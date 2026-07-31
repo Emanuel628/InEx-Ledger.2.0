@@ -118,6 +118,14 @@ function buildFullCpaCsv(dataset, options = {}) {
     "Indirect Tax Recoverable",
     "Review Status",
     "Review Notes",
+    "Category Mapping Reason",
+    "Category Mapping Confidence",
+    "Receipt Status",
+    "Receipt Missing Reason",
+    "Business Purpose",
+    "Supporting Evidence",
+    "Receipt Confirmed At",
+    "Receipt Confirmed By",
     "Internal Transaction ID"
   ]];
 
@@ -162,6 +170,14 @@ function buildFullCpaCsv(dataset, options = {}) {
       row.indirectTaxRecoverable ? "Yes" : "No",
       row.reviewStatus,
       row.reviewNotes || "",
+      row.categoryMappingReason || "",
+      row.categoryMappingConfidence || "",
+      row.receiptStatus || "pending",
+      row.receiptMissingReason || "",
+      row.businessPurpose || "",
+      row.supportingEvidence || "",
+      row.receiptStatusConfirmedAt || "",
+      row.receiptStatusConfirmedBy || "",
       row.internalTransactionId
     ]);
   }

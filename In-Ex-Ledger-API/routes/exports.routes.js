@@ -239,7 +239,10 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
         `SELECT id, account_id, category_id, amount, type, description, description_encrypted, date, note,
                 currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
                 indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
-                review_status, review_notes, payer_name, tax_form_type
+                review_status, review_notes, payer_name, tax_form_type,
+                category_mapping_reason, category_mapping_confidence,
+                receipt_status, receipt_missing_reason, business_purpose, supporting_evidence,
+                receipt_status_confirmed_at, receipt_status_confirmed_by
          FROM transactions
          WHERE business_id = $1
            AND date >= $2 AND date <= $3
@@ -1373,7 +1376,10 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
           `SELECT id, account_id, category_id, amount, type, description, date, note,
                   currency, source_amount, exchange_rate, tax_treatment,
                   indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
-                  review_status, payer_name, tax_form_type
+                  review_status, payer_name, tax_form_type,
+                  category_mapping_reason, category_mapping_confidence,
+                  receipt_status, receipt_missing_reason, business_purpose, supporting_evidence,
+                  receipt_status_confirmed_at, receipt_status_confirmed_by
            FROM transactions
            WHERE business_id = $1
              AND date >= $2 AND date <= $3

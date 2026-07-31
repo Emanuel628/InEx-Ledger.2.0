@@ -1244,9 +1244,16 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
   let capitalAssetCount = 0;
   let capitalAssetTotal = 0;
   const flagged = [];
+  const receiptStatusCounts = { pending: 0, attached: 0, missing: 0, not_required: 0 };
 
   for (const txn of transactions || []) {
     const status = txn.__status;
+    const receiptStatusKey = String(txn?.receipt_status || "pending").trim().toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(receiptStatusCounts, receiptStatusKey)) {
+      receiptStatusCounts[receiptStatusKey] += 1;
+    } else {
+      receiptStatusCounts.pending += 1;
+    }
     const amount = Number(txn?.__businessAmounts?.deductibleAmount ?? txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
     if (status.needsCategory) needsCategoryCount += 1;
     if (!status.needsCategory && !status.isMapped && String(txn?.type || "").toLowerCase() === "expense") unmappedTaxCount += 1;
@@ -1326,6 +1333,7 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     homeOfficeTotal: Number(homeOfficeTotal.toFixed(2)),
     capitalAssetCount,
     capitalAssetTotal: Number(capitalAssetTotal.toFixed(2)),
+    receiptStatusCounts,
     samples: flagged.slice(0, 6).map((item) => ({
       reason: item.reason,
       description: truncateText(item.description, 42),
@@ -1457,7 +1465,8 @@ function buildFinalDisclosureLines(reviewInsights, artifactSummary, labels) {
   return [
     "Potential deductible amounts shown here are bookkeeping workpaper estimates only.",
     `${labels.statusBadgeText}. ${labels.not_filed}`,
-    `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked; ${artifactSummary.totalCount} additional support artifact${artifactSummary.totalCount !== 1 ? "s" : ""} linked across ${artifactSummary.transactionCount} transaction${artifactSummary.transactionCount !== 1 ? "s" : ""}.`
+    `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked; ${artifactSummary.totalCount} additional support artifact${artifactSummary.totalCount !== 1 ? "s" : ""} linked across ${artifactSummary.transactionCount} transaction${artifactSummary.transactionCount !== 1 ? "s" : ""}.`,
+    "Receipt evidence status is a self-reported owner attestation, not a determination by this software or a tax professional, and does not change what is included above."
   ];
 }
 
@@ -2394,7 +2403,11 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
     `Transactions with any receipt file: ${reviewInsights.transactionWithReceiptCount}`,
     `Expense rows with receipt: ${reviewInsights.receiptLinkedCount}`,
     `Expense rows missing receipt: ${reviewInsights.expenseWithoutReceiptAttachmentCount}`,
-    `Coverage: ${reviewInsights.expenseTransactionCount ? `${((reviewInsights.receiptLinkedCount / reviewInsights.expenseTransactionCount) * 100).toFixed(1)}%` : "-"}`
+    `Coverage: ${reviewInsights.expenseTransactionCount ? `${((reviewInsights.receiptLinkedCount / reviewInsights.expenseTransactionCount) * 100).toFixed(1)}%` : "-"}`,
+    (() => {
+      const counts = reviewInsights.receiptStatusCounts || { attached: 0, pending: 0, missing: 0, not_required: 0 };
+      return `Evidence status: ${counts.attached} attached / ${counts.pending} pending / ${counts.missing} missing / ${counts.not_required} not required`;
+    })()
   ], { maxChars: 34 });
   canvas.drawCard(40, top - 256, 252, 98, "Additional Support Artifacts", [
     `Linked: ${artifactSummary.totalCount} across ${artifactSummary.transactionCount} transactions`,

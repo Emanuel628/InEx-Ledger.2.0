@@ -144,6 +144,40 @@ test("dataset totals and summaries stay internally consistent", () => {
   assert.equal(dataset.totals.missingReceiptCount, dataset.receiptSummary.missing);
 });
 
+test("dataset rows surface transaction-level receipt_status evidence fields for export", () => {
+  const fixture = buildFixture({
+    transactions: [
+      { id: "income1", type: "income", amount: 1200, category_id: "sales", account_id: "bank", date: "2026-04-01", description: "Client invoice" },
+      {
+        id: "fuel1",
+        type: "expense",
+        amount: 45,
+        category_id: "fuel",
+        account_id: "bank",
+        date: "2026-04-02",
+        description: "Shell fuel",
+        receipt_status: "missing",
+        receipt_missing_reason: "Pump receipt not printed",
+        business_purpose: "",
+        supporting_evidence: "Bank statement line item",
+        receipt_status_confirmed_at: "2026-04-03T00:00:00.000Z",
+        receipt_status_confirmed_by: "user-99"
+      }
+    ]
+  });
+  const dataset = buildNormalizedExportDataset(fixture);
+  const fuel = dataset.rows.find((row) => row.id === "fuel1");
+  const income = dataset.rows.find((row) => row.id === "income1");
+
+  assert.equal(fuel.receiptStatus, "missing");
+  assert.equal(fuel.receiptMissingReason, "Pump receipt not printed");
+  assert.equal(fuel.supportingEvidence, "Bank statement line item");
+  assert.equal(fuel.receiptStatusConfirmedBy, "user-99");
+  assert.match(fuel.receiptStatusConfirmedAt, /2026-04-03/);
+  // A transaction with no receipt_status set defaults to 'pending', never left blank/undefined.
+  assert.equal(income.receiptStatus, "pending");
+});
+
 test("support artifacts clear matching review flags and receipt gaps", () => {
   const supportArtifactMap = new Map([
     ["fuel1", [{ artifact_type: "mileage_log", review_status: "accepted" }, { artifact_type: "receipt", review_status: "accepted" }]],

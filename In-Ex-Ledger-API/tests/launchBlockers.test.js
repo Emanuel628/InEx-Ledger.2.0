@@ -171,7 +171,16 @@ function loadTransactionsRouter(options = {}) {
                     note: params[10],
                     currency: params[11],
                     payer_name: params[22],
-                    tax_form_type: params[23]
+                    tax_form_type: params[23],
+                    // Simulates the CTE join added to the INSERT statement so a
+                    // freshly created transaction reports its category/account
+                    // immediately, without requiring a second round trip.
+                    account_name: "Checking",
+                    category_name: "Income",
+                    category_kind: "income",
+                    category_color: "emerald",
+                    tax_map_us: "other_income",
+                    tax_map_ca: null
                   }
                 ]
               };
@@ -194,7 +203,16 @@ function loadTransactionsRouter(options = {}) {
                     note: params[8],
                     currency: params[9],
                     payer_name: params[20],
-                    tax_form_type: params[21]
+                    tax_form_type: params[21],
+                    // Simulates the CTE join added to the UPDATE statement so an
+                    // edited transaction reports its (possibly changed) category
+                    // immediately, without requiring a second round trip.
+                    account_name: "Checking",
+                    category_name: "Income",
+                    category_kind: "income",
+                    category_color: "emerald",
+                    tax_map_us: "other_income",
+                    tax_map_ca: null
                   }
                 ]
               };
@@ -453,6 +471,70 @@ test("transactions PUT stores encrypted descriptions without duplicating plain t
     assert.equal(fixture.state.updateParams[5], null);
     assert.equal(fixture.state.updateParams[6], "enc:Client B");
     assert.equal(response.body.description, "Client B");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("transactions POST returns the category name/kind/color and tax maps immediately, without requiring a refresh", async () => {
+  const fixture = loadTransactionsRouter();
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/transactions")
+      .send({
+        account_id: TEST_ACCOUNT_ID,
+        category_id: TEST_CATEGORY_ID,
+        amount: 1200,
+        type: "income",
+        date: "2026-05-02",
+        description: "Client B",
+        note: "Invoice"
+      });
+
+    assert.equal(response.status, 201);
+    // The bug this guards against: POST previously used a bare `RETURNING *`
+    // with no join, so a newly created transaction came back with only
+    // category_id and no category_name — the UI rendered "Uncategorized"
+    // until the next full list refresh joined it in.
+    assert.equal(response.body.category_id, TEST_CATEGORY_ID);
+    assert.equal(response.body.category_name, "Income");
+    assert.equal(response.body.category_kind, "income");
+    assert.equal(response.body.category_color, "emerald");
+    assert.equal(response.body.account_name, "Checking");
+    assert.equal(response.body.tax_map_us, "other_income");
+    assert.equal(response.body.tax_map_ca, null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("transactions PUT returns the updated category name/kind/color and tax maps immediately, without requiring a refresh", async () => {
+  const fixture = loadTransactionsRouter();
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put(`/api/transactions/${TEST_TRANSACTION_ID}`)
+      .send({
+        account_id: TEST_ACCOUNT_ID,
+        category_id: TEST_CATEGORY_ID,
+        amount: 4500,
+        type: "income",
+        date: "2026-05-02",
+        description: "Client B",
+        note: "Platform payout"
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.category_id, TEST_CATEGORY_ID);
+    assert.equal(response.body.category_name, "Income");
+    assert.equal(response.body.category_kind, "income");
+    assert.equal(response.body.category_color, "emerald");
+    assert.equal(response.body.account_name, "Checking");
+    assert.equal(response.body.tax_map_us, "other_income");
+    assert.equal(response.body.tax_map_ca, null);
   } finally {
     fixture.cleanup();
   }
