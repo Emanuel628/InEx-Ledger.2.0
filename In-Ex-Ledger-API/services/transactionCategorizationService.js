@@ -40,7 +40,7 @@ const REVIEW_ONLY_PATTERNS = [
   /\bcredit card payment\b/i,
   /\btransfer (to|from)\b/i,
   /\bpayment to card\b/i,
-  /\bloan payment\b/i,
+  /\bloan\b/i,
   /\baffirm\b/i,
   /\bafterpay\b/i,
   /\bklarna\b/i,
@@ -50,8 +50,75 @@ const REVIEW_ONLY_PATTERNS = [
   /\bpaychex\b/i,
   /\birs tax refund\b/i,
   /\bcra tax refund\b/i,
-  /\bcash back\b/i,
-  /\bredemption\b/i
+  /\bcash[- ]back\b/i,
+  /\bredemption\b/i,
+  // Owner/shareholder equity movements are neither revenue nor an operating
+  // expense -- they're capital activity. Guessing a P&L category for them
+  // misstates the business's actual income and expenses.
+  /\bowners? draw\b/i,
+  /\bowner('?s)? contribution\b/i,
+  /\bcapital contribution\b/i,
+  /\bmember draw\b/i,
+  /\bshareholder loan\b/i
+];
+
+// A refund, reversal, or chargeback is an adjustment to a PRIOR transaction,
+// not a new independent event -- the merchant/description keyword rules that
+// correctly categorize an original purchase or payout are not evidence about
+// what a *reversal* of one should be. A positive amount from an expense
+// merchant (e.g. "Home Depot Refund") must not become sales revenue just
+// because it's a positive number; a reversed payout must not re-trigger the
+// same income keyword that mapped the original payout. Route all of these to
+// review with an accurate reason instead of guessing -- correlating a refund
+// back to its original transaction's category is a real improvement but
+// isn't reliable from text alone, so review is the honest fallback.
+const REFUND_REVERSAL_PATTERNS = [
+  /\brefund\b/i,
+  /\breversal\b/i,
+  /\breversed\b/i,
+  /\bcredit memo\b/i,
+  /\bchargeback\b/i,
+  /\breturned payment\b/i,
+  /\bpayment returned\b/i,
+  /\breturned customer payment\b/i
+];
+
+// Broad government/tax descriptors are ambiguous by nature -- "IRS payment"
+// alone could be personal or corporate income tax, a payroll-tax remittance,
+// a penalty, an estimated-tax payment, or something else entirely. Guessing
+// any single category for these is a confidently wrong answer. Only wording
+// specific enough to identify a real, distinct business expense (business
+// license, permit fee, property tax, vehicle registration -- see the Sales
+// Tax / Business Tax & Licenses keyword lists) is allowed to auto-map.
+const GOVERNMENT_TAX_AMBIGUOUS_PATTERNS = [
+  /\birs\b/i,
+  /\bcra\b/i,
+  /\btreasury\b/i,
+  /\brevenue canada\b/i,
+  /\brevenu canada\b/i,
+  /\brevenue department\b/i,
+  /\bdepartment of revenue\b/i,
+  /\bgovernment payment\b/i,
+  /\bgovernment fee\b/i,
+  /\bgovernment of canada\b/i,
+  /\btax payment\b/i,
+  /\btax remittance\b/i,
+  /\bestimated tax\b/i
+];
+
+// Sales tax / GST / HST collected from customers and remitted to the
+// government is money the business held in trust, not a deductible
+// operating expense -- auto-mapping it to an expense category (e.g. "Sales
+// Tax") would misstate it as ordinary P&L activity. This app has no
+// liability-account concept to record it correctly, so even this
+// unambiguous wording is preserved for review rather than guessed at.
+const TAX_LIABILITY_REMITTANCE_PATTERNS = [
+  /\bsales tax remittance\b/i,
+  /\bgst payment\b/i,
+  /\bhst payment\b/i,
+  /\bgst\/hst payment\b/i,
+  /\bgst remittance\b/i,
+  /\bhst remittance\b/i
 ];
 
 // A card issuer's name on a bank feed is virtually always a payment *to* the
@@ -322,11 +389,19 @@ const CATEGORY_RULES = [
   },
   {
     kind: "expense",
+    // Deliberately excludes bare government/tax-authority mentions ("irs",
+    // "cra", "revenue canada", "tax payment", "dmv", ...) and tax-remittance
+    // wording ("sales tax remittance", "gst/hst payment") -- see
+    // GOVERNMENT_TAX_AMBIGUOUS_PATTERNS and TAX_LIABILITY_REMITTANCE_PATTERNS
+    // above for why those are routed to review instead of auto-mapped here.
+    // Only wording specific enough to identify a real, distinct deductible
+    // expense (a license, a permit, a property tax bill, a registration fee)
+    // is trusted to auto-map.
     usCategory: "Sales Tax",
     caCategory: "Business Tax & Licenses",
     keywords: [
       "business license", "permit fee", "service ontario", "service canada",
-      "sales tax remittance", "hst payment", "gst payment", "property tax"
+      "property tax"
     ],
     providerHints: ["tax", "government"]
   }
@@ -466,10 +541,7 @@ const CATEGORY_RULE_EXPANSIONS = [
   {
     usCategory: "Sales Tax",
     caCategory: "Business Tax & Licenses",
-    keywords: [
-      "irs", "cra", "revenue canada", "revenu canada", "government fee",
-      "vehicle registration", "tax payment remittance", "government of canada", "dmv"
-    ]
+    keywords: ["vehicle registration"]
   }
 ];
 
@@ -1006,13 +1078,24 @@ function normalizedContains(textTokens, compactText, keyword) {
   return compactKw.length >= COMPACT_MATCH_MIN_LENGTH && compactText.includes(compactKw);
 }
 
-// A rule's score is the strongest single keyword hit it earns (plus at most
-// one provider-hint bonus), not the sum of every keyword that happens to
-// match. Summing let a handful of soft, unrelated words each add their own
-// points and rack up a confidently-wrong score (e.g. a description containing
-// "food", "meal", and "dining" separately used to out-score a real brand
-// match) -- taking the max means a rule needs one genuinely strong signal,
-// not a pile of weak ones.
+// A rule's score is the strongest single keyword hit it earns, not the sum
+// of every keyword that happens to match. Summing let a handful of soft,
+// unrelated words each add their own points and rack up a confidently-wrong
+// score (e.g. a description containing "food", "meal", and "dining"
+// separately used to out-score a real brand match) -- taking the max means
+// a rule needs one genuinely strong signal, not a pile of weak ones.
+//
+// Provider-hint metadata (the bank/Plaid category_guess) is kept entirely
+// separate from that keyword score: it earns at most one capped bonus
+// (never one bonus per matching hint), and -- critically -- that bonus is
+// only ever added on top of an already-independently-qualifying keyword
+// score for the auto-map *decision* (see keywordScore vs score below). A
+// provider hint can raise confidence once a rule already qualifies, or
+// break a near-tie between two plausible rules, but it can never by itself
+// (or combined with a single weak description-only word) manufacture a
+// score that crosses the auto-map floor -- that would let a noisy bank
+// category label auto-map a transaction with no real merchant/description
+// evidence at all.
 function scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactDescFull, providerHintText }) {
   let merchantBest = 0;
   let descBest = 0;
@@ -1040,13 +1123,11 @@ function scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactD
     }
   }
 
-  let score = Math.max(merchantBest, descBest);
+  const keywordScore = Math.max(merchantBest, descBest);
+  const providerHintMatched = (rule.providerHints || []).some((hint) => providerHintText.includes(hint));
+  const hintBonus = providerHintMatched ? 2 : 0;
 
-  for (const hint of rule.providerHints || []) {
-    if (providerHintText.includes(hint)) score += 2;
-  }
-
-  return { score, merchantStrong };
+  return { score: keywordScore + hintBonus, keywordScore, merchantStrong };
 }
 
 function createTransactionCategorizer({ categories = [], region = "US", historyRows = [], mappingRules = [] } = {}) {
@@ -1095,6 +1176,23 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
         reason: "mapping_rule",
         confidence: "high",
         ruleId: explicitRule.id || null
+      };
+    }
+
+    // A refund/reversal/chargeback is an adjustment to a PRIOR transaction,
+    // not new independent evidence -- checked before history or keyword
+    // scoring so neither can use the original merchant's usual category (or
+    // an income-side keyword an unrelated reversal happens to contain) to
+    // guess at what is fundamentally a different kind of line. This also
+    // covers the common case where a positive refund of an expense purchase
+    // gets typed as "income" purely by sign, which would otherwise search
+    // the wrong kind's history/rules entirely. Not kind-gated: a refund can
+    // land on either side depending on how the bank/CSV signed it.
+    if (REFUND_REVERSAL_PATTERNS.some((pattern) => pattern.test(haystack))) {
+      return {
+        categoryName: getImportedFallbackCategoryName(kind),
+        reason: "refund_reversal_review",
+        confidence: "low"
       };
     }
 
@@ -1152,26 +1250,50 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
       };
     }
 
+    if (kind === "expense" && TAX_LIABILITY_REMITTANCE_PATTERNS.some((pattern) => pattern.test(haystack))) {
+      return {
+        categoryName: getImportedFallbackCategoryName(kind),
+        reason: "tax_liability_review",
+        confidence: "low"
+      };
+    }
+
+    if (kind === "expense" && GOVERNMENT_TAX_AMBIGUOUS_PATTERNS.some((pattern) => pattern.test(haystack))) {
+      return {
+        categoryName: getImportedFallbackCategoryName(kind),
+        reason: "government_tax_review",
+        confidence: "low"
+      };
+    }
+
     let best = null;
     let secondBestScore = 0;
     for (const rule of CATEGORY_RULES) {
       if (rule.kind !== kind) continue;
-      const { score, merchantStrong } = scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactDescFull, providerHintText });
+      const { score, keywordScore, merchantStrong } = scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactDescFull, providerHintText });
       if (!best || score > best.score) {
         secondBestScore = best?.score || 0;
-        best = { rule, score, merchantStrong };
+        best = { rule, score, keywordScore, merchantStrong };
       } else if (score > secondBestScore) {
         secondBestScore = score;
       }
     }
 
-    // A rule only gets to auto-map a category if its keyword-match score clears
-    // this floor AND clearly beats every other rule (no near-ties). Below the
-    // floor, or in a near-tie between two plausible categories, we don't guess
-    // — the transaction stays in the Imported bucket for manual review instead
-    // of risking a confidently-wrong category on a weak signal.
+    // A rule only gets to auto-map a category if its KEYWORD-ONLY score
+    // (merchant or description evidence, before any provider-hint bonus)
+    // clears this floor on its own, AND the full score (keyword + hint)
+    // clearly beats every other rule (no near-ties). Gating on keywordScore
+    // rather than the hint-inflated score is what keeps a provider hint from
+    // ever manufacturing an auto-map by itself, or by combining with a
+    // single weak description-only word -- the hint can still raise
+    // confidence (see below) or help break a tie once a rule already
+    // qualifies, but it can't be the reason a rule qualifies in the first
+    // place. Below the floor, or in a near-tie between two plausible
+    // categories, we don't guess — the transaction stays in the Imported
+    // bucket for manual review instead of risking a confidently-wrong
+    // category on a weak signal.
     const meetsConfidenceThreshold = best
-      && best.score >= MIN_SCORE_TO_AUTO_MAP
+      && best.keywordScore >= MIN_SCORE_TO_AUTO_MAP
       && best.score > secondBestScore;
 
     if (meetsConfidenceThreshold) {

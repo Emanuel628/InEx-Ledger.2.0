@@ -46,7 +46,6 @@ const { getTaxDashboard } = require("../services/taxDashboardService.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 const { normalizeReviewFilter, matchesReviewFilter, buildReviewSummary} = require("../services/transactionReviewFlagService.js");
 const { sendBookkeepingActivityEmail } = require("../services/bookkeepingEmailService.js");
-const { findDefaultCategoryForRegion } = require("../api/utils/seedDefaultsForBusiness.js");
 const {
   buildBusinessTransactionCategorizer,
   resolveCanonicalCategoryTemplate
@@ -54,6 +53,11 @@ const {
 const {
   learnTransactionMappingRules
 } = require("../services/transactionMappingRuleService.js");
+const {
+  validateManualReceiptStatusChange,
+  ReceiptStatusValidationError
+} = require("../services/receiptStatusService.js");
+const { AUDIT_ACTIONS, recordAuditEventForRequest } = require("../services/auditEventService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -855,6 +859,8 @@ if (filters.review) {
               a.name AS account_name,
               t.category_id,
               c.name AS category_name,
+              c.kind AS category_kind,
+              c.color AS category_color,
               t.amount,
                b.region AS business_region,
                c.tax_map_us,
@@ -883,7 +889,13 @@ if (filters.review) {
               t.recurring_occurrence_date,
               t.is_adjustment,
               t.original_transaction_id,
-              t.created_at
+              t.created_at,
+              t.receipt_status,
+              t.receipt_missing_reason,
+              t.business_purpose,
+              t.supporting_evidence,
+              t.receipt_status_confirmed_at,
+              t.receipt_status_confirmed_by
        FROM transactions t
        JOIN businesses b ON b.id = t.business_id
        LEFT JOIN accounts a ON a.id = t.account_id
@@ -1030,15 +1042,27 @@ router.post("/", async (req, res) => {
     await assertCanCreateTransactions(client, businessId, 1, { subscription });
 
     const result = await client.query(
-      `INSERT INTO transactions
-        (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note,
-         currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
-         indirect_tax_amount, indirect_tax_recoverable, personal_use_pct, review_status, review_notes,
-         payer_name, tax_form_type, category_mapping_reason, category_mapping_confidence, category_mapping_rule_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-               $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
-               $23, $24, $25, $26, $27)
-       RETURNING *`,
+      `WITH ins AS (
+         INSERT INTO transactions
+           (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note,
+            currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
+            indirect_tax_amount, indirect_tax_recoverable, personal_use_pct, review_status, review_notes,
+            payer_name, tax_form_type, category_mapping_reason, category_mapping_confidence, category_mapping_rule_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                 $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+                 $23, $24, $25, $26, $27)
+         RETURNING *
+       )
+       SELECT ins.*,
+              a.name AS account_name,
+              c.name AS category_name,
+              c.kind AS category_kind,
+              c.color AS category_color,
+              c.tax_map_us,
+              c.tax_map_ca
+         FROM ins
+         LEFT JOIN accounts a ON a.id = ins.account_id
+         LEFT JOIN categories c ON c.id = ins.category_id`,
       [
         crypto.randomUUID(),
         businessId,
@@ -1137,6 +1161,8 @@ router.get("/:id", async (req, res, next) => {
       `SELECT t.*,
               a.name AS account_name,
               c.name AS category_name,
+              c.kind AS category_kind,
+              c.color AS category_color,
               c.tax_map_us,
               c.tax_map_ca
          FROM transactions t
@@ -1235,39 +1261,51 @@ router.put("/:id", async (req, res) => {
     const taxFormType = type === "income" && VALID_TAX_FORMS.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
 
     const result = await pool.query(
-      `UPDATE transactions
-          SET account_id              = $1,
-              category_id             = $2,
-              amount                  = $3,
-              type                    = $4,
-              cleared                 = $5,
-              description             = $6,
-              description_encrypted   = $7,
-              date                    = $8,
-              note                    = $9,
-              currency                = $10,
-              source_amount           = $11,
-              exchange_rate           = $12,
-              exchange_date           = $13,
-              converted_amount        = $14,
-              tax_treatment           = $15,
-              indirect_tax_amount     = $16,
-              indirect_tax_recoverable= $17,
-              personal_use_pct        = $18,
-              review_status           = $19,
-              review_notes            = $20,
-              payer_name              = $21,
-              tax_form_type           = $22,
-              category_mapping_reason = $23,
-              category_mapping_confidence = $24,
-              category_mapping_rule_id = $25,
-              adjusted_by_id          = $26,
-              adjusted_at             = NOW()
-        WHERE id = $27
-          AND business_id = $28
-          AND deleted_at IS NULL
-          AND (is_adjustment = false OR is_adjustment IS NULL)
-       RETURNING *`,
+      `WITH upd AS (
+         UPDATE transactions
+            SET account_id              = $1,
+                category_id             = $2,
+                amount                  = $3,
+                type                    = $4,
+                cleared                 = $5,
+                description             = $6,
+                description_encrypted   = $7,
+                date                    = $8,
+                note                    = $9,
+                currency                = $10,
+                source_amount           = $11,
+                exchange_rate           = $12,
+                exchange_date           = $13,
+                converted_amount        = $14,
+                tax_treatment           = $15,
+                indirect_tax_amount     = $16,
+                indirect_tax_recoverable= $17,
+                personal_use_pct        = $18,
+                review_status           = $19,
+                review_notes            = $20,
+                payer_name              = $21,
+                tax_form_type           = $22,
+                category_mapping_reason = $23,
+                category_mapping_confidence = $24,
+                category_mapping_rule_id = $25,
+                adjusted_by_id          = $26,
+                adjusted_at             = NOW()
+          WHERE id = $27
+            AND business_id = $28
+            AND deleted_at IS NULL
+            AND (is_adjustment = false OR is_adjustment IS NULL)
+         RETURNING *
+       )
+       SELECT upd.*,
+              a.name AS account_name,
+              c.name AS category_name,
+              c.kind AS category_kind,
+              c.color AS category_color,
+              c.tax_map_us,
+              c.tax_map_ca
+         FROM upd
+         LEFT JOIN accounts a ON a.id = upd.account_id
+         LEFT JOIN categories c ON c.id = upd.category_id`,
       [
         account_id,
         mappedCategoryId,
@@ -1706,6 +1744,134 @@ router.patch("/:id/cleared", async (req, res) => {
   }
 });
 
+// receipt_status can never be set to 'attached' through this endpoint — that
+// value is only ever derived from an actual receipt file being on record
+// (see services/receiptStatusService.js, wired into routes/receipts.routes.js).
+// This endpoint exists solely for the user-driven attestations: confirming a
+// receipt is missing (with a reason) or not required (with a business
+// purpose), or resetting back to pending. It never touches `cleared`, amount,
+// category, or any other transaction field.
+router.patch("/:id/receipt-status", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid transaction ID." });
+  }
+
+  let normalizedStatus;
+  try {
+    normalizedStatus = validateManualReceiptStatusChange({
+      status: req.body?.receipt_status,
+      receiptMissingReason: req.body?.receipt_missing_reason,
+      businessPurpose: req.body?.business_purpose
+    });
+  } catch (err) {
+    if (err instanceof ReceiptStatusValidationError) {
+      return res.status(err.status).json({ error: err.message, code: err.code });
+    }
+    throw err;
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const existing = await pool.query(
+      `SELECT t.id,
+              t.date,
+              COALESCE(rc.receipt_count, 0)::int AS receipt_count
+         FROM transactions t
+         LEFT JOIN (
+           SELECT transaction_id, COUNT(*)::int AS receipt_count
+             FROM receipts
+            WHERE transaction_id = $1
+            GROUP BY transaction_id
+         ) rc ON rc.transaction_id = t.id
+        WHERE t.id = $1
+          AND t.business_id = $2
+          AND t.deleted_at IS NULL
+          AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+          AND (t.is_void = false OR t.is_void IS NULL)
+        LIMIT 1`,
+      [req.params.id, businessId]
+    );
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+    if (Number(existing.rows[0].receipt_count || 0) > 0) {
+      return res.status(409).json({
+        error: "This transaction already has a receipt file on record. Remove it before changing the receipt status manually.",
+        code: "receipt_status_conflict"
+      });
+    }
+    await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
+
+    const receiptMissingReason = normalizedStatus === "missing"
+      ? String(req.body?.receipt_missing_reason || "").trim()
+      : null;
+    const businessPurpose = normalizedStatus === "not_required"
+      ? String(req.body?.business_purpose || "").trim()
+      : null;
+    const supportingEvidence = String(req.body?.supporting_evidence || "").trim() || null;
+
+    const result = await pool.query(
+      `WITH upd AS (
+         UPDATE transactions
+            SET receipt_status = $1,
+                receipt_missing_reason = $2,
+                business_purpose = $3,
+                supporting_evidence = $4,
+                receipt_status_confirmed_at = NOW(),
+                receipt_status_confirmed_by = $5
+          WHERE id = $6
+            AND business_id = $7
+            AND deleted_at IS NULL
+            AND (is_adjustment = false OR is_adjustment IS NULL)
+            AND (is_void = false OR is_void IS NULL)
+         RETURNING *
+       )
+       SELECT upd.*,
+              a.name AS account_name,
+              c.name AS category_name,
+              c.kind AS category_kind,
+              c.color AS category_color,
+              c.tax_map_us,
+              c.tax_map_ca
+         FROM upd
+         LEFT JOIN accounts a ON a.id = upd.account_id
+         LEFT JOIN categories c ON c.id = upd.category_id`,
+      [
+        normalizedStatus,
+        receiptMissingReason,
+        businessPurpose,
+        supportingEvidence,
+        req.user.id,
+        req.params.id,
+        businessId
+      ]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Transactions changed after export."
+    }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
+    void recordAuditEventForRequest(pool, req, {
+      action: AUDIT_ACTIONS.TRANSACTION_UPDATED,
+      businessId,
+      metadata: {
+        transactionId: req.params.id,
+        field: "receipt_status",
+        receiptStatus: normalizedStatus
+      }
+    });
+
+    res.json(decryptTransactionRow(result.rows[0]));
+  } catch (err) {
+    logError("PATCH /transactions/:id/receipt-status error:", err);
+    return handleTransactionMutationError(res, err, "Failed to update receipt status.");
+  }
+});
+
 /* =========================================================
    CSV IMPORT  —  POST /transactions/import/csv
    ========================================================= */
@@ -2065,261 +2231,6 @@ async function countImportableCsvRows(rows, cols, options = {}) {
   }
 
   return importableRows;
-}
-
-// ─── Smart CSV Category Detection ────────────────────────────────────────────
-// CSV_CATEGORY_RULES — ordered most-specific first within each kind.
-// Each rule may optionally carry nameCA: the seeded category name for CA businesses.
-// This ensures imported transactions land in the pre-existing seeded category
-// (which already has the correct tax_map_ca / tax_map_us set), rather than
-// creating a new unmapped category.
-const CSV_CATEGORY_RULES = [
-  // Expense rules — ordered most-specific first
-  {
-    kind: "expense", name: "Bank Fees", nameCA: "Interest & Bank Charges",
-    keywords: [
-      // Description-pattern keywords (user-written, e.g. from our own CSV exports)
-      "bank service fee", "banking fee", "account service fee", "monthly banking",
-      "wire fee", "bank maintenance", "account maintenance fee",
-      // Merchant / system keywords
-      "overdraft", "service charge", "maintenance fee", "wire transfer fee", "atm fee",
-      "foreign transaction", "bank fee", "interest charge", "nsf fee", "returned item",
-      "monthly fee", "account fee", "stop payment", "insufficient funds"
-    ]
-  },
-  {
-    // US: "Meals" (50% deductible, Line 24b); CA: "Meals & Entertainment" (50%, T2125 Line 8523)
-    kind: "expense", name: "Meals", nameCA: "Meals & Entertainment",
-    keywords: [
-      // Description-pattern keywords — business meal descriptions
-      "client meal", "client meals", "client lunch", "client dinner", "client breakfast",
-      "business meal", "business lunch", "business dinner", "business breakfast",
-      "team lunch", "team dinner", "working lunch", "working dinner",
-      "networking lunch", "networking breakfast", "networking dinner",
-      "prospect lunch", "prospect dinner", "holiday dinner", "holiday lunch",
-      "milestone dinner", "strategy meeting", "kickoff lunch", "review dinner",
-      "lunch meeting", "dinner meeting", "breakfast meeting",
-      "meals -", "client meals -", "meals and entertainment",
-      // Merchant names
-      "mcdonald", "burger king", "wendy", "subway", "starbucks", "dunkin", "taco bell",
-      "chick-fil-a", "chickfila", "pizza hut", "domino", "kfc ", "chipotle", "panera",
-      "olive garden", "applebee", "denny", "ihop", "red lobster", "outback steakhouse",
-      "buffalo wild", "five guys", "shake shack", "popeye", "panda express", "sonic drive",
-      "arby", "dairy queen", "baskin robbins", "jamba juice", "smoothie king",
-      "doordash", "uber eats", "ubereats", "grubhub", "skip the dishes", "skipthedishes",
-      "postmates", "just eat", "foodora", "tim horton", "a&w restaurant", "harvey's",
-      "new york fries", "boston pizza", "pizza pizza", "pita pit", "mary brown", "st-hubert",
-      "baton rouge", "milestones", "earls restaurant", "moxies", "joey restaurant",
-      "cactus club", "white spot", "montana's", "kelseys", "jack astor", "swiss chalet",
-      "in-n-out", "whataburger", "wingstop", "raising cane", "zaxby", "culver",
-      "waffle house", "cracker barrel", "texas roadhouse", "longhorn steakhouse",
-      "the keg", "moxie"]
-  },
-  {
-    kind: "expense", name: "Groceries",
-    keywords: ["walmart supercenter", "walmart grocery", "walmart neighborhood", "costco",
-      "whole foods", "trader joe", "kroger", "safeway", "publix", "albertsons",
-      "h-e-b", "heb ", "aldi ", "lidl ", "wegman", "meijer", "stop & shop", "stopnshop",
-      "shoprite", "food lion", "giant eagle", "harris teeter", "winn dixie", "save-a-lot",
-      "no frills", "metro grocery", "loblaws", "sobeys", "iga grocery", "freshco",
-      "food basics", "giant tiger", "co-op food", "save-on-foods", "thrifty foods",
-      "overwaitea", "independent grocer", "real canadian superstore", "provigo", "maxi grocery",
-      "superstore", "walmart"]
-  },
-  {
-    kind: "expense", name: "Fuel & Gas",
-    keywords: ["shell gas", "shell station", "shell #", "chevron", "bp gas", "bp station",
-      "exxon", "mobil gas", "mobil #", "sunoco", "marathon gas", "speedway gas",
-      "circle k gas", "wawa gas", "sheetz", "pilot flying", "loves travel stop",
-      "petro canada", "petrocan", "esso", "husky gas", "ultramar", "pioneer gas",
-      "canadian tire gas", "petro-t", "irving oil", "kwik trip gas", "casey's gas"]
-  },
-  {
-    kind: "expense", name: "Ride Sharing & Taxi",
-    keywords: ["lyft", "didi", "waymo", "yellow cab", "blue cab", "green cab",
-      "taxicab", "rideshare", "uber"]
-  },
-  {
-    kind: "expense", name: "Travel",
-    keywords: [
-      // Description-pattern keywords
-      "flight to", "train to", "bus to", "travel -", "client conference", "business trip",
-      "conference travel", "airfare", "flight ticket", "train ticket", "bus ticket",
-      "travel expense", "travel cost",
-      // Merchant names
-      "delta air", "american airlines", "united airlines", "southwest air", "spirit air",
-      "air canada", "westjet", "jetblue", "frontier airlines", "alaska airlines",
-      "lufthansa", "british airways", "air france", "air transat", "porter airlines",
-      "flair airlines", "sunwing", "marriott", "hilton", "hyatt", "sheraton", "westin",
-      "holiday inn", "hampton inn", "doubletree", "residence inn", "four seasons",
-      "ritz carlton", "best western", "motel 6", "super 8", "comfort inn", "airbnb",
-      "vrbo", "booking.com", "expedia", "travelocity", "priceline", "hotels.com",
-      "trivago", "kayak", "orbitz", "amtrak", "via rail", "greyhound bus", "airport hotel",
-      "airport parking", "airlines"]
-  },
-  {
-    kind: "expense", name: "Software & Subscriptions",
-    keywords: [
-      // Description-pattern keywords
-      "software subscriptions", "software subscription", "software -", "app subscription",
-      "saas subscription", "annual subscription", "monthly subscription",
-      // Merchant names
-      "netflix", "spotify", "hulu", "disney plus", "disney+", "amazon prime",
-      "apple tv+", "hbo max", "youtube premium", "adobe ", "microsoft 365", "microsoft office",
-      "github", "slack", "zoom", "dropbox", "google one", "google workspace",
-      "amazon web services", "aws ", "azure ", "digitalocean", "heroku", "notion ",
-      "figma ", "canva ", "mailchimp", "hubspot", "salesforce", "quickbooks", "xero",
-      "freshbooks", "wave apps", "shopify", "wix ", "squarespace", "godaddy",
-      "namecheap", "cloudflare", "twilio", "sendgrid", "anthropic", "openai",
-      "subscription fee", "membership renewal"]
-  },
-  {
-    kind: "expense", name: "Advertising & Marketing",
-    keywords: ["google ads", "google adwords", "facebook ads", "meta ads", "instagram ads",
-      "tiktok ads", "twitter ads", "pinterest ads", "linkedin ads", "bing ads",
-      "snapchat ads", "youtube ads", "constant contact", "hootsuite", "buffer ",
-      "sprout social", "semrush", "ahrefs", "klaviyo", "activecampaign"]
-  },
-  {
-    kind: "expense", name: "Phone & Internet",
-    keywords: [
-      // Description-pattern keywords
-      "home internet and phone", "internet and phone", "home internet", "business internet",
-      "business phone", "phone - business", "internet - business", "business use allocation",
-      "phone business", "internet service provider", "cell phone plan",
-      // Merchant names
-      "rogers", "bell canada", "telus", "fido wireless", "koodo", "virgin mobile",
-      "freedom mobile", "shaw cable", "videotron", "eastlink", "at&t", "att wireless",
-      "att mobility", "verizon", "t-mobile", "tmobile", "sprint wireless", "comcast",
-      "xfinity", "spectrum ", "cox communication", "centurylink", "frontier comm",
-      "windstream", "google fi", "mint mobile", "visible wireless",
-      "internet service", "wireless service", "cellular service"]
-  },
-  {
-    kind: "expense", name: "Insurance",
-    keywords: ["allstate", "state farm", "geico", "progressive ins", "farmers insurance",
-      "nationwide ins", "liberty mutual", "usaa", "aetna", "blue cross", "cigna",
-      "united health", "sun life", "great-west life", "manulife", "canada life",
-      "desjardins ins", "intact insurance", "co-operators", "aviva canada",
-      "td insurance", "rbc insurance", "bmo insurance", "insurance premium", "insurance payment"]
-  },
-  {
-    kind: "expense", name: "Health & Wellness",
-    keywords: ["cvs pharmacy", "walgreens", "rite aid", "shoppers drug mart", "london drugs",
-      "pharmasave", "rexall", "loblaws pharmacy", "costco pharmacy", "planet fitness",
-      "goodlife fitness", "anytime fitness", "la fitness", "24 hour fitness", "equinox",
-      "crunch fitness", "ymca", "medical clinic", "dental office", "dentist", "optometrist",
-      "physio", "physiotherapy", "chiropractor", "massage therapy", "pharmacy", "drugstore",
-      "health clinic", "urgent care", "hospital"]
-  },
-  {
-    kind: "expense", name: "Office Supplies",
-    keywords: [
-      // Description-pattern keywords
-      "office supplies", "office supply", "supplies restock", "printer ink", "printer paper",
-      "office paper", "year-end supplies", "stationery", "toner cartridge",
-      // Merchant names
-      "staples ", "office depot", "officemax", "office max", "uline ", "viking direct",
-      "grand & toy", "bureau en gros", "reliable office supplies"
-    ]
-  },
-  {
-    kind: "expense", name: "Shipping & Postage",
-    keywords: ["fedex", "ups store", "ups shipping", "usps", "dhl", "canada post",
-      "purolator", "canpar", "loomis express", "fleet courier", "postage", "courier service"]
-  },
-  {
-    kind: "expense", name: "Vehicle & Transportation",
-    keywords: ["autozone", "advance auto", "o'reilly auto", "oreilly auto", "napa auto",
-      "jiffy lube", "valvoline", "midas ", "meineke", "firestone", "goodyear", "pep boys",
-      "maaco", "enterprise rent", "budget rent-a", "avis ", "hertz ", "national car rental",
-      "dollar car", "thrifty car", "u-haul", "penske truck", "zipcar",
-      "parking lot", "parking meter", "car wash", "auto repair", "oil change", "dealership"]
-  },
-  {
-    kind: "expense", name: "Rent & Utilities",
-    keywords: ["rent payment", "hydro ", "bc hydro", "enbridge", "atco gas", "fortis bc",
-      "epcor", "alectra", "union gas", "pacific gas", "pge ", "con edison",
-      "national grid", "water utility", "sewage", "garbage collect", "monthly rent",
-      "apartment rent", "electric utility", "natural gas utility"]
-  },
-  {
-    kind: "expense", name: "Legal & Professional", nameCA: "Legal & Accounting Fees",
-    keywords: [
-      // Description-pattern keywords
-      "legal and accounting", "legal & accounting", "bookkeeper", "bookkeeping",
-      "year-end bookkeeping", "quarterly bookkeeping", "monthly bookkeeping",
-      "cpa fee", "accounting fee", "legal fee", "professional fee",
-      "legal fees", "attorney fees", "lawyer fee", "notary fee",
-      // Merchant names
-      "law firm", "attorney", "accountant", "cpa firm", "fiverr",
-      "upwork", "toptal", "99designs", "freelance payment", "contractor payment", "notary"
-    ]
-  },
-  {
-    kind: "expense", name: "Government & Taxes",
-    keywords: ["irs ", "cra ", "revenue canada", "revenu canada", "department of finance",
-      "government fee", "permit fee", "business license", "vehicle registration",
-      "tax payment", "government of canada", "service canada", "service ontario",
-      "dmv ", "property tax", "hst payment", "gst payment", "sales tax remittance"]
-  },
-
-  // Income rules
-  {
-    kind: "income", name: "Payroll Income",
-    keywords: ["payroll", "salary deposit", "direct deposit payroll", "adp ", "paychex",
-      "ceridian", "paylocity", "gusto payroll", "bamboohr", "kronos payroll",
-      "wages", "employment income", "employment deposit", "biweekly pay", "weekly pay"]
-  },
-  {
-    kind: "income", name: "Sales Revenue",
-    keywords: [
-      // Description-pattern keywords — consulting / freelance / service income
-      "consulting fee", "consultant fee", "consulting fee -", "service fee -",
-      "freelance fee", "retainer fee", "project fee", "client fee",
-      "professional service income", "service income", "billable",
-      // Payment platform / merchant keywords
-      "square ", "stripe", "paypal", "shopify", "amazon seller", "etsy ", "ebay sale",
-      "venmo", "zelle", "e-transfer", "interac e-transfer", "interac etransfer",
-      "payment received", "invoice payment", "client payment", "settlement deposit",
-      "transfer in", "deposit", "direct deposit"
-    ]
-  },
-];
-
-function detectCsvCategory(description, kind, region) {
-  const desc = description.toLowerCase();
-  const isCA = String(region || "").toUpperCase() === "CA";
-  for (const rule of CSV_CATEGORY_RULES) {
-    if (rule.kind !== kind) continue;
-    if (rule.keywords.some(kw => desc.includes(kw))) {
-      return (isCA && rule.nameCA) ? rule.nameCA : rule.name;
-    }
-  }
-  return kind === "income" ? "Imported Income" : "Imported Expense";
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
-function resolveCsvCategoryTemplate(name, kind, region) {
-  const matchedDefault = findDefaultCategoryForRegion(region, name, kind);
-  if (matchedDefault) {
-    return {
-      color: matchedDefault.color || null,
-      tax_map_us: matchedDefault.tax_map_us || null,
-      tax_map_ca: matchedDefault.tax_map_ca || null
-    };
-  }
-
-  const normalizedRegion = String(region || "").toUpperCase() === "CA" ? "CA" : "US";
-  if (kind === "income") {
-    return normalizedRegion === "CA"
-      ? { color: "slate", tax_map_us: null, tax_map_ca: "other_income" }
-      : { color: "slate", tax_map_us: "other_income", tax_map_ca: null };
-  }
-
-  return normalizedRegion === "CA"
-    ? { color: "slate", tax_map_us: null, tax_map_ca: "other_expense" }
-    : { color: "slate", tax_map_us: "other_expense", tax_map_ca: null };
 }
 
 router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
@@ -2859,7 +2770,6 @@ module.exports.__private = {
   parseImportDateRange,
   isPlannedCsvDuplicate,
   countImportableCsvRows,
-  resolveCsvCategoryTemplate,
   getCategoryCacheEntryId,
   ensureCategoryTemplateFields,
   resolveCategoryId

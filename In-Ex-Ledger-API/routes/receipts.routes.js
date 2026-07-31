@@ -35,6 +35,8 @@ const {
 } = require("../services/accountingLockService.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 const { sendBookkeepingActivityEmail } = require("../services/bookkeepingEmailService.js");
+const { syncReceiptStatusForTransaction } = require("../services/receiptStatusService.js");
+const { AUDIT_ACTIONS, recordAuditEventForRequest } = require("../services/auditEventService.js");
 
 const router = express.Router();
 const storageDir = getReceiptStorageDir();
@@ -460,12 +462,28 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
     // Authoritative monthly receipt counter (never decremented on delete).
     await incrementReceiptUsage(client, businessId, 1);
 
+    if (transactionId !== null) {
+      await syncReceiptStatusForTransaction(client, {
+        businessId,
+        transactionId,
+        actorUserId: req.user?.id || null
+      });
+    }
+
     await client.query("COMMIT");
     committed = true;
     void invalidateSnapshotsForBusiness({
       businessId,
       reason: "Receipt evidence changed after export."
     }).catch((error) => logWarn("Receipt snapshot invalidation failed", { businessId, err: error.message }));
+
+    if (transactionId !== null) {
+      void recordAuditEventForRequest(pool, req, {
+        action: AUDIT_ACTIONS.RECEIPT_UPLOADED,
+        businessId,
+        metadata: { receiptId, transactionId, filename: req.file.originalname }
+      });
+    }
 
     // Best-effort: notify Basic businesses as they approach their monthly cap.
     void evaluateUsageLimitEmails({ businessId, resources: ["receipts"], subscription });
@@ -562,7 +580,7 @@ router.patch("/:id/attach", async (req, res) => {
     inTransaction = true;
 
     const receiptLookup = await client.query(
-      `SELECT id, business_id
+      `SELECT id, business_id, transaction_id
        FROM receipts
        WHERE id = $1
          AND business_id = ANY($2::uuid[])
@@ -578,6 +596,7 @@ router.patch("/:id/attach", async (req, res) => {
     }
 
     const receiptBusinessId = receiptLookup.rows[0].business_id;
+    const previousTransactionId = receiptLookup.rows[0].transaction_id;
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [receiptBusinessId]);
     const lockState = await loadAccountingLockState(client, receiptBusinessId);
 
@@ -649,6 +668,24 @@ router.patch("/:id/attach", async (req, res) => {
       await client.query("ROLLBACK");
       inTransaction = false;
       return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    // Re-derive receipt_status for both the transaction this receipt is
+    // leaving (if any) and the one it's joining (if any) — a reassignment
+    // can change both sides at once.
+    if (previousTransactionId && previousTransactionId !== transactionId) {
+      await syncReceiptStatusForTransaction(client, {
+        businessId: receiptBusinessId,
+        transactionId: previousTransactionId,
+        actorUserId: req.user?.id || null
+      });
+    }
+    if (transactionId) {
+      await syncReceiptStatusForTransaction(client, {
+        businessId: receiptBusinessId,
+        transactionId,
+        actorUserId: req.user?.id || null
+      });
     }
 
     await client.query("COMMIT");
@@ -774,6 +811,7 @@ router.delete("/:id", async (req, res) => {
     const found = await client.query(
       `SELECT r.storage_path,
               r.business_id,
+              r.transaction_id,
               (
                 SELECT t.date
                   FROM transactions t
@@ -819,11 +857,21 @@ router.delete("/:id", async (req, res) => {
       movedToPending = await moveFileIfExists(storagePath, pendingDeletePath);
     }
 
+    const deletedTransactionId = found.rows[0]?.transaction_id || null;
+
     await client.query(
       `DELETE FROM receipts
        WHERE id = $1 AND business_id = $2`,
       [receiptId, receiptBusinessId]
     );
+
+    if (deletedTransactionId) {
+      await syncReceiptStatusForTransaction(client, {
+        businessId: receiptBusinessId,
+        transactionId: deletedTransactionId,
+        actorUserId: req.user?.id || null
+      });
+    }
 
     await client.query("COMMIT");
     void invalidateSnapshotsForBusiness({
@@ -833,6 +881,14 @@ router.delete("/:id", async (req, res) => {
       businessId: receiptBusinessId,
       err: error.message
     }));
+
+    if (deletedTransactionId) {
+      void recordAuditEventForRequest(pool, req, {
+        action: AUDIT_ACTIONS.RECEIPT_DELETED,
+        businessId: receiptBusinessId,
+        metadata: { receiptId, transactionId: deletedTransactionId }
+      });
+    }
 
     if (movedToPending) {
       await safeUnlink(pendingDeletePath);

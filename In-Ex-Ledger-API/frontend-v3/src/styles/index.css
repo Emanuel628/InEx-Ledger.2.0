@@ -3314,6 +3314,16 @@ tbody tr:last-child td {
   text-align: right;
 }
 
+.transaction-detail-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .transaction-detail-actions {
   display: flex;
   flex-wrap: wrap;

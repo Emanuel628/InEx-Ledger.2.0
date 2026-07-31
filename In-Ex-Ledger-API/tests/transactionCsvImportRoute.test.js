@@ -93,7 +93,8 @@ function loadTransactionsRouterWithState() {
           import_batch_id: params[13],
           category_mapping_reason: params[14],
           category_mapping_confidence: params[15],
-          category_mapping_rule_id: params[16]
+          category_mapping_rule_id: params[16],
+          review_status: /'needs_review'/i.test(sql) ? "needs_review" : null
         });
         return { rows: [], rowCount: 1 };
       }
@@ -370,6 +371,15 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
     }
   });
   assert.equal(state.emailed, true);
+
+  assert.ok(state.insertedTransactions.length > 0);
+  for (const row of state.insertedTransactions) {
+    assert.equal(
+      row.review_status,
+      "needs_review",
+      `CSV-imported row for '${row.merchant_name}' (mapping confidence: ${row.category_mapping_confidence}) must land as needs_review regardless of mapping confidence, and must never be auto-set to ready/matched/locked`
+    );
+  }
 });
 
 test("POST /api/transactions/import/csv uses split bank descriptions for live category mapping", async () => {
