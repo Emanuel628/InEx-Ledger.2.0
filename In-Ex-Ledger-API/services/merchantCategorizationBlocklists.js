@@ -22,7 +22,20 @@ const AMBIGUOUS_RETAILERS = [
   "7 eleven", "circle k", "wawa", "sheetz", "kum go", "caseys",
   "royal farms", "getgo", "stewarts shops", "cumberland farms",
   "kwik star", "kwik trip", "racetrac", "murphy usa", "murphy express",
-  "quiktrip", "maverik", "loves country store", "rutters"
+  "quiktrip", "maverik", "loves country store", "rutters",
+  // Grocery: same "sells everything a household or a business could buy"
+  // ambiguity as the big-box retailers above.
+  "kroger", "safeway", "albertsons", "publix", "whole foods",
+  "whole foods market", "trader joe's", "trader joes", "loblaws",
+  "real canadian superstore", "superstore", "sobeys", "metro",
+  "food basics", "no frills", "save on foods",
+  // Pharmacy/mixed: front-of-store general merchandise plus prescriptions --
+  // exactly as likely to be personal as business.
+  "cvs", "cvs pharmacy", "walgreens", "rite aid", "shoppers drug mart",
+  "london drugs",
+  // Discount / department: general merchandise, same reasoning as Walmart.
+  "dollar general", "dollar tree", "family dollar", "dollarama",
+  "macy's", "macys", "nordstrom", "hudson's bay", "hudsons bay"
 ];
 
 // If any of these appear alongside a blocklisted retailer's name, the

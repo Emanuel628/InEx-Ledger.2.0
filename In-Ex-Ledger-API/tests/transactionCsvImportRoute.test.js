@@ -74,6 +74,9 @@ function loadTransactionsRouterWithState() {
       }
 
       if (/INSERT INTO transactions/i.test(sql)) {
+        if (String(params[7] || "").includes("FORCE_INSERT_FAIL")) {
+          throw new Error("simulated insert failure");
+        }
         state.insertedTransactions.push({
           id: params[0],
           business_id: params[1],
@@ -391,4 +394,41 @@ test("POST /api/transactions/import/csv uses split bank descriptions for live ca
   assert.equal(state.insertedTransactions[0].description_encrypted, "POS PURCHASE MICROSOFT 365 ANNUAL SUBSCRIPTION");
   assert.equal(state.insertedTransactions[0].category_id, categoryIdByName.get("Software & Subscriptions"));
   assert.equal(state.insertedTransactions[0].category_mapping_reason, "canonical_rule");
+});
+
+test("POST /api/transactions/import/csv retains skipped-row detail for missing fields and insert failures", async () => {
+  const { app, state, accountId } = loadTransactionsRouterWithState();
+  const csv = [
+    "Date,Merchant_Name,Description,Amount",
+    "2026-05-01,,Missing amount row,",
+    "2026-05-02,BadRow Co,FORCE_INSERT_FAIL trigger,-10.00",
+    "2026-05-03,Adobe Systems,*Photoshop Sub,-54.99"
+  ].join("\n");
+
+  const response = await request(app)
+    .post("/api/transactions/import/csv")
+    .field("account_id", accountId)
+    .field("skip_duplicates", "false")
+    .attach("file", Buffer.from(csv, "utf8"), "skipped-rows.csv");
+
+  assert.equal(response.status, 200, JSON.stringify({
+    body: response.body,
+    loggedErrors: state.loggedErrors
+  }));
+  assert.equal(response.body.imported, 1);
+  assert.equal(response.body.skipped, 2);
+  assert.equal(response.body.skipped_rows.length, 2);
+
+  const [missingFieldRow, insertFailedRow] = response.body.skipped_rows;
+  assert.equal(missingFieldRow.reason_code, "missing_required_field");
+  assert.equal(missingFieldRow.row, 2);
+  assert.match(missingFieldRow.reason, /missing or invalid amount/);
+  assert.equal(missingFieldRow.description, "Missing amount row");
+  assert.equal(missingFieldRow.date, "2026-05-01");
+
+  assert.equal(insertFailedRow.reason_code, "insert_failed");
+  assert.equal(insertFailedRow.row, 3);
+  assert.equal(insertFailedRow.merchant_name, "BadRow Co");
+  assert.equal(insertFailedRow.date, "2026-05-02");
+  assert.match(insertFailedRow.reason, /simulated insert failure/);
 });

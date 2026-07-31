@@ -63,11 +63,16 @@ const REVIEW_ONLY_PATTERNS = [
 // AND a payment/autopay idiom together (rather than the issuer name alone)
 // so this never hijacks a genuinely different rule, like "TD Insurance" /
 // "RBC Insurance" / "BMO Insurance" business insurance products sold by the
-// same banks' insurance arms.
+// same banks' insurance arms. That AND requirement is exactly what makes it
+// safe to include bare "td"/"rbc"/"bmo" tickers below (real statement text
+// often reads "RBC BILL PAYMENT" with no "Royal Bank" spelled out) -- the
+// ticker alone never fires without a payment idiom alongside it.
 const CARD_ISSUER_PATTERNS = [
-  /\bcapital one\b/i,
+  /\bcapital ?one\b/i,
+  /\bcap one\b/i,
   /\bchase\b/i,
-  /\bamerican express\b/i,
+  /\bjpmorgan chase\b/i,
+  /\bamerican ?express\b/i,
   /\bamex\b/i,
   /\bciti(bank)?\b/i,
   /\bbank of america\b/i,
@@ -75,11 +80,10 @@ const CARD_ISSUER_PATTERNS = [
   /\bdiscover card\b/i,
   /\bbarclaycard\b/i,
   /\bsynchrony\b/i,
-  /\btd bank\b/i,
-  /\btd canada trust\b/i,
-  /\brbc royal bank\b/i,
+  /\btd\b/i,
+  /\brbc\b/i,
   /\bscotiabank\b/i,
-  /\bbmo bank of montreal\b/i,
+  /\bbmo\b/i,
   /\bcibc\b/i,
   /\bus bank\b/i,
   /\bpnc bank\b/i
@@ -87,14 +91,22 @@ const CARD_ISSUER_PATTERNS = [
 
 const CARD_PAYMENT_IDIOM_PATTERNS = [
   /\bautopay\b/i,
+  /\bauto[ -]pay\b/i,
   /\bmobile payment\b/i,
-  /\be ?payment\b/i,
+  /\bmobile pmt\b/i,
+  /\be[ -]?pay(ment)?\b/i,
+  /\bweb pay\b/i,
   /\bcrd (cr )?payment\b/i,
+  /\bcrd pmt\b/i,
   /\bcredit crd\b/i,
+  /\bcrcard\b/i,
   /\bonline banking payment\b/i,
-  /\bthank you for your payment\b/i,
-  /\bcard payment\b/i,
-  /\bpayment thank you\b/i
+  /\bpre-?authorized\b/i,
+  /\bpad payment\b/i,
+  /\bthank you\b/i,
+  /\bpayment\b/i,
+  /\bpymt\b/i,
+  /\bpmt\b/i
 ];
 
 // P2P transfers (Interac e-Transfer, Zelle, Venmo) are frequently owner
@@ -103,7 +115,7 @@ const CARD_PAYMENT_IDIOM_PATTERNS = [
 // Service Income inflates revenue, which is a real books error, not a
 // convenience. Route them to review instead of guessing.
 const INCOME_REVIEW_ONLY_PATTERNS = [
-  /\binterac e ?transfer\b/i,
+  /\binterac e[- ]?transfer\b/i,
   /\bzelle\b/i,
   /\bvenmo\b/i,
   /\bsettlement deposit\b/i
@@ -211,6 +223,14 @@ const CATEGORY_RULES = [
     providerHints: ["office_supplies"]
   },
   {
+    // "restaurant"/"coffee"/"cafe"/"pizza"/"burger"/"meal"/"dining" are real
+    // signal when they're literally in the merchant's own name (a business
+    // called "Tony's Pizza" almost certainly is one) but too soft to trust
+    // from the description alone, where a bank/Plaid category_guess hint
+    // could otherwise combine with a bare mention to clear the auto-map
+    // floor on very little real evidence. merchantOnlyKeywords below strips
+    // their description-field credit while leaving merchant-field matches
+    // (and all the named brands/multi-word phrases) untouched.
     kind: "expense",
     usCategory: "Meals",
     caCategory: "Meals & Entertainment",
@@ -219,6 +239,7 @@ const CATEGORY_RULES = [
       "uber eats", "ubereats", "doordash", "skip the dishes", "grubhub",
       "client lunch", "business lunch", "meal", "dining"
     ],
+    merchantOnlyKeywords: new Set(["restaurant", "coffee", "cafe", "pizza", "burger", "meal", "dining"]),
     providerHints: ["food", "restaurant", "dining"]
   },
   {
@@ -233,6 +254,9 @@ const CATEGORY_RULES = [
     providerHints: ["travel", "lodging", "airfare", "transportation"]
   },
   {
+    // Bare "gas"/"fuel" are merchant-only for the same reason as the soft
+    // Meals words above: real signal if it's the merchant's own name, too
+    // soft to trust from the description alone.
     kind: "expense",
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
@@ -241,6 +265,7 @@ const CATEGORY_RULES = [
       "jiffy lube", "valvoline", "autozone", "napa auto", "parking meter", "parking lot",
       "auto repair", "oil change"
     ],
+    merchantOnlyKeywords: new Set(["gas", "fuel"]),
     providerHints: ["automotive", "gas", "fuel", "vehicle"]
   },
   {
@@ -992,6 +1017,7 @@ function scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactD
   let merchantBest = 0;
   let descBest = 0;
   let merchantStrong = false;
+  const merchantOnly = rule.merchantOnlyKeywords;
 
   for (const keyword of rule.keywords || []) {
     const isMultiWord = keyword.includes(" ");
@@ -1001,6 +1027,14 @@ function scoreRule(rule, { merchantTokens, compactMerchant, descTokens, compactD
       merchantStrong = true;
       continue;
     }
+    // A handful of single-word keywords (soft meal words like "coffee"/
+    // "pizza", or bare "gas"/"fuel") are real signal when they're the
+    // merchant's own name, but too soft to trust from the description alone
+    // -- a description-only hit combined with a provider-hint bonus could
+    // otherwise clear the auto-map floor on very little evidence. These are
+    // flagged per-rule via merchantOnlyKeywords and simply don't earn
+    // description-field credit.
+    if (merchantOnly && merchantOnly.has(keyword)) continue;
     if (normalizedContains(descTokens, compactDescFull, keyword)) {
       descBest = Math.max(descBest, isMultiWord ? 3 : 2);
     }
