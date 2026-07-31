@@ -423,3 +423,49 @@ test("categorizer falls back to Imported when a canonical rule's category doesn'
   assert.equal(result.categoryName, "Imported Expense");
   assert.equal(result.reason, "fallback_imported");
 });
+
+// Regression tests: mapping-hardening pass (issuer aliases, blocklist growth,
+// merchant-only soft keywords)
+
+test("categorizer still maps a real 'Tony's Pizza' merchant to Meals (control — merchant-field soft keywords still count)", () => {
+  const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
+  const result = categorize({ type: "expense", merchantName: "Tony's Pizza Shop", description: "Order 4471" });
+  assert.equal(result.categoryName, "Meals");
+});
+
+test("categorizer does not let a description-only soft meal word plus a provider hint clear the auto-map floor", () => {
+  const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
+  const result = categorize({
+    type: "expense",
+    merchantName: "",
+    description: "coffee meeting reimbursement",
+    categoryGuess: "FOOD_AND_DRINK"
+  });
+  assert.equal(result.categoryName, "Imported Expense");
+});
+
+test("categorizer does not let a description-only bare 'gas' plus a provider hint clear the auto-map floor", () => {
+  const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
+  const result = categorize({
+    type: "expense",
+    merchantName: "",
+    description: "gas reimbursement",
+    categoryGuess: "AUTOMOTIVE"
+  });
+  assert.equal(result.categoryName, "Imported Expense");
+});
+
+test("categorizer routes bare RBC/TD/BMO ticker + payment idiom to review without hijacking their insurance products", () => {
+  const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
+  assert.equal(categorize({ type: "expense", merchantName: "RBC", description: "RBC Bill Payment" }).categoryName, "Imported Expense");
+  assert.equal(categorize({ type: "expense", merchantName: "TD", description: "TD Pre-Authorized Payment" }).categoryName, "Imported Expense");
+});
+
+for (const merchant of ["Kroger", "Safeway", "Whole Foods Market", "CVS Pharmacy", "Walgreens", "Dollar General", "Macy's"]) {
+  test(`categorizer leaves grocery/pharmacy/discount retailer '${merchant}' in Imported Expense`, () => {
+    const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
+    const result = categorize({ type: "expense", merchantName: merchant, description: "Purchase" });
+    assert.equal(result.categoryName, "Imported Expense");
+    assert.equal(result.reason, "ambiguous_retailer");
+  });
+}

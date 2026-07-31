@@ -2436,7 +2436,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       return id;
     }
 
-    const results = { imported: 0, skipped: 0, duplicates: 0, out_of_range: 0, errors: [] };
+    const results = { imported: 0, skipped: 0, duplicates: 0, out_of_range: 0, errors: [], skipped_rows: [] };
     const MAX_ROWS = 1000;
     const rowsToProcess = rows.slice(0, MAX_ROWS);
     client = await pool.connect();
@@ -2482,6 +2482,22 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       const { amount, type, description, merchantName, categoryGuess, date } = extractRowData(row, cols);
 
       if (!date || !amount || !type || amount <= 0 || !description) {
+        const missing = [];
+        if (!date) missing.push("date");
+        if (!amount || amount <= 0) missing.push("amount");
+        if (!type) missing.push("type");
+        if (!description) missing.push("description");
+        results.skipped_rows.push({
+          row: i + 2,
+          reason_code: "missing_required_field",
+          reason: `Row ${i + 2}: missing or invalid ${missing.join(", ")}`,
+          date: date || null,
+          description: description || null,
+          merchant_name: merchantName || null,
+          category_guess: categoryGuess || null,
+          amount: amount || null,
+          type: type || null
+        });
         results.skipped++;
         continue;
       }
@@ -2498,7 +2514,19 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       try {
         assertDateUnlocked(lockState, date);
       } catch {
-        results.errors.push({ row: i + 2, reason: `Row ${i + 2}: date ${date} falls within a locked accounting period` });
+        const reason = `Row ${i + 2}: date ${date} falls within a locked accounting period`;
+        results.errors.push({ row: i + 2, reason });
+        results.skipped_rows.push({
+          row: i + 2,
+          reason_code: "locked_period",
+          reason,
+          date,
+          description,
+          merchant_name: merchantName || null,
+          category_guess: categoryGuess || null,
+          amount,
+          type
+        });
         results.skipped++;
         continue;
       }
@@ -2533,7 +2561,19 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         type
       );
       if (!categoryId) {
-        results.errors.push({ row: i + 2, reason: `Row ${i + 2}: could not resolve category` });
+        const reason = `Row ${i + 2}: could not resolve category`;
+        results.errors.push({ row: i + 2, reason });
+        results.skipped_rows.push({
+          row: i + 2,
+          reason_code: "category_unresolved",
+          reason,
+          date,
+          description,
+          merchant_name: merchantName || null,
+          category_guess: categoryGuess || null,
+          amount,
+          type
+        });
         results.skipped++;
         continue;
       }
@@ -2571,7 +2611,19 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         );
         results.imported++;
       } catch (insertErr) {
-        results.errors.push({ row: i + 2, reason: `Row ${i + 2}: ${insertErr.message}` });
+        const reason = `Row ${i + 2}: ${insertErr.message}`;
+        results.errors.push({ row: i + 2, reason });
+        results.skipped_rows.push({
+          row: i + 2,
+          reason_code: "insert_failed",
+          reason,
+          date,
+          description,
+          merchant_name: merchantName || null,
+          category_guess: categoryGuess || null,
+          amount,
+          type
+        });
         results.skipped++;
       }
     }

@@ -2693,7 +2693,11 @@ tbody tr:last-child td {
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  /* Higher than .transaction-modal-backdrop (70): the add/edit drawer can be
+     opened from within another open modal (e.g. recovering a skipped CSV
+     import row without losing the import results underneath) and must stay
+     the topmost interactive layer in that case. */
+  z-index: 75;
   display: flex;
   justify-content: flex-end;
   overflow: hidden;
@@ -3196,6 +3200,72 @@ tbody tr:last-child td {
   margin: 14px 0 0;
   padding-left: 20px;
   color: var(--red);
+}
+
+.csv-stat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.csv-stat-toggle:hover,
+.csv-stat-toggle:focus-visible {
+  border-color: var(--blue);
+  background: var(--surface);
+}
+
+.csv-stat-toggle svg {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+
+.csv-stat-toggle svg.is-rotated {
+  transform: rotate(180deg);
+}
+
+.csv-skipped-table-wrap {
+  margin-top: 14px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.csv-skipped-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.csv-skipped-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-weight: 800;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.csv-skipped-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  color: var(--ink);
+}
+
+.csv-skipped-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.csv-skipped-recovered {
+  color: var(--green);
+  font-weight: 800;
 }
 
 .transaction-detail-amount {

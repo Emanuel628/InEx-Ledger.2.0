@@ -187,6 +187,18 @@ type LegacyRecurringTemplate = {
   active?: boolean
 }
 
+export type CsvSkippedRow = {
+  row: number
+  reason_code: string
+  reason: string
+  date: string | null
+  description: string | null
+  merchant_name: string | null
+  category_guess: string | null
+  amount: number | null
+  type: 'income' | 'expense' | null
+}
+
 export type CsvImportResult = {
   imported?: number
   skipped?: number
@@ -194,6 +206,7 @@ export type CsvImportResult = {
   truncated?: boolean
   truncated_at?: number
   errors?: { reason?: string }[]
+  skipped_rows?: CsvSkippedRow[]
 }
 
 export type TransactionPageFilters = {

@@ -44,6 +44,7 @@ import {
   type CategoryOption,
   type Transaction,
   type CsvImportResult,
+  type CsvSkippedRow,
   type RecurringTemplateDraft,
   type RecurringTemplate,
   type ReviewQueueResponse,
@@ -59,6 +60,8 @@ function Transactions(props: PageProps) {
   const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [recoveryRow, setRecoveryRow] = useState<{ row: CsvSkippedRow; accountName: string } | null>(null)
+  const [recoveredSkipRowKeys, setRecoveredSkipRowKeys] = useState<Set<number>>(new Set())
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [transactionRows, setTransactionRows] = useState<Transaction[]>([])
   const [transactionTotal, setTransactionTotal] = useState(0)
@@ -194,11 +197,31 @@ function Transactions(props: PageProps) {
       {...props}
       overlay={
         <>
+          {csvImportOpen ? (
+            <CsvImportModal
+              accounts={accountOptions}
+              region={businessRegion}
+              onClose={() => setCsvImportOpen(false)}
+              onImport={(input) => importTransactionsCsv(input)}
+              onImported={async (result) => {
+                await refreshPageData()
+                return result
+              }}
+              recoveredRowKeys={recoveredSkipRowKeys}
+              onRecoverRow={(row, accountId) => {
+                const accountName = accountOptions.find((account) => account.id === accountId)?.name || ''
+                setRecoveryRow({ row, accountName })
+                setEditingTransaction(null)
+                setDrawerOpen(true)
+              }}
+            />
+          ) : null}
           {drawerOpen ? (
             <TransactionDrawer
               onClose={() => {
                 setDrawerOpen(false)
                 setEditingTransaction(null)
+                setRecoveryRow(null)
               }}
               onSave={(draft) => {
                 void saveTransactionDraft(draft, editingTransaction, accountOptions, categoryOptions)
@@ -208,7 +231,11 @@ function Transactions(props: PageProps) {
                         ? rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row))
                         : [savedTransaction, ...rows]
                     ))
+                    if (recoveryRow) {
+                      setRecoveredSkipRowKeys((keys) => new Set(keys).add(recoveryRow.row.row))
+                    }
                     setEditingTransaction(null)
+                    setRecoveryRow(null)
                     setDrawerOpen(false)
                   })
                   .catch((error) => {
@@ -223,7 +250,11 @@ function Transactions(props: PageProps) {
                         ? rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row))
                         : [savedTransaction, ...rows]
                     ))
+                    if (recoveryRow) {
+                      setRecoveredSkipRowKeys((keys) => new Set(keys).add(recoveryRow.row.row))
+                    }
                     setEditingTransaction(null)
+                    setRecoveryRow(null)
                     setDrawerOpen(false)
                     setReceiptTransaction(savedTransaction)
                   })
@@ -233,12 +264,14 @@ function Transactions(props: PageProps) {
                   })
               )}
               transaction={editingTransaction}
+              initialDraft={recoveryRow ? skippedRowToDraftSeed(recoveryRow.row, recoveryRow.accountName) : undefined}
               accounts={accountOptions}
               categories={categoryOptions}
               onAttachReceipt={(transaction) => setReceiptTransaction(transaction)}
               onManageCategories={() => {
                 setDrawerOpen(false)
                 setEditingTransaction(null)
+                setRecoveryRow(null)
                 props.onNavigate('Categories')
               }}
             />
@@ -349,18 +382,6 @@ function Transactions(props: PageProps) {
                 setEndDateFilter('')
               }}
               onClose={() => setFiltersOpen(false)}
-            />
-          ) : null}
-          {csvImportOpen ? (
-            <CsvImportModal
-              accounts={accountOptions}
-              region={businessRegion}
-              onClose={() => setCsvImportOpen(false)}
-              onImport={(input) => importTransactionsCsv(input)}
-              onImported={async (result) => {
-                await refreshPageData()
-                return result
-              }}
             />
           ) : null}
         </>
@@ -707,12 +728,16 @@ function CsvImportModal({
   onClose,
   onImport,
   onImported,
+  recoveredRowKeys,
+  onRecoverRow,
 }: {
   accounts: AccountOption[]
   region: 'US' | 'CA'
   onClose: () => void
   onImport: (input: { file: File; accountId: string; startDate?: string; endDate?: string }) => Promise<CsvImportResult>
   onImported: (result: CsvImportResult) => Promise<CsvImportResult>
+  recoveredRowKeys: Set<number>
+  onRecoverRow: (row: CsvSkippedRow, accountId: string) => void
 }) {
   const [accountId, setAccountId] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -722,6 +747,7 @@ function CsvImportModal({
   const [result, setResult] = useState<CsvImportResult | null>(null)
   const [importing, setImporting] = useState(false)
   const [showBankHelp, setShowBankHelp] = useState(false)
+  const [skippedSectionOpen, setSkippedSectionOpen] = useState(false)
 
   async function startImport() {
     setError('')
@@ -772,13 +798,66 @@ function CsvImportModal({
           <div className="csv-import-result">
             <div className="csv-import-success">
               <div className="csv-stat"><span className="csv-stat-num">{result.imported || 0}</span> imported</div>
-              <div className="csv-stat"><span className="csv-stat-num">{result.skipped || 0}</span> skipped</div>
+              {result.skipped_rows?.length ? (
+                <button
+                  type="button"
+                  className="csv-stat csv-stat-toggle"
+                  aria-expanded={skippedSectionOpen}
+                  onClick={() => setSkippedSectionOpen((value) => !value)}
+                >
+                  <span className="csv-stat-num">{result.skipped || 0}</span> skipped
+                  <ChevronDown size={14} className={skippedSectionOpen ? 'is-rotated' : ''} />
+                </button>
+              ) : (
+                <div className="csv-stat"><span className="csv-stat-num">{result.skipped || 0}</span> skipped</div>
+              )}
               {Number(result.out_of_range || 0) > 0 ? (
                 <div className="csv-stat"><span className="csv-stat-num">{result.out_of_range}</span> outside date range</div>
               ) : null}
             </div>
             {result.truncated ? <p className="csv-import-note">Only the first {result.truncated_at} rows were processed.</p> : null}
-            {result.errors?.length ? (
+            {skippedSectionOpen && result.skipped_rows?.length ? (
+              <div className="csv-skipped-table-wrap">
+                <table className="csv-skipped-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th className="align-right">Amount</th>
+                      <th>Why it was skipped</th>
+                      <th className="action-col">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.skipped_rows.map((row) => {
+                      const recovered = recoveredRowKeys.has(row.row)
+                      return (
+                        <tr key={row.row}>
+                          <td data-label="Date">{row.date || '—'}</td>
+                          <td data-label="Description">{row.description || row.merchant_name || '—'}</td>
+                          <td data-label="Amount" className="align-right amount">{row.amount != null ? formatMoney(Number(row.amount)) : '—'}</td>
+                          <td data-label="Why it was skipped">{row.reason}</td>
+                          <td data-label="Action" className="action-col">
+                            {recovered ? (
+                              <span className="csv-skipped-recovered">Added</span>
+                            ) : (
+                              <button
+                                className="row-action"
+                                type="button"
+                                onClick={() => onRecoverRow(row, accountId)}
+                              >
+                                Edit &amp; add
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {!result.skipped_rows?.length && result.errors?.length ? (
               <ul className="csv-error-list">
                 {result.errors.slice(0, 10).map((item, index) => <li key={`${item.reason || 'error'}-${index}`}>{item.reason || 'Row skipped.'}</li>)}
               </ul>
@@ -1231,6 +1310,7 @@ function TransactionDrawer({
   onSave,
   onSaveAndAttachReceipt,
   transaction,
+  initialDraft,
   accounts,
   categories,
   onAttachReceipt,
@@ -1240,12 +1320,15 @@ function TransactionDrawer({
   onSave: (draft: TransactionDraft) => void
   onSaveAndAttachReceipt: (draft: TransactionDraft) => Promise<void>
   transaction: Transaction | null
+  initialDraft?: Partial<TransactionDraft>
   accounts: AccountOption[]
   categories: CategoryOption[]
   onAttachReceipt: (transaction: Transaction) => void
   onManageCategories: () => void
 }) {
-  const [draft, setDraft] = useState<TransactionDraft>(() => transaction ? transactionToDraft(transaction) : emptyDraft)
+  const [draft, setDraft] = useState<TransactionDraft>(() => (
+    transaction ? transactionToDraft(transaction) : { ...emptyDraft, ...initialDraft }
+  ))
   const [error, setError] = useState('')
   const isIncome = draft.kind === 'Income'
   const isEditing = Boolean(transaction)
@@ -1739,6 +1822,16 @@ function transactionToDraft(transaction: Transaction): TransactionDraft {
     category: transaction.category,
     account: transaction.account,
     note: transaction.note,
+  }
+}
+
+function skippedRowToDraftSeed(row: CsvSkippedRow, accountName: string): Partial<TransactionDraft> {
+  return {
+    kind: row.type === 'income' ? 'Income' : 'Expense',
+    amount: row.amount != null ? String(Math.abs(Number(row.amount))) : '',
+    description: row.description || row.merchant_name || '',
+    date: row.date || '',
+    account: accountName,
   }
 }
 
