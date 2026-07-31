@@ -312,7 +312,10 @@ test("POST /api/auth/register does not reveal existing account emails", async ()
     assert.equal(response.body?.verification_state, undefined);
     assert.equal(response.body?.signup_bootstrap_token, undefined);
     assert.equal(fixture.state.insertedUserParams, null);
-    assert.equal(fixture.state.passwordResetTokenInserts, 1);
+    // The duplicate-signup notice now points to the plain /forgot-password
+    // page instead of embedding a one-click reset token/link, so no
+    // password_reset_tokens row is created for this notification path.
+    assert.equal(fixture.state.passwordResetTokenInserts, 0);
     assert.equal(fixture.state.sentEmails.length, 1);
     assert.deepEqual(fixture.state.sentEmails[0]?.to, ["existing@example.com"]);
   } finally {

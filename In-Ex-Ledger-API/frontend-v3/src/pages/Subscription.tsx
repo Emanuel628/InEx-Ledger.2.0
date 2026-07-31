@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, CreditCard, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CreditCard, Download, ExternalLink, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { usePlan } from '../context/PlanContext'
 import {
   cancelSubscription,
+  formatBillingDateFromUnix,
+  formatBillingInvoiceAmount,
+  formatSubscriptionDate,
   loadBillingOverview,
   loadBillingPricing,
   openBillingPortal,
   resumeSubscription,
   startCheckout,
   type BillingInterval,
+  type BillingInvoice,
   type BillingOverview,
+  type BillingPaymentMethod,
   type BillingPricing,
 } from '../lib/billingApi'
 import { BASIC_LIMITS_NOTE, formatPlanPeriod, formatPlanPrice } from '../lib/planContent'
@@ -25,6 +30,7 @@ function Subscription(props: PageProps) {
   const [dataError, setDataError] = useState('')
   const [working, setWorking] = useState(false)
   const [confirmingCheckout, setConfirmingCheckout] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
 
   async function refreshSubscription() {
     setLoadingData(true)
@@ -113,6 +119,12 @@ function Subscription(props: PageProps) {
   // trial user could never actually start Stripe checkout.
   const shouldManageExistingSubscription = Boolean((subscription?.isPaid || subscription?.stripeSubscriptionId) && !canResume)
   const needsBillingPortal = ['past_due', 'unpaid'].includes(String(subscription?.effectiveStatus || subscription?.status || '').toLowerCase())
+  // An active, non-canceled Pro subscriber picking a different interval than
+  // the one they're actually on switches directly (see handleSwitchInterval)
+  // instead of going through Checkout or the generic Stripe portal.
+  const canSwitchIntervalDirectly = Boolean(
+    isProActive && shouldManageExistingSubscription && subscription?.billingInterval && interval !== subscription.billingInterval
+  )
 
   async function handleCheckout() {
     setWorking(true)
@@ -120,6 +132,10 @@ function Subscription(props: PageProps) {
     try {
       if (canResume) {
         await handleResume()
+        return
+      }
+      if (canSwitchIntervalDirectly) {
+        await handleSwitchInterval()
         return
       }
       if (shouldManageExistingSubscription || needsBillingPortal) {
@@ -162,10 +178,33 @@ function Subscription(props: PageProps) {
     }
   }
 
-  async function handleCancel() {
-    if (!window.confirm('Cancel this subscription? Pro stays active until the paid period ends when Stripe allows it.')) {
-      return
+  async function handleSwitchInterval() {
+    setWorking(true)
+    setDataError('')
+    try {
+      const updated = await resumeSubscription(interval)
+      setOverview((current) => current ? { ...current, subscription: updated } : current)
+      await refreshPlanContext()
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to switch billing interval.')
+    } finally {
+      setWorking(false)
     }
+  }
+
+  async function handleOpenPortal() {
+    setWorking(true)
+    setDataError('')
+    try {
+      await openBillingPortal()
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to open Stripe portal.')
+      setWorking(false)
+    }
+  }
+
+  async function confirmCancel() {
+    setShowCancelModal(false)
     setWorking(true)
     setDataError('')
     try {
@@ -179,6 +218,30 @@ function Subscription(props: PageProps) {
     }
   }
 
+  const invoices = overview?.invoices || []
+  const paymentMethod = overview?.paymentMethod
+
+  function downloadInvoicesCsv() {
+    const rows = [
+      ['Invoice', 'Date', 'Status', 'Total', 'Currency'],
+      ...invoices.map((invoice) => [
+        invoice.number || invoice.id,
+        formatBillingDateFromUnix(invoice.created),
+        invoice.status || 'paid',
+        String((Number(invoice.amount_paid ?? invoice.amount_due ?? 0) / 100).toFixed(2)),
+        (invoice.currency || 'usd').toUpperCase(),
+      ]),
+    ]
+    const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'inex-ledger-subscription-invoices.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <AppShell {...props}>
       <main className="transactions-page subscription-page-v3">
@@ -189,6 +252,21 @@ function Subscription(props: PageProps) {
             <p>Pick the plan that fits this workspace.</p>
           </div>
         </section>
+
+        {!loadingData ? (
+          <p className="subscription-status-line">
+            {isProActive ? (
+              <>
+                You're on the <strong>Pro</strong> plan
+                {subscription?.currentPeriodEnd ? (
+                  <> · {subscription?.cancelAtPeriodEnd ? 'ends' : 'renews'} {formatSubscriptionDate(subscription.currentPeriodEnd)}</>
+                ) : null}
+              </>
+            ) : (
+              <>You're on the <strong>Basic</strong> plan.</>
+            )}
+          </p>
+        ) : null}
 
         {confirmingCheckout ? (
           <section className="top-alert checkout-confirm-banner" role="status">
@@ -223,7 +301,7 @@ function Subscription(props: PageProps) {
             {loadingData ? null : !isProActive ? (
               <span className="status-pill status-income">Current plan</span>
             ) : !canResume ? (
-              <button className="secondary-button" type="button" disabled={working} onClick={() => void handleCancel()}>
+              <button className="secondary-button" type="button" disabled={working} onClick={() => setShowCancelModal(true)}>
                 Keep Basic
               </button>
             ) : null}
@@ -249,9 +327,9 @@ function Subscription(props: PageProps) {
               </div>
             ) : null}
 
-            {canResume && subscription?.billingInterval && interval !== subscription.billingInterval ? (
+            {(canResume || canSwitchIntervalDirectly) && subscription?.billingInterval && interval !== subscription.billingInterval ? (
               <p className="subscription-interval-note">
-                Switching to {interval === 'monthly' ? 'monthly' : 'yearly'} billing takes effect immediately with no prorated credit or charge.
+                Switching to {interval === 'monthly' ? 'monthly' : 'yearly'} billing applies at your next renewal -- your current period isn't affected, and the new price is charged in full with no proration.
               </p>
             ) : null}
 
@@ -259,6 +337,11 @@ function Subscription(props: PageProps) {
               <button className="primary-button" type="button" disabled={working} onClick={() => void handleResume()}>
                 <CreditCard size={18} />
                 {working ? 'Working' : 'Keep Pro active'}
+              </button>
+            ) : canSwitchIntervalDirectly ? (
+              <button className="primary-button" type="button" disabled={working} onClick={() => void handleSwitchInterval()}>
+                <CreditCard size={18} />
+                {working ? 'Switching' : `Switch to ${interval === 'monthly' ? 'monthly' : 'yearly'}`}
               </button>
             ) : shouldManageExistingSubscription || needsBillingPortal ? (
               <button className="primary-button" type="button" disabled={working || loadingData || !overview?.portalAvailable} onClick={() => void handleCheckout()}>
@@ -273,9 +356,135 @@ function Subscription(props: PageProps) {
             ) : null}
           </article>
         </section>
+
+        {isProActive ? (
+          <article className="billing-side-card subscription-payment-card">
+            <span className={`status-pill ${paymentMethod ? 'status-income' : 'status-draft'}`}>
+              {paymentMethod ? 'Connected' : 'Not connected'}
+            </span>
+            <strong>{formatPaymentMethod(paymentMethod)}</strong>
+            <p>{paymentMethod ? 'Default payment method for Stripe subscription billing.' : 'A default payment method will appear here after Stripe checkout.'}</p>
+            <button className="secondary-button" type="button" onClick={() => void handleOpenPortal()} disabled={working || loadingData || !overview?.portalAvailable}>
+              <ExternalLink size={16} />
+              Open Stripe portal
+            </button>
+          </article>
+        ) : null}
+
+        {isProActive ? (
+          <section className="table-panel">
+            <div className="table-panel-header">
+              <div>
+                <h2>Invoice history</h2>
+                <p>Recent subscription invoices and receipts.</p>
+              </div>
+              <button className="secondary-button" type="button" disabled={!invoices.length} onClick={downloadInvoicesCsv}>
+                <Download size={17} />
+                Export CSV
+              </button>
+            </div>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Date</th>
+                    <th>Payment method</th>
+                    <th>Status</th>
+                    <th className="align-right">Total</th>
+                    <th className="action-col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.length ? (
+                    invoices.map((invoice) => (
+                      <BillingInvoiceRow invoice={invoice} method={formatPaymentMethod(paymentMethod)} key={invoice.id} />
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6}>
+                        <div className="empty-table-state">
+                          <strong>{loadingData ? 'Loading subscription invoices' : 'No subscription invoices yet'}</strong>
+                          <span>Stripe receipts will appear after the first successful checkout.</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
       </main>
+
+      {showCancelModal ? (
+        <div className="transaction-modal-backdrop" role="presentation" onMouseDown={() => setShowCancelModal(false)}>
+          <section
+            className="transaction-detail-modal subscription-action-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancelSubscriptionTitle"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="drawer-header">
+              <div>
+                <h2 id="cancelSubscriptionTitle">Cancel your subscription and return to Basic?</h2>
+              </div>
+              <button className="icon-button" type="button" aria-label="Close cancel subscription" onClick={() => setShowCancelModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="transaction-detail-body">
+              <p>
+                You'll keep full Pro access through the rest of your current billing period -- after that, this workspace switches to Basic automatically.
+                No refund is issued for the current period, and you can resubscribe any time.
+              </p>
+            </div>
+            <div className="drawer-actions">
+              <button className="secondary-button" type="button" onClick={() => setShowCancelModal(false)}>Never mind</button>
+              <button className="secondary-button danger-button" type="button" onClick={() => void confirmCancel()}>Cancel and return to Basic</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </AppShell>
   )
+}
+
+function BillingInvoiceRow({ invoice, method }: { invoice: BillingInvoice; method: string }) {
+  return (
+    <tr>
+      <td data-label="Invoice">
+        <strong>{invoice.number || invoice.id}</strong>
+      </td>
+      <td data-label="Date">{formatBillingDateFromUnix(invoice.created)}</td>
+      <td data-label="Payment method">{method}</td>
+      <td data-label="Status">
+        <span className="status-pill status-income">{invoice.status || 'paid'}</span>
+      </td>
+      <td data-label="Total" className="align-right amount">{formatBillingInvoiceAmount(invoice)}</td>
+      <td data-label="Action" className="action-col receipt-actions">
+        {invoice.hosted_invoice_url ? <a className="row-action" href={invoice.hosted_invoice_url} rel="noreferrer" target="_blank">View</a> : null}
+        {invoice.invoice_pdf ? <a className="row-action" href={invoice.invoice_pdf} rel="noreferrer" target="_blank">PDF</a> : null}
+      </td>
+    </tr>
+  )
+}
+
+function formatPaymentMethod(method?: BillingPaymentMethod | null) {
+  if (!method) return 'No payment method yet'
+  if (method.type === 'card') {
+    return `${method.brand || 'Card'} ending ${method.last4 || '----'}`
+  }
+  if (method.type === 'us_bank_account') {
+    return `${method.bankName || 'Bank account'} ending ${method.last4 || '----'}`
+  }
+  return method.type || 'Payment method'
+}
+
+function csvCell(value: string | number) {
+  const text = String(value)
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 function readPreferredBillingInterval(): BillingInterval {

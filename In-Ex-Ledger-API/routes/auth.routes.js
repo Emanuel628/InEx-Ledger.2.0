@@ -188,8 +188,10 @@ function isTransientLoginInfrastructureError(err) {
    4. PASSWORD RESET UTILITIES (DB-backed)
    ========================================================= */
 async function createPasswordResetToken(email) {
-  // 32 bytes => 256-bit token entropy, encoded as a 64-char hex string.
-  const token = crypto.randomBytes(32).toString("hex");
+  // 6-digit numeric code, emailed and re-entered by hand -- not a link
+  // token, so it's hashed and scoped by email the same way the old 256-bit
+  // hex token was.
+  const token = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
   const tokenHash = hashValue(token);
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
   await pool.query("DELETE FROM password_reset_tokens WHERE email = $1", [email]);
@@ -200,18 +202,19 @@ async function createPasswordResetToken(email) {
   return { token, expiresAt };
 }
 
-async function consumePasswordResetToken(token) {
+async function consumePasswordResetToken(email, token) {
+  const normalizedEmail = normalizeEmail(email);
   const rawToken = String(token || "").trim();
-  if (!rawToken) return null;
+  if (!normalizedEmail || !rawToken) return null;
   const tokenHash = hashValue(rawToken);
   await pool.query("DELETE FROM password_reset_tokens WHERE expires_at <= NOW()");
   const result = await pool.query(
     `DELETE FROM password_reset_tokens
-      -- Legacy UUID token rows can still exist from the pre-hash migration window.
-      WHERE (token_hash = $1 OR token::text = $2)
+      WHERE email = $1
+        AND token_hash = $2
         AND expires_at > NOW()
       RETURNING email`,
-    [tokenHash, rawToken]
+    [normalizedEmail, tokenHash]
   );
   return result.rows[0]?.email ?? null;
 }
@@ -308,8 +311,8 @@ function buildVerificationLink(req, token) {
   return `${getAppBaseUrl(req)}/api/auth/verify-email?token=${token}`;
 }
 
-function buildPasswordResetLink(req, token) {
-  return `${getAppBaseUrl(req)}/reset-password#token=${token}`;
+function buildForgotPasswordLink(req) {
+  return `${getAppBaseUrl(req)}/forgot-password`;
 }
 
 function createVerificationStatusToken(email) {
@@ -410,8 +413,7 @@ async function sendPasswordChangedConfirmationEmail(user, req, { lang = null } =
   if (!user?.email) return;
   try {
     const emailLang = lang || await getPreferredLanguageForUser(user.id);
-    const { token } = await createPasswordResetToken(user.email);
-    const resetLink = buildPasswordResetLink(req, token);
+    const resetLink = buildForgotPasswordLink(req);
     const emailContent = buildPasswordChangedEmail(emailLang, { resetLink });
     await sendAppEmail({ to: user.email, ...emailContent });
   } catch (err) {
@@ -425,12 +427,11 @@ async function sendPasswordChangedConfirmationEmail(user, req, { lang = null } =
 async function sendNewSignInAlertEmail(user, req, deviceContext) {
   if (!user?.email || !deviceContext?.ipAddress) return;
   try {
-    const [lang, resetToken, location] = await Promise.all([
+    const [lang, location] = await Promise.all([
       getPreferredLanguageForUser(user.id),
-      createPasswordResetToken(user.email),
       fetchIpLocation(deviceContext.ipAddress)
     ]);
-    const resetLink = buildPasswordResetLink(req, resetToken.token);
+    const resetLink = buildForgotPasswordLink(req);
     const emailContent = buildNewSignInAlertEmail(lang, {
       signInTime: new Date().toISOString(),
       city: location?.city || "",
@@ -1092,10 +1093,9 @@ router.post("/register", authLimiter, async (req, res) => {
       // silently go unnoticed.
       try {
         const lang = await getPreferredLanguageForEmail(email);
-        const { token: resetToken } = await createPasswordResetToken(email);
         const emailContent = buildDuplicateSignupNoticeEmail(lang, {
           loginLink: `${getAppBaseUrl(req)}/login`,
-          resetLink: buildPasswordResetLink(req, resetToken)
+          resetLink: buildForgotPasswordLink(req)
         });
         await sendAppEmail({ to: email, ...emailContent });
       } catch (emailErr) {
@@ -2240,8 +2240,7 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
   try {
     const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
     if (userResult.rowCount > 0) {
-      const { token } = await createPasswordResetToken(email);
-      const resetLink = buildPasswordResetLink(req, token);
+      const { token: code } = await createPasswordResetToken(email);
       logInfo("Password reset requested", {
         email: maskEmail(email),
         delivery: "primary_email"
@@ -2249,7 +2248,7 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
 
       try {
         const lang = await getPreferredLanguageForEmail(email);
-        const emailContent = buildPasswordResetEmail(lang, resetLink);
+        const emailContent = buildPasswordResetEmail(lang, code);
         await sendAppEmail({ to: email, ...emailContent });
       } catch (emailErr) {
         logError("[forgot-password] failed to send reset email", {
@@ -2261,7 +2260,7 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
 
     }
     // Always return 200 for security reasons (don't leak which emails exist)
-    return res.status(200).json({ message: "If the email is registered, a reset link was sent." });
+    return res.status(200).json({ message: "If the email is registered, a reset code was sent." });
   } catch (err) {
     logError("Forgot password error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -2287,8 +2286,7 @@ router.post("/account-recovery", passwordLimiter, async (req, res) => {
     );
 
     if (userResult.rowCount > 0) {
-      const { token } = await createPasswordResetToken(email);
-      const resetLink = buildPasswordResetLink(req, token);
+      const { token: code } = await createPasswordResetToken(email);
       logInfo("Account recovery password reset requested", {
         email: maskEmail(email),
         recoveryEmail: maskEmail(recoveryEmail),
@@ -2297,7 +2295,7 @@ router.post("/account-recovery", passwordLimiter, async (req, res) => {
 
       try {
         const lang = await getPreferredLanguageForEmail(email);
-        const emailContent = buildPasswordResetEmail(lang, resetLink);
+        const emailContent = buildPasswordResetEmail(lang, code);
         await sendAppEmail({ to: recoveryEmail, ...emailContent });
       } catch (emailErr) {
         logError("[account-recovery] failed to send reset email", {
@@ -2308,7 +2306,7 @@ router.post("/account-recovery", passwordLimiter, async (req, res) => {
     }
 
     return res.status(200).json({
-      message: "If the account and recovery email match, a reset link was sent."
+      message: "If the account and recovery email match, a reset code was sent."
     });
   } catch (err) {
     logError("Account recovery error:", err);
@@ -2321,8 +2319,9 @@ router.post("/account-recovery", passwordLimiter, async (req, res) => {
  */
 router.post("/reset-password", passwordLimiter, async (req, res) => {
   const { token, password, confirmPassword } = req.body;
+  const requestEmail = normalizeEmail(req.body?.email);
 
-  if (!token || !password || password !== confirmPassword) {
+  if (!requestEmail || !token || !password || password !== confirmPassword) {
     return res.status(400).json({ error: "Invalid input or passwords do not match." });
   }
 
@@ -2330,8 +2329,8 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
     return res.status(400).json({ error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol." });
   }
 
-  const email = await consumePasswordResetToken(token);
-  if (!email) return res.status(400).json({ error: "Token expired or invalid." });
+  const email = await consumePasswordResetToken(requestEmail, token);
+  if (!email) return res.status(400).json({ error: "Code expired or invalid." });
 
   try {
     const hashedPassword = await hashPassword(password);

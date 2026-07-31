@@ -1,3 +1,13 @@
+.subscription-payment-card {
+  width: min(420px, 100%);
+}
+
+.subscription-status-line {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .billing-heading-actions {
   display: flex;
   flex-wrap: wrap;

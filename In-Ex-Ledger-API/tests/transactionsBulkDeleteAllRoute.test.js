@@ -19,7 +19,8 @@ const OWNER_USER_ID = "user-owner-1";
 function loadTransactionsRouterWithState({
   isOwner = true,
   lockedThroughDate = null,
-  deletedCount = 42
+  deletedCount = 42,
+  accountExists = true
 } = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = { poolQueries: [] };
@@ -30,6 +31,10 @@ function loadTransactionsRouterWithState({
 
       if (/SELECT id FROM businesses WHERE id = \$1 AND user_id = \$2/i.test(sql)) {
         return isOwner ? { rows: [{ id: BUSINESS_ID }], rowCount: 1 } : { rows: [], rowCount: 0 };
+      }
+
+      if (/SELECT id FROM accounts WHERE id = \$1 AND business_id = \$2/i.test(sql)) {
+        return accountExists ? { rows: [{ id: params[0] }], rowCount: 1 } : { rows: [], rowCount: 0 };
       }
 
       if (/SELECT id\s+FROM transactions\s+WHERE business_id = \$1\s+AND deleted_at IS NULL\s+AND date <= \$2/i.test(sql)) {
@@ -197,4 +202,41 @@ test("DELETE /api/transactions/bulk-delete-all also clears any pre-existing undo
   assert.ok(resetQuery, "expected a follow-up UPDATE clearing prior undo-eligible deletions");
   assert.deepEqual(resetQuery.params, [BUSINESS_ID]);
   assert.match(resetQuery.sql, /deleted_reason IS DISTINCT FROM 'bulk_delete_all'/);
+});
+
+test("DELETE /api/transactions/bulk-delete-all with an accountId only deletes that account's transactions", async () => {
+  const { app, state } = loadTransactionsRouterWithState({ deletedCount: 5 });
+  const accountId = "00000000-0000-4000-8000-000000000777";
+  const response = await request(app)
+    .delete("/api/transactions/bulk-delete-all")
+    .send({ confirm: "DELETE", accountId });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.count, 5);
+
+  const updateQuery = state.poolQueries.find((entry) => /UPDATE transactions\s+SET deleted_at = now\(\)/i.test(entry.sql));
+  assert.ok(updateQuery, "expected an UPDATE transactions query to run");
+  assert.deepEqual(updateQuery.params, [BUSINESS_ID, accountId]);
+  assert.match(updateQuery.sql, /AND account_id = \$2/);
+});
+
+test("DELETE /api/transactions/bulk-delete-all rejects an accountId that doesn't belong to this business", async () => {
+  const { app } = loadTransactionsRouterWithState({ accountExists: false });
+  const response = await request(app)
+    .delete("/api/transactions/bulk-delete-all")
+    .send({ confirm: "DELETE", accountId: "00000000-0000-4000-8000-000000000778" });
+
+  assert.equal(response.status, 404);
+});
+
+test("DELETE /api/transactions/bulk-delete-all treats accountId 'ALL' as a whole-business delete", async () => {
+  const { app, state } = loadTransactionsRouterWithState({ deletedCount: 9 });
+  const response = await request(app)
+    .delete("/api/transactions/bulk-delete-all")
+    .send({ confirm: "DELETE", accountId: "ALL" });
+
+  assert.equal(response.status, 200);
+  const updateQuery = state.poolQueries.find((entry) => /UPDATE transactions\s+SET deleted_at = now\(\)/i.test(entry.sql));
+  assert.deepEqual(updateQuery.params, [BUSINESS_ID]);
+  assert.doesNotMatch(updateQuery.sql, /account_id/);
 });

@@ -306,10 +306,10 @@ export async function deleteTransaction(transactionId: string) {
   })
 }
 
-export async function deleteAllTransactions() {
+export async function deleteAllTransactions(accountId?: string) {
   const response = await apiRequest<{ message?: string; count?: number }>('/api/transactions/bulk-delete-all', {
     method: 'DELETE',
-    body: JSON.stringify({ confirm: 'DELETE' }),
+    body: JSON.stringify(accountId ? { confirm: 'DELETE', accountId } : { confirm: 'DELETE' }),
   })
   return { count: Number(response.count || 0) }
 }

@@ -719,7 +719,7 @@ test("additional-business slot checkout sends the user to a Stripe subscription_
     assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][subscription]"), "sub_test_update_123");
     assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][price]"), "price_addon_month_usd");
     assert.equal(portalRequest.body.get("flow_data[subscription_update_confirm][items][0][quantity]"), "2");
-    assert.equal(portalRequest.body.get("return_url"), "https://app.inexledger.test/subscription?billing=updated");
+    assert.equal(portalRequest.body.get("return_url"), "https://app.inexledger.test/settings?billing=updated");
   } finally {
     fixture.cleanup();
   }
@@ -1415,6 +1415,77 @@ test("billing resume can switch a canceling yearly subscription to monthly", asy
     assert.equal(resumeRequest.body.get("items[1][id]"), "si_addon_yearly");
     assert.equal(resumeRequest.body.get("items[1][price]"), "price_addon_month_usd");
     assert.equal(resumeRequest.body.get("metadata[billing_interval]"), "monthly");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing resume switches an already-active (non-canceled) subscription's interval directly, with no proration", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    stripeSubscriptionResponse: {
+      metadata: {
+        billing_interval: "monthly",
+        currency: "usd",
+        additional_businesses: "0"
+      },
+      items: {
+        data: [
+          {
+            id: "si_base_monthly",
+            quantity: 1,
+            price: { id: "price_month_usd" }
+          }
+        ]
+      }
+    },
+    subscriptionSnapshots: [
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        stripeSubscriptionId: "sub_active_switch_123",
+        billingInterval: "monthly",
+        currency: "usd",
+        additionalBusinesses: 0
+      },
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        stripeSubscriptionId: "sub_active_switch_123",
+        billingInterval: "yearly",
+        currency: "usd",
+        additionalBusinesses: 0
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/resume")
+      .send({ billingInterval: "yearly" });
+
+    assert.equal(res.status, 200);
+
+    const switchRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/subscriptions/sub_active_switch_123") &&
+      entry.body?.get("items[0][id]") === "si_base_monthly"
+    );
+
+    assert.ok(switchRequest, "an active, non-canceled subscription should still switch interval directly");
+    assert.equal(switchRequest.body.get("proration_behavior"), "none");
+    assert.equal(switchRequest.body.get("items[0][price]"), "price_year_usd");
+    assert.equal(switchRequest.body.get("metadata[billing_interval]"), "yearly");
+
+    // No Stripe-hosted portal/checkout session should be created for this --
+    // it's a direct, silent API update, so there's nothing to preselect wrong.
+    const portalOrCheckoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/sessions") || String(entry.url).endsWith("/checkout/sessions")
+    );
+    assert.equal(portalOrCheckoutRequest, undefined);
   } finally {
     fixture.cleanup();
   }

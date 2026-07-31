@@ -15,8 +15,9 @@ function ForgotPassword(props: PageProps) {
     setError('')
     setMessage('')
     try {
-      const response = await requestPasswordReset(email)
-      setMessage(response.resetCode ? `Reset code: ${response.resetCode}` : response.message)
+      await requestPasswordReset(email)
+      window.sessionStorage.setItem('inex-reset-email', email)
+      props.onNavigate('ResetPassword')
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : 'Unable to create reset code.')
     } finally {
@@ -30,7 +31,7 @@ function ForgotPassword(props: PageProps) {
       onNavigate={props.onNavigate}
     >
       <h2>Forgot password</h2>
-      <p>Enter your email and we will send a reset link if the account exists.</p>
+      <p>Enter your email and we will send a reset code if the account exists.</p>
       <form className="auth-form" onSubmit={(event) => {
         event.preventDefault()
         void submitResetRequest()
@@ -43,9 +44,8 @@ function ForgotPassword(props: PageProps) {
         {error ? <p className="auth-error" role="alert">{error}</p> : null}
         <button className="primary-button" type="submit" disabled={submitting}>
           <Mail size={18} />
-          {submitting ? 'Creating code...' : 'Send reset code'}
+          {submitting ? 'Sending code...' : 'Send reset code'}
         </button>
-        <button className="secondary-button" type="button" onClick={() => props.onNavigate('Login')}>Back to sign in</button>
       </form>
     </AuthShell>
   )

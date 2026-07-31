@@ -200,43 +200,40 @@ function buildVerificationEmail(lang, verificationLink) {
    ========================================================= */
 const PASSWORD_RESET = {
   en: {
-    subject: "Reset your InEx Ledger password",
+    subject: "Your InEx Ledger password reset code",
     eyebrow: "InEx Ledger security",
     heading: "Reset your password",
-    body: "We received a request to reset the password for your InEx Ledger account. Click the button below to choose a new password.",
-    buttonLabel: "Reset password",
-    expiry: "This link expires in 20 minutes. If the button does not work, copy and paste this link into your browser:",
+    body: "We received a request to reset the password for your InEx Ledger account. Enter this code on the reset password page to continue:",
+    expiry: "This code expires in 20 minutes.",
     ignore: "If you did not request a password reset, you can safely ignore this email.",
-    text: (link) =>
-      `Reset your InEx Ledger password\n\nWe received a request to reset the password for your account. Use this link to choose a new password:\n${link}\n\nThis link expires in 20 minutes.\n\nIf you did not request a password reset, you can safely ignore this email.`
+    text: (code) =>
+      `Reset your InEx Ledger password\n\nWe received a request to reset the password for your account. Enter this code on the reset password page:\n\n${code}\n\nThis code expires in 20 minutes.\n\nIf you did not request a password reset, you can safely ignore this email.`
   },
   fr: {
-    subject: "Réinitialisez votre mot de passe InEx Ledger",
+    subject: "Votre code de réinitialisation InEx Ledger",
     eyebrow: "Sécurité InEx Ledger",
     heading: "Réinitialisez votre mot de passe",
-    body: "Nous avons reçu une demande de réinitialisation du mot de passe pour votre compte InEx Ledger. Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe.",
-    buttonLabel: "Réinitialiser le mot de passe",
-    expiry: "Ce lien expire dans 20 minutes. Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :",
+    body: "Nous avons reçu une demande de réinitialisation du mot de passe pour votre compte InEx Ledger. Entrez ce code sur la page de réinitialisation pour continuer :",
+    expiry: "Ce code expire dans 20 minutes.",
     ignore: "Si vous n'avez pas demandé de réinitialisation de mot de passe, vous pouvez ignorer ce courriel en toute sécurité.",
-    text: (link) =>
-      `Réinitialisez votre mot de passe InEx Ledger\n\nNous avons reçu une demande de réinitialisation du mot de passe pour votre compte. Utilisez ce lien pour choisir un nouveau mot de passe :\n${link}\n\nCe lien expire dans 20 minutes.\n\nSi vous n'avez pas demandé de réinitialisation, vous pouvez ignorer ce courriel en toute sécurité.`
+    text: (code) =>
+      `Réinitialisez votre mot de passe InEx Ledger\n\nNous avons reçu une demande de réinitialisation du mot de passe pour votre compte. Entrez ce code sur la page de réinitialisation :\n\n${code}\n\nCe code expire dans 20 minutes.\n\nSi vous n'avez pas demandé de réinitialisation, vous pouvez ignorer ce courriel en toute sécurité.`
   }
 };
 
-function buildPasswordResetEmail(lang, resetLink) {
+function buildPasswordResetEmail(lang, code) {
   const l = normalizeEmailLang(lang);
   const s = PASSWORD_RESET[l];
-  const safeResetLink = sanitizeHttpUrl(resetLink);
+  const safeCode = escapeHtml(String(code || "").trim());
   const html = wrapEmailHtml(
     `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
      <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
     `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
-     ${ctaButton(safeResetLink, s.buttonLabel)}
-     <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">${s.expiry}</p>
-     <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${escapeHtml(safeResetLink)}</p>
+     <p style="margin: 0 0 14px; font-size: 32px; font-weight: 700; letter-spacing: 0.2em; color: #0f172a; font-family: monospace;">${safeCode}</p>
+     <p style="margin: 0 0 14px; color: #475569; font-size: 13px; line-height: 1.6;">${s.expiry}</p>
      <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">${s.ignore}</p>`
   );
-  return { subject: s.subject, html, text: s.text(safeResetLink) };
+  return { subject: s.subject, html, text: s.text(String(code || "").trim()) };
 }
 
 /* =========================================================

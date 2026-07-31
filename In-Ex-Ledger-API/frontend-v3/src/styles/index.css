@@ -2949,6 +2949,13 @@ tbody tr:last-child td {
   font-weight: 850;
 }
 
+.delete-all-warning {
+  margin: 0;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .csv-import-help-toggle {
   align-self: flex-start;
   color: var(--blue);

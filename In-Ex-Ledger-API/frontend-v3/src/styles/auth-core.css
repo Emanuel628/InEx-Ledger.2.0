@@ -183,6 +183,91 @@
   font-weight: 900;
 }
 
+.password-meter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: -6px;
+}
+
+.password-meter {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.meter-segment {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.meter-segment.is-filled.is-weak {
+  background: var(--red);
+}
+
+.meter-segment.is-filled.is-fair {
+  background: #d69e2e;
+}
+
+.meter-segment.is-filled.is-strong {
+  background: var(--green);
+}
+
+.password-strength-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.password-requirements {
+  display: grid;
+  gap: 6px;
+  margin: -4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.password-requirements li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.password-requirements li::before {
+  content: '\2022';
+  position: absolute;
+  left: 4px;
+}
+
+.password-requirements li.is-met {
+  color: var(--green);
+}
+
+.password-requirements li.is-met::before {
+  content: '\2713';
+  left: 0;
+}
+
+.password-match-message {
+  margin: -4px 0 0;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.password-match-message.is-mismatch {
+  color: var(--red);
+}
+
+.password-match-message.is-match {
+  color: var(--green);
+}
+
 .trial-value-list {
   display: grid;
   gap: 10px;

@@ -159,28 +159,29 @@ describe("buildVerificationEmail", () => {
 /* ================================================================== */
 
 describe("buildPasswordResetEmail", () => {
-  const link = "https://app.inexledger.com/reset-password?token=tok";
+  const code = "482913";
 
   it("returns English content", () => {
-    const { subject, html, text } = buildPasswordResetEmail("en", link);
-    assert.ok(subject.includes("Reset your InEx Ledger password"));
+    const { subject, html, text } = buildPasswordResetEmail("en", code);
+    assert.ok(subject.includes("password reset code"));
     assert.ok(html.includes("Reset your password"));
     assert.ok(text.includes("reset the password"));
-    assert.ok(html.includes(link));
+    assert.ok(html.includes(code));
+    assert.ok(text.includes(code));
   });
 
   it("returns French content", () => {
-    const { subject, html, text } = buildPasswordResetEmail("fr", link);
-    assert.ok(subject.includes("Réinitialisez votre mot de passe"));
+    const { subject, html, text } = buildPasswordResetEmail("fr", code);
+    assert.ok(subject.includes("réinitialisation"));
     assert.ok(html.includes("Réinitialisez votre mot de passe"));
     assert.ok(text.includes("mot de passe"));
-    assert.ok(html.includes(link));
+    assert.ok(html.includes(code));
   });
 
-  it("escapes/sanitizes unsafe reset link content in HTML", () => {
-    const unsafe = `https://app.inexledger.com/reset?token="><img src=x onerror=alert(1)>`;
+  it("escapes unsafe code content in HTML", () => {
+    const unsafe = `123456"><img src=x onerror=alert(1)>`;
     const { html } = buildPasswordResetEmail("en", unsafe);
-    assert.ok(html.includes("https://app.inexledger.com/reset?token="));
+    assert.ok(html.includes("123456"));
     assert.ok(!html.includes("<img"));
     assert.ok(!html.includes(`"><img`));
   });

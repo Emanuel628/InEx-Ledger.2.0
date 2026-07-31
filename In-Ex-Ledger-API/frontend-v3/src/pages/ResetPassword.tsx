@@ -4,7 +4,7 @@ import AuthShell from '../components/AuthShell'
 import { resetPassword } from '../lib/authApi'
 
 function ResetPassword(props: PageProps) {
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => window.sessionStorage.getItem('inex-reset-email') || '')
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -20,7 +20,8 @@ function ResetPassword(props: PageProps) {
       }
 
       await resetPassword({ email, code, password })
-      props.onNavigate('Login')
+      window.sessionStorage.removeItem('inex-reset-email')
+      props.onNavigate('Settings')
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : 'Unable to reset password.')
     } finally {

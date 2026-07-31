@@ -22,8 +22,10 @@ import {
 } from 'lucide-react'
 import type { PageProps, ThemeMode } from '../App'
 import AppShell from '../components/AppShell'
+import { usePlan } from '../context/PlanContext'
 import { normalizeLanguage as normalizeLanguageValue } from '../lib/i18n'
 import { confirmMfaToggle, deleteMyAccount, loadMfaStatus, requestAccountDeleteReauth, requestMfaToggle } from '../lib/authApi'
+import { loadAccounts, type AccountRecord } from '../lib/accountsApi'
 import {
   exportAccountData,
   loadAccountingLock,
@@ -76,6 +78,7 @@ const provinceOptions = [
 ]
 
 function Settings(props: PageProps) {
+  const { refreshPlanContext } = usePlan()
   const [activeSection, setActiveSection] = useState<SettingsSection>('Account')
   const [fullName, setFullName] = useState('')
   const [originalFullName, setOriginalFullName] = useState('')
@@ -93,6 +96,32 @@ function Settings(props: PageProps) {
     setFullName(name)
     setOriginalFullName(name)
   }, [props.authUser])
+
+  // Stripe checkout, the billing portal, and the additional-business-slot
+  // flow all redirect back here with ?checkout=success|cancel or
+  // ?billing=updated once payment is confirmed (see billing.routes.js
+  // return_url / success_url). Surface that outcome and refresh the shared
+  // plan snapshot so gates elsewhere in the app pick it up immediately.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const checkoutState = params.get('checkout')
+    const billingUpdated = params.get('billing') === 'updated'
+    if (!checkoutState && !billingUpdated) return
+
+    const cleanUrl = new URL(window.location.href)
+    cleanUrl.searchParams.delete('checkout')
+    cleanUrl.searchParams.delete('billing')
+    window.history.replaceState({}, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`)
+    setActiveSection('Billing')
+
+    if (checkoutState === 'cancel') {
+      setStatusMessage('Checkout was canceled. No changes were made to your plan.')
+      return
+    }
+
+    setStatusMessage('Payment confirmed. Your plan is up to date.')
+    void refreshPlanContext()
+  }, [refreshPlanContext])
 
   useEffect(() => {
     const businessId = props.authUser?.currentBusinessId
@@ -469,12 +498,9 @@ function AccountingLockControls() {
 
 function BillingSettings({ onNavigate }: { onNavigate: PageProps['onNavigate'] }) {
   return (
-    <SettingsPanel eyebrow="Billing" title="Plan and billing" description="Keep subscription actions visible, but send payment methods and invoices through Stripe.">
-      <SettingsRow icon={CreditCard} title="Stripe billing portal" description="Payment methods, invoices, cancellation, and reactivation belong in billing.">
-        <button className="primary-button" type="button" onClick={() => onNavigate('Billing')}>Open billing</button>
-      </SettingsRow>
-      <SettingsRow icon={Download} title="Subscription" description="Review your plan, usage, and billing.">
-        <button className="secondary-button" type="button" onClick={() => onNavigate('Subscription')}>Manage plan</button>
+    <SettingsPanel eyebrow="Billing" title="Plan and billing" description="Manage your plan, invoices, and payment method from one place.">
+      <SettingsRow icon={CreditCard} title="Subscription" description="Review your plan, invoices, payment method, and billing interval.">
+        <button className="primary-button" type="button" onClick={() => onNavigate('Subscription')}>Manage plan</button>
       </SettingsRow>
       <SettingsRow icon={Building2} title="Business workspaces" description="Switch, add, or remove business workspaces.">
         <button className="secondary-button" type="button" onClick={() => onNavigate('BusinessWorkspaces')}>Manage workspaces</button>
@@ -665,6 +691,14 @@ function DataSettings({
   const [deleteError, setDeleteError] = useState('')
   const [deleting, setDeleting] = useState(false)
 
+  const [showDeleteTransactionsModal, setShowDeleteTransactionsModal] = useState(false)
+  const [accounts, setAccounts] = useState<AccountRecord[]>([])
+  const [loadingAccounts, setLoadingAccounts] = useState(false)
+  const [selectedAccountId, setSelectedAccountId] = useState('ALL')
+  const [transactionsConfirmText, setTransactionsConfirmText] = useState('')
+  const [transactionsDeleteError, setTransactionsDeleteError] = useState('')
+  const [deletingTransactions, setDeletingTransactions] = useState(false)
+
   async function runExport(format: 'json' | 'csv') {
     try {
       await exportAccountData(format)
@@ -673,19 +707,41 @@ function DataSettings({
     }
   }
 
-  async function handleDeleteAllTransactions() {
-    const typed = window.prompt(
-      'This permanently deletes every transaction in this business. This cannot be undone from the app. Type DELETE to confirm.',
-    )
-    if (typed !== 'DELETE') {
+  async function openDeleteTransactionsModal() {
+    setSelectedAccountId('ALL')
+    setTransactionsConfirmText('')
+    setTransactionsDeleteError('')
+    setShowDeleteTransactionsModal(true)
+    setLoadingAccounts(true)
+    try {
+      setAccounts(await loadAccounts())
+    } catch {
+      setAccounts([])
+    } finally {
+      setLoadingAccounts(false)
+    }
+  }
+
+  function closeDeleteTransactionsModal() {
+    setShowDeleteTransactionsModal(false)
+  }
+
+  async function submitDeleteAllTransactions() {
+    if (transactionsConfirmText.trim() !== 'DELETE') {
+      setTransactionsDeleteError('Type DELETE to confirm.')
       return
     }
+    setTransactionsDeleteError('')
+    setDeletingTransactions(true)
     try {
-      const result = await deleteAllTransactions()
+      const result = await deleteAllTransactions(selectedAccountId === 'ALL' ? undefined : selectedAccountId)
+      setShowDeleteTransactionsModal(false)
       window.alert(`Deleted ${result.count} transaction(s).`)
       window.location.reload()
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete all transactions.')
+      setTransactionsDeleteError(deleteError instanceof Error ? deleteError.message : 'Unable to delete transactions.')
+    } finally {
+      setDeletingTransactions(false)
     }
   }
 
@@ -763,11 +819,57 @@ function DataSettings({
           <strong>Delete all transactions</strong>
           <p>Permanently deletes every transaction in this business. Locked accounting periods are protected.</p>
         </div>
-        <button className="secondary-button danger-button" type="button" onClick={() => void handleDeleteAllTransactions()}>
+        <button className="secondary-button danger-button" type="button" onClick={() => void openDeleteTransactionsModal()}>
           <Trash2 size={17} />
           Delete all
         </button>
       </div>
+
+      {showDeleteTransactionsModal ? (
+        <div className="transaction-modal-backdrop" role="presentation" onMouseDown={closeDeleteTransactionsModal}>
+          <section
+            className="transaction-detail-modal subscription-action-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deleteTransactionsTitle"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="drawer-header">
+              <div>
+                <h2 id="deleteTransactionsTitle">Delete all transactions</h2>
+                <p>Choose which account's transactions to permanently delete. Locked accounting periods are protected.</p>
+              </div>
+              <button className="icon-button" type="button" aria-label="Close delete transactions" onClick={closeDeleteTransactionsModal}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="transaction-detail-body">
+              <form className="drawer-form" onSubmit={(event) => { event.preventDefault(); void submitDeleteAllTransactions() }}>
+                <label>
+                  Account
+                  <select value={selectedAccountId} onChange={(event) => setSelectedAccountId(event.target.value)} disabled={loadingAccounts}>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>{account.name}</option>
+                    ))}
+                    <option value="ALL" style={{ color: '#d83b3b', fontWeight: 900 }}>ALL — delete every account's transactions</option>
+                  </select>
+                </label>
+                {selectedAccountId === 'ALL' ? (
+                  <p className="delete-all-warning">This deletes every transaction in this business, across every account.</p>
+                ) : null}
+                <Field label="Type DELETE to confirm" value={transactionsConfirmText} onChange={setTransactionsConfirmText} />
+                {transactionsDeleteError ? <p className="drawer-error" role="alert">{transactionsDeleteError}</p> : null}
+              </form>
+            </div>
+            <div className="drawer-actions">
+              <button className="secondary-button" type="button" onClick={closeDeleteTransactionsModal} disabled={deletingTransactions}>Cancel</button>
+              <button className="secondary-button danger-button" type="button" onClick={() => void submitDeleteAllTransactions()} disabled={deletingTransactions || loadingAccounts}>
+                {deletingTransactions ? 'Deleting...' : 'DELETE'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {!confirmingDelete ? (
         <div className="settings-danger-zone">
           <div>

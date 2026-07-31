@@ -17,7 +17,7 @@ function loadAuthRouterFixture() {
     RESEND_API_KEY: process.env.RESEND_API_KEY
   };
   const state = {
-    resetEmailLink: null
+    resetEmailCode: null
   };
 
   process.env.APP_BASE_URL = "https://app.inexledger.test";
@@ -109,9 +109,9 @@ function loadAuthRouterFixture() {
         getPreferredLanguageForEmail: async () => "en",
         buildWelcomeVerificationEmail: () => ({ subject: "", html: "", text: "" }),
         buildVerificationEmail: () => ({ subject: "", html: "", text: "" }),
-        buildPasswordResetEmail: (_lang, resetLink) => {
-          state.resetEmailLink = resetLink;
-          return { subject: "Reset", html: resetLink, text: resetLink };
+        buildPasswordResetEmail: (_lang, code) => {
+          state.resetEmailCode = code;
+          return { subject: "Reset", html: code, text: code };
         },
         buildEmailChangeEmail: () => ({ subject: "", html: "", text: "" }),
         buildMfaEmailContent: () => ({ subject: "", html: "", text: "" })
@@ -151,7 +151,7 @@ function loadAuthRouterFixture() {
   };
 }
 
-test("forgot-password emails a reset link that keeps the token in the URL hash", async () => {
+test("forgot-password emails a 6-digit reset code, not a link", async () => {
   const fixture = loadAuthRouterFixture();
 
   try {
@@ -160,8 +160,8 @@ test("forgot-password emails a reset link that keeps the token in the URL hash",
       .send({ email: "person@example.com" });
 
     assert.equal(response.status, 200);
-    assert.match(String(fixture.state.resetEmailLink || ""), /\/reset-password#token=/);
-    assert.doesNotMatch(String(fixture.state.resetEmailLink || ""), /\?token=/);
+    assert.match(String(fixture.state.resetEmailCode || ""), /^\d{6}$/);
+    assert.doesNotMatch(String(fixture.state.resetEmailCode || ""), /reset-password|token=|https?:\/\//);
   } finally {
     fixture.cleanup();
   }

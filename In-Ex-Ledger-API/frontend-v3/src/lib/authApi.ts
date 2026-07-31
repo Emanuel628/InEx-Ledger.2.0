@@ -208,13 +208,14 @@ export async function requestPasswordReset(email: string) {
     method: 'POST',
     body: JSON.stringify({ email }),
   })
-  return { ok: true, message: response.message, resetCode: undefined as string | undefined }
+  return { ok: true, message: response.message }
 }
 
 export async function resetPassword(input: { email: string; code: string; password: string }) {
   await authRequest('/api/auth/reset-password', {
     method: 'POST',
     body: JSON.stringify({
+      email: input.email,
       token: input.code,
       password: input.password,
       confirmPassword: input.password,

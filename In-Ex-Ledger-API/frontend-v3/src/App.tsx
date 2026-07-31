@@ -9,7 +9,6 @@ import Invoices from './pages/Invoices'
 import Messages from './pages/Messages'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
-import Billing from './pages/Billing'
 import Subscription from './pages/Subscription'
 import BusinessWorkspaces from './pages/BusinessWorkspaces'
 import Landing from './pages/Landing'
@@ -52,7 +51,6 @@ export type AppPage =
   | 'Analytics'
   | 'Messages'
   | 'Settings'
-  | 'Billing'
   | 'Subscription'
   | 'BusinessWorkspaces'
   | 'Landing'
@@ -125,7 +123,6 @@ const pageSlugByPage: Partial<Record<AppPage, string>> = {
   Analytics: 'analytics',
   Messages: 'messages',
   Settings: 'settings',
-  Billing: 'billing',
   Subscription: 'subscription',
   BusinessWorkspaces: 'workspaces',
   Landing: '',
@@ -493,10 +490,6 @@ function App() {
 
   if (currentPage === 'Settings') {
     return <Settings {...pageProps} />
-  }
-
-  if (currentPage === 'Billing') {
-    return <Billing {...pageProps} />
   }
 
   if (currentPage === 'Subscription') {

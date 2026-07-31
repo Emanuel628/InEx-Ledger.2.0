@@ -7,6 +7,7 @@ import {
   formatSubscriptionMoney,
   loadBillingOverview,
   loadBillingPricing,
+  resumeSubscription,
   startAdditionalBusinessCheckout,
   startCheckout,
   type BillingInterval,
@@ -134,6 +135,20 @@ function BusinessWorkspaces(props: PageProps) {
     }
   }
 
+  async function keepProActive() {
+    setWorking(true)
+    setDataError('')
+    try {
+      await resumeSubscription(activeBillingInterval)
+      await refreshOverview()
+      await refreshPlanContext()
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to keep Pro active.')
+    } finally {
+      setWorking(false)
+    }
+  }
+
   return (
     <AppShell {...props}>
       <main className="transactions-page subscription-page-v3">
@@ -245,6 +260,7 @@ function BusinessWorkspaces(props: PageProps) {
               }
             }}
             onStartProCheckout={startProCheckout}
+            onKeepProActive={keepProActive}
             currentBusinessCount={capacity.active}
             maxBusinessesAllowed={capacity.max}
             hasAvailableBusinessSlot={hasAvailableBusinessSlot}
@@ -319,6 +335,7 @@ function AddBusinessModal({
   onSave,
   onStartAdditionalBusinessCheckout,
   onStartProCheckout,
+  onKeepProActive,
   currentBusinessCount,
   maxBusinessesAllowed,
   hasAvailableBusinessSlot,
@@ -336,6 +353,7 @@ function AddBusinessModal({
   onSave: (input: { name: string; region: 'US' | 'CA'; language: string }) => Promise<void>
   onStartAdditionalBusinessCheckout: () => Promise<void>
   onStartProCheckout: () => Promise<void>
+  onKeepProActive: () => Promise<void>
   currentBusinessCount: number
   maxBusinessesAllowed: number
   hasAvailableBusinessSlot: boolean
@@ -397,6 +415,18 @@ function AddBusinessModal({
     }
   }
 
+  async function keepProActive() {
+    setOpeningCheckout(true)
+    setError('')
+    try {
+      await onKeepProActive()
+    } catch (keepActiveError) {
+      setError(keepActiveError instanceof Error ? keepActiveError.message : 'Unable to keep Pro active.')
+    } finally {
+      setOpeningCheckout(false)
+    }
+  }
+
   return (
     <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
@@ -448,9 +478,15 @@ function AddBusinessModal({
               </div>
 
               {isCancellationPending ? (
-                <p className="drawer-error" role="note">
-                  Your subscription is scheduled to end. Keep Pro active before purchasing another business slot.
-                </p>
+                <>
+                  <p className="drawer-error" role="note">
+                    Your subscription is scheduled to end. Keep Pro active before purchasing another business slot.
+                  </p>
+                  <button className="primary-button" type="button" disabled={saving || openingCheckout} onClick={() => void keepProActive()}>
+                    <CreditCard size={18} />
+                    {openingCheckout ? 'Working...' : 'Keep Pro active'}
+                  </button>
+                </>
               ) : !hasStripeSubscription ? (
                 <button className="primary-button" type="button" disabled={saving || openingCheckout} onClick={() => void startProCheckout()}>
                   <CreditCard size={18} />

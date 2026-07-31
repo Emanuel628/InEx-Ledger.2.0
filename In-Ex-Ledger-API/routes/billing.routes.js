@@ -1198,7 +1198,7 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
     const sessionPayload = {
       customer: customerId,
       configuration: configurationId,
-      return_url: buildAppUrl("/subscription")
+      return_url: buildAppUrl("/settings")
     };
 
     const session = await stripeRequest("/billing_portal/sessions", sessionPayload);
@@ -1264,20 +1264,28 @@ router.post("/resume", requireAuth, requireCsrfProtection, billingMutationLimite
       return res.status(200).json({ subscription });
     }
 
-    if (!subscription.cancelAtPeriodEnd) {
+    // A plain "resume" call with nothing to change is a no-op. But this route
+    // also doubles as the direct, no-portal way to switch an *active*
+    // (non-canceled) subscription's billing interval -- so only bail early
+    // when there's truly nothing to do, not just when it isn't canceled.
+    if (!subscription.cancelAtPeriodEnd && !requestedBillingInterval) {
       return res.status(200).json({ subscription });
     }
 
     if (!subscription.stripeSubscriptionId) {
-      await pool.query(
-        `UPDATE business_subscriptions
-            SET cancel_at_period_end = false,
-                canceled_at = NULL,
-                updated_at = NOW()
-          WHERE business_id = $1`,
-        [billingBusinessId]
-      );
-      subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+      if (subscription.cancelAtPeriodEnd) {
+        await pool.query(
+          `UPDATE business_subscriptions
+              SET cancel_at_period_end = false,
+                  canceled_at = NULL,
+                  updated_at = NOW()
+            WHERE business_id = $1`,
+          [billingBusinessId]
+        );
+        subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+      }
+      // No live Stripe subscription to switch an interval on -- checkout is
+      // the correct path for that case.
       return res.status(200).json({ subscription });
     }
 
@@ -1522,11 +1530,11 @@ router.post("/additional-businesses/checkout", requireAuth, requireCsrfProtectio
     const sessionPayload = {
       customer: subscription.stripeCustomerId,
       configuration: configurationId,
-      return_url: buildAppUrl("/subscription?billing=updated"),
+      return_url: buildAppUrl("/settings?billing=updated"),
       "flow_data[type]": "subscription_update_confirm",
       "flow_data[subscription_update_confirm][subscription]": subscription.stripeSubscriptionId,
       "flow_data[after_completion][type]": "redirect",
-      "flow_data[after_completion][redirect][return_url]": buildAppUrl("/subscription?billing=updated")
+      "flow_data[after_completion][redirect][return_url]": buildAppUrl("/settings?billing=updated")
     };
     if (existingAddonItem) {
       sessionPayload["flow_data[subscription_update_confirm][items][0][id]"] = existingAddonItem.id;

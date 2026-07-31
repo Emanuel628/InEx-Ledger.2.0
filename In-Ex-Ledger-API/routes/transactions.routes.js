@@ -1348,16 +1348,31 @@ router.delete("/bulk-delete-all", async (req, res) => {
     if (confirm !== "DELETE") {
       return res.status(400).json({ error: "Confirmation required. Send { confirm: 'DELETE' }." });
     }
+    const rawAccountId = String(req.body?.accountId || "").trim();
+    const accountId = rawAccountId && rawAccountId !== "ALL" ? rawAccountId : null;
+    if (accountId) {
+      const accountCheck = await pool.query(
+        "SELECT id FROM accounts WHERE id = $1 AND business_id = $2 LIMIT 1",
+        [accountId, businessId]
+      );
+      if (!accountCheck.rowCount) {
+        return res.status(404).json({ error: "Account not found for this business." });
+      }
+    }
     const lockState = await loadAccountingLockState(pool, businessId);
     if (lockState?.lockedThroughDate) {
+      const lockedTransactionParams = accountId
+        ? [businessId, lockState.lockedThroughDate, accountId]
+        : [businessId, lockState.lockedThroughDate];
       const lockedTransaction = await pool.query(
         `SELECT id
            FROM transactions
           WHERE business_id = $1
             AND deleted_at IS NULL
             AND date <= $2
+            ${accountId ? "AND account_id = $3" : ""}
           LIMIT 1`,
-        [businessId, lockState.lockedThroughDate]
+        lockedTransactionParams
       );
       if (lockedTransaction.rowCount > 0) {
         return res.status(409).json({
@@ -1367,12 +1382,14 @@ router.delete("/bulk-delete-all", async (req, res) => {
         });
       }
     }
+    const deleteParams = accountId ? [businessId, accountId] : [businessId];
     const result = await pool.query(
       `UPDATE transactions
           SET deleted_at = now(), is_void = true, voided_at = now(), deleted_reason = 'bulk_delete_all'
         WHERE business_id = $1
-          AND deleted_at IS NULL`,
-      [businessId]
+          AND deleted_at IS NULL
+          ${accountId ? "AND account_id = $2" : ""}`,
+      deleteParams
     );
     // Delete All is a hard reset: any transaction that was already
     // soft-deleted (and still undo-eligible) before this run must also be
@@ -1385,8 +1402,9 @@ router.delete("/bulk-delete-all", async (req, res) => {
           AND deleted_at IS NOT NULL
           AND (is_void = true OR is_void IS NULL)
           AND (is_adjustment = false OR is_adjustment IS NULL)
-          AND deleted_reason IS DISTINCT FROM 'bulk_delete_all'`,
-      [businessId]
+          AND deleted_reason IS DISTINCT FROM 'bulk_delete_all'
+          ${accountId ? "AND account_id = $2" : ""}`,
+      deleteParams
     );
     void invalidateSnapshotsForBusiness({
       businessId,

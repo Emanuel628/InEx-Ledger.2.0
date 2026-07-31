@@ -83,7 +83,7 @@ export async function startCheckout(billingInterval: BillingInterval) {
     body: JSON.stringify({
       billingInterval,
       checkoutAttemptId,
-      returnPath: '/subscription',
+      returnPath: '/settings',
     }),
   })
 
