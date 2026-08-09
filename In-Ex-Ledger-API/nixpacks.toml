@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs"]
 
 [phases.install]
-cmds = ["npm install", "npm --prefix frontend-v3 install"]
+cmds = ["npm ci", "npm --prefix frontend-v3 ci"]
 
 [phases.build]
 cmds = [

@@ -2,11 +2,11 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-# Install deps first (better caching)
+# Install dependencies from lockfiles first for better caching and reproducible builds.
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 COPY frontend-v3/package*.json ./frontend-v3/
-RUN npm --prefix frontend-v3 install
+RUN npm --prefix frontend-v3 ci
 
 # Copy rest of API
 COPY . .
