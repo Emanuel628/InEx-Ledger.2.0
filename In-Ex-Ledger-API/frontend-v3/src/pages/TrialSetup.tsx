@@ -11,6 +11,7 @@ import {
   type BillingInterval,
   type BillingPricing,
 } from '../lib/billingApi'
+import { normalizeInternalPath } from '../lib/navigation'
 import {
   BASIC_FEATURES,
   BASIC_LIMITS_NOTE,
@@ -22,7 +23,7 @@ import {
 
 function readNextPath() {
   const next = new URLSearchParams(window.location.search).get('next') || ''
-  return next.startsWith('/') && !next.startsWith('//') ? next : '/transactions'
+  return normalizeInternalPath(next)
 }
 
 function resolveStayPage() {

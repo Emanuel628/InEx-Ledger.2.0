@@ -32,6 +32,7 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
 import { startInactivityMonitor } from './lib/inactivityMonitor'
 import { applyV3PhraseTranslations, getStoredLanguage, getUserLanguage, observeV3PhraseTranslations, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
+import { normalizeInternalPath, resolvePageFromInternalPath } from './lib/navigation'
 import { PlanProvider } from './context/PlanContext'
 
 declare global {
@@ -192,13 +193,12 @@ function normalizeLegacyAppV3Path() {
  *  internal path or that points back into the auth flow itself. */
 function getNextPageFromQuery(): AppPage | null {
   const next = String(new URLSearchParams(window.location.search).get('next') || '')
-  if (!next.startsWith('/') || next.startsWith('//')) {
+  if (normalizeInternalPath(next, '') === '') {
     return null
   }
 
-  const normalized = next.toLowerCase().split(/[?#]/)[0].replace(/^\/+/, '').replace(/\/+$/, '')
-  const page = pageBySlug.get(normalized)
-  return page && !authFlowPages.has(page) ? page : null
+  const page = resolvePageFromInternalPath(next, pageBySlug, 'Landing', authFlowPages)
+  return page === 'Landing' ? null : page
 }
 
 /** Resolves a raw app path (as returned by the backend's `redirect_to`, e.g.
@@ -207,12 +207,7 @@ function getNextPageFromQuery(): AppPage | null {
  *  address bar for the destination page to read if it cares (see
  *  navigateToPath). */
 function resolvePageFromRawPath(path: string): AppPage {
-  const normalized = String(path || '')
-    .toLowerCase()
-    .split(/[?#]/)[0]
-    .replace(/^\/+/, '')
-    .replace(/\/+$/, '')
-  return pageBySlug.get(normalized) || 'Transactions'
+  return resolvePageFromInternalPath(path, pageBySlug, 'Transactions')
 }
 
 function chooseAuthenticatedPage(user: AuthUser) {
@@ -369,9 +364,9 @@ function App() {
   // AppPage enum value, preserving the query string so the destination page
   // can read it (see getNextPageFromQuery's `?next=` convention).
   const navigateToPath = (path: string) => {
-    const page = resolvePageFromRawPath(path)
+    const fullPath = normalizeInternalPath(path)
+    const page = resolvePageFromRawPath(fullPath)
     setCurrentPage(page)
-    const fullPath = String(path || '').startsWith('/') ? path : `/${path || ''}`
     if (`${window.location.pathname}${window.location.search}` !== fullPath) {
       window.history.pushState({}, '', fullPath)
     }
