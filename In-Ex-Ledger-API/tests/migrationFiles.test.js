@@ -182,6 +182,20 @@ test("migration checksum hashing is stable across LF and CRLF line endings", () 
   assert.equal(computeChecksum(crlfSql), expected);
 });
 
+test("child business integrity migration enforces composite tenant links safely", () => {
+  const sql = readMigration("20260809_add_child_business_integrity_constraints.sql");
+
+  assert.match(sql, /ON transactions \(id, business_id\)/i);
+  assert.match(sql, /ON receipts \(id, business_id\)/i);
+  assert.match(sql, /fk_support_artifacts_transaction_business/i);
+  assert.match(sql, /FOREIGN KEY \(transaction_id, business_id\)\s+REFERENCES transactions \(id, business_id\)\s+NOT VALID/i);
+  assert.match(sql, /fk_support_artifacts_legacy_receipt_business/i);
+  assert.match(sql, /FOREIGN KEY \(legacy_receipt_id, business_id\)\s+REFERENCES receipts \(id, business_id\)\s+NOT VALID/i);
+  assert.match(sql, /fk_transaction_review_states_transaction_business/i);
+  assert.match(sql, /fk_vehicle_expense_details_transaction_business/i);
+  assert.doesNotMatch(sqlWithoutComments(sql), /\bVALIDATE\s+CONSTRAINT\b/i);
+});
+
 test("new destructive migrations require an explicit review marker", () => {
   const unreviewed = fs
     .readdirSync(migrationsDir)
