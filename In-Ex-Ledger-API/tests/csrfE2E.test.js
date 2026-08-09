@@ -31,6 +31,7 @@ const {
 
 const { signToken } = require("../middleware/auth.middleware.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { ACCESS_TOKEN_COOKIE } = require("../utils/authUtils.js");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,7 +78,7 @@ function buildTestApp() {
 }
 
 /**
- * Obtain a valid JWT for use in Authorization header.
+ * Obtain a valid JWT for use in the auth cookie.
  * Payload mirrors the structure created by auth.routes.js on login:
  *   { id, email, mfa_enabled }
  */
@@ -87,6 +88,10 @@ function makeAuthToken() {
     email: "test@example.com",
     mfa_enabled: false
   });
+}
+
+function authCookie(token) {
+  return `${ACCESS_TOKEN_COOKIE}=${token}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +280,7 @@ test("e2e CSRF: valid authenticated write with matching token succeeds (200)", a
 
   const res = await request(app)
     .post("/api/test-write")
-    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${csrfToken}`])
+    .set("Cookie", [authCookie(authToken), `${CSRF_COOKIE_NAME}=${csrfToken}`])
     .set(CSRF_HEADER_NAME, csrfToken)
     .send({ amount: 100 });
 
@@ -289,7 +294,7 @@ test("e2e CSRF: authenticated write WITHOUT CSRF token is rejected (403)", async
 
   const res = await request(app)
     .post("/api/test-write")
-    .set("Cookie", `access_token=${authToken}`)
+    .set("Cookie", authCookie(authToken))
     // no Cookie and no CSRF header
     .send({ amount: 100 });
 
@@ -309,7 +314,7 @@ test("e2e CSRF: authenticated write with INVALID CSRF token is rejected (403)", 
   // Cookie holds the real token but the header sends a tampered one
   const res = await request(app)
     .post("/api/test-write")
-    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${realToken}`])
+    .set("Cookie", [authCookie(authToken), `${CSRF_COOKIE_NAME}=${realToken}`])
     .set(CSRF_HEADER_NAME, fakeToken)
     .send({ amount: 100 });
 
@@ -329,7 +334,7 @@ test("e2e CSRF: authenticated write with MISMATCHED tokens is rejected (403)", a
   // Both tokens are individually valid but they don't match each other
   const res = await request(app)
     .post("/api/test-write")
-    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${tokenA}`])
+    .set("Cookie", [authCookie(authToken), `${CSRF_COOKIE_NAME}=${tokenA}`])
     .set(CSRF_HEADER_NAME, tokenB)
     .send({ amount: 100 });
 
