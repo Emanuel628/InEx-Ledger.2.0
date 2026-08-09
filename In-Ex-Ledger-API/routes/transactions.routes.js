@@ -58,11 +58,14 @@ const {
   ReceiptStatusValidationError
 } = require("../services/receiptStatusService.js");
 const { AUDIT_ACTIONS, recordAuditEventForRequest } = require("../services/auditEventService.js");
+const {
+  isTransactionReviewStatus,
+  transactionReviewStatusList
+} = require("../config/transactionReviewStatus.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
 const VALID_TAX_TREATMENTS = new Set(["income", "operating", "capital", "split_use", "nondeductible"]);
-const VALID_REVIEW_STATUSES = new Set(["needs_review", "ready", "matched", "locked"]);
 const VALID_TAX_FORMS = new Set(["1099-NEC", "1099-K", "T4A", "none"]);
 const MAX_TRANSACTION_AMOUNT = 999999999.99;
 const MAX_PERCENT = 100;
@@ -341,10 +344,10 @@ function normalizeTransactionTaxPayload(payload, fallbackCurrency) {
 
   const reviewStatusRaw = String(payload?.review_status || "").trim().toLowerCase();
   const reviewStatus = reviewStatusRaw || null;
-  if (reviewStatus && !VALID_REVIEW_STATUSES.has(reviewStatus)) {
+  if (reviewStatus && !isTransactionReviewStatus(reviewStatus)) {
     return {
       valid: false,
-      message: "review_status must be one of needs_review, ready, matched, or locked"
+      message: `review_status must be one of ${transactionReviewStatusList()}`
     };
   }
 
@@ -656,7 +659,7 @@ function buildTransactionListFilters(query, now = new Date()) {
   }
 
   const reviewStatus = String(query.review_status || "").trim().toLowerCase();
-  if (reviewStatus && !VALID_REVIEW_STATUSES.has(reviewStatus)) {
+  if (reviewStatus && !isTransactionReviewStatus(reviewStatus)) {
     return { valid: false, error: "Invalid review_status filter." };
   }
 
@@ -1653,8 +1656,8 @@ router.patch("/:id/review-status", async (req, res) => {
     return res.status(400).json({ error: "Invalid transaction ID." });
   }
   const status = String(req.body?.review_status || "").trim().toLowerCase();
-  if (!VALID_REVIEW_STATUSES.has(status)) {
-    return res.status(400).json({ error: "review_status must be one of needs_review, ready, matched, or locked" });
+  if (!isTransactionReviewStatus(status)) {
+    return res.status(400).json({ error: `review_status must be one of ${transactionReviewStatusList()}` });
   }
 
   try {
