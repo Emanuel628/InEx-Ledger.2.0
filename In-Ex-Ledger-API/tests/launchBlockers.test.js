@@ -576,7 +576,8 @@ test("production env validation requires FIELD_ENCRYPTION_KEY and Stripe price I
       STRIPE_ADDL_M_US: "price_5",
       STRIPE_ADDL_Y_US: "price_6",
         STRIPE_ADDL_M_CA: "price_7",
-        STRIPE_ADDL_Y_CA: "price_8"
+        STRIPE_ADDL_Y_CA: "price_8",
+        INEX_LEDGER_SUPPORT_SECRET: "support-secret-test"
       };
       delete process.env.FIELD_ENCRYPTION_KEY;
 

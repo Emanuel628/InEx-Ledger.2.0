@@ -24,7 +24,8 @@ function collectRequiredEnvironmentVariables(nodeEnv = process.env.NODE_ENV) {
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "EXPORT_GRANT_SECRET",
-    "RECEIPT_STORAGE_DIR"
+    "RECEIPT_STORAGE_DIR",
+    "INEX_LEDGER_SUPPORT_SECRET"
   );
 
   STRIPE_PRICE_ENTRIES.forEach((entry) => {

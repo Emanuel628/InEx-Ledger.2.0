@@ -22,6 +22,7 @@ const PRODUCTION_ENV_FIXTURE = {
   STRIPE_WEBHOOK_SECRET: "whsec_test_123",
   EXPORT_GRANT_SECRET: "test-export-grant-secret",
   RECEIPT_STORAGE_DIR: "storage/receipts",
+  INEX_LEDGER_SUPPORT_SECRET: "support-secret-test",
   STRIPE_PRO_M_US: "price_pro_m_us",
   STRIPE_PRO_Y_US: "price_pro_y_us",
   STRIPE_PRO_M_CA: "price_pro_m_ca",
@@ -74,7 +75,8 @@ test("collectRequiredEnvironmentVariables('production') includes core production
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "EXPORT_GRANT_SECRET",
-    "RECEIPT_STORAGE_DIR"
+    "RECEIPT_STORAGE_DIR",
+    "INEX_LEDGER_SUPPORT_SECRET"
   ];
   for (const name of expected) {
     assert.ok(
@@ -120,6 +122,22 @@ test("validateEnvironmentOrThrow('production') throws ENV_VALIDATION_FAILED when
         assert.equal(err.code, "ENV_VALIDATION_FAILED");
         assert.ok(Array.isArray(err.missing));
         assert.ok(err.missing.includes("FIELD_ENCRYPTION_KEY"));
+        return true;
+      }
+    );
+  });
+});
+
+test("validateEnvironmentOrThrow('production') requires the mounted internal support secret", () => {
+  const incomplete = { ...PRODUCTION_ENV_FIXTURE };
+  delete incomplete.INEX_LEDGER_SUPPORT_SECRET;
+
+  withSyntheticEnv(incomplete, () => {
+    assert.throws(
+      () => validateEnvironmentOrThrow("production"),
+      (err) => {
+        assert.equal(err.code, "ENV_VALIDATION_FAILED");
+        assert.ok(err.missing.includes("INEX_LEDGER_SUPPORT_SECRET"));
         return true;
       }
     );
