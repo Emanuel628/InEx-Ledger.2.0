@@ -204,21 +204,39 @@ function loadRouter(routePath, routeName) {
     }
     if (requestName === "../services/invoiceService") {
       return {
-        listInvoices: async () => [],
+        listInvoices: async (...args) => {
+          state.serviceCalls.push({ routeName, method: "listInvoices", args });
+          if (state.forceServiceErrorFor === "listInvoices") {
+            throw new Error("invoice list exploded");
+          }
+          return [];
+        },
         createInvoice: async (...args) => {
           state.serviceCalls.push({ routeName, method: "createInvoice", args });
+          if (state.forceServiceErrorFor === "createInvoice") {
+            throw new Error("invoice create exploded");
+          }
           return { id: "invoice_1" };
         },
         getInvoice: async (...args) => {
           state.serviceCalls.push({ routeName, method: "getInvoice", args });
+          if (state.forceServiceErrorFor === "getInvoice") {
+            throw new Error("invoice get exploded");
+          }
           return null;
         },
         updateInvoice: async (...args) => {
           state.serviceCalls.push({ routeName, method: "updateInvoice", args });
+          if (state.forceServiceErrorFor === "updateInvoice") {
+            throw new Error("invoice update exploded");
+          }
           return { id: "invoice_1" };
         },
         deleteInvoice: async (...args) => {
           state.serviceCalls.push({ routeName, method: "deleteInvoice", args });
+          if (state.forceServiceErrorFor === "deleteInvoice") {
+            throw new Error("invoice delete exploded");
+          }
           return true;
         }
       };
@@ -561,6 +579,22 @@ test("invoices routes require auth independently of V2 middleware", async () => 
   }
 });
 
+test("invoices routes enforce their route-level limiter before the service layer", async () => {
+  const fixture = loadRouter(INVOICES_ROUTE_PATH, "invoices");
+  try {
+    const response = await authed(
+      request(fixture.app)
+        .get("/api/test")
+        .set("x-test-rate-limit", "block")
+    );
+
+    assert.equal(response.status, 429);
+    assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("invoices delete enforces CSRF on mutations at the router level", async () => {
   const fixture = loadRouter(INVOICES_ROUTE_PATH, "invoices");
   try {
@@ -571,6 +605,22 @@ test("invoices delete enforces CSRF on mutations at the router level", async () 
 
     assert.equal(response.status, 403);
     assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("invoices list logs service failures instead of swallowing them silently", async () => {
+  const fixture = loadRouter(INVOICES_ROUTE_PATH, "invoices");
+  try {
+    fixture.state.forceServiceErrorFor = "listInvoices";
+    const response = await authed(request(fixture.app).get("/api/test"));
+
+    assert.equal(response.status, 500);
+    assert.equal(response.body.error, "Failed to load invoices.");
+    assert.equal(fixture.state.logErrors.length, 1);
+    assert.match(fixture.state.logErrors[0].message, /GET \/invoices failed/);
+    assert.match(String(fixture.state.logErrors[0].context?.err || ""), /invoice list exploded/);
   } finally {
     fixture.cleanup();
   }

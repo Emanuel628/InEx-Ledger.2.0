@@ -5,18 +5,25 @@ const router = express.Router();
 const invoiceService = require('../services/invoiceService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
+const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 const { isUuid } = require('../api/utils/v2HttpValidators');
+const { logError } = require('../utils/logger.js');
 
 const INVOICE_STATUS_VALUES = new Set(['draft', 'open', 'sent', 'partial', 'paid', 'void']);
 
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+router.use(createDataApiLimiter({ keyPrefix: 'rl:v2:invoices' }));
 router.use((req, res, next) => (
 	["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
 		? requireCsrfProtection(req, res, next)
 		: next()
 ));
+
+function formatRouteError(err) {
+	return err instanceof Error ? err.message : String(err || 'unknown_error');
+}
 
 function isValidDateOnly(value) {
 	return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
@@ -57,6 +64,7 @@ router.get('/', async (req, res) => {
 		const invoices = await invoiceService.listInvoices(businessId);
 		res.json(invoices);
 	} catch (err) {
+		logError('GET /invoices failed', { err: formatRouteError(err), businessId });
 		res.status(500).json({ error: 'Failed to load invoices.' });
 	}
 });
@@ -75,6 +83,7 @@ router.post('/', async (req, res) => {
 		const invoice = await invoiceService.createInvoice(businessId, req.body);
 		res.status(201).json(invoice);
 	} catch (err) {
+		logError('POST /invoices failed', { err: formatRouteError(err), businessId });
 		res.status(500).json({ error: 'Failed to create invoice.' });
 	}
 });
@@ -92,6 +101,7 @@ router.get('/:id', async (req, res) => {
 		}
 		res.json(invoice);
 	} catch (err) {
+		logError('GET /invoices/:id failed', { err: formatRouteError(err), businessId, invoiceId: req.params.id });
 		res.status(500).json({ error: 'Failed to load invoice.' });
 	}
 });
@@ -116,6 +126,7 @@ router.put('/:id', async (req, res) => {
 		}
 		res.json(invoice);
 	} catch (err) {
+		logError('PUT /invoices/:id failed', { err: formatRouteError(err), businessId, invoiceId: req.params.id });
 		res.status(500).json({ error: 'Failed to update invoice.' });
 	}
 });
@@ -133,6 +144,7 @@ router.delete('/:id', async (req, res) => {
 		}
 		res.json({ success: true });
 	} catch (err) {
+		logError('DELETE /invoices/:id failed', { err: formatRouteError(err), businessId, invoiceId: req.params.id });
 		res.status(500).json({ error: 'Failed to delete invoice.' });
 	}
 });
