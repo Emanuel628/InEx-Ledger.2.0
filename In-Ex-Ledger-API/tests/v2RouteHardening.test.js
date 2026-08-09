@@ -18,7 +18,8 @@ function loadRouter(routePath, routeName) {
   const state = {
     serviceCalls: [],
     logErrors: [],
-    forceProjectListError: false
+    forceProjectListError: false,
+    forceServiceErrorFor: null
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -87,14 +88,23 @@ function loadRouter(routePath, routeName) {
         },
         createProject: async (...args) => {
           state.serviceCalls.push({ routeName, method: "createProject", args });
+          if (state.forceServiceErrorFor === "createProject") {
+            throw new Error("project create exploded");
+          }
           return { id: "project_1" };
         },
         updateProject: async (...args) => {
           state.serviceCalls.push({ routeName, method: "updateProject", args });
+          if (state.forceServiceErrorFor === "updateProject") {
+            throw new Error("project update exploded");
+          }
           return { id: "project_1" };
         },
         deleteProject: async (...args) => {
           state.serviceCalls.push({ routeName, method: "deleteProject", args });
+          if (state.forceServiceErrorFor === "deleteProject") {
+            throw new Error("project delete exploded");
+          }
           return true;
         }
       };
@@ -167,6 +177,9 @@ function loadRouter(routePath, routeName) {
         listBillableExpenses: async () => [],
         createBillableExpense: async (...args) => {
           state.serviceCalls.push({ routeName, method: "createBillableExpense", args });
+          if (state.forceServiceErrorFor === "createBillableExpense") {
+            throw new Error("billable expense create exploded");
+          }
           return { id: "expense_1" };
         },
         getBillableExpense: async (...args) => {
@@ -175,10 +188,16 @@ function loadRouter(routePath, routeName) {
         },
         updateBillableExpense: async (...args) => {
           state.serviceCalls.push({ routeName, method: "updateBillableExpense", args });
+          if (state.forceServiceErrorFor === "updateBillableExpense") {
+            throw new Error("billable expense update exploded");
+          }
           return { id: "expense_1" };
         },
         deleteBillableExpense: async (...args) => {
           state.serviceCalls.push({ routeName, method: "deleteBillableExpense", args });
+          if (state.forceServiceErrorFor === "deleteBillableExpense") {
+            throw new Error("billable expense delete exploded");
+          }
           return true;
         }
       };
@@ -235,6 +254,19 @@ function authed(agent) {
 
 function authedWithCsrf(agent) {
   return authed(agent).set("x-csrf-token", "test-csrf");
+}
+
+const TEST_PROJECT_ID = "00000000-0000-4000-8000-000000009005";
+const TEST_EXPENSE_ID = "00000000-0000-4000-8000-000000009007";
+
+function validBillableExpensePayload() {
+  return {
+    project_id: TEST_PROJECT_ID,
+    description: "Travel expense",
+    amount: 12.5,
+    currency: "USD",
+    expense_date: "2026-05-14"
+  };
 }
 
 test("projects routes require auth independently of V2 middleware", async () => {
@@ -444,6 +476,76 @@ test("projects list logs service failures instead of swallowing them silently", 
     assert.equal(fixture.state.logErrors.length, 1);
     assert.match(fixture.state.logErrors[0].message, /GET \/projects failed/);
     assert.match(String(fixture.state.logErrors[0].context?.err || ""), /project list exploded/);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("projects create service failures return 500, not validation-shaped 400", async () => {
+  const fixture = loadRouter(PROJECTS_ROUTE_PATH, "projects");
+  try {
+    fixture.state.forceServiceErrorFor = "createProject";
+    const response = await authedWithCsrf(request(fixture.app).post("/api/test"))
+      .send({ name: "Website refresh" });
+
+    assert.equal(response.status, 500);
+    assert.equal(response.body.error, "Failed to create project");
+    assert.equal(fixture.state.serviceCalls.length, 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("projects update and delete service failures return 500", async () => {
+  const fixture = loadRouter(PROJECTS_ROUTE_PATH, "projects");
+  try {
+    fixture.state.forceServiceErrorFor = "updateProject";
+    const updateResponse = await authedWithCsrf(
+      request(fixture.app).put(`/api/test/${TEST_PROJECT_ID}`)
+    ).send({ name: "Website refresh" });
+
+    fixture.state.forceServiceErrorFor = "deleteProject";
+    const deleteResponse = await authedWithCsrf(
+      request(fixture.app).delete(`/api/test/${TEST_PROJECT_ID}`)
+    );
+
+    assert.equal(updateResponse.status, 500);
+    assert.equal(deleteResponse.status, 500);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billable expense create service failures return 500, not validation-shaped 400", async () => {
+  const fixture = loadRouter(BILLABLE_EXPENSES_ROUTE_PATH, "billable-expenses");
+  try {
+    fixture.state.forceServiceErrorFor = "createBillableExpense";
+    const response = await authedWithCsrf(request(fixture.app).post("/api/test"))
+      .send(validBillableExpensePayload());
+
+    assert.equal(response.status, 500);
+    assert.equal(response.body.error, "Failed to create billable expense");
+    assert.equal(fixture.state.serviceCalls.length, 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billable expense update and delete service failures return 500", async () => {
+  const fixture = loadRouter(BILLABLE_EXPENSES_ROUTE_PATH, "billable-expenses");
+  try {
+    fixture.state.forceServiceErrorFor = "updateBillableExpense";
+    const updateResponse = await authedWithCsrf(
+      request(fixture.app).put(`/api/test/${TEST_EXPENSE_ID}`)
+    ).send(validBillableExpensePayload());
+
+    fixture.state.forceServiceErrorFor = "deleteBillableExpense";
+    const deleteResponse = await authedWithCsrf(
+      request(fixture.app).delete(`/api/test/${TEST_EXPENSE_ID}`)
+    );
+
+    assert.equal(updateResponse.status, 500);
+    assert.equal(deleteResponse.status, 500);
   } finally {
     fixture.cleanup();
   }

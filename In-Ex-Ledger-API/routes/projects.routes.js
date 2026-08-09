@@ -80,7 +80,7 @@ router.post('/', async (req, res) => {
     res.status(201).json({ project });
   } catch (err) {
     logError('POST /projects failed', { err: formatRouteError(err), businessId: req.business?.id });
-    res.status(400).json({ error: 'Failed to create project' });
+    res.status(500).json({ error: 'Failed to create project' });
   }
 });
 
@@ -102,7 +102,7 @@ router.put('/:id', async (req, res) => {
     res.json({ project });
   } catch (err) {
     logError('PUT /projects/:id failed', { err: formatRouteError(err), businessId: req.business?.id, projectId: req.params.id });
-    res.status(400).json({ error: 'Failed to update project' });
+    res.status(500).json({ error: 'Failed to update project' });
   }
 });
 
@@ -117,7 +117,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     logError('DELETE /projects/:id failed', { err: formatRouteError(err), businessId: req.business?.id, projectId: req.params.id });
-    res.status(400).json({ error: 'Failed to delete project' });
+    res.status(500).json({ error: 'Failed to delete project' });
   }
 });
 

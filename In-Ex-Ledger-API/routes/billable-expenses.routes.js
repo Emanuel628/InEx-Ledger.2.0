@@ -97,7 +97,7 @@ router.post('/', async (req, res) => {
     res.status(201).json({ expense });
   } catch (err) {
     logError('POST /billable-expenses failed', { err: formatRouteError(err), businessId: req.business?.id });
-    res.status(400).json({ error: 'Failed to create billable expense' });
+    res.status(500).json({ error: 'Failed to create billable expense' });
   }
 });
 
@@ -119,7 +119,7 @@ router.put('/:id', async (req, res) => {
     res.json({ expense });
   } catch (err) {
     logError('PUT /billable-expenses/:id failed', { err: formatRouteError(err), businessId: req.business?.id, expenseId: req.params.id });
-    res.status(400).json({ error: 'Failed to update billable expense' });
+    res.status(500).json({ error: 'Failed to update billable expense' });
   }
 });
 
@@ -134,7 +134,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     logError('DELETE /billable-expenses/:id failed', { err: formatRouteError(err), businessId: req.business?.id, expenseId: req.params.id });
-    res.status(400).json({ error: 'Failed to delete billable expense' });
+    res.status(500).json({ error: 'Failed to delete billable expense' });
   }
 });
 
