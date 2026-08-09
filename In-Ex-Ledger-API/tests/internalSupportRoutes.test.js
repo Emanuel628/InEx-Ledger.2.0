@@ -7,6 +7,8 @@ const express = require("express");
 const request = require("supertest");
 
 const ROUTE_PATH = require.resolve("../routes/internalSupport.routes.js");
+const USER_ID = "11111111-1111-4111-8111-111111111111";
+const BUSINESS_ID = "22222222-2222-4222-8222-222222222222";
 
 function loadInternalSupportRouterFixture() {
   const originalLoad = Module._load.bind(Module);
@@ -20,20 +22,20 @@ function loadInternalSupportRouterFixture() {
             state.queryCount += 1;
             if (/SELECT id\s+FROM users\s+WHERE lower\(email\) = lower\(\$1\)/i.test(sql)) {
               if (String(params[0]).toLowerCase() === "owner@example.com") {
-                return { rows: [{ id: "user_support_1" }], rowCount: 1 };
+                return { rows: [{ id: USER_ID }], rowCount: 1 };
               }
               return { rows: [], rowCount: 0 };
             }
             if (/FROM users\s+WHERE id = \$1/i.test(sql)) {
               return {
                 rows: [{
-                  id: "user_support_1",
+                  id: USER_ID,
                   email: "owner@example.com",
                   display_name: "Owner Example",
                   email_verified: true,
                   role: "user",
                   created_at: "2026-06-01T12:00:00.000Z",
-                  active_business_id: "biz_support_1"
+                  active_business_id: BUSINESS_ID
                 }],
                 rowCount: 1
               };
@@ -41,7 +43,7 @@ function loadInternalSupportRouterFixture() {
             if (/SELECT id, region, language\s+FROM businesses\s+WHERE user_id = \$1/i.test(sql.replace(/\s+/g, " "))) {
               return {
                 rows: [{
-                  id: "biz_support_1",
+                  id: BUSINESS_ID,
                   region: "US",
                   language: "en"
                 }],
@@ -51,14 +53,14 @@ function loadInternalSupportRouterFixture() {
             if (/FROM businesses b\s+JOIN users u/i.test(sql.replace(/\s+/g, " "))) {
               return {
                 rows: [{
-                  id: "biz_support_1",
+                  id: BUSINESS_ID,
                   name: "Support Business",
-                  user_id: "user_support_1",
+                  user_id: USER_ID,
                   region: "US",
                   language: "en",
                   created_at: "2026-06-02T09:00:00.000Z",
                   owner_email: "owner@example.com",
-                  active_business_id: "biz_support_1"
+                  active_business_id: BUSINESS_ID
                 }],
                 rowCount: 1
               };
@@ -71,7 +73,7 @@ function loadInternalSupportRouterFixture() {
 
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
       return {
-        findBillingAnchorBusinessIdForUser: async () => "biz_support_1",
+        findBillingAnchorBusinessIdForUser: async () => BUSINESS_ID,
         getSubscriptionSnapshotForBusiness: async () => ({
           effectiveTier: "v1",
           effectiveStatus: "active",
@@ -146,7 +148,7 @@ test("internal support business and subscription lookups return bounded context 
 
   try {
     const businessResponse = await request(fixture.app)
-      .get("/api/internal/support/businesses/biz_support_1")
+      .get(`/api/internal/support/businesses/${BUSINESS_ID}`)
       .set("x-support-secret", "support-secret-test");
     assert.equal(businessResponse.status, 200);
     assert.equal(businessResponse.body?.item?.includedBusinesses, 1);
@@ -154,13 +156,47 @@ test("internal support business and subscription lookups return bounded context 
     assert.equal(businessResponse.body?.item?.businessLimit, 3);
 
     const subscriptionResponse = await request(fixture.app)
-      .get("/api/internal/support/users/user_support_1/subscription")
+      .get(`/api/internal/support/users/${USER_ID}/subscription`)
       .set("x-support-secret", "support-secret-test");
     assert.equal(subscriptionResponse.status, 200);
     assert.equal(subscriptionResponse.body?.item?.plan, "v1");
     assert.equal(subscriptionResponse.body?.item?.subscriptionStatus, "active");
     assert.equal(subscriptionResponse.body?.item?.additionalBusinessSlots, 2);
     assert.equal(subscriptionResponse.body?.item?.cancelAtPeriodEnd, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("internal support business lookup rejects malformed ids before DB access", async () => {
+  process.env.INEX_LEDGER_SUPPORT_SECRET = "support-secret-test";
+  const fixture = loadInternalSupportRouterFixture();
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/internal/support/businesses/not-a-uuid")
+      .set("x-support-secret", "support-secret-test");
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { ok: false, message: "Invalid business ID." });
+    assert.equal(fixture.state.queryCount, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("internal support subscription lookup rejects malformed user ids before DB access", async () => {
+  process.env.INEX_LEDGER_SUPPORT_SECRET = "support-secret-test";
+  const fixture = loadInternalSupportRouterFixture();
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/internal/support/users/not-a-uuid/subscription")
+      .set("x-support-secret", "support-secret-test");
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { ok: false, message: "Invalid user ID." });
+    assert.equal(fixture.state.queryCount, 0);
   } finally {
     fixture.cleanup();
   }

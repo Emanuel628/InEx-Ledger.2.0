@@ -10,6 +10,7 @@ const { logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireSupportSecret);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // This router is gated only by a single shared secret (see requireSupportSecret)
 // rather than a per-agent identity, so every access is logged here to leave a
@@ -125,6 +126,11 @@ router.get("/users/:email", async (req, res) => {
 });
 
 router.get("/businesses/:businessId", async (req, res) => {
+  const businessId = String(req.params.businessId || "").trim();
+  if (!UUID_RE.test(businessId)) {
+    return res.status(400).json({ ok: false, message: "Invalid business ID." });
+  }
+
   try {
     const businessResult = await pool.query(
       `SELECT b.id,
@@ -140,7 +146,7 @@ router.get("/businesses/:businessId", async (req, res) => {
            ON u.id = b.user_id
         WHERE b.id = $1
         LIMIT 1`,
-      [req.params.businessId]
+      [businessId]
     );
     const business = businessResult.rows[0] || null;
     if (!business) {
@@ -180,8 +186,13 @@ router.get("/businesses/:businessId", async (req, res) => {
 });
 
 router.get("/users/:userId/subscription", async (req, res) => {
+  const userId = String(req.params.userId || "").trim();
+  if (!UUID_RE.test(userId)) {
+    return res.status(400).json({ ok: false, message: "Invalid user ID." });
+  }
+
   try {
-    const context = await fetchUserContextById(req.params.userId);
+    const context = await fetchUserContextById(userId);
     if (!context) {
       return res.status(404).json({ ok: false, message: "User not found." });
     }
