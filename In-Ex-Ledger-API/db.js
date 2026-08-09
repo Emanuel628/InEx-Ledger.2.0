@@ -212,7 +212,10 @@ async function getAppliedMigrations() {
   );
   const applied = new Map();
   for (const row of result.rows) {
-    applied.set(row.filename, row.checksum);
+    const canonicalFilename = getCanonicalMigrationFilename(row.filename);
+    if (!applied.has(canonicalFilename) || row.filename === canonicalFilename) {
+      applied.set(canonicalFilename, row.checksum);
+    }
   }
   return applied;
 }
@@ -267,7 +270,7 @@ async function hasRepairableBillableExpensesSchema() {
   ]);
 }
 
-async function canAutoRepairMigrationDrift(filename, storedChecksum) {
+async function canAcceptHistoricalMigrationDrift(filename, storedChecksum) {
   if (isCompatibleHistoricalMigrationChecksum(filename, storedChecksum)) {
     return true;
   }
@@ -277,89 +280,6 @@ async function canAutoRepairMigrationDrift(filename, storedChecksum) {
   }
 
   return false;
-}
-
-async function repairAppliedMigrationChecksum(filename, checksum) {
-  await withRetry(() =>
-    pool.query(
-      'UPDATE schema_migrations SET checksum = $2 WHERE filename = $1',
-      [filename, checksum]
-    )
-  );
-}
-
-async function normalizeHistoricalMigrationAliases() {
-  const aliasEntries = Object.entries(HISTORICAL_MIGRATION_FILENAME_ALIASES);
-  if (!aliasEntries.length) {
-    return;
-  }
-
-  const client = await withRetry(() => pool.connect());
-  try {
-    await client.query('BEGIN');
-
-    for (const [canonicalFilename, aliasSet] of aliasEntries) {
-      const aliases = Array.from(aliasSet);
-      if (!aliases.length) {
-        continue;
-      }
-
-      const result = await client.query(
-        `SELECT filename
-           FROM schema_migrations
-          WHERE filename = $1
-             OR filename = ANY($2::text[])
-          ORDER BY CASE WHEN filename = $1 THEN 0 ELSE 1 END, filename`,
-        [canonicalFilename, aliases]
-      );
-
-      if (!result.rowCount) {
-        continue;
-      }
-
-      const canonicalRow = result.rows.find((row) => row.filename === canonicalFilename);
-      const aliasRows = result.rows.filter((row) => row.filename !== canonicalFilename);
-
-      if (canonicalRow) {
-        if (aliasRows.length) {
-          await client.query(
-            'DELETE FROM schema_migrations WHERE filename = ANY($1::text[])',
-            [aliasRows.map((row) => row.filename)]
-          );
-          console.warn(
-            `Removed ${aliasRows.length} legacy migration alias entr${aliasRows.length === 1 ? 'y' : 'ies'} for ${canonicalFilename}.`
-          );
-        }
-        continue;
-      }
-
-      const [primaryAlias, ...extraAliases] = aliasRows;
-      await client.query(
-        'UPDATE schema_migrations SET filename = $2 WHERE filename = $1',
-        [primaryAlias.filename, canonicalFilename]
-      );
-      if (extraAliases.length) {
-        await client.query(
-          'DELETE FROM schema_migrations WHERE filename = ANY($1::text[])',
-          [extraAliases.map((row) => row.filename)]
-        );
-      }
-      console.warn(
-        `Normalized historical migration alias ${primaryAlias.filename} -> ${canonicalFilename}.`
-      );
-    }
-
-    await client.query('COMMIT');
-  } catch (err) {
-    try {
-      await client.query('ROLLBACK');
-    } catch (rollbackErr) {
-      console.error(`ROLLBACK failed while normalizing migration aliases: ${rollbackErr.message}`);
-    }
-    throw err;
-  } finally {
-    client.release();
-  }
 }
 
 // Run a single migration file inside a transaction and record it on success
@@ -420,7 +340,6 @@ async function initDatabase() {
   }
 
   await bootstrapMigrationsTable();
-  await normalizeHistoricalMigrationAliases();
   const appliedMap = await getAppliedMigrations();
 
   let newCount = 0;
@@ -434,12 +353,12 @@ async function initDatabase() {
     if (appliedMap.has(filename)) {
       const storedChecksum = appliedMap.get(filename);
       if (storedChecksum !== checksum) {
-        if (await canAutoRepairMigrationDrift(filename, storedChecksum)) {
+        if (await canAcceptHistoricalMigrationDrift(filename, storedChecksum)) {
           console.warn(
-            `Repairing historical migration checksum drift for ${filename}. ` +
-            `stored=${storedChecksum} current=${checksum}`
+            `Accepted historical migration checksum drift for ${filename} without modifying migration metadata. ` +
+            `stored=${storedChecksum} current=${checksum}. ` +
+            'Run npm run migrations:repair-checksums only after operator review.'
           );
-          await repairAppliedMigrationChecksum(filename, checksum);
           skippedCount++;
           continue;
         }

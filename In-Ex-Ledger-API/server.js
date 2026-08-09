@@ -612,7 +612,7 @@ async function initializeDatabaseWithRetry() {
           dbState = 'failed';
           dbLastError = message;
           logError('Database initialization failed with a non-retryable error. Manual intervention required.', { message });
-          return;
+          throw err;
         }
         dbState = 'retrying';
         dbLastError = message;
@@ -629,14 +629,10 @@ async function startServer() {
   initializeRateLimiterProtection();
   initializeReceiptStorage();
 
+  await initializeDatabaseWithRetry();
+
   server = app.listen(PORT, () => {
     logInfo(`API running on port ${PORT}`);
-  });
-
-  initializeDatabaseWithRetry().catch((err) => {
-    dbState = 'failed';
-    dbLastError = err?.message || String(err);
-    logError('Database initialization failed unexpectedly.', { message: dbLastError });
   });
 }
 
@@ -656,7 +652,12 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 if (require.main === module) {
-  startServer();
+  startServer().catch((err) => {
+    dbState = 'failed';
+    dbLastError = err?.message || String(err);
+    logError('Startup failed before HTTP server was opened.', { message: dbLastError });
+    process.exit(1);
+  });
 }
 
 module.exports = {
