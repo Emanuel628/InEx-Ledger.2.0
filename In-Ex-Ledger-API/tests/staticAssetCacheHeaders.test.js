@@ -19,6 +19,31 @@ test("canonical HTML pages disable browser caching", async () => {
   assertNoStore(response);
 });
 
+test("responses include a generated request id", async () => {
+  const response = await request(app).get("/transactions").expect(200);
+
+  assert.match(response.headers["x-request-id"] || "", /^[0-9a-f-]{36}$/i);
+});
+
+test("safe caller request ids are echoed", async () => {
+  const response = await request(app)
+    .get("/transactions")
+    .set("X-Request-ID", "support-case_123:attempt.4")
+    .expect(200);
+
+  assert.strictEqual(response.headers["x-request-id"], "support-case_123:attempt.4");
+});
+
+test("unsafe caller request ids are replaced", async () => {
+  const response = await request(app)
+    .get("/transactions")
+    .set("X-Request-ID", "bad request id with spaces")
+    .expect(200);
+
+  assert.match(response.headers["x-request-id"] || "", /^[0-9a-f-]{36}$/i);
+  assert.notStrictEqual(response.headers["x-request-id"], "bad request id with spaces");
+});
+
 test("JavaScript assets disable browser caching", async () => {
   const response = await request(app).get("/js/global.js").expect(200);
   assertNoStore(response);

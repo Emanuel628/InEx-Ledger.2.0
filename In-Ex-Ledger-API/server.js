@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const routes = require('./routes/index.js');
@@ -122,6 +123,8 @@ const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
   "/api/email/inbound",
   "/api/support-email/inbound"
 ]);
+const REQUEST_ID_HEADER = 'X-Request-ID';
+const SAFE_REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 function setStaticAssetCacheHeaders(res, filePath) {
   const normalizedPath = String(filePath || '').toLowerCase();
@@ -229,6 +232,15 @@ function isOriginlessRequestAllowed(req) {
   return ORIGINLESS_API_WRITE_ALLOWLIST.has(req.path);
 }
 
+function resolveRequestId(req) {
+  const incomingRequestId = String(req.get(REQUEST_ID_HEADER) || '').trim();
+  if (SAFE_REQUEST_ID_PATTERN.test(incomingRequestId)) {
+    return incomingRequestId;
+  }
+
+  return crypto.randomUUID();
+}
+
 function buildCorsOptions(req, callback) {
   const origin = String(req.headers.origin || '').trim();
   if (!origin) {
@@ -314,6 +326,14 @@ let dbLastError = null;
 let dbInitPromise = null;
 
 app.set('trust proxy', 1);
+
+app.use((req, res, next) => {
+  const requestId = resolveRequestId(req);
+  req.id = requestId;
+  req.requestId = requestId;
+  res.setHeader(REQUEST_ID_HEADER, requestId);
+  next();
+});
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -577,6 +597,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   const status = err.status || err.statusCode || 500;
   logError('Unhandled error', {
+    requestId: req.requestId,
     status,
     method: req.method,
     path: req.path,
@@ -584,7 +605,10 @@ app.use((err, req, res, next) => {
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
   const message = status < 500 ? err.message : 'Internal server error';
-  res.status(status).json({ error: message });
+  res.status(status).json({
+    error: message,
+    ...(status >= 500 && req.requestId ? { requestId: req.requestId } : {})
+  });
 });
 
 /* =========================================================
