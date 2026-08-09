@@ -210,6 +210,28 @@ test("requireAuth returns 401 for an expired token", () => {
   assert.equal(res.statusCode, 401);
 });
 
+test("requireAuth logs structured rejection context with safe request fallbacks", () => {
+  const token = makeExpiredToken({ id: "user_exp3" });
+  const req = createReq({ accessToken: token });
+  const res = createRes();
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (message) => warnings.push(String(message));
+
+  try {
+    requireAuth(req, res, () => {});
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(res.statusCode, 401);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Auth rejected/);
+  assert.match(warnings[0], /"method":"UNKNOWN"/);
+  assert.match(warnings[0], /"path":"unknown"/);
+  assert.doesNotMatch(warnings[0], /undefined undefined/);
+});
+
 test("requireAuth returns 401 for a malformed token", () => {
   const req = createReq({ accessToken: "not.a.realtoken" });
   const res = createRes();

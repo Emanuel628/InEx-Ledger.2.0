@@ -29,6 +29,15 @@ function getRequestToken(req) {
   return String(req.cookies?.[ACCESS_TOKEN_COOKIE] || "").trim();
 }
 
+function getAuthLogContext(req, err) {
+  return {
+    requestId: req.requestId || req.id || "",
+    method: req.method || "UNKNOWN",
+    path: req.originalUrl || req.path || "unknown",
+    reason: err.message
+  };
+}
+
 function requireAuth(req, res, next) {
   const token = getRequestToken(req);
   if (!token) {
@@ -38,7 +47,7 @@ function requireAuth(req, res, next) {
   try {
     req.user = verifyToken(token);
   } catch (err) {
-    logWarn(`Auth rejected [${req.method} ${req.path}]: ${err.message}`);
+    logWarn("Auth rejected", getAuthLogContext(req, err));
     return res.status(401).json({ error: "Authentication required" });
   }
 
@@ -51,7 +60,7 @@ function optionalAuth(req, res, next) {
     try {
       req.user = verifyToken(token);
     } catch (err) {
-      logWarn(`optionalAuth rejected invalid token: ${err.message}`);
+      logWarn("optionalAuth rejected invalid token", getAuthLogContext(req, err));
     }
   }
 
