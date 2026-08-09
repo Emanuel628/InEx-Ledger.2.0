@@ -17,6 +17,18 @@ const PLAN_CODES = {
   BUSINESS: "business"
 };
 
+const SUBSCRIPTION_STATUS_VALUES = [
+  "free",
+  "trialing",
+  "active",
+  "past_due",
+  "unpaid",
+  "canceled",
+  "incomplete",
+  "incomplete_expired",
+  "paused"
+];
+
 const PLAN_NAMES = {
   [PLAN_CODES.BASIC]: "Basic",
   [PLAN_CODES.PRO]: "Pro",
@@ -163,6 +175,7 @@ function getPlanLimit(planCode, limitKey) {
 module.exports = {
   PLAN_CODES,
   PLAN_NAMES,
+  SUBSCRIPTION_STATUS_VALUES,
   FEATURE_KEYS,
   FEATURE_LABELS,
   ALL_FEATURE_KEYS,

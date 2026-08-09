@@ -2,9 +2,12 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   PLAN_CODES,
   PLAN_NAMES,
+  SUBSCRIPTION_STATUS_VALUES,
   FEATURE_KEYS,
   ALL_FEATURE_KEYS,
   PLAN_FEATURES,
@@ -13,6 +16,8 @@ const {
   planHasFeature,
   getPlanLimit
 } = require("../config/planCatalog.js");
+
+const apiRoot = path.join(__dirname, "..");
 
 test("every plan explicitly defines every known feature key", () => {
   for (const planCode of [PLAN_CODES.BASIC, PLAN_CODES.PRO, PLAN_CODES.BUSINESS]) {
@@ -110,6 +115,23 @@ test("internal DB plan codes are preserved for backward compatibility", () => {
   assert.equal(PLAN_CODES.BASIC, "free");
   assert.equal(PLAN_CODES.PRO, "v1");
   assert.equal(PLAN_CODES.BUSINESS, "business");
+});
+
+test("business subscription migration constrains canonical plan and status values", () => {
+  const sql = fs.readFileSync(
+    path.join(apiRoot, "db", "migrations", "20260809_add_business_subscription_status_checks.sql"),
+    "utf8"
+  );
+
+  assert.match(sql, /chk_business_subscriptions_plan_code/);
+  assert.match(sql, /chk_business_subscriptions_status/);
+  assert.match(sql, /NOT VALID/i);
+  for (const planCode of Object.values(PLAN_CODES)) {
+    assert.match(sql, new RegExp(`'${planCode}'`));
+  }
+  for (const status of SUBSCRIPTION_STATUS_VALUES) {
+    assert.match(sql, new RegExp(`'${status}'`));
+  }
 });
 
 test("getPlanDefinition normalizes unrecognized/missing codes to Basic", () => {
