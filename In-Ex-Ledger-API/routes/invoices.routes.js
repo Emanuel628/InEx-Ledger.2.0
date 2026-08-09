@@ -7,8 +7,8 @@ const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
+const { isUuid } = require('../api/utils/v2HttpValidators');
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INVOICE_STATUS_VALUES = new Set(['draft', 'open', 'sent', 'partial', 'paid', 'void']);
 
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
@@ -17,10 +17,6 @@ router.use((req, res, next) => (
 		? requireCsrfProtection(req, res, next)
 		: next()
 ));
-
-function isUuid(value) {
-	return UUID_RE.test(String(value || ''));
-}
 
 function isValidDateOnly(value) {
 	return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
