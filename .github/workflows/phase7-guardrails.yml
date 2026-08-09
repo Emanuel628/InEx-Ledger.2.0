@@ -54,12 +54,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: In-Ex-Ledger-API/package-lock.json
 
-      - name: Debug repo structure
-        run: |
-          pwd
-          ls -la
-          ls -la In-Ex-Ledger-API
-
       - name: Install dependencies
         working-directory: In-Ex-Ledger-API
         run: npm ci
