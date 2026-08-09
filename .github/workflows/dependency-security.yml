@@ -32,6 +32,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - name: api
+            path: In-Ex-Ledger-API
+            lockfile: In-Ex-Ledger-API/package-lock.json
+            audit: npm run security:deps
+          - name: frontend-v3
+            path: In-Ex-Ledger-API/frontend-v3
+            lockfile: In-Ex-Ledger-API/frontend-v3/package-lock.json
+            audit: npm audit --omit=dev --audit-level=high
+          - name: pdf-worker
+            path: pdf-worker
+            lockfile: pdf-worker/package-lock.json
+            audit: npm audit --omit=dev --audit-level=high
 
     steps:
       - name: Checkout repository
@@ -42,12 +58,12 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: In-Ex-Ledger-API/package-lock.json
+          cache-dependency-path: ${{ matrix.package.lockfile }}
 
-      - name: Install dependencies
-        working-directory: In-Ex-Ledger-API
+      - name: Install ${{ matrix.package.name }} dependencies
+        working-directory: ${{ matrix.package.path }}
         run: npm ci
 
-      - name: Audit production dependencies
-        working-directory: In-Ex-Ledger-API
-        run: npm run security:deps
+      - name: Audit ${{ matrix.package.name }} production dependencies
+        working-directory: ${{ matrix.package.path }}
+        run: ${{ matrix.package.audit }}

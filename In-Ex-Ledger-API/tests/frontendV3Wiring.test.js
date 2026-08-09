@@ -28,6 +28,10 @@ function readFrontendFiles() {
   }));
 }
 
+function normalizeNewlines(source) {
+  return source.replace(/\r\n/g, "\n");
+}
+
 test("v3 wired app pages do not ship mock business data fallbacks", () => {
   const forbiddenPatterns = [
     /\bmock-\w+/i,
@@ -196,7 +200,9 @@ test("v3 header notifications use real unread message counts without noisy local
 
 test("v3 shell has an SPA-owned i18n runtime wired to business language", () => {
   const appSource = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
-  const shellSource = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
+  const shellSource = normalizeNewlines(
+    fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8")
+  );
   const authSource = fs.readFileSync(path.join(frontendRoot, "lib", "authApi.ts"), "utf8");
   const i18nSource = fs.readFileSync(path.join(frontendRoot, "lib", "i18n.ts"), "utf8");
 
@@ -608,10 +614,16 @@ test("v3 Help page reflects the current app workflows", () => {
 });
 
 test("phase 7 guardrails installs frontend v3 dependencies before i18n runtime checks", () => {
-  const workflow = fs.readFileSync(path.join(repoRoot, "..", ".github", "workflows", "phase7-guardrails.yml"), "utf8");
+  const workflow = normalizeNewlines(
+    fs.readFileSync(path.join(repoRoot, "..", ".github", "workflows", "phase7-guardrails.yml"), "utf8")
+  );
 
   assert.match(workflow, /Install frontend v3 dependencies/);
-  assert.match(workflow, /working-directory: In-Ex-Ledger-API\/frontend-v3[\s\S]*run: npm install/);
+  assert.match(workflow, /working-directory: In-Ex-Ledger-API\/frontend-v3[\s\S]*run: npm ci/);
+  assert.match(workflow, /Lint frontend v3[\s\S]*run: npm run lint/);
+  assert.match(workflow, /Type-check frontend v3[\s\S]*run: npx tsc -b --noEmit/);
+  assert.match(workflow, /Check frontend v3 i18n catalog[\s\S]*run: npm run i18n:v3:check/);
+  assert.match(workflow, /Build frontend v3[\s\S]*run: npm run build:frontend-v3/);
 });
 
 test("legacy auth defaults avoid rapid v3 session expiry and refresh throttling", () => {

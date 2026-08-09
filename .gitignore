@@ -13,4 +13,5 @@ tmp-*.txt
 .claude/
 In-Ex-Ledger-API/storage/
 In-Ex-Ledger-API/test-results/
+In-Ex-Ledger-API/tests/e2e/screenshots/*.json
 insert-i18n.js

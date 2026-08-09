@@ -62,11 +62,27 @@ jobs:
 
       - name: Install dependencies
         working-directory: In-Ex-Ledger-API
-        run: npm install
+        run: npm ci
 
       - name: Install frontend v3 dependencies
         working-directory: In-Ex-Ledger-API/frontend-v3
-        run: npm install
+        run: npm ci
+
+      - name: Lint frontend v3
+        working-directory: In-Ex-Ledger-API/frontend-v3
+        run: npm run lint
+
+      - name: Type-check frontend v3
+        working-directory: In-Ex-Ledger-API/frontend-v3
+        run: npx tsc -b --noEmit
+
+      - name: Check frontend v3 i18n catalog
+        working-directory: In-Ex-Ledger-API
+        run: npm run i18n:v3:check
+
+      - name: Build frontend v3
+        working-directory: In-Ex-Ledger-API
+        run: npm run build:frontend-v3
 
       - name: Run database migrations
         working-directory: In-Ex-Ledger-API
