@@ -14,9 +14,38 @@ const {
 } = require("../db.js");
 
 const migrationsDir = path.join(__dirname, "..", "db", "migrations");
+const HISTORICAL_DESTRUCTIVE_MIGRATIONS = new Set([
+  "002_enforce_business_name_uniqueness.sql",
+  "015_harden_core_data_paths.sql",
+  "026_fix_exports_schema.sql",
+  "035_fix_schema_gaps.sql",
+  "036_drop_cpa_audit_business_fk.sql",
+  "041_enforce_category_name_ci_unique.sql",
+  "043_drop_goals.sql",
+  "045_drop_cpa_audit_user_fks.sql",
+  "048_fix_cpa_audit_fk_constraints.sql",
+  "048_reset_ip_based_signin_device_fingerprints.sql",
+  "050_drop_cpa_audit_grant_id_fk.sql",
+  "20260511_extend_messages_for_invoices.sql",
+  "20260731_add_transaction_receipt_status.sql"
+]);
+
+function readMigration(filename) {
+  return fs.readFileSync(path.join(migrationsDir, filename), "utf8");
+}
+
+function sqlWithoutComments(sql) {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/--.*$/gm, "");
+}
+
+function containsDestructiveSql(sql) {
+  return /\bDELETE\s+FROM\b|\bDROP\s+TABLE\b|\bDROP\s+CONSTRAINT\b|\bTRUNCATE\b/i.test(sqlWithoutComments(sql));
+}
 
 test("migration 045 keeps original applied SQL shape", () => {
-  const sql = fs.readFileSync(path.join(migrationsDir, "045_drop_cpa_audit_user_fks.sql"), "utf8");
+  const sql = readMigration("045_drop_cpa_audit_user_fks.sql");
 
   assert.match(sql, /ALTER TABLE cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_owner_user_id_fkey;/i);
   assert.match(sql, /ALTER TABLE cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_actor_user_id_fkey;/i);
@@ -24,14 +53,14 @@ test("migration 045 keeps original applied SQL shape", () => {
 });
 
 test("migration 048 idempotently drops legacy cpa_audit_logs user FKs", () => {
-  const sql = fs.readFileSync(path.join(migrationsDir, "048_fix_cpa_audit_fk_constraints.sql"), "utf8");
+  const sql = readMigration("048_fix_cpa_audit_fk_constraints.sql");
 
   assert.match(sql, /ALTER TABLE IF EXISTS cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_owner_user_id_fkey;/i);
   assert.match(sql, /ALTER TABLE IF EXISTS cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_actor_user_id_fkey;/i);
 });
 
 test("migration 049 creates persistent Stripe webhook idempotency table", () => {
-  const sql = fs.readFileSync(path.join(migrationsDir, "049_create_stripe_webhook_events.sql"), "utf8");
+  const sql = readMigration("049_create_stripe_webhook_events.sql");
 
   assert.match(sql, /CREATE TABLE IF NOT EXISTS stripe_webhook_events/i);
   assert.match(sql, /event_id\s+TEXT\s+PRIMARY KEY/i);
@@ -40,13 +69,13 @@ test("migration 049 creates persistent Stripe webhook idempotency table", () => 
 });
 
 test("migration 050 drops cpa_audit_logs grant_id FK to prevent XX000 on account deletion", () => {
-  const sql = fs.readFileSync(path.join(migrationsDir, "050_drop_cpa_audit_grant_id_fk.sql"), "utf8");
+  const sql = readMigration("050_drop_cpa_audit_grant_id_fk.sql");
 
   assert.match(sql, /ALTER TABLE IF EXISTS cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_grant_id_fkey;/i);
 });
 
 test("billable expenses base migration does not inline the projects FK", () => {
-  const sql = fs.readFileSync(path.join(migrationsDir, "20260419_create_billable_expenses_table.sql"), "utf8");
+  const sql = readMigration("20260419_create_billable_expenses_table.sql");
 
   assert.match(sql, /project_id\s+UUID/i);
   assert.doesNotMatch(sql, /project_id\s+UUID\s+REFERENCES\s+projects\(id\)/i);
@@ -151,4 +180,24 @@ test("migration checksum hashing is stable across LF and CRLF line endings", () 
 
   assert.equal(computeChecksum(lfSql), expected);
   assert.equal(computeChecksum(crlfSql), expected);
+});
+
+test("new destructive migrations require an explicit review marker", () => {
+  const unreviewed = fs
+    .readdirSync(migrationsDir)
+    .filter((file) => file.endsWith(".sql"))
+    .filter((file) => {
+      const sql = readMigration(file);
+      return (
+        containsDestructiveSql(sql)
+        && !HISTORICAL_DESTRUCTIVE_MIGRATIONS.has(file)
+        && !/destructive-migration-reviewed:/i.test(sql)
+      );
+    });
+
+  assert.deepEqual(
+    unreviewed,
+    [],
+    "destructive migrations must document review with a destructive-migration-reviewed: comment"
+  );
 });

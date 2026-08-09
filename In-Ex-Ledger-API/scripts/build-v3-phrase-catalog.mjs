@@ -192,6 +192,10 @@ function loadExistingCatalog() {
   }
 }
 
+function normalizeLineEndings(source) {
+  return source.replace(/\r\n/g, '\n')
+}
+
 // Regenerating must not clobber reviewed human translations: carry forward any
 // existing es/fr entry for a phrase that is still present, and only fall back
 // to the English identity mapping for newly-added phrases.
@@ -208,7 +212,7 @@ const nextSource = `${header}export const v3PhraseCatalog = ${JSON.stringify(cat
 
 if (checkOnly) {
   const currentSource = fs.existsSync(outputPath) ? fs.readFileSync(outputPath, 'utf8') : ''
-  if (currentSource !== nextSource) {
+  if (normalizeLineEndings(currentSource) !== normalizeLineEndings(nextSource)) {
     console.error(`v3 phrase catalog is stale. Run: node scripts/build-v3-phrase-catalog.mjs`)
     process.exit(1)
   }
