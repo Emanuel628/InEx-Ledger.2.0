@@ -27,7 +27,8 @@ const {
     buildEvidenceRows,
     buildChecklistItems,
     isWorkpaperReady,
-    buildCategoryBuckets
+    buildCategoryBuckets,
+    buildReviewInsights
   }
 } = require("../services/pdfGeneratorService.js");
 
@@ -677,6 +678,41 @@ test("unresolvedSeverityWeight prioritizes description and duplicate blockers wi
   assert.equal(unresolvedSeverityWeight({ __status: { flags: ["FC"] } }), 1);
   assert.equal(unresolvedSeverityWeight({ __status: { flags: ["RS"] } }), 1);
   assert.equal(unresolvedSeverityWeight({ __status: { flags: ["PR"] } }), 2);
+});
+
+test("buildReviewInsights tallies transaction-level receipt_status counts, defaulting missing values to pending", () => {
+  const transactions = [
+    {
+      id: "t1",
+      type: "expense",
+      amount: 50,
+      receipt_status: "attached",
+      __status: buildTransactionStatus({ id: "t1", type: "expense", amount: 50, description: "Gas", categoryId: "c1" }, { id: "c1", name: "Fuel & Gas", tax_map_us: "" }, { region: "US" })
+    },
+    {
+      id: "t2",
+      type: "expense",
+      amount: 20,
+      receipt_status: "missing",
+      __status: buildTransactionStatus({ id: "t2", type: "expense", amount: 20, description: "Import", categoryId: "c2" }, { id: "c2", name: "Imported Expense", tax_map_us: "" }, { region: "US" })
+    },
+    {
+      id: "t3",
+      type: "expense",
+      amount: 15,
+      receipt_status: "not_required",
+      __status: buildTransactionStatus({ id: "t3", type: "expense", amount: 15, description: "Bank fee", categoryId: "c3" }, { id: "c3", name: "Bank Fees", tax_map_us: "" }, { region: "US" })
+    },
+    {
+      id: "t4",
+      type: "expense",
+      amount: 5,
+      // No receipt_status set on this transaction at all.
+      __status: buildTransactionStatus({ id: "t4", type: "expense", amount: 5, description: "Misc", categoryId: "c4" }, { id: "c4", name: "Imported Expense", tax_map_us: "" }, { region: "US" })
+    }
+  ];
+  const insights = buildReviewInsights(transactions, [], []);
+  assert.deepEqual(insights.receiptStatusCounts, { pending: 1, attached: 1, missing: 1, not_required: 1 });
 });
 
 test("buildFinalDisclosureLines uses the active packet status label", () => {

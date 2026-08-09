@@ -74,6 +74,9 @@ function loadTransactionsRouterWithState() {
       }
 
       if (/INSERT INTO transactions/i.test(sql)) {
+        if (String(params[7] || "").includes("FORCE_INSERT_FAIL")) {
+          throw new Error("simulated insert failure");
+        }
         state.insertedTransactions.push({
           id: params[0],
           business_id: params[1],
@@ -90,7 +93,8 @@ function loadTransactionsRouterWithState() {
           import_batch_id: params[13],
           category_mapping_reason: params[14],
           category_mapping_confidence: params[15],
-          category_mapping_rule_id: params[16]
+          category_mapping_rule_id: params[16],
+          review_status: /'needs_review'/i.test(sql) ? "needs_review" : null
         });
         return { rows: [], rowCount: 1 };
       }
@@ -304,42 +308,42 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
         categoryId: categoryIdByName.get("Software & Subscriptions"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "medium"
       },
       {
         merchant: "OpenAI",
         categoryId: categoryIdByName.get("Software & Subscriptions"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "medium"
+        confidence: "low"
       },
       {
         merchant: "Uber* Eats",
         categoryId: categoryIdByName.get("Meals"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "medium"
       },
       {
         merchant: "Shell Oil 48293",
         categoryId: categoryIdByName.get("Car & Truck Expenses"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "medium"
       },
       {
         merchant: "Stripe",
         categoryId: categoryIdByName.get("Sales Revenue"),
         type: "income",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "low"
       },
       {
         merchant: "Comcast Business",
         categoryId: categoryIdByName.get("Phone & Internet"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "high"
+        confidence: "low"
       },
       {
         merchant: "Facebook",
@@ -367,6 +371,15 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
     }
   });
   assert.equal(state.emailed, true);
+
+  assert.ok(state.insertedTransactions.length > 0);
+  for (const row of state.insertedTransactions) {
+    assert.equal(
+      row.review_status,
+      "needs_review",
+      `CSV-imported row for '${row.merchant_name}' (mapping confidence: ${row.category_mapping_confidence}) must land as needs_review regardless of mapping confidence, and must never be auto-set to ready/matched/locked`
+    );
+  }
 });
 
 test("POST /api/transactions/import/csv uses split bank descriptions for live category mapping", async () => {
@@ -391,4 +404,41 @@ test("POST /api/transactions/import/csv uses split bank descriptions for live ca
   assert.equal(state.insertedTransactions[0].description_encrypted, "POS PURCHASE MICROSOFT 365 ANNUAL SUBSCRIPTION");
   assert.equal(state.insertedTransactions[0].category_id, categoryIdByName.get("Software & Subscriptions"));
   assert.equal(state.insertedTransactions[0].category_mapping_reason, "canonical_rule");
+});
+
+test("POST /api/transactions/import/csv retains skipped-row detail for missing fields and insert failures", async () => {
+  const { app, state, accountId } = loadTransactionsRouterWithState();
+  const csv = [
+    "Date,Merchant_Name,Description,Amount",
+    "2026-05-01,,Missing amount row,",
+    "2026-05-02,BadRow Co,FORCE_INSERT_FAIL trigger,-10.00",
+    "2026-05-03,Adobe Systems,*Photoshop Sub,-54.99"
+  ].join("\n");
+
+  const response = await request(app)
+    .post("/api/transactions/import/csv")
+    .field("account_id", accountId)
+    .field("skip_duplicates", "false")
+    .attach("file", Buffer.from(csv, "utf8"), "skipped-rows.csv");
+
+  assert.equal(response.status, 200, JSON.stringify({
+    body: response.body,
+    loggedErrors: state.loggedErrors
+  }));
+  assert.equal(response.body.imported, 1);
+  assert.equal(response.body.skipped, 2);
+  assert.equal(response.body.skipped_rows.length, 2);
+
+  const [missingFieldRow, insertFailedRow] = response.body.skipped_rows;
+  assert.equal(missingFieldRow.reason_code, "missing_required_field");
+  assert.equal(missingFieldRow.row, 2);
+  assert.match(missingFieldRow.reason, /missing or invalid amount/);
+  assert.equal(missingFieldRow.description, "Missing amount row");
+  assert.equal(missingFieldRow.date, "2026-05-01");
+
+  assert.equal(insertFailedRow.reason_code, "insert_failed");
+  assert.equal(insertFailedRow.row, 3);
+  assert.equal(insertFailedRow.merchant_name, "BadRow Co");
+  assert.equal(insertFailedRow.date, "2026-05-02");
+  assert.match(insertFailedRow.reason, /simulated insert failure/);
 });

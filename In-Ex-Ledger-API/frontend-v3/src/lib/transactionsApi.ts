@@ -3,6 +3,8 @@ import { getTaxLineOptions } from './categoriesApi'
 
 export type TransactionStatus = 'Cleared' | 'Needs review' | 'Missing receipt' | 'Draft'
 
+export type ReceiptStatus = 'pending' | 'attached' | 'missing' | 'not_required'
+
 export type Transaction = {
   id: string
   accountId: string
@@ -21,6 +23,9 @@ export type Transaction = {
   reviewStatus: string
   reviewNotes: string
   reviewIssues: ReviewQueueItem[]
+  receiptStatus: ReceiptStatus
+  receiptMissingReason: string
+  businessPurpose: string
 }
 
 export type TransactionDraft = {
@@ -138,6 +143,9 @@ type LegacyTransaction = {
   receipt_count?: number
   review_status?: string | null
   review_notes?: string | null
+  receipt_status?: string | null
+  receipt_missing_reason?: string | null
+  business_purpose?: string | null
 }
 
 type LegacyCategoryOption = {
@@ -187,6 +195,18 @@ type LegacyRecurringTemplate = {
   active?: boolean
 }
 
+export type CsvSkippedRow = {
+  row: number
+  reason_code: string
+  reason: string
+  date: string | null
+  description: string | null
+  merchant_name: string | null
+  category_guess: string | null
+  amount: number | null
+  type: 'income' | 'expense' | null
+}
+
 export type CsvImportResult = {
   imported?: number
   skipped?: number
@@ -194,6 +214,7 @@ export type CsvImportResult = {
   truncated?: boolean
   truncated_at?: number
   errors?: { reason?: string }[]
+  skipped_rows?: CsvSkippedRow[]
 }
 
 export type TransactionPageFilters = {
@@ -441,7 +462,29 @@ function mapTransaction(row: LegacyTransaction, reviewItemsByTransaction = new M
     reviewStatus: row.review_status || '',
     reviewNotes: row.review_notes || '',
     reviewIssues: reviewItem ? [reviewItem] : [],
+    receiptStatus: isReceiptStatus(row.receipt_status) ? row.receipt_status : 'pending',
+    receiptMissingReason: row.receipt_missing_reason || '',
+    businessPurpose: row.business_purpose || '',
   }
+}
+
+function isReceiptStatus(value: unknown): value is ReceiptStatus {
+  return value === 'pending' || value === 'attached' || value === 'missing' || value === 'not_required'
+}
+
+export async function updateTransactionReceiptStatus(
+  transactionId: string,
+  input: { receiptStatus: 'pending' | 'missing' | 'not_required'; receiptMissingReason?: string; businessPurpose?: string },
+) {
+  const saved = await apiRequest<LegacyTransaction>(`/api/transactions/${transactionId}/receipt-status`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      receipt_status: input.receiptStatus,
+      receipt_missing_reason: input.receiptMissingReason || '',
+      business_purpose: input.businessPurpose || '',
+    }),
+  })
+  return mapTransaction(saved)
 }
 
 function mapRecurringTemplate(row: LegacyRecurringTemplate): RecurringTemplate {

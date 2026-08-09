@@ -381,6 +381,12 @@ function buildNormalizedRow(enrichedTxn, context) {
     personalUsePct: Number.isFinite(personalUsePct) ? personalUsePct : "",
     reviewStatus: buildReviewStatus({ includedInPnl, exclusionCode: exclusion?.label || "" }, status),
     reviewNotes: String(enrichedTxn.review_notes || enrichedTxn.reviewNotes || enrichedTxn.note || "").trim(),
+    receiptStatus: String(enrichedTxn.receipt_status || enrichedTxn.receiptStatus || "pending").trim().toLowerCase(),
+    receiptMissingReason: String(enrichedTxn.receipt_missing_reason || enrichedTxn.receiptMissingReason || "").trim(),
+    businessPurpose: String(enrichedTxn.business_purpose || enrichedTxn.businessPurpose || "").trim(),
+    supportingEvidence: String(enrichedTxn.supporting_evidence || enrichedTxn.supportingEvidence || "").trim(),
+    receiptStatusConfirmedAt: normalizeIsoDate(enrichedTxn.receipt_status_confirmed_at || enrichedTxn.receiptStatusConfirmedAt) || "",
+    receiptStatusConfirmedBy: enrichedTxn.receipt_status_confirmed_by || enrichedTxn.receiptStatusConfirmedBy || "",
     province,
     supportSummary: status.supportSummary || "",
     internalTransactionId: enrichedTxn.id || ""

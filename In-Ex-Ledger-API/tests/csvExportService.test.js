@@ -92,6 +92,14 @@ test("full CPA CSV includes authoritative workpaper columns and no Tax ID", () =
   assert.doesNotMatch(csv, /Tax ID/i);
 });
 
+test("full CPA CSV includes receipt-status and category-mapping evidence columns", () => {
+  const csv = buildFullCpaCsv(buildDataset()).toString("utf8");
+  assert.match(csv, /Receipt Status,Receipt Missing Reason,Business Purpose,Supporting Evidence,Receipt Confirmed At,Receipt Confirmed By/);
+  assert.match(csv, /Category Mapping Reason,Category Mapping Confidence/);
+  // Rows with no receipt_status set on the source transaction default to 'pending'.
+  assert.match(csv, /,pending,/);
+});
+
 test("full CPA CSV inventories support artifacts beyond receipts", () => {
   const csv = buildFullCpaCsv(buildDataset()).toString("utf8");
   assert.match(csv, /Support Artifacts,Support Artifact Count/);

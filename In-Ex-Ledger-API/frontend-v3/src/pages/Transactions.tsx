@@ -39,11 +39,13 @@ import {
   saveTransactionDraft,
   undoDeletedTransaction,
   updateRecurringTemplateStatus,
+  updateTransactionReceiptStatus,
   type AccountOption,
   type BusinessTaxProfile,
   type CategoryOption,
   type Transaction,
   type CsvImportResult,
+  type CsvSkippedRow,
   type RecurringTemplateDraft,
   type RecurringTemplate,
   type ReviewQueueResponse,
@@ -59,6 +61,8 @@ function Transactions(props: PageProps) {
   const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [recoveryRow, setRecoveryRow] = useState<{ row: CsvSkippedRow; accountName: string } | null>(null)
+  const [recoveredSkipRowKeys, setRecoveredSkipRowKeys] = useState<Set<number>>(new Set())
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [transactionRows, setTransactionRows] = useState<Transaction[]>([])
   const [transactionTotal, setTransactionTotal] = useState(0)
@@ -71,6 +75,7 @@ function Transactions(props: PageProps) {
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([])
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [receiptTransaction, setReceiptTransaction] = useState<Transaction | null>(null)
+  const [receiptStatusTransaction, setReceiptStatusTransaction] = useState<Transaction | null>(null)
   const [recurringEditorTemplate, setRecurringEditorTemplate] = useState<RecurringTemplate | null | 'new'>(null)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [loadingData, setLoadingData] = useState(true)
@@ -183,22 +188,42 @@ function Transactions(props: PageProps) {
   useEffect(() => {
     document.body.classList.toggle(
       'modal-is-open',
-      drawerOpen || Boolean(selectedTransaction) || Boolean(receiptTransaction) || Boolean(recurringEditorTemplate) || filtersOpen || csvImportOpen,
+      drawerOpen || Boolean(selectedTransaction) || Boolean(receiptTransaction) || Boolean(receiptStatusTransaction) || Boolean(recurringEditorTemplate) || filtersOpen || csvImportOpen,
     )
 
     return () => document.body.classList.remove('modal-is-open')
-  }, [csvImportOpen, drawerOpen, filtersOpen, receiptTransaction, recurringEditorTemplate, selectedTransaction])
+  }, [csvImportOpen, drawerOpen, filtersOpen, receiptTransaction, receiptStatusTransaction, recurringEditorTemplate, selectedTransaction])
 
   return (
     <AppShell
       {...props}
       overlay={
         <>
+          {csvImportOpen ? (
+            <CsvImportModal
+              accounts={accountOptions}
+              region={businessRegion}
+              onClose={() => setCsvImportOpen(false)}
+              onImport={(input) => importTransactionsCsv(input)}
+              onImported={async (result) => {
+                await refreshPageData()
+                return result
+              }}
+              recoveredRowKeys={recoveredSkipRowKeys}
+              onRecoverRow={(row, accountId) => {
+                const accountName = accountOptions.find((account) => account.id === accountId)?.name || ''
+                setRecoveryRow({ row, accountName })
+                setEditingTransaction(null)
+                setDrawerOpen(true)
+              }}
+            />
+          ) : null}
           {drawerOpen ? (
             <TransactionDrawer
               onClose={() => {
                 setDrawerOpen(false)
                 setEditingTransaction(null)
+                setRecoveryRow(null)
               }}
               onSave={(draft) => {
                 void saveTransactionDraft(draft, editingTransaction, accountOptions, categoryOptions)
@@ -208,7 +233,11 @@ function Transactions(props: PageProps) {
                         ? rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row))
                         : [savedTransaction, ...rows]
                     ))
+                    if (recoveryRow) {
+                      setRecoveredSkipRowKeys((keys) => new Set(keys).add(recoveryRow.row.row))
+                    }
                     setEditingTransaction(null)
+                    setRecoveryRow(null)
                     setDrawerOpen(false)
                   })
                   .catch((error) => {
@@ -223,7 +252,11 @@ function Transactions(props: PageProps) {
                         ? rows.map((row) => (row.id === savedTransaction.id ? savedTransaction : row))
                         : [savedTransaction, ...rows]
                     ))
+                    if (recoveryRow) {
+                      setRecoveredSkipRowKeys((keys) => new Set(keys).add(recoveryRow.row.row))
+                    }
                     setEditingTransaction(null)
+                    setRecoveryRow(null)
                     setDrawerOpen(false)
                     setReceiptTransaction(savedTransaction)
                   })
@@ -233,12 +266,14 @@ function Transactions(props: PageProps) {
                   })
               )}
               transaction={editingTransaction}
+              initialDraft={recoveryRow ? skippedRowToDraftSeed(recoveryRow.row, recoveryRow.accountName) : undefined}
               accounts={accountOptions}
               categories={categoryOptions}
               onAttachReceipt={(transaction) => setReceiptTransaction(transaction)}
               onManageCategories={() => {
                 setDrawerOpen(false)
                 setEditingTransaction(null)
+                setRecoveryRow(null)
                 props.onNavigate('Categories')
               }}
             />
@@ -265,6 +300,13 @@ function Transactions(props: PageProps) {
                   return
                 }
                 setReceiptTransaction(selectedTransaction)
+              }}
+              onManageReceiptStatus={() => {
+                if (isTransactionLocked(selectedTransaction, accountingLock)) {
+                  setDataError(`This transaction is locked through ${formatIsoDate(accountingLock?.lockedThroughDate || '')}.`)
+                  return
+                }
+                setReceiptStatusTransaction(selectedTransaction)
               }}
               onEdit={() => {
                 if (isTransactionLocked(selectedTransaction, accountingLock)) {
@@ -305,6 +347,17 @@ function Transactions(props: PageProps) {
                 await refreshPageData()
                 setReceiptTransaction(null)
                 setSelectedTransaction(null)
+              }}
+            />
+          ) : null}
+          {receiptStatusTransaction ? (
+            <ReceiptStatusModal
+              transaction={receiptStatusTransaction}
+              onClose={() => setReceiptStatusTransaction(null)}
+              onUpdated={(updated) => {
+                setTransactionRows((rows) => rows.map((row) => (row.id === updated.id ? updated : row)))
+                setReceiptStatusTransaction(null)
+                setSelectedTransaction((current) => (current && current.id === updated.id ? updated : current))
               }}
             />
           ) : null}
@@ -349,18 +402,6 @@ function Transactions(props: PageProps) {
                 setEndDateFilter('')
               }}
               onClose={() => setFiltersOpen(false)}
-            />
-          ) : null}
-          {csvImportOpen ? (
-            <CsvImportModal
-              accounts={accountOptions}
-              region={businessRegion}
-              onClose={() => setCsvImportOpen(false)}
-              onImport={(input) => importTransactionsCsv(input)}
-              onImported={async (result) => {
-                await refreshPageData()
-                return result
-              }}
             />
           ) : null}
         </>
@@ -707,12 +748,16 @@ function CsvImportModal({
   onClose,
   onImport,
   onImported,
+  recoveredRowKeys,
+  onRecoverRow,
 }: {
   accounts: AccountOption[]
   region: 'US' | 'CA'
   onClose: () => void
   onImport: (input: { file: File; accountId: string; startDate?: string; endDate?: string }) => Promise<CsvImportResult>
   onImported: (result: CsvImportResult) => Promise<CsvImportResult>
+  recoveredRowKeys: Set<number>
+  onRecoverRow: (row: CsvSkippedRow, accountId: string) => void
 }) {
   const [accountId, setAccountId] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -722,6 +767,7 @@ function CsvImportModal({
   const [result, setResult] = useState<CsvImportResult | null>(null)
   const [importing, setImporting] = useState(false)
   const [showBankHelp, setShowBankHelp] = useState(false)
+  const [skippedSectionOpen, setSkippedSectionOpen] = useState(false)
 
   async function startImport() {
     setError('')
@@ -772,13 +818,66 @@ function CsvImportModal({
           <div className="csv-import-result">
             <div className="csv-import-success">
               <div className="csv-stat"><span className="csv-stat-num">{result.imported || 0}</span> imported</div>
-              <div className="csv-stat"><span className="csv-stat-num">{result.skipped || 0}</span> skipped</div>
+              {result.skipped_rows?.length ? (
+                <button
+                  type="button"
+                  className="csv-stat csv-stat-toggle"
+                  aria-expanded={skippedSectionOpen}
+                  onClick={() => setSkippedSectionOpen((value) => !value)}
+                >
+                  <span className="csv-stat-num">{result.skipped || 0}</span> skipped
+                  <ChevronDown size={14} className={skippedSectionOpen ? 'is-rotated' : ''} />
+                </button>
+              ) : (
+                <div className="csv-stat"><span className="csv-stat-num">{result.skipped || 0}</span> skipped</div>
+              )}
               {Number(result.out_of_range || 0) > 0 ? (
                 <div className="csv-stat"><span className="csv-stat-num">{result.out_of_range}</span> outside date range</div>
               ) : null}
             </div>
             {result.truncated ? <p className="csv-import-note">Only the first {result.truncated_at} rows were processed.</p> : null}
-            {result.errors?.length ? (
+            {skippedSectionOpen && result.skipped_rows?.length ? (
+              <div className="csv-skipped-table-wrap">
+                <table className="csv-skipped-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th className="align-right">Amount</th>
+                      <th>Why it was skipped</th>
+                      <th className="action-col">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.skipped_rows.map((row) => {
+                      const recovered = recoveredRowKeys.has(row.row)
+                      return (
+                        <tr key={row.row}>
+                          <td data-label="Date">{row.date || '—'}</td>
+                          <td data-label="Description">{row.description || row.merchant_name || '—'}</td>
+                          <td data-label="Amount" className="align-right amount">{row.amount != null ? formatMoney(Number(row.amount)) : '—'}</td>
+                          <td data-label="Why it was skipped">{row.reason}</td>
+                          <td data-label="Action" className="action-col">
+                            {recovered ? (
+                              <span className="csv-skipped-recovered">Added</span>
+                            ) : (
+                              <button
+                                className="row-action"
+                                type="button"
+                                onClick={() => onRecoverRow(row, accountId)}
+                              >
+                                Edit &amp; add
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {!result.skipped_rows?.length && result.errors?.length ? (
               <ul className="csv-error-list">
                 {result.errors.slice(0, 10).map((item, index) => <li key={`${item.reason || 'error'}-${index}`}>{item.reason || 'Row skipped.'}</li>)}
               </ul>
@@ -1231,6 +1330,7 @@ function TransactionDrawer({
   onSave,
   onSaveAndAttachReceipt,
   transaction,
+  initialDraft,
   accounts,
   categories,
   onAttachReceipt,
@@ -1240,12 +1340,15 @@ function TransactionDrawer({
   onSave: (draft: TransactionDraft) => void
   onSaveAndAttachReceipt: (draft: TransactionDraft) => Promise<void>
   transaction: Transaction | null
+  initialDraft?: Partial<TransactionDraft>
   accounts: AccountOption[]
   categories: CategoryOption[]
   onAttachReceipt: (transaction: Transaction) => void
   onManageCategories: () => void
 }) {
-  const [draft, setDraft] = useState<TransactionDraft>(() => transaction ? transactionToDraft(transaction) : emptyDraft)
+  const [draft, setDraft] = useState<TransactionDraft>(() => (
+    transaction ? transactionToDraft(transaction) : { ...emptyDraft, ...initialDraft }
+  ))
   const [error, setError] = useState('')
   const isIncome = draft.kind === 'Income'
   const isEditing = Boolean(transaction)
@@ -1404,6 +1507,7 @@ function TransactionDetailsModal({
   onClose,
   onUpdate,
   onAttachReceipt,
+  onManageReceiptStatus,
   onEdit,
   onManageCategories,
   onDelete,
@@ -1414,6 +1518,7 @@ function TransactionDetailsModal({
   onClose: () => void
   onUpdate: (transaction: Transaction) => void
   onAttachReceipt: () => void
+  onManageReceiptStatus: () => void
   onEdit: () => void
   onManageCategories: () => void
   onDelete: () => void
@@ -1456,8 +1561,15 @@ function TransactionDetailsModal({
           <dl className="transaction-detail-list">
             <div><dt>Category</dt><dd>{transaction.category}</dd></div>
             <div><dt>Receipt</dt><dd>{transaction.receipt}</dd></div>
+            <div><dt>Receipt evidence</dt><dd>{receiptStatusLabel(transaction.receiptStatus)}</dd></div>
             <div><dt>Status</dt><dd><StatusPill status={transaction.status} /></dd></div>
           </dl>
+          {transaction.receiptStatus === 'missing' && transaction.receiptMissingReason ? (
+            <p className="transaction-detail-note">Reason: {transaction.receiptMissingReason}</p>
+          ) : null}
+          {transaction.receiptStatus === 'not_required' && transaction.businessPurpose ? (
+            <p className="transaction-detail-note">Business purpose: {transaction.businessPurpose}</p>
+          ) : null}
           {reviewItem ? (
             <section className="transaction-review-detail">
               <h3>Needs review</h3>
@@ -1492,8 +1604,131 @@ function TransactionDetailsModal({
               <ReceiptText size={17} />
               Attach receipt
             </button>
+            <button className="secondary-button" type="button" disabled={isLocked} onClick={onManageReceiptStatus}>
+              No receipt / not required
+            </button>
             <button className="secondary-button danger-button" type="button" disabled={isLocked} onClick={onDelete}>Delete</button>
           </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function receiptStatusLabel(status: Transaction['receiptStatus']): string {
+  switch (status) {
+    case 'attached':
+      return 'Attached'
+    case 'missing':
+      return 'Confirmed missing'
+    case 'not_required':
+      return 'Not required'
+    default:
+      return 'Pending decision'
+  }
+}
+
+function ReceiptStatusModal({
+  transaction,
+  onClose,
+  onUpdated,
+}: {
+  transaction: Transaction
+  onClose: () => void
+  onUpdated: (transaction: Transaction) => void
+}) {
+  const [choice, setChoice] = useState<'missing' | 'not_required' | 'pending'>(
+    transaction.receiptStatus === 'missing' || transaction.receiptStatus === 'not_required'
+      ? transaction.receiptStatus
+      : 'missing',
+  )
+  const [reason, setReason] = useState(transaction.receiptMissingReason)
+  const [purpose, setPurpose] = useState(transaction.businessPurpose)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function submit() {
+    setError('')
+    if (choice === 'missing' && !reason.trim()) {
+      setError('Add a short reason the receipt is missing.')
+      return
+    }
+    if (choice === 'not_required' && !purpose.trim()) {
+      setError('Add a short business-purpose note.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const updated = await updateTransactionReceiptStatus(transaction.id, {
+        receiptStatus: choice,
+        receiptMissingReason: choice === 'missing' ? reason.trim() : '',
+        businessPurpose: choice === 'not_required' ? purpose.trim() : '',
+      })
+      onUpdated(updated)
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Unable to update receipt status.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="transaction-detail-modal receipt-status-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="receiptStatusTitle"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="drawer-header">
+          <div>
+            <h2 id="receiptStatusTitle">Receipt evidence status</h2>
+            <p>{transaction.description} - {formatMoney(transaction.amount)}</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close receipt status" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <form className="drawer-form" onSubmit={(event) => event.preventDefault()}>
+          <label>
+            <span>This transaction's receipt is</span>
+            <select value={choice} onChange={(event) => setChoice(event.target.value as typeof choice)}>
+              <option value="missing">No receipt available</option>
+              <option value="not_required">Not required for this transaction</option>
+              <option value="pending">Decide later (reset to pending)</option>
+            </select>
+          </label>
+          {choice === 'missing' ? (
+            <label>
+              <span>Why is the receipt missing?</span>
+              <textarea
+                rows={3}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="e.g. Cash purchase, receipt not printed"
+              />
+            </label>
+          ) : null}
+          {choice === 'not_required' ? (
+            <label>
+              <span>Business purpose (attestation)</span>
+              <textarea
+                rows={3}
+                value={purpose}
+                onChange={(event) => setPurpose(event.target.value)}
+                placeholder="e.g. Bank-assessed fee, no receipt is issued for this charge"
+              />
+            </label>
+          ) : null}
+          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+        </form>
+        <div className="drawer-actions">
+          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+          <button className="primary-button" type="button" disabled={saving} onClick={() => void submit()}>
+            {saving ? <>Saving<LoadingDots /></> : 'Save receipt status'}
+          </button>
         </div>
       </section>
     </div>
@@ -1739,6 +1974,16 @@ function transactionToDraft(transaction: Transaction): TransactionDraft {
     category: transaction.category,
     account: transaction.account,
     note: transaction.note,
+  }
+}
+
+function skippedRowToDraftSeed(row: CsvSkippedRow, accountName: string): Partial<TransactionDraft> {
+  return {
+    kind: row.type === 'income' ? 'Income' : 'Expense',
+    amount: row.amount != null ? String(Math.abs(Number(row.amount))) : '',
+    description: row.description || row.merchant_name || '',
+    date: row.date || '',
+    account: accountName,
   }
 }
 

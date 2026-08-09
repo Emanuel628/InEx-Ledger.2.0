@@ -80,7 +80,7 @@ function loadReceiptsRouter(options = {}) {
         if (/business_usage_periods/i.test(text)) {
           return { rowCount: 1, rows: [periodRow()] };
         }
-        if (/SELECT id, business_id\s+FROM receipts/i.test(text)) {
+        if (/SELECT id, business_id(?:, transaction_id)?\s+FROM receipts/i.test(text)) {
           if (options.receiptExists === false) {
             return { rowCount: 0, rows: [] };
           }
