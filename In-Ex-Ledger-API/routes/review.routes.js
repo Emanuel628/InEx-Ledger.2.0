@@ -635,10 +635,16 @@ router.get("/issues/:transactionId", async (req, res) => {
               ${USER_NAME_SQL.replaceAll("u.", "creator.")} AS created_by_name,
               ${USER_NAME_SQL.replaceAll("u.", "resolver.")} AS resolved_by_name
          FROM transaction_review_states trs
+         JOIN transactions t
+           ON t.id = trs.transaction_id
+          AND t.business_id = trs.business_id
          LEFT JOIN users creator ON creator.id = trs.created_by_user_id
          LEFT JOIN users resolver ON resolver.id = trs.resolved_by_user_id
         WHERE trs.business_id = $1
           AND trs.transaction_id = $2
+          AND t.business_id = $1
+          AND t.id = $2
+          AND t.deleted_at IS NULL
         ORDER BY trs.updated_at DESC, trs.created_at DESC`,
       [businessId, transactionId]
     );

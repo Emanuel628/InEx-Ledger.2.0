@@ -489,6 +489,25 @@ test("GET /api/review/queue suppresses derived issues already marked resolved", 
   );
 });
 
+test("GET /api/review/issues/:transactionId anchors issue reads to the owned transaction", async () => {
+  const { app, state } = loadReviewRouterFixture();
+
+  const response = await request(app)
+    .get("/api/review/issues/3fa85f64-5717-4562-b3fc-2c963f66afa6");
+
+  assert.equal(response.status, 200);
+
+  const issueQuery = state.queries.find((entry) =>
+    /FROM transaction_review_states trs/i.test(entry.sql)
+    && /JOIN transactions t/i.test(entry.sql)
+  );
+  assert.ok(issueQuery, "expected review issue read to join the parent transaction");
+  assert.deepEqual(issueQuery.params, ["biz_1", "3fa85f64-5717-4562-b3fc-2c963f66afa6"]);
+  assert.match(issueQuery.sql, /t\.business_id = \$1/i);
+  assert.match(issueQuery.sql, /t\.id = \$2/i);
+  assert.match(issueQuery.sql, /t\.deleted_at IS NULL/i);
+});
+
 test("POST /api/review/issues creates a reviewer issue", async () => {
   const { app } = loadReviewRouterFixture();
 
