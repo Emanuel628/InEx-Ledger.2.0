@@ -26,3 +26,18 @@ test("database startup accepts known historical checksum drift without rewriting
   assert.doesNotMatch(initDatabaseBody, /DELETE\s+FROM\s+schema_migrations/i);
   assert.match(initDatabaseBody, /canAcceptHistoricalMigrationDrift/);
 });
+
+test("server does not listen for traffic before database initialization completes", () => {
+  const serverSource = fs.readFileSync(path.join(apiRoot, "server.js"), "utf8");
+  const startServerBody = serverSource.slice(
+    serverSource.indexOf("async function startServer()"),
+    serverSource.indexOf("function shutdown(signal)")
+  );
+
+  const initIndex = startServerBody.indexOf("await initializeDatabaseWithRetry()");
+  const listenIndex = startServerBody.indexOf("app.listen(");
+
+  assert.ok(initIndex !== -1, "startServer must await database initialization");
+  assert.ok(listenIndex !== -1, "startServer must open the HTTP listener");
+  assert.ok(initIndex < listenIndex, "database initialization must complete before app.listen");
+});
