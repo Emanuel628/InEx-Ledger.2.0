@@ -428,11 +428,13 @@ function buildApp(router) {
   return app;
 }
 
-function makeCsrfHeaders() {
+function makeCsrfHeaders(authToken = null) {
   const token = generateCsrfToken();
   return {
     [CSRF_HEADER_NAME]: token,
-    Cookie: `${CSRF_COOKIE_NAME}=${token}`
+    Cookie: authToken
+      ? [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${token}`]
+      : `${CSRF_COOKIE_NAME}=${token}`
   };
 }
 
@@ -793,11 +795,10 @@ test("mfa enable rotates the authenticated session for subsequent protected acti
       mfa_enabled: false,
       mfa_authenticated: false
     });
-    const csrfHeaders = makeCsrfHeaders();
+    const csrfHeaders = makeCsrfHeaders(authToken);
 
     const startResponse = await request(app)
       .post("/api/auth/mfa/enable")
-      .set("Authorization", `Bearer ${authToken}`)
       .set(csrfHeaders)
       .send({});
 
@@ -811,7 +812,6 @@ test("mfa enable rotates the authenticated session for subsequent protected acti
 
     const finishResponse = await request(app)
       .post("/api/auth/mfa/enable")
-      .set("Authorization", `Bearer ${authToken}`)
       .set(csrfHeaders)
       .send({
         code: codeMatch[1],
@@ -848,8 +848,7 @@ test("logout preserves only the browser-level MFA trust cookie for MFA-authentic
     const response = await request(app)
       .post("/api/auth/logout")
       .set("User-Agent", "TestBrowser/1.0")
-      .set("Authorization", `Bearer ${authToken}`)
-      .set(makeCsrfHeaders())
+      .set(makeCsrfHeaders(authToken))
       .send({});
 
     assert.equal(response.status, 204);
@@ -881,8 +880,7 @@ test("logout without MFA authentication does not rewrite the browser-level trust
     const response = await request(app)
       .post("/api/auth/logout")
       .set("User-Agent", "TestBrowser/1.0")
-      .set("Authorization", `Bearer ${authToken}`)
-      .set(makeCsrfHeaders())
+      .set(makeCsrfHeaders(authToken))
       .send({});
 
     assert.equal(response.status, 204);

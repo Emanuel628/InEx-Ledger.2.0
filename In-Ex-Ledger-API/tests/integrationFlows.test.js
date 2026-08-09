@@ -303,7 +303,7 @@ test("transactions: POST with auth but no CSRF returns 403", async () => {
 
   const res = await request(app)
     .post("/api/transactions")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", `access_token=${token}`)
     .send({ type: "expense", amount: 10, date: "2026-01-01" });
 
   assert.equal(res.status, 403);
@@ -316,7 +316,7 @@ test("businesses: POST with auth but no CSRF returns 403", async () => {
 
   const res = await request(app)
     .post("/api/businesses")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", `access_token=${token}`)
     .send({ name: "My Business" });
 
   assert.equal(res.status, 403);
@@ -329,7 +329,7 @@ test("me/onboarding: PUT with auth but no CSRF returns 403", async () => {
 
   const res = await request(app)
     .put("/api/me/onboarding")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", `access_token=${token}`)
     .send({ business_name: "Test Business" });
 
   assert.equal(res.status, 403);
@@ -342,7 +342,7 @@ test("categories: POST with auth but no CSRF returns 403", async () => {
 
   const res = await request(app)
     .post("/api/categories")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", `access_token=${token}`)
     .send({ name: "Meals", kind: "expense" });
 
   assert.equal(res.status, 403);
@@ -355,7 +355,7 @@ test("accounts: POST with auth but no CSRF returns 403", async () => {
 
   const res = await request(app)
     .post("/api/accounts")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", `access_token=${token}`)
     .send({ name: "Checking", type: "checking" });
 
   assert.equal(res.status, 403);
@@ -368,7 +368,7 @@ test("mileage: POST with auth but no CSRF returns 403", async () => {
 
   const res = await request(app)
     .post("/api/mileage")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", `access_token=${token}`)
     .send({ trip_date: "2026-01-01", purpose: "Client visit", miles: 10 });
 
   assert.equal(res.status, 403);
@@ -386,9 +386,8 @@ test("onboarding: PUT with missing business_name returns 400", async () => {
 
   const res = await request(app)
     .put("/api/me/onboarding")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({
       region: "US",
       language: "en",
@@ -409,9 +408,8 @@ test("onboarding: PUT with invalid region returns 400", async () => {
 
   const res = await request(app)
     .put("/api/me/onboarding")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({
       business_name: "Test Co",
       region: "XX",
@@ -433,9 +431,8 @@ test("onboarding: PUT with invalid language returns 400", async () => {
 
   const res = await request(app)
     .put("/api/me/onboarding")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({
       business_name: "Test Co",
       region: "US",
@@ -457,9 +454,8 @@ test("onboarding: PUT CA region without province returns 400", async () => {
 
   const res = await request(app)
     .put("/api/me/onboarding")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({
       business_name: "Conseil Tremblay",
       region: "CA",
@@ -482,9 +478,8 @@ test("onboarding: PUT with non-numeric activity code returns 400", async () => {
 
   const res = await request(app)
     .put("/api/me/onboarding")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({
       business_name: "Test Co",
       region: "US",
@@ -508,9 +503,8 @@ test("onboarding: PUT ignores an unexpected business type field", async () => {
 
   const res = await request(app)
     .put("/api/me/onboarding")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({
       business_name: "Test Co",
       business_type: "invalid_type",
@@ -538,9 +532,8 @@ test("categories: POST with missing name returns 400", async () => {
 
   const res = await request(app)
     .post("/api/categories")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ kind: "expense" });
 
   assert.equal(res.status, 400);
@@ -555,9 +548,8 @@ test("categories: POST with invalid kind returns 400", async () => {
 
   const res = await request(app)
     .post("/api/categories")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ name: "My Category", kind: "invalid" });
 
   assert.equal(res.status, 400);
@@ -572,9 +564,8 @@ test("categories: POST with invalid color returns 400", async () => {
 
   const res = await request(app)
     .post("/api/categories")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ name: "My Category", kind: "expense", color: "fuchsia" });
 
   assert.equal(res.status, 400);
@@ -589,9 +580,8 @@ test("categories: POST with invalid tax map returns 400", async () => {
 
   const res = await request(app)
     .post("/api/categories")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ name: "My Category", kind: "expense", tax_map_us: "fuchsia_line" });
 
   assert.equal(res.status, 400);
@@ -610,9 +600,8 @@ test("accounts: POST with missing name and type returns 400", async () => {
 
   const res = await request(app)
     .post("/api/accounts")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({});
 
   assert.equal(res.status, 400);
@@ -626,9 +615,8 @@ test("accounts: POST with invalid type returns 400", async () => {
 
   const res = await request(app)
     .post("/api/accounts")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ name: "Main Account", type: "piggybank" });
 
   assert.equal(res.status, 400);
@@ -643,9 +631,8 @@ test("accounts: POST with blank name returns 400", async () => {
 
   const res = await request(app)
     .post("/api/accounts")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ name: "   ", type: "checking" });
 
   assert.equal(res.status, 400);
@@ -660,9 +647,8 @@ test("accounts: PUT with blank name returns 400", async () => {
 
   const res = await request(app)
     .put("/api/accounts/00000000-0000-4000-8000-000000000001")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ name: "   " });
 
   assert.equal(res.status, 400);
@@ -681,9 +667,8 @@ test("businesses: POST with missing name returns 400", async () => {
 
   const res = await request(app)
     .post("/api/businesses")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ region: "US", language: "en" });
 
   assert.equal(res.status, 400);
@@ -698,9 +683,8 @@ test("businesses: POST with invalid region returns 400", async () => {
 
   const res = await request(app)
     .post("/api/businesses")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ name: "Test Corp", region: "EU", language: "en" });
 
   assert.equal(res.status, 400);
@@ -715,9 +699,8 @@ test("businesses: POST with invalid language returns 400", async () => {
 
   const res = await request(app)
     .post("/api/businesses")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ name: "Test Corp", region: "US", language: "klingon" });
 
   assert.equal(res.status, 400);
@@ -736,9 +719,8 @@ test("businesses: DELETE requires MFA verification when MFA is enabled", async (
 
   const res = await request(app)
     .delete("/api/businesses/00000000-0000-4000-8000-000000000001")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", [`access_token=${token}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ password: "SomePass1!" });
 
   assert.equal(res.status, 403);
@@ -764,7 +746,7 @@ test("exports: POST /generate with auth but no CSRF returns 403", async () => {
 
   const res = await request(app)
     .post("/api/exports/generate")
-    .set("Authorization", `Bearer ${token}`)
+    .set("Cookie", `access_token=${token}`)
     .send({});
 
   assert.equal(res.status, 403);

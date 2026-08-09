@@ -29,10 +29,12 @@ function makeToken() {
   return signToken({ id: TEST_USER_ID, email: "owner@example.com", mfa_enabled: false });
 }
 
-function csrfHeaders(token) {
+function csrfHeaders(token, authToken = null) {
   return {
     [CSRF_HEADER_NAME]: token,
-    Cookie: `${CSRF_COOKIE_NAME}=${token}`
+    Cookie: authToken
+      ? [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${token}`]
+      : `${CSRF_COOKIE_NAME}=${token}`
   };
 }
 
@@ -96,7 +98,7 @@ test("POST /api/invoices-v1/:id/send rejects missing CSRF (403)", async () => {
   const app = buildApp(router);
   const res = await request(app)
     .post(`/api/invoices-v1/${TEST_INVOICE_ID}/send`)
-    .set("Authorization", `Bearer ${makeToken()}`)
+    .set("Cookie", `access_token=${makeToken()}`)
     .send({});
   assert.equal(res.status, 403);
 });
@@ -107,8 +109,7 @@ test("POST /api/invoices-v1/:id/send rejects invalid UUID (400)", async () => {
   const csrf = generateCsrfToken();
   const res = await request(app)
     .post(`/api/invoices-v1/not-a-uuid/send`)
-    .set("Authorization", `Bearer ${makeToken()}`)
-    .set(csrfHeaders(csrf))
+    .set(csrfHeaders(csrf, makeToken()))
     .send({});
   assert.equal(res.status, 400);
 });

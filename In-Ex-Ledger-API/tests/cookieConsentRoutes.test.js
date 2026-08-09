@@ -153,7 +153,7 @@ test("GET /api/consent/cookie restores the latest saved database decision for th
   try {
     const response = await request(fixture.app)
       .get("/api/consent/cookie")
-      .set("Authorization", "Bearer valid_access_token");
+      .set("Cookie", "access_token=valid_access_token");
 
     assert.equal(response.status, 200);
     assert.equal(response.body?.record?.decision, "declined");

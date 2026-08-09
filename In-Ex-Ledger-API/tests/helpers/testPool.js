@@ -33,6 +33,7 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 
 const { signToken } = require("../../middleware/auth.middleware.js");
+const { ACCESS_TOKEN_COOKIE } = require("../../utils/authUtils.js");
 const {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
@@ -173,13 +174,13 @@ function csrfPair() {
 }
 
 /**
- * Returns the Authorization header value for Bearer-token auth.
+ * Returns the Cookie header value for cookie-backed auth.
  *
  * @param {string} jwt
- * @returns {string}  e.g. "Bearer eyJ..."
+ * @returns {string} e.g. "access_token=eyJ..."
  */
-function bearerHeader(jwt) {
-  return `Bearer ${jwt}`;
+function authCookie(jwt) {
+  return `${ACCESS_TOKEN_COOKIE}=${jwt}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +277,7 @@ module.exports = {
   makeAuthToken,
   makeMfaToken,
   csrfPair,
-  bearerHeader,
+  authCookie,
   makeUserRow,
   makeBusinessRow,
   makeTransactionRow,

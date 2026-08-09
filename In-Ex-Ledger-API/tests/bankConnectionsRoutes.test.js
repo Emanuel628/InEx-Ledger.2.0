@@ -25,7 +25,7 @@ function loadRouter() {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, res, next) {
-          if (!req.headers.authorization) {
+          if (!String(req.headers.cookie || "").includes("access_token=")) {
             return res.status(401).json({ error: "Authentication required" });
           }
           req.user = { id: "user-1" };
@@ -113,7 +113,7 @@ test("bank-connections list returns connection count", async () => {
   try {
     const response = await request(fixture.app)
       .get("/api/bank-connections")
-      .set("Authorization", "Bearer test")
+      .set("Cookie", "access_token=test")
       .set("x-csrf-token", "test-csrf");
 
     assert.equal(response.status, 200);
@@ -129,7 +129,7 @@ test("bank-connections delete rejects invalid ids before the service layer", asy
   try {
     const response = await request(fixture.app)
       .delete("/api/bank-connections/not-a-uuid")
-      .set("Authorization", "Bearer test")
+      .set("Cookie", "access_token=test")
       .set("x-csrf-token", "test-csrf");
 
     assert.equal(response.status, 400);
@@ -145,7 +145,7 @@ test("bank-connections list logs failures and returns 500", async () => {
     fixture.state.forceListError = true;
     const response = await request(fixture.app)
       .get("/api/bank-connections")
-      .set("Authorization", "Bearer test")
+      .set("Cookie", "access_token=test")
       .set("x-csrf-token", "test-csrf");
 
     assert.equal(response.status, 500);

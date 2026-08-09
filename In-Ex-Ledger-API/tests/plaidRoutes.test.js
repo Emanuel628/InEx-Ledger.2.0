@@ -27,10 +27,12 @@ function makeToken() {
   return signToken({ id: TEST_USER_ID, email: "plaid@example.com", mfa_enabled: false });
 }
 
-function csrfHeaders(token) {
+function csrfHeaders(token, authToken = null) {
   return {
     [CSRF_HEADER_NAME]: token,
-    Cookie: `${CSRF_COOKIE_NAME}=${token}`
+    Cookie: authToken
+      ? [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${token}`]
+      : `${CSRF_COOKIE_NAME}=${token}`
   };
 }
 
@@ -164,7 +166,7 @@ test("POST /api/plaid/link-token rejects missing CSRF (403)", async () => {
   const auth = makeToken();
   const res = await request(app)
     .post("/api/plaid/link-token")
-    .set("Authorization", `Bearer ${auth}`)
+    .set("Cookie", `access_token=${auth}`)
     .send({});
   assert.equal(res.status, 403);
 });
@@ -177,8 +179,7 @@ test("POST /api/plaid/link-token returns 503 with plaid_not_configured when env 
     const auth = makeToken();
     const res = await request(app)
       .post("/api/plaid/link-token")
-      .set("Authorization", `Bearer ${auth}`)
-      .set(csrfHeaders(csrf))
+      .set(csrfHeaders(csrf, auth))
       .send({});
     assert.equal(res.status, 503);
     assert.equal(res.body.code, "plaid_not_configured");
@@ -193,8 +194,7 @@ test("POST /api/plaid/exchange-public-token returns 503 when env is missing", as
     const auth = makeToken();
     const res = await request(app)
       .post("/api/plaid/exchange-public-token")
-      .set("Authorization", `Bearer ${auth}`)
-      .set(csrfHeaders(csrf))
+      .set(csrfHeaders(csrf, auth))
       .send({ public_token: "public-sandbox-xyz" });
     assert.equal(res.status, 503);
     assert.equal(res.body.code, "plaid_not_configured");

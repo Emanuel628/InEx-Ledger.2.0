@@ -21,7 +21,7 @@ const {
   makeAuthToken,
   makeMfaToken,
   csrfPair,
-  bearerHeader,
+  authCookie,
   makeUserRow,
   makeBusinessRow,
   makeTransactionRow,
@@ -108,7 +108,7 @@ test("makeFakePoolSequence: returns rows in sequence order", async () => {
 // makeAuthToken / makeMfaToken
 // ---------------------------------------------------------------------------
 
-test("makeAuthToken: returns a valid JWT accepted by requireAuth", async () => {
+test("makeAuthToken: returns a valid JWT accepted by cookie-backed requireAuth", async () => {
   const router = express.Router();
   router.use(requireAuth);
   router.get("/ping", (_req, res) => res.json({ ok: true }));
@@ -118,7 +118,7 @@ test("makeAuthToken: returns a valid JWT accepted by requireAuth", async () => {
 
   const res = await request(app)
     .get("/api/test/ping")
-    .set("Authorization", bearerHeader(token));
+    .set("Cookie", authCookie(token));
 
   assert.equal(res.status, 200);
   assert.equal(res.body.ok, true);

@@ -59,10 +59,7 @@ function parseConsentCookie(rawValue) {
 
 async function resolveAuthenticatedUserId(req) {
   try {
-    const authHeader = String(req.headers.authorization || "").trim();
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : String(req.cookies?.[ACCESS_TOKEN_COOKIE] || "").trim();
+    const token = String(req.cookies?.[ACCESS_TOKEN_COOKIE] || "").trim();
     if (token) {
       const payload = verifyToken(token);
       return payload?.id || payload?.userId || payload?.sub || null;

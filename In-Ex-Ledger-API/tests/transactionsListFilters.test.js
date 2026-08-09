@@ -26,10 +26,12 @@ function makeToken() {
   return signToken({ id: TEST_USER_ID, email: "filters@example.com", mfa_enabled: false });
 }
 
-function csrfHeaders(token) {
+function csrfHeaders(token, authToken = null) {
   return {
     [CSRF_HEADER_NAME]: token,
-    Cookie: `${CSRF_COOKIE_NAME}=${token}`
+    Cookie: authToken
+      ? [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${token}`]
+      : `${CSRF_COOKIE_NAME}=${token}`
   };
 }
 
@@ -129,8 +131,7 @@ test("GET /api/transactions returns 400 when account_id is not a valid UUID", as
   const auth = makeToken();
   const res = await request(app)
     .get("/api/transactions?account_id=not-a-uuid")
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
   assert.equal(res.status, 400);
   assert.match(res.body.error || "", /account_id/i);
 });
@@ -142,8 +143,7 @@ test("GET /api/transactions accepts valid account_id and threads it into the SQL
   const auth = makeToken();
   const res = await request(app)
     .get(`/api/transactions?account_id=${VALID_ACCOUNT_ID}`)
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
   assert.equal(res.status, 200);
   assert.equal(res.body.account_id, VALID_ACCOUNT_ID);
   const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql) && c.params.includes(VALID_ACCOUNT_ID));
@@ -159,8 +159,7 @@ test("GET /api/transactions?all=true bumps limit to the hard cap and reports ret
   const auth = makeToken();
   const res = await request(app)
     .get(`/api/transactions?all=true`)
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
   assert.equal(res.status, 200);
   assert.equal(res.body.returned_all, true);
   assert.equal(res.body.limit, 50000);
@@ -175,8 +174,7 @@ test("GET /api/transactions defaults to limit=100 when neither all nor limit are
   const auth = makeToken();
   const res = await request(app)
     .get(`/api/transactions`)
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
   assert.equal(res.status, 200);
   assert.equal(res.body.limit, 100);
   assert.equal(res.body.returned_all, false);
@@ -189,8 +187,7 @@ test("GET /api/transactions caps an explicit huge limit to 5000 when all is not 
   const auth = makeToken();
   const res = await request(app)
     .get(`/api/transactions?limit=99999`)
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
   assert.equal(res.status, 200);
   assert.equal(res.body.limit, 5000);
 });
@@ -202,8 +199,7 @@ test("GET /api/transactions returns 400 when category_id is not a valid UUID", a
   const auth = makeToken();
   const res = await request(app)
     .get("/api/transactions?category_id=not-a-uuid")
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
   assert.equal(res.status, 400);
   assert.match(res.body.error || "", /category_id/i);
 });
@@ -216,8 +212,7 @@ test("GET /api/transactions threads type, category, search, and period filters i
   const categoryId = "33333333-3333-4333-8333-333333333333";
   const res = await request(app)
     .get(`/api/transactions?type=income&category_id=${categoryId}&search=stripe&period=last-month`)
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
 
   assert.equal(res.status, 200);
   assert.equal(res.body.type, "income");
@@ -244,8 +239,7 @@ test("GET /api/transactions threads v3 name, date range, and status filters into
   const auth = makeToken();
   const res = await request(app)
     .get("/api/transactions?account_name=Primary%20Checking&category_name=Meals&start_date=2026-01-01&end_date=2026-01-31&v3_status=cleared")
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
 
   assert.equal(res.status, 200);
   const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql) && c.params.includes("Primary Checking"));
@@ -268,15 +262,13 @@ test("GET /api/transactions rejects invalid v3 date and status filters", async (
 
   const badDate = await request(app)
     .get("/api/transactions?start_date=01-01")
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
   assert.equal(badDate.status, 400);
   assert.match(badDate.body.error || "", /start_date/i);
 
   const badStatus = await request(app)
     .get("/api/transactions?v3_status=weird")
-    .set("Authorization", `Bearer ${auth}`)
-    .set(csrfHeaders(csrf));
+    .set(csrfHeaders(csrf, auth));
   assert.equal(badStatus.status, 400);
   assert.match(badStatus.body.error || "", /v3_status/i);
 });

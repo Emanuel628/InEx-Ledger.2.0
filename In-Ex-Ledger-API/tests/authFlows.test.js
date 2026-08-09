@@ -27,6 +27,7 @@ const {
 
 const {
   verifyPassword,
+  ACCESS_TOKEN_COOKIE,
   isLegacyScryptHash,
   COOKIE_OPTIONS
 } = require("../utils/authUtils.js");
@@ -73,11 +74,12 @@ function createRes() {
 }
 
 /**
- * Creates a minimal req double with an Authorization header.
+ * Creates a minimal req double with optional auth inputs.
  */
-function createReq({ authHeader = null, user = null } = {}) {
+function createReq({ accessToken = null, authHeader = null, user = null } = {}) {
   return {
     headers: authHeader ? { authorization: authHeader } : {},
+    cookies: accessToken ? { [ACCESS_TOKEN_COOKIE]: accessToken } : {},
     user
   };
 }
@@ -153,7 +155,7 @@ test("verifyToken throws on an empty string", () => {
 test("requireAuth calls next() and sets req.user for a valid token", () => {
   const payload = { id: "user_ok", email: "ok@test.com", mfa_enabled: true };
   const token = signToken(payload);
-  const req = createReq({ authHeader: `Bearer ${token}` });
+  const req = createReq({ accessToken: token });
   const res = createRes();
   let called = false;
 
@@ -166,7 +168,7 @@ test("requireAuth calls next() and sets req.user for a valid token", () => {
   assert.equal(req.user.email, payload.email);
 });
 
-test("requireAuth returns 401 when Authorization header is absent", () => {
+test("requireAuth returns 401 when access token cookie is absent", () => {
   const req = createReq();
   const res = createRes();
   let called = false;
@@ -180,8 +182,9 @@ test("requireAuth returns 401 when Authorization header is absent", () => {
   assert.ok(res.body?.error, "error field must be present");
 });
 
-test("requireAuth returns 401 when Authorization header does not start with Bearer", () => {
-  const req = createReq({ authHeader: "Token abc123" });
+test("requireAuth ignores Authorization header credentials", () => {
+  const token = signToken({ id: "user_header", email: "header@test.com" });
+  const req = createReq({ authHeader: `Bearer ${token}` });
   const res = createRes();
   let called = false;
 
@@ -195,7 +198,7 @@ test("requireAuth returns 401 when Authorization header does not start with Bear
 
 test("requireAuth returns 401 for an expired token", () => {
   const token = makeExpiredToken({ id: "user_exp2" });
-  const req = createReq({ authHeader: `Bearer ${token}` });
+  const req = createReq({ accessToken: token });
   const res = createRes();
   let called = false;
 
@@ -208,7 +211,7 @@ test("requireAuth returns 401 for an expired token", () => {
 });
 
 test("requireAuth returns 401 for a malformed token", () => {
-  const req = createReq({ authHeader: "Bearer not.a.realtoken" });
+  const req = createReq({ accessToken: "not.a.realtoken" });
   const res = createRes();
   let called = false;
 

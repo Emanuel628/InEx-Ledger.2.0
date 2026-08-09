@@ -24,7 +24,7 @@ function loadRouter({ effectiveTier = "v1", usage = null, businesses = [{ id: "b
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, res, next) {
-          if (!req.headers.authorization) {
+          if (!String(req.headers.cookie || "").includes("access_token=")) {
             return res.status(401).json({ error: "Authentication required" });
           }
           req.user = { id: "user-1" };
@@ -108,7 +108,7 @@ test("plan-context reports Basic features, usage, and no quick-add fields", asyn
   try {
     const response = await request(fixture.app)
       .get("/api/entitlements/plan-context")
-      .set("Authorization", "Bearer test");
+      .set("Cookie", "access_token=test");
 
     assert.equal(response.status, 200);
     assert.equal(response.body.plan.code, "free");
@@ -144,7 +144,7 @@ test("plan-context reports Pro features with null (not Infinity) usage limits", 
   try {
     const response = await request(fixture.app)
       .get("/api/entitlements/plan-context")
-      .set("Authorization", "Bearer test");
+      .set("Cookie", "access_token=test");
 
     assert.equal(response.status, 200);
     assert.equal(response.body.plan.code, "v1");
@@ -168,7 +168,7 @@ test("plan-context route logs failures and returns 500", async () => {
     fixture.state.forceError = true;
     const response = await request(fixture.app)
       .get("/api/entitlements/plan-context")
-      .set("Authorization", "Bearer test");
+      .set("Cookie", "access_token=test");
 
     assert.equal(response.status, 500);
     assert.equal(fixture.state.logErrors.length, 1);
@@ -183,10 +183,10 @@ test("legacy /features endpoint agrees with the plan-context feature map", async
   try {
     const planContext = await request(fixture.app)
       .get("/api/entitlements/plan-context")
-      .set("Authorization", "Bearer test");
+      .set("Cookie", "access_token=test");
     const features = await request(fixture.app)
       .get("/api/entitlements/features")
-      .set("Authorization", "Bearer test");
+      .set("Cookie", "access_token=test");
 
     assert.equal(features.status, 200);
     assert.equal(features.body.effective_tier, "free");

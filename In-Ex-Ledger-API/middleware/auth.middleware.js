@@ -26,11 +26,6 @@ function verifyToken(token) {
 }
 
 function getRequestToken(req) {
-  const authHeader = String(req.headers.authorization || "").trim();
-  if (authHeader.startsWith("Bearer ")) {
-    return authHeader.slice("Bearer ".length).trim();
-  }
-
   return String(req.cookies?.[ACCESS_TOKEN_COOKIE] || "").trim();
 }
 
@@ -109,6 +104,7 @@ function requireMfaIfEnabled(req, res, next) {
 module.exports = {
   signToken,
   verifyToken,
+  getRequestToken,
   requireAuth,
   optionalAuth,
   requireMfa,

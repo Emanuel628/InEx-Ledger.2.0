@@ -25,7 +25,7 @@ function loadRouter(routePath, routeName) {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, res, next) {
-          if (!req.headers.authorization) {
+          if (!String(req.headers.cookie || "").includes("access_token=")) {
             return res.status(401).json({ error: "Authentication required" });
           }
           req.user = { id: "00000000-0000-4000-8000-000000009001" };
@@ -230,7 +230,7 @@ function loadRouter(routePath, routeName) {
 }
 
 function authed(agent) {
-  return agent.set("Authorization", "Bearer test-token");
+  return agent.set("Cookie", "access_token=test-token");
 }
 
 function authedWithCsrf(agent) {

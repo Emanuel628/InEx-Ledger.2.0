@@ -20,7 +20,7 @@ function loadSystemRouter() {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, res, next) {
-          if (!req.headers.authorization) {
+          if (!String(req.headers.cookie || "").includes("access_token=")) {
             return res.status(401).json({ error: "Authentication required" });
           }
           req.user = { id: "user-1" };
@@ -126,7 +126,7 @@ test("system diagnostics logs failures instead of swallowing them", async () => 
     fixture.state.diagnosticsShouldThrow = true;
     const response = await request(fixture.app)
       .get("/api/system/diagnostics")
-      .set("Authorization", "Bearer test");
+      .set("Cookie", "access_token=test");
 
     assert.equal(response.status, 500);
     assert.equal(fixture.state.logErrors.length, 1);

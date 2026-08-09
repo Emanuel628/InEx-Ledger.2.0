@@ -123,7 +123,7 @@ test("sessions: DELETE /api/sessions/:id rejects missing CSRF token (403)", asyn
 
   const res = await request(app)
     .delete("/api/sessions/some-session-id")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   // no CSRF cookie/header
   assert.equal(res.status, 403);
 });
@@ -143,7 +143,7 @@ test("sessions: DELETE /api/sessions (all) rejects missing CSRF token (403)", as
 
   const res = await request(app)
     .delete("/api/sessions")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -174,7 +174,7 @@ test("privacy: POST /erase rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/privacy/erase")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -186,9 +186,8 @@ test("privacy: POST /erase rejects when MFA is enabled but the session is not MF
 
   const res = await request(app)
     .post("/api/privacy/erase")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({});
   assert.equal(res.status, 403);
   assert.equal(res.body?.mfa_required, true);
@@ -210,7 +209,7 @@ test("privacy: POST /delete rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/privacy/delete")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -222,9 +221,8 @@ test("privacy: POST /delete rejects when MFA is enabled but the session is not M
 
   const res = await request(app)
     .post("/api/privacy/delete")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ password: "example-password" });
   assert.equal(res.status, 403);
   assert.equal(res.body?.mfa_required, true);
@@ -239,9 +237,8 @@ test("privacy: POST /delete requires password even when MFA-authenticated", asyn
 
   const res = await request(app)
     .post("/api/privacy/delete")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({});
   assert.equal(res.status, 400);
 });
@@ -254,9 +251,8 @@ test("privacy: POST /erase requires password even when MFA-authenticated", async
 
   const res = await request(app)
     .post("/api/privacy/erase")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({});
   assert.equal(res.status, 400);
 });
@@ -282,7 +278,7 @@ test("auth: POST /change-password rejects missing CSRF token (403)", async () =>
 
   const res = await request(app)
     .post("/api/auth/change-password")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ currentPassword: "old", newPassword: "new123!" });
   assert.equal(res.status, 403);
 });
@@ -295,9 +291,8 @@ test("auth: POST /change-password rejects when MFA is enabled but the session is
 
   const res = await request(app)
     .post("/api/auth/change-password")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ currentPassword: "old", newPassword: "new123!" });
   assert.equal(res.status, 403);
   assert.equal(res.body?.mfa_required, true);
@@ -318,7 +313,7 @@ test("auth: POST /logout rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/auth/logout")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -339,7 +334,7 @@ test("auth: POST /request-email-change rejects missing CSRF token (403)", async 
 
   const res = await request(app)
     .post("/api/auth/request-email-change")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ newEmail: "new@example.com", currentPassword: "pass" });
   assert.equal(res.status, 403);
 });
@@ -363,7 +358,7 @@ test("billing: POST /cancel rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/billing/cancel")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -382,7 +377,7 @@ test("billing: POST /checkout-session rejects missing CSRF token (403)", async (
 
   const res = await request(app)
     .post("/api/billing/checkout-session")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -405,7 +400,7 @@ test("me: PUT / (settings update) rejects missing CSRF token (403)", async () =>
 
   const res = await request(app)
     .put("/api/me/")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ full_name: "Alice" });
   assert.equal(res.status, 403);
 });
@@ -427,7 +422,7 @@ test("me: PUT /preferences rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .put("/api/me/preferences")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ dynamic_sidebar_favorites: ["transactions"] });
   assert.equal(res.status, 403);
 });
@@ -447,7 +442,7 @@ test("me: DELETE / (account deletion) rejects missing CSRF token (403)", async (
 
   const res = await request(app)
     .delete("/api/me/")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ password: "secret" });
   assert.equal(res.status, 403);
 });
@@ -473,7 +468,7 @@ test("transactions: POST / rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/transactions")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ amount: 100, type: "expense" });
   assert.equal(res.status, 403);
 });
@@ -493,7 +488,7 @@ test("transactions: DELETE /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .delete("/api/transactions/some-tx-id")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -514,7 +509,7 @@ test("transactions: PUT /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .put("/api/transactions/some-tx-id")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ amount: 200, type: "income" });
   assert.equal(res.status, 403);
 });
@@ -534,7 +529,7 @@ test("transactions: PATCH /:id/cleared rejects missing CSRF token (403)", async 
 
   const res = await request(app)
     .patch("/api/transactions/some-tx-id/cleared")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -557,7 +552,7 @@ test("businesses: POST / (create business) rejects missing CSRF token (403)", as
 
   const res = await request(app)
     .post("/api/businesses")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ name: "Acme", region: "US" });
   assert.equal(res.status, 403);
 });
@@ -577,7 +572,7 @@ test("businesses: POST /:id/activate rejects missing CSRF token (403)", async ()
 
   const res = await request(app)
     .post(`/api/businesses/${TEST_BUSINESS_ID}/activate`)
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -598,7 +593,7 @@ test("businesses: DELETE /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .delete(`/api/businesses/${TEST_BUSINESS_ID}`)
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ password: "secret" });
   assert.equal(res.status, 403);
 });
@@ -611,9 +606,8 @@ test("businesses: DELETE /:id rejects when MFA is enabled but the session is not
 
   const res = await request(app)
     .delete(`/api/businesses/${TEST_BUSINESS_ID}`)
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", [`access_token=${authToken}`, `${CSRF_COOKIE_NAME}=${csrf}`])
     .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ password: "secret" });
   assert.equal(res.status, 403);
   assert.equal(res.body?.mfa_required, true);
@@ -641,7 +635,7 @@ test("categories: POST / rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/categories")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ name: "Utilities", kind: "expense" });
   assert.equal(res.status, 403);
 });
@@ -663,7 +657,7 @@ test("categories: PUT /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .put("/api/categories/some-cat-id")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ name: "Utilities" });
   assert.equal(res.status, 403);
 });
@@ -683,7 +677,7 @@ test("categories: DELETE /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .delete("/api/categories/some-cat-id")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -706,7 +700,7 @@ test("accounts: POST / rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/accounts")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ name: "Cash", kind: "checking" });
   assert.equal(res.status, 403);
 });
@@ -728,7 +722,7 @@ test("accounts: PUT /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .put("/api/accounts/some-acc-id")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ name: "Savings" });
   assert.equal(res.status, 403);
 });
@@ -748,7 +742,7 @@ test("accounts: DELETE /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .delete("/api/accounts/some-acc-id")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -771,7 +765,7 @@ test("recurring: POST / rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/recurring")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ name: "Rent" });
   assert.equal(res.status, 403);
 });
@@ -793,7 +787,7 @@ test("recurring: PUT /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .put("/api/recurring/some-rec-id")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ name: "Rent Updated" });
   assert.equal(res.status, 403);
 });
@@ -813,7 +807,7 @@ test("recurring: DELETE /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .delete("/api/recurring/some-rec-id")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -836,7 +830,7 @@ test("mileage: POST / rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/mileage")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ distance: 10 });
   assert.equal(res.status, 403);
 });
@@ -858,7 +852,7 @@ test("mileage: PUT /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .put("/api/mileage/some-mil-id")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ distance: 20 });
   assert.equal(res.status, 403);
 });
@@ -878,7 +872,7 @@ test("mileage: DELETE /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .delete("/api/mileage/some-mil-id")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -897,7 +891,7 @@ test("mileage: POST /costs rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/mileage/costs")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ amount: 10 });
   assert.equal(res.status, 403);
 });
@@ -917,7 +911,7 @@ test("mileage: DELETE /costs/:id rejects missing CSRF token (403)", async () => 
 
   const res = await request(app)
     .delete("/api/mileage/costs/some-cost-id")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -940,7 +934,7 @@ test("exports: POST /request-grant rejects missing CSRF token (403)", async () =
 
   const res = await request(app)
     .post("/api/exports/request-grant")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({});
   assert.equal(res.status, 403);
 });
@@ -960,7 +954,7 @@ test("exports: POST /secure-export rejects missing CSRF token (403)", async () =
 
   const res = await request(app)
     .post("/api/exports/secure-export")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({});
   assert.equal(res.status, 403);
 });
@@ -984,7 +978,7 @@ test("analytics: POST /whatif rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .post("/api/analytics/whatif")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({});
   assert.equal(res.status, 403);
 });
@@ -1008,7 +1002,7 @@ test("receipts: DELETE /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .delete("/api/receipts/some-receipt-id")
-    .set("Authorization", `Bearer ${authToken}`);
+    .set("Cookie", `access_token=${authToken}`);
   assert.equal(res.status, 403);
 });
 
@@ -1029,7 +1023,7 @@ test("receipts: PATCH /:id/attach rejects missing CSRF token (403)", async () =>
 
   const res = await request(app)
     .patch("/api/receipts/some-receipt-id/attach")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Cookie", `access_token=${authToken}`)
     .send({ transaction_id: "tx-1" });
   assert.equal(res.status, 403);
 });
