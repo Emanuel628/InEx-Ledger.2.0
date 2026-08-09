@@ -39,6 +39,7 @@ const {
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
 const { buildFeatureRequiresPlanResponse } = require("../middleware/requirePlanFeature.js");
+const { FEATURE_KEYS } = require("../config/planCatalog.js");
 const {
   AUDIT_ACTIONS,
   recordAuditEventForRequest
@@ -475,8 +476,8 @@ router.post("/history", exportGrantLimiter, async (req, res) => {
     user.business_id = await resolveBusinessIdForUser(user);
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
+    if (!hasFeatureAccess(subscription, FEATURE_KEYS.PDF_EXPORTS)) {
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.PDF_EXPORTS));
     }
     const format = String(req.body?.format || "").toLowerCase();
     const dateRange = validateDateRange(req.body);
@@ -604,8 +605,8 @@ router.post("/request-grant", exportGrantLimiter, async (req, res) => {
       return res.status(400).json({ error: "Unsupported export type." });
     }
 
-    if (exportType !== "csv_basic" && !hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
+    if (exportType !== "csv_basic" && !hasFeatureAccess(subscription, FEATURE_KEYS.PDF_EXPORTS)) {
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.PDF_EXPORTS));
     }
 
     if (includeTaxId && exportType !== "pdf") {
@@ -1026,8 +1027,8 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
     user.business_id = await resolveBusinessIdForUser(user);
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
+    if (!hasFeatureAccess(subscription, FEATURE_KEYS.PDF_EXPORTS)) {
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.PDF_EXPORTS));
     }
     const result = await pool.query(
       `SELECT e.id,
@@ -1089,8 +1090,8 @@ router.get("/history/:id/diagnostics", exportGrantLimiter, async (req, res) => {
     user.business_id = await resolveBusinessIdForUser(user);
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
+    if (!hasFeatureAccess(subscription, FEATURE_KEYS.PDF_EXPORTS)) {
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.PDF_EXPORTS));
     }
 
     const { id } = req.params;
@@ -1209,8 +1210,8 @@ router.get("/history/:id/redacted", exportGrantLimiter, async (req, res) => {
     user.business_id = await resolveBusinessIdForUser(user);
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
+    if (!hasFeatureAccess(subscription, FEATURE_KEYS.PDF_EXPORTS)) {
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.PDF_EXPORTS));
     }
     const { id } = req.params;
     const { rows } = await pool.query(
@@ -1352,8 +1353,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     }
 
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "pdf_exports"));
+    if (!hasFeatureAccess(subscription, FEATURE_KEYS.PDF_EXPORTS)) {
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.PDF_EXPORTS));
     }
 
     const includeTaxId = Boolean(req.body?.includeTaxId);

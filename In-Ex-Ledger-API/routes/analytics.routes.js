@@ -9,6 +9,7 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const { FEATURE_KEYS } = require("../config/planCatalog.js");
 const WEEKS_PER_MONTH = 52 / 12;
 const BIWEEKS_PER_MONTH = 26 / 12;
 const MAX_ANALYTICS_AMOUNT = 999999999.99;
@@ -116,7 +117,7 @@ router.get("/dashboard", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    const hasTaxEstimates = hasFeatureAccess(subscription, "tax_estimates");
+    const hasTaxEstimates = hasFeatureAccess(subscription, FEATURE_KEYS.TAX_ESTIMATES);
     const businessRow = await pool.query(
       "SELECT region FROM businesses WHERE id = $1",
       [businessId]

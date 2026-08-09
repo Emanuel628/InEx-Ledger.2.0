@@ -62,6 +62,7 @@ const {
   isTransactionReviewStatus,
   transactionReviewStatusList
 } = require("../config/transactionReviewStatus.js");
+const { FEATURE_KEYS } = require("../config/planCatalog.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -1007,9 +1008,9 @@ router.post("/", async (req, res) => {
     }
     if (
       hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
-      !hasFeatureAccess(subscription, "edge_case_tools")
+      !hasFeatureAccess(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS)
     ) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "edge_case_tools"));
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS));
     }
 
     const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
@@ -1228,9 +1229,9 @@ router.put("/:id", async (req, res) => {
     }
     if (
       hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
-      !hasFeatureAccess(subscription, "edge_case_tools")
+      !hasFeatureAccess(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS)
     ) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, "edge_case_tools"));
+      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS));
     }
     const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
 

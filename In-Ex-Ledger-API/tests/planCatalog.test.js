@@ -134,6 +134,30 @@ test("business subscription migration constrains canonical plan and status value
   }
 });
 
+test("backend route feature checks use FEATURE_KEYS instead of raw literals", () => {
+  const routeFiles = [
+    "analytics.routes.js",
+    "exports.routes.js",
+    "transactions.routes.js"
+  ];
+
+  for (const routeFile of routeFiles) {
+    const source = fs.readFileSync(path.join(apiRoot, "routes", routeFile), "utf8");
+    for (const featureKey of ALL_FEATURE_KEYS) {
+      assert.doesNotMatch(
+        source,
+        new RegExp(`hasFeatureAccess\\([^)]*['"]${featureKey}['"]`),
+        `${routeFile} should import FEATURE_KEYS instead of hardcoding "${featureKey}"`
+      );
+      assert.doesNotMatch(
+        source,
+        new RegExp(`buildFeatureRequiresPlanResponse\\([^)]*['"]${featureKey}['"]`),
+        `${routeFile} should import FEATURE_KEYS instead of hardcoding "${featureKey}"`
+      );
+    }
+  }
+});
+
 test("getPlanDefinition normalizes unrecognized/missing codes to Basic", () => {
   assert.equal(getPlanDefinition(undefined).code, PLAN_CODES.BASIC);
   assert.equal(getPlanDefinition(null).code, PLAN_CODES.BASIC);
