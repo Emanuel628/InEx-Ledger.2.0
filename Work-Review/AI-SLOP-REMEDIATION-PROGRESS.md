@@ -113,7 +113,31 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [x] Checksum repair removed from `prestart` (`391319b9`)
 - [x] Server does not listen before DB init/migration readiness (`fabc898f`)
 - [~] Read-only migration verification split from repair commands
-- [~] Environment validation for required production settings
+- [~] Environment validation for required production settings — still half credit,
+  but real progress: the audit (Pass 10) found `envValidationService.js`'s
+  production-required list too narrow for what's actually mounted and
+  security-sensitive. Checked each flagged variable's real failure mode on `main`
+  first rather than blanket-requiring the whole list: `REDIS_URL`,
+  `PDF_WORKER_URL`/`PDF_WORKER_SECRET`, and `EXPORT_PUBLIC_KEY_JWK`/
+  `EXPORT_PRIVATE_KEY_JWK` are all unconditionally required by the app's own
+  existing logic (`middleware/rateLimiter.js`'s `isRateLimitingRequired()` is
+  literally `isProduction()`; PDF/secure export have no feature flag gating them)
+  but previously only failed at request time (`pdfWorkerClient.js` throws,
+  `crypto.routes.js`/`rateLimiter.js` degrade to 503/in-memory) instead of at
+  startup — added all 5 to the production-required list, plus the
+  previously-undocumented `EXPORT_PRIVATE_KEY_JWK` to `.env.example`. Left the
+  inbound-email/support-reply HMAC secrets alone: the audit itself says some of
+  this list is "optional by design," there's no code-level signal (no
+  `ENABLE_INBOUND_EMAIL`-style flag) for which deployments intend to use those
+  features, and guessing would be the same kind of unilateral scope call flagged
+  elsewhere in this file — those routes already fail closed with a clear 503 if
+  unconfigured, so there's no security gap, just an ops-observability gap that
+  needs a product answer on which surfaces are actually expected in production.
+  Not marking `[x]`: the audit's fuller suggested design (a real two-tier
+  core-vs-feature-gated validator, plus an env-validation matrix in
+  `Docs/PRODUCTION-READINESS.md`) still isn't built. 5 new/expanded tests in
+  `tests/envValidationService.test.js`, all passing; `tests/launchBlockers.test.js`
+  unaffected (its assertion is a `.includes()` check, not an exact list).
 - [~] Docker/Nixpacks/start scripts reconciled
 - [x] Reproducible installs (`npm ci`) in CI/deployment (`afdefa17`, `6a313ff0`)
 
@@ -914,3 +938,32 @@ test that had been failing identically since PR 13).
     1366/1367 passing; the one failure is the still-open PR #303's fix, not
     a regression from this change (this branch predates that merge).
     Phase 5: 3.5/5 → 4.0/5; overall 30.0/54 → **30.5/54 (~56%)**.
+
+- **PR 20** (`fix/production-env-validation-gaps`): still on the checklist,
+  Phase 3's "Environment validation for required production settings" (Pass
+  10). Checked each variable the audit flagged as under-validated against
+  its actual failure mode on `main`, rather than blanket-adding the whole
+  list: `REDIS_URL` is unconditionally required in production per the app's
+  own `isRateLimitingRequired() === isProduction()` logic; `PDF_WORKER_URL`/
+  `PDF_WORKER_SECRET` and `EXPORT_PUBLIC_KEY_JWK`/`EXPORT_PRIVATE_KEY_JWK`
+  back core, unconditionally-mounted features (PDF export, secure export)
+  with no feature flag gating them. All 5 previously only failed at request
+  time — added them to `envValidationService.js`'s production-required
+  list so a misconfigured deploy fails at startup instead of shipping and
+  silently degrading (Redis) or 500ing/503ing on first real use (PDF/secure
+  export). Also found `EXPORT_PRIVATE_KEY_JWK` was undocumented in
+  `.env.example` even though its public-key counterpart was already there —
+  added it. Deliberately left the inbound-email/support-reply HMAC secrets
+  (`INBOUND_EMAIL_WEBHOOK_SECRET`, `SUPPORT_INBOUND_WEBHOOK_SECRET`,
+  `INVOICE_REPLY_HMAC_SECRET`, `SUPPORT_REPLY_HMAC_SECRET`) alone — the
+  audit itself calls some of this list "optional by design," there's no
+  `ENABLE_INBOUND_EMAIL`-style flag to key off of, and those routes already
+  fail closed with a clear 503 rather than insecurely, so guessing which
+  deployments need them would be a scope call, not a bug fix. 5 new/expanded
+  tests in `tests/envValidationService.test.js`, all passing;
+  `tests/launchBlockers.test.js` unaffected (its assertion is a
+  `.includes()` check). Not marking the checklist item `[x]`: the audit's
+  fuller design (a real core-vs-feature-gated validator, plus a
+  `Docs/PRODUCTION-READINESS.md` matrix) still isn't built, so this stays at
+  half credit — Phase 3's score and the overall percentage are unchanged by
+  this PR.
