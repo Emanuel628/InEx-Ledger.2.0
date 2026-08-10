@@ -113,6 +113,10 @@ function isManagedReceiptPath(filePath) {
   return path.resolve(filePath).startsWith(storageDir);
 }
 
+function getPortableBasename(filePath) {
+  return path.posix.basename(String(filePath).replace(/\\/g, "/"));
+}
+
 function normalizeReceiptStorageCandidate(filePath) {
   const storageDir = getReceiptStorageDir();
   const rawPath = String(filePath || "").trim();
@@ -120,7 +124,7 @@ function normalizeReceiptStorageCandidate(filePath) {
     return null;
   }
 
-  const candidate = path.resolve(storageDir, path.basename(rawPath));
+  const candidate = path.resolve(storageDir, getPortableBasename(rawPath));
   const storageRoot = `${storageDir}${path.sep}`;
   if (!candidate.startsWith(storageRoot)) {
     return null;

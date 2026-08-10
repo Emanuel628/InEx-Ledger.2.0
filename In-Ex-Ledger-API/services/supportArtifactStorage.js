@@ -15,6 +15,10 @@ function ensureSupportArtifactStorageDir() {
   return directory;
 }
 
+function getPortableBasename(filePath) {
+  return path.posix.basename(String(filePath).replace(/\\/g, "/"));
+}
+
 function normalizeSupportArtifactCandidate(filePath) {
   const storageDir = getSupportArtifactStorageDir();
   const rawPath = String(filePath || "").trim();
@@ -22,7 +26,7 @@ function normalizeSupportArtifactCandidate(filePath) {
     return null;
   }
 
-  const candidate = path.resolve(storageDir, path.basename(rawPath));
+  const candidate = path.resolve(storageDir, getPortableBasename(rawPath));
   const storageRoot = `${storageDir}${path.sep}`;
   if (!candidate.startsWith(storageRoot)) {
     return null;
