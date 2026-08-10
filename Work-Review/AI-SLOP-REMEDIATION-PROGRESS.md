@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 22.0 / 54 action items (~41%)
+## Overall: 23.0 / 54 action items (~43%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -76,8 +76,17 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [ ] Account type/currency assumptions reviewed for closed-set constraints
 - [~] Migration tests for new invariants (`c44d08b1` guards destructive migrations)
 
-## Phase 6 - Product Truth And Legacy/Static Cleanup — 0 / 5
-- [ ] Archived legacy frontend confirmed reference-only, not runtime-reachable
+## Phase 6 - Product Truth And Legacy/Static Cleanup — 1.0 / 5
+- [x] Archived legacy frontend confirmed reference-only, not runtime-reachable —
+  independently verified: `server.js` only mounts `publicDir` (`public/`) and
+  `htmlDir` (`public/html`) as static roots; `legacy/public-html` is a sibling
+  directory, not a descendant of either, and is not referenced by any
+  `express.static`/`app.use` call. Added `In-Ex-Ledger-API/legacy/public-html/README.md`
+  stating this explicitly (Pass 4's suggested guardrail). Also fixed
+  `Docs/DEPLOYMENT.md`'s "Frontend Bundle" checklist, which told deployers to
+  verify a legacy file that isn't served and a `public/html/settings.html` file
+  that doesn't exist at all (retired, 301-redirects to `/settings`) — replaced
+  with a check against the actual served V3 bundle and static SEO pages.
 - [ ] Inventory of active `public/js`/static HTML paths still directly serveable
   (73 tracked files as of this pass)
 - [ ] Old auth scripts / V2 placeholders quarantined or removed
@@ -186,3 +195,27 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   a real, pre-existing gap in the process (see the note under Phase 1 above) rather
   than one introduced by this PR sequence. Full test suite: 1278/1279 passing (same
   pre-existing, unrelated failure).
+
+- **PR 4** (`chore/extract-mileage-query-service`, open as of this PR): Phase 7,
+  its remaining two items. Extracted `mileage.routes.js`'s dynamic `date`/`trip_date`
+  column-mode SQL builders into `services/mileageQueryService.js` (same pattern as
+  PR 2), added `Docs/DYNAMIC_SQL_RULES.md`, and added 9 direct unit tests. See that
+  PR's own description for detail; not folded into this file's Phase 7 section yet
+  since it hasn't merged.
+
+- **PR 5** (`chore/archive-legacy-frontend-guardrails`): Phase 6, its first item.
+  Before writing anything, checked what actually serves `legacy/public-html` —
+  confirmed by reading `server.js`'s static-mount setup directly (`publicDir` =
+  `public/`, `htmlDir` = `public/html`, only those two are passed to
+  `express.static`) that the directory is never served, matching the audit's Pass 4
+  claim. Then, rather than treating "not reachable" as good enough on its own, went
+  looking for anywhere the archived status wasn't actually reflected — found
+  `Docs/DEPLOYMENT.md`'s pre-deploy checklist telling deployers to verify a legacy
+  landing page that's never served, and a `public/html/settings.html` that doesn't
+  exist on disk at all (that page was retired in favor of V3's `/settings`, confirmed
+  via `tests/v3LegacyHtmlRetirement.test.js` and a direct `ls`). Fixed the checklist
+  to check the actual served V3 bundle and static SEO pages instead. Added
+  `legacy/public-html/README.md` per the audit's suggested guardrail, so the archive
+  status is stated in the directory itself, not just implied by omission from
+  routing. No source/behavior changes — docs and one new README only. Full test
+  suite: 1287/1288 passing (same pre-existing, unrelated failure as every prior PR).
