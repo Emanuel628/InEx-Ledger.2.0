@@ -94,3 +94,15 @@ test("no V3 source file writes a literal access/refresh/session-token-named stor
 
   assert.deepEqual(offenders, []);
 });
+
+test("no V3 source file constructs an Authorization header", () => {
+  const offenders = [];
+  for (const file of collectSourceFiles()) {
+    const source = fs.readFileSync(file, "utf8");
+    if (/\bAuthorization\s*:/i.test(source) || /\.set\(\s*['"`]Authorization['"`]/i.test(source)) {
+      offenders.push(path.relative(frontendRoot, file));
+    }
+  }
+
+  assert.deepEqual(offenders, []);
+});
