@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 26.0 / 54 action items (~48%)
+## Overall: 26.5 / 54 action items (~49%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -107,7 +107,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   covering all 6 pages across all 4 URL aliases (bare, `.html`, `/html/*`,
   `/html/*.html`).
 
-## Phase 7 - Route And Service Decomposition — 3.0 / 4
+## Phase 7 - Route And Service Decomposition — 3.5 / 4
 - [x] Consolidated the repeated account/category join SQL in `transactions.routes.js`
   (was duplicated across 7 call sites: GET list, GET single, POST, PUT, and the
   `cleared`/`review-status`/`receipt-status` PATCH routes) into one shared fragment.
@@ -116,13 +116,21 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   routes — the ones that mark a transaction cleared or change its review status from
   the UI previously lost the category display until the next full list reload, same
   bug class as the earlier Add-Transaction fix.
-- [~] **Landed this PR**: moved transaction list filter-parsing (`buildTransactionListFilters`,
+- [x] Moved transaction list filter-parsing (`buildTransactionListFilters`,
   `buildTransactionListWhereClause`, `getTransactionPeriodBounds`) out of
-  `transactions.routes.js` into a new `services/transactionListQueryService.js`, with
-  13 new direct unit tests. Half credit: the filter-parsing half of this item is done;
-  the review-summary orchestration (the three-query dance — review-source query, review
-  filtering, building the final `WHERE` clause with the review-filtered ID list — still
-  lives inline in the `GET /` handler) is not yet extracted.
+  `transactions.routes.js` into `services/transactionListQueryService.js`. The
+  review-summary orchestration (the three-query dance — review-source query, review
+  filtering, building the final `WHERE` clause with the review-filtered ID list, the
+  paginated list query, the aggregate summary query) that was deliberately deferred is
+  now also extracted, as four more pure functions in the same module
+  (`buildTransactionReviewSourceQuery`, `buildFinalTransactionWhereClause`,
+  `buildTransactionListQuery`, `buildTransactionSummaryQuery`) — moved verbatim (byte-
+  identical SQL text), only parameterizing what varied (the join-clause SQL, `now`).
+  `GET /` dropped from ~228 lines to ~72; the route now reads as parse → build query →
+  run query → shape response. 19 direct unit tests total across all 7 functions in this
+  module. Full HTTP test coverage for this endpoint (191 tests across 6 files that hit
+  `GET /api/transactions`) still passes unchanged, confirming behavior parity on the
+  highest-traffic endpoint in the file.
 - [x] Codify dynamic-SQL rules (values as params, identifiers from constants only, no
   request-derived text interpolated) — written down in `Docs/DYNAMIC_SQL_RULES.md`,
   citing the existing modules that already follow it.
@@ -267,3 +275,22 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   across all 4 URL aliases they're reachable under, never serve their raw HTML
   while gated, and don't affect unrelated canonical pages. Full test suite:
   1290/1291 passing (same pre-existing, unrelated failure as every prior PR).
+
+- **PR 7** (`refactor/extract-transaction-list-orchestration`): Phase 7, its
+  last item, prompted by the user asking whether `transactions.routes.js`
+  (2,602 lines, 21 endpoints) was worth tackling. Rather than attempting the
+  whole file, scoped to the one piece the audit specifically flagged (Pass 32:
+  "correct-looking but too complex for a route file") and PR 2 had explicitly
+  deferred: `GET /`'s three-query orchestration. Extracted the review-source
+  query, the review-filter-to-WHERE-clause folding, the paginated list query,
+  and the summary query into four pure functions in
+  `services/transactionListQueryService.js`, moved verbatim (same SQL text,
+  byte-for-byte) so no query behavior could drift in the move. `GET /` went
+  from ~228 lines to ~72. Left everything else in the file alone — the CSV
+  import handler (~380 lines, the single largest remaining chunk) is a
+  different, larger, differently-shaped problem and wasn't pulled into this
+  PR. Added 6 new direct unit tests for the extracted functions (19 total in
+  the module now). Verified behavior parity by running every test file that
+  exercises `GET /api/transactions` (191 tests across 6 files) — all passing
+  unchanged — on top of the full suite: 1296/1297 passing (same pre-existing,
+  unrelated failure as every prior PR).

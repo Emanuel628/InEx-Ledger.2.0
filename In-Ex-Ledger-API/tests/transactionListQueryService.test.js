@@ -6,7 +6,11 @@ const assert = require("node:assert/strict");
 const {
   getTransactionPeriodBounds,
   buildTransactionListFilters,
-  buildTransactionListWhereClause
+  buildTransactionListWhereClause,
+  buildTransactionReviewSourceQuery,
+  buildFinalTransactionWhereClause,
+  buildTransactionListQuery,
+  buildTransactionSummaryQuery
 } = require("../services/transactionListQueryService.js");
 
 const NOW = new Date("2026-06-15T12:00:00.000Z");
@@ -114,4 +118,57 @@ test("buildTransactionListWhereClause threads period bounds as two date-comparis
   assert.match(whereSql, /t\.date >= \$2/);
   assert.match(whereSql, /t\.date < \$3/);
   assert.deepEqual(params.slice(1), ["2026-01-01", "2027-01-01"]);
+});
+
+test("buildTransactionReviewSourceQuery reuses the where clause params unmodified and caps at 50000 rows", () => {
+  const { whereSql, params } = buildTransactionListWhereClause(["biz-1"], buildTransactionListFilters({}, NOW));
+  const query = buildTransactionReviewSourceQuery(whereSql, params);
+  assert.match(query.sql, /WHERE t\.business_id = ANY\(\$1::uuid\[\]\)/);
+  assert.match(query.sql, /LIMIT 50000/);
+  assert.match(query.sql, /LEFT JOIN \(\s*SELECT transaction_id, COUNT\(\*\)::int AS receipt_count/);
+  assert.deepEqual(query.params, params);
+});
+
+test("buildFinalTransactionWhereClause passes the where clause through unchanged when no review filter is active", () => {
+  const filters = buildTransactionListFilters({}, NOW);
+  const { whereSql, params } = buildTransactionListWhereClause(["biz-1"], filters);
+  const result = buildFinalTransactionWhereClause(whereSql, params, filters.review, []);
+  assert.equal(result.whereSql, whereSql);
+  assert.deepEqual(result.params, params);
+});
+
+test("buildFinalTransactionWhereClause forces an empty result set when the review filter matches nothing", () => {
+  const filters = buildTransactionListFilters({}, NOW);
+  const { whereSql, params } = buildTransactionListWhereClause(["biz-1"], filters);
+  const result = buildFinalTransactionWhereClause(whereSql, params, "needs_review", []);
+  assert.match(result.whereSql, /AND false$/);
+  assert.deepEqual(result.params, params);
+});
+
+test("buildFinalTransactionWhereClause appends the review-filtered id list as the last param", () => {
+  const filters = buildTransactionListFilters({}, NOW);
+  const { whereSql, params } = buildTransactionListWhereClause(["biz-1"], filters);
+  const result = buildFinalTransactionWhereClause(whereSql, params, "needs_review", ["txn-1", "txn-2"]);
+  assert.match(result.whereSql, /AND t\.id = ANY\(\$2::uuid\[\]\)$/);
+  assert.deepEqual(result.params, [["biz-1"], ["txn-1", "txn-2"]]);
+});
+
+test("buildTransactionListQuery appends limit/offset as the final two params and inlines the given join clause", () => {
+  const query = buildTransactionListQuery("t.business_id = ANY($1::uuid[])", [["biz-1"]], 25, 50, "LEFT JOIN accounts a ON a.id = t.account_id");
+  assert.match(query.sql, /LEFT JOIN accounts a ON a\.id = t\.account_id/);
+  assert.match(query.sql, /LIMIT \$2 OFFSET \$3/);
+  assert.deepEqual(query.params, [["biz-1"], 25, 50]);
+});
+
+test("buildTransactionSummaryQuery derives month/current-year/previous-year bounds from the given date and threads six trailing params", () => {
+  const query = buildTransactionSummaryQuery("t.business_id = ANY($1::uuid[])", [["biz-1"]], NOW);
+  assert.match(query.sql, /t\.date >= \$2\s+AND t\.date < \$3/);
+  assert.match(query.sql, /t\.date >= \$4/);
+  assert.match(query.sql, /t\.date >= \$6/);
+  assert.deepEqual(query.params, [
+    ["biz-1"],
+    "2026-06-01", "2026-07-01",
+    "2026-01-01", "2027-01-01",
+    "2025-01-01", "2026-01-01"
+  ]);
 });
