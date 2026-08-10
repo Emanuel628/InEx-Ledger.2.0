@@ -315,6 +315,33 @@ those. Route file: 1,981 → 1,864 lines. Full billing-adjacent HTTP suite (169
 tests across 7 files, including the real Stripe checkout/webhook/portal
 flows) passes unchanged.
 
+**Fourth pass, same reasoning**: `routes/exports.routes.js` (1,783 lines) was
+next up once auth/transactions/billing were done. Read all 14 of its
+top-level functions before choosing anything; extracted the 9 that are pure
+or near-pure (date-range/tax-ID validation, secure-export tax ID decryption
+and format-checking, export metadata row building, CRA Quick Method supply
+type inference from ledger data, PDF report ID and CSV filename generation,
+export-artifact ID collection, export history row normalization) into
+`services/exportRequestService.js`, along with the `DATE_PATTERN`,
+`SSN_RE`/`EIN_RE`/`SIN_RE`/`BN_RE` constants they depend on. `DATE_PATTERN` is
+also used by two route handlers outside the extraction, so it's re-exported
+and imported back; `SUPPORTED_EXPORT_TYPES` wasn't used by anything moved, so
+it stays untouched in the route file. Left everything DB-touching in place:
+the `requireEmailVerified` middleware, `fetchUserDisplayName`,
+`fetchExportSourceRows` (the large multi-table export data fetch),
+`storeCompletedExport`, and `persistSnapshotBestEffort`. The now-unused
+`decryptJwe` import was removed from the route file (still used indirectly
+through the new service). Added 18 new direct unit tests — none of these 9
+functions had any direct test coverage before, only indirect coverage
+through 6 HTTP-level export test files; testing `resolveSecureExportTaxId`'s
+decrypt-success and invalid-decrypted-format branches required a
+`Module._load` mock for `jweDecryptService.js` (the same pattern the existing
+`exportsRegression.test.js` already uses to mock that module at the
+HTTP-request level). All 18 passed on the first run. Route file:
+1,783 → 1,615 lines. Full export-adjacent HTTP suite (198 tests across 6
+files) passes unchanged; full backend suite went from 1,328 to 1,346 tests
+(the 18 new ones), same 1 pre-existing unrelated failure as always.
+
 ## Phase 8 - V3 React Cleanup — 0.5 / 7
 - [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
 - [ ] Large controller pages split by workflow
@@ -678,3 +705,30 @@ flows) passes unchanged.
   unchanged. Full suite: 1328/1329 passing (same pre-existing, unrelated
   failure as every prior PR). Not counted toward Phase 7's score, same
   reasoning as PR 13/14.
+
+- **PR 16** (`refactor/extract-exports-request-helpers`): same path,
+  `routes/exports.routes.js` (1,783 lines, the next-largest untouched route
+  file once auth/transactions/billing were done). Read all 14 top-level
+  functions before choosing anything. Extracted the 9 pure/near-pure ones —
+  `validateDateRange`, `isValidTaxId`, `resolveSecureExportTaxId`,
+  `buildExportMetadataRows`, `inferQuickMethodSupplyType`,
+  `createPdfReportId`, `buildCsvFilename`, `collectExportArtifactIds`,
+  `normalizeExportHistoryEntry` — into `services/exportRequestService.js`,
+  along with the `DATE_PATTERN` and `SSN_RE`/`EIN_RE`/`SIN_RE`/`BN_RE`
+  constants they use. `DATE_PATTERN` is also read by two route handlers
+  outside the extraction, so it's re-exported and imported back;
+  `SUPPORTED_EXPORT_TYPES` wasn't touched by any extracted function, so it
+  stays put. Left the middleware and every DB-touching function alone:
+  `requireEmailVerified`, `fetchUserDisplayName`, `fetchExportSourceRows`
+  (the large multi-table export fetch), `storeCompletedExport`,
+  `persistSnapshotBestEffort`. Removed the now-unused `decryptJwe` import
+  from the route file (the new service imports it directly instead). 18 new
+  direct unit tests, all passing on the first run; testing
+  `resolveSecureExportTaxId`'s decrypt-success and invalid-format branches
+  needed a `Module._load` mock for `jweDecryptService.js`, the same mocking
+  pattern `tests/exportsRegression.test.js` already uses. Route file:
+  1,783 → 1,615 lines. Full export-adjacent HTTP suite (198 tests across 6
+  files: critical flows, CSRF E2E, exports regression, index route guards,
+  integration flows, plan catalog) passes unchanged. Full suite: 1346/1347
+  passing (same pre-existing, unrelated failure as every prior PR). Not
+  counted toward Phase 7's score, same reasoning as PR 13/14/15.
