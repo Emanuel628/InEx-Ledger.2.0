@@ -81,6 +81,23 @@ const MAX_TRANSACTION_PAYER_NAME_LENGTH = 200;
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+// Every endpoint that returns a full transaction row (GET single, POST, PUT,
+// and the cleared/review-status/receipt-status PATCH routes) must enrich it
+// with the same account/category fields, or the frontend shows
+// "Uncategorized" until the next list refresh. These two fragments are the
+// single source of that shape; every query below references a base row
+// aliased `t` (a real table alias for the plain SELECT, or the mutation's
+// own CTE named `t` for INSERT/UPDATE) so the fragment never needs its own
+// identifier substitution.
+const TRANSACTION_JOIN_COLUMNS_SQL = `a.name AS account_name,
+              c.name AS category_name,
+              c.kind AS category_kind,
+              c.color AS category_color,
+              c.tax_map_us,
+              c.tax_map_ca`;
+const TRANSACTION_JOIN_CLAUSE_SQL = `LEFT JOIN accounts a ON a.id = t.account_id
+         LEFT JOIN categories c ON c.id = t.category_id`;
+
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createTransactionLimiter());
@@ -551,6 +568,10 @@ function handleTransactionMutationError(res, err, fallbackMessage) {
     });
   }
 
+  if (err instanceof ReceiptStatusValidationError) {
+    return res.status(err.status).json({ error: err.message, code: err.code });
+  }
+
   return res.status(500).json({ error: fallbackMessage });
 }
 
@@ -902,14 +923,13 @@ if (filters.review) {
               t.receipt_status_confirmed_by
        FROM transactions t
        JOIN businesses b ON b.id = t.business_id
-       LEFT JOIN accounts a ON a.id = t.account_id
        LEFT JOIN (
       SELECT transaction_id, COUNT(*)::int AS receipt_count
       FROM receipts
       WHERE business_id = ANY($1::uuid[])
       GROUP BY transaction_id
       ) rc ON rc.transaction_id = t.id
-       LEFT JOIN categories c ON c.id = t.category_id
+       ${TRANSACTION_JOIN_CLAUSE_SQL}
        WHERE ${finalWhereSql}
        ORDER BY t.date DESC, t.created_at DESC
        LIMIT $${limitParamIdx} OFFSET $${offsetParamIdx}`,
@@ -1046,7 +1066,7 @@ router.post("/", async (req, res) => {
     await assertCanCreateTransactions(client, businessId, 1, { subscription });
 
     const result = await client.query(
-      `WITH ins AS (
+      `WITH t AS (
          INSERT INTO transactions
            (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note,
             currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
@@ -1057,16 +1077,10 @@ router.post("/", async (req, res) => {
                  $23, $24, $25, $26, $27)
          RETURNING *
        )
-       SELECT ins.*,
-              a.name AS account_name,
-              c.name AS category_name,
-              c.kind AS category_kind,
-              c.color AS category_color,
-              c.tax_map_us,
-              c.tax_map_ca
-         FROM ins
-         LEFT JOIN accounts a ON a.id = ins.account_id
-         LEFT JOIN categories c ON c.id = ins.category_id`,
+       SELECT t.*,
+              ${TRANSACTION_JOIN_COLUMNS_SQL}
+         FROM t
+         ${TRANSACTION_JOIN_CLAUSE_SQL}`,
       [
         crypto.randomUUID(),
         businessId,
@@ -1163,15 +1177,9 @@ router.get("/:id", async (req, res, next) => {
 
     const result = await pool.query(
       `SELECT t.*,
-              a.name AS account_name,
-              c.name AS category_name,
-              c.kind AS category_kind,
-              c.color AS category_color,
-              c.tax_map_us,
-              c.tax_map_ca
+              ${TRANSACTION_JOIN_COLUMNS_SQL}
          FROM transactions t
-         LEFT JOIN accounts a ON a.id = t.account_id
-         LEFT JOIN categories c ON c.id = t.category_id
+         ${TRANSACTION_JOIN_CLAUSE_SQL}
         WHERE t.id = $1
           AND t.business_id = $2
           AND t.deleted_at IS NULL
@@ -1265,7 +1273,7 @@ router.put("/:id", async (req, res) => {
     const taxFormType = type === "income" && VALID_TAX_FORMS.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
 
     const result = await pool.query(
-      `WITH upd AS (
+      `WITH t AS (
          UPDATE transactions
             SET account_id              = $1,
                 category_id             = $2,
@@ -1300,16 +1308,10 @@ router.put("/:id", async (req, res) => {
             AND (is_adjustment = false OR is_adjustment IS NULL)
          RETURNING *
        )
-       SELECT upd.*,
-              a.name AS account_name,
-              c.name AS category_name,
-              c.kind AS category_kind,
-              c.color AS category_color,
-              c.tax_map_us,
-              c.tax_map_ca
-         FROM upd
-         LEFT JOIN accounts a ON a.id = upd.account_id
-         LEFT JOIN categories c ON c.id = upd.category_id`,
+       SELECT t.*,
+              ${TRANSACTION_JOIN_COLUMNS_SQL}
+         FROM t
+         ${TRANSACTION_JOIN_CLAUSE_SQL}`,
       [
         account_id,
         mappedCategoryId,
@@ -1680,14 +1682,20 @@ router.patch("/:id/review-status", async (req, res) => {
     await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
 
     const result = await pool.query(
-      `UPDATE transactions
-         SET review_status = $1
-       WHERE id = $2
-         AND business_id = $3
-         AND deleted_at IS NULL
-         AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND (is_void = false OR is_void IS NULL)
-       RETURNING *`,
+      `WITH t AS (
+         UPDATE transactions
+            SET review_status = $1
+          WHERE id = $2
+            AND business_id = $3
+            AND deleted_at IS NULL
+            AND (is_adjustment = false OR is_adjustment IS NULL)
+            AND (is_void = false OR is_void IS NULL)
+         RETURNING *
+       )
+       SELECT t.*,
+              ${TRANSACTION_JOIN_COLUMNS_SQL}
+         FROM t
+         ${TRANSACTION_JOIN_CLAUSE_SQL}`,
       [status, req.params.id, businessId]
     );
     void invalidateSnapshotsForBusiness({
@@ -1722,14 +1730,20 @@ router.patch("/:id/cleared", async (req, res) => {
 
     await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
     const result = await pool.query(
-      `UPDATE transactions
-       SET cleared = $1
-       WHERE id = $2
-         AND business_id = $3
-         AND deleted_at IS NULL
-         AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND (is_void = false OR is_void IS NULL)
-       RETURNING *`,
+      `WITH t AS (
+         UPDATE transactions
+            SET cleared = $1
+          WHERE id = $2
+            AND business_id = $3
+            AND deleted_at IS NULL
+            AND (is_adjustment = false OR is_adjustment IS NULL)
+            AND (is_void = false OR is_void IS NULL)
+         RETURNING *
+       )
+       SELECT t.*,
+              ${TRANSACTION_JOIN_COLUMNS_SQL}
+         FROM t
+         ${TRANSACTION_JOIN_CLAUSE_SQL}`,
       [req.body.cleared, req.params.id, businessId]
     );
 
@@ -1760,21 +1774,12 @@ router.patch("/:id/receipt-status", async (req, res) => {
     return res.status(400).json({ error: "Invalid transaction ID." });
   }
 
-  let normalizedStatus;
   try {
-    normalizedStatus = validateManualReceiptStatusChange({
+    const normalizedStatus = validateManualReceiptStatusChange({
       status: req.body?.receipt_status,
       receiptMissingReason: req.body?.receipt_missing_reason,
       businessPurpose: req.body?.business_purpose
     });
-  } catch (err) {
-    if (err instanceof ReceiptStatusValidationError) {
-      return res.status(err.status).json({ error: err.message, code: err.code });
-    }
-    throw err;
-  }
-
-  try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const existing = await pool.query(
       `SELECT t.id,
@@ -1815,7 +1820,7 @@ router.patch("/:id/receipt-status", async (req, res) => {
     const supportingEvidence = String(req.body?.supporting_evidence || "").trim() || null;
 
     const result = await pool.query(
-      `WITH upd AS (
+      `WITH t AS (
          UPDATE transactions
             SET receipt_status = $1,
                 receipt_missing_reason = $2,
@@ -1830,16 +1835,10 @@ router.patch("/:id/receipt-status", async (req, res) => {
             AND (is_void = false OR is_void IS NULL)
          RETURNING *
        )
-       SELECT upd.*,
-              a.name AS account_name,
-              c.name AS category_name,
-              c.kind AS category_kind,
-              c.color AS category_color,
-              c.tax_map_us,
-              c.tax_map_ca
-         FROM upd
-         LEFT JOIN accounts a ON a.id = upd.account_id
-         LEFT JOIN categories c ON c.id = upd.category_id`,
+       SELECT t.*,
+              ${TRANSACTION_JOIN_COLUMNS_SQL}
+         FROM t
+         ${TRANSACTION_JOIN_CLAUSE_SQL}`,
       [
         normalizedStatus,
         receiptMissingReason,
