@@ -55,8 +55,18 @@ function buildStripePriceEnvMap() {
   return { base, addon };
 }
 
+function parseStripeUnitAmount(price) {
+  const raw = price?.unit_amount_decimal ?? price?.unit_amount;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    throw new Error("Stripe price is missing a valid unit amount");
+  }
+  return numeric / 100;
+}
+
 module.exports = {
   STRIPE_PRICE_ENTRIES,
   buildStripePriceLookup,
-  buildStripePriceEnvMap
+  buildStripePriceEnvMap,
+  parseStripeUnitAmount
 };
