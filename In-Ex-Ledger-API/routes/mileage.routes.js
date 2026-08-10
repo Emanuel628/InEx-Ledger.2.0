@@ -8,6 +8,11 @@ const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForU
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
+const {
+  mileageDateColumn,
+  buildMileageInsertSql,
+  buildMileageInsertValues
+} = require("../services/mileageQueryService.js");
 
 /**
  * Vehicle cost tracking (fuel / maintenance / insurance entries) is a Pro
@@ -122,8 +127,8 @@ router.get("/", async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
     const mileageColumns = await getMileageColumnMode();
-    const dateSelect = mileageDateSelect(mileageColumns);
-    const dateOrderBy = mileageDateOrderBy(mileageColumns);
+    const dateSelect = mileageDateColumn(mileageColumns);
+    const dateOrderBy = mileageDateColumn(mileageColumns);
 
     const result = await pool.query(
       `SELECT id, ${dateSelect} AS trip_date, purpose, destination, miles, km,
@@ -156,7 +161,7 @@ router.get("/summary", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const mileageColumns = await getMileageColumnMode();
-    const dateSelect = mileageDateSelect(mileageColumns);
+    const dateSelect = mileageDateColumn(mileageColumns);
 
     const [mileageResult, costsResult] = await Promise.all([
       pool.query(
@@ -353,6 +358,7 @@ router.post("/", async (req, res) => {
     const insertSql = buildMileageInsertSql(mileageColumns);
     const insertValues = buildMileageInsertValues(
       mileageColumns,
+      crypto.randomUUID(),
       businessId,
       mileageDate,
       purpose,
@@ -409,90 +415,6 @@ async function getMileageColumnMode() {
   });
 
   return cachedMileageColumnModePromise;
-}
-
-function mileageDateSelect(mode) {
-  if (mode.hasTripDate && mode.hasDate) {
-    return "COALESCE(trip_date, date)";
-  }
-
-  if (mode.hasTripDate) {
-    return "trip_date";
-  }
-
-  return "date";
-}
-
-function mileageDateOrderBy(mode) {
-  if (mode.hasTripDate && mode.hasDate) {
-    return "COALESCE(trip_date, date)";
-  }
-
-  if (mode.hasTripDate) {
-    return "trip_date";
-  }
-
-  return "date";
-}
-
-function buildMileageInsertSql(mode) {
-  const dateColumns = [];
-  if (mode.hasDate) {
-    dateColumns.push("date");
-  }
-  if (mode.hasTripDate) {
-    dateColumns.push("trip_date");
-  }
-
-  if (!dateColumns.length) {
-    throw new Error("Mileage table is missing both date and trip_date columns.");
-  }
-
-  const valuePositions = [
-    "$1",
-    "$2",
-    ...dateColumns.map((_, index) => `$${index + 3}`),
-    `$${dateColumns.length + 3}`,
-    `$${dateColumns.length + 4}`,
-    `$${dateColumns.length + 5}`,
-    `$${dateColumns.length + 6}`,
-    `$${dateColumns.length + 7}`,
-    `$${dateColumns.length + 8}`
-  ];
-
-  const columns = ["id", "business_id", ...dateColumns, "purpose", "destination", "miles", "km", "odometer_start", "odometer_end"];
-  return `INSERT INTO mileage (${columns.join(", ")})
-       VALUES (${valuePositions.join(", ")})
-       RETURNING *`;
-}
-
-function buildMileageInsertValues(
-  mode,
-  businessId,
-  mileageDate,
-  purpose,
-  destination,
-  miles,
-  km,
-  odometerStart,
-  odometerEnd
-) {
-  const values = [crypto.randomUUID(), businessId];
-  if (mode.hasDate) {
-    values.push(mileageDate);
-  }
-  if (mode.hasTripDate) {
-    values.push(mileageDate);
-  }
-  values.push(
-    purpose,
-    destination || null,
-    miles,
-    km,
-    odometerStart,
-    odometerEnd
-  );
-  return values;
 }
 
 function normalizeMileageDistances(miles, km) {
@@ -721,7 +643,7 @@ router.put("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const mileageColumns = await getMileageColumnMode();
-    const dateCol = mileageDateSelect(mileageColumns);
+    const dateCol = mileageDateColumn(mileageColumns);
 
     const existing = await pool.query(
       `SELECT id, ${dateCol} AS trip_date FROM mileage WHERE id = $1 AND business_id = $2`,
@@ -793,7 +715,7 @@ router.put("/:id", async (req, res) => {
       values
     );
 
-    const dateSelect = mileageDateSelect(mileageColumns);
+    const dateSelect = mileageDateColumn(mileageColumns);
     const row = result.rows[0];
     // Normalize the trip_date field in the response
     row.trip_date = row.trip_date ?? row.date ?? null;
@@ -823,7 +745,7 @@ router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const mileageColumns = await getMileageColumnMode();
-    const dateCol = mileageDateSelect(mileageColumns);
+    const dateCol = mileageDateColumn(mileageColumns);
 
     const existing = await pool.query(
       `SELECT id, ${dateCol} AS trip_date FROM mileage WHERE id = $1 AND business_id = $2 LIMIT 1`,
