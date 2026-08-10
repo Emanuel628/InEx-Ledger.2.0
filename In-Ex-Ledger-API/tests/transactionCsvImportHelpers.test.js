@@ -5,6 +5,12 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 
 const ROUTE_PATH = require.resolve("../routes/transactions.routes.js");
+const {
+  parseCsv,
+  detectColumns,
+  extractRowData,
+  parseImportDateRange
+} = require("../services/transactionCsvImportService.js");
 
 function loadTransactionRouteModule() {
   return loadTransactionRouteModuleWithDb();
@@ -82,9 +88,6 @@ function loadTransactionRouteModuleWithDb(dbImpl = null) {
 }
 
 test("parseCsv preserves embedded newlines inside quoted fields", () => {
-  const routeModule = loadTransactionRouteModule();
-  const { parseCsv } = routeModule.__private;
-
   const rows = parseCsv(
     'Date,Description,Amount\n' +
     '"2026-04-01","Vendor line 1\nVendor line 2","-45.67"\n'
@@ -97,13 +100,11 @@ test("parseCsv preserves embedded newlines inside quoted fields", () => {
 });
 
 test("parseImportDateRange returns nulls when both fields are empty", () => {
-  const { parseImportDateRange } = loadTransactionRouteModule().__private;
   assert.deepEqual(parseImportDateRange({}), { startDate: null, endDate: null });
   assert.deepEqual(parseImportDateRange({ start_date: "", end_date: "" }), { startDate: null, endDate: null });
 });
 
 test("parseImportDateRange accepts valid YYYY-MM-DD values", () => {
-  const { parseImportDateRange } = loadTransactionRouteModule().__private;
   assert.deepEqual(
     parseImportDateRange({ start_date: "2026-01-01", end_date: "2026-12-31" }),
     { startDate: "2026-01-01", endDate: "2026-12-31" }
@@ -119,26 +120,21 @@ test("parseImportDateRange accepts valid YYYY-MM-DD values", () => {
 });
 
 test("parseImportDateRange rejects malformed start_date", () => {
-  const { parseImportDateRange } = loadTransactionRouteModule().__private;
   const out = parseImportDateRange({ start_date: "2026/01/01" });
   assert.match(out.error || "", /start_date/);
 });
 
 test("parseImportDateRange rejects malformed end_date", () => {
-  const { parseImportDateRange } = loadTransactionRouteModule().__private;
   const out = parseImportDateRange({ end_date: "Jan 1 2026" });
   assert.match(out.error || "", /end_date/);
 });
 
 test("parseImportDateRange rejects when start_date is after end_date", () => {
-  const { parseImportDateRange } = loadTransactionRouteModule().__private;
   const out = parseImportDateRange({ start_date: "2026-12-31", end_date: "2026-01-01" });
   assert.match(out.error || "", /on or before/);
 });
 
 test("detectColumns and extractRowData preserve merchant and provider hint fields for mapping", () => {
-  const routeModule = loadTransactionRouteModule();
-  const { detectColumns, extractRowData } = routeModule.__private;
   const headers = ["Date", "Merchant_Name", "Description", "Personal_Finance_Category", "Amount"];
   const cols = detectColumns(headers);
   const row = {
@@ -158,8 +154,6 @@ test("detectColumns and extractRowData preserve merchant and provider hint field
 });
 
 test("extractRowData combines split bank description fields before categorization", () => {
-  const routeModule = loadTransactionRouteModule();
-  const { detectColumns, extractRowData } = routeModule.__private;
   const headers = ["Date", "Description_1", "Description_2", "Amount"];
   const cols = detectColumns(headers);
   const row = {

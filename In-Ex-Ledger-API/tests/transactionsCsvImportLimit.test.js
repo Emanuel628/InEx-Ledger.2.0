@@ -12,7 +12,7 @@ process.env.FIELD_ENCRYPTION_KEY =
 const {
   countImportableCsvRows,
   isPlannedCsvDuplicate
-} = require("../routes/transactions.routes.js").__private;
+} = require("../services/transactionCsvImportService.js");
 
 test("isPlannedCsvDuplicate matches same-file duplicates within the 2-day window", () => {
   const plannedRows = [{
