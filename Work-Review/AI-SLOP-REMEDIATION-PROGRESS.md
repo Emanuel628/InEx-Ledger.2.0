@@ -31,6 +31,14 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [x] Ignores for runtime/browser/session artifacts — verified (`test-results/` etc.)
 - [x] CI coverage for V3 lint/type/i18n/build + backend/frontend-v3/pdf-worker audits —
   verified (`phase7-guardrails.yml`, `dependency-security.yml`)
+  - **Known gap, verified by reading actual workflow run logs (not just the YAML) on
+    PRs #287 and #288**: `dependency-security.yml`'s `dependency-review` job fails on
+    every PR with `Dependency review is not supported on this repository. Please
+    ensure that Dependency graph is enabled`. This predates this PR sequence and isn't
+    fixable by a code change — it's a GitHub repo setting (Settings → Security →
+    Dependency graph). The three `npm-audit` jobs in the same workflow (api,
+    frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
+    rather than silently working around it.
 
 ## Phase 2 - Security Contract Cleanup — 3.0 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
@@ -156,3 +164,25 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   combined with this change — it threads request-scoped state (query results feeding
   back into a second query's parameters) that deserves its own careful, isolated pass
   rather than being bundled into a pure-function extraction.
+
+- **PR 3** (`chore/fix-review-followups`): quality follow-up on PR 1/2, no new phase
+  progress (percentage unchanged). A review of the previous two PRs against this
+  file's own scoring — re-checked against `PROGRAMMING-QUALITY-RESEARCH-2026-08-09.md`
+  — surfaced three real, narrow issues, all fixed here:
+  1. `transactionListQueryService.js`'s header comment referenced "Phase 7," this
+     tracker file, and "moved verbatim" — process history, not durable documentation.
+     Rewritten to explain what the module does and why it's side-effect-free.
+  2. The module duplicated a UUID-validation regex that already exists as `isUuid` in
+     `api/utils/v2HttpValidators.js` (used by the v2 business routes). Switched to
+     importing it instead — same regex, same behavior, one fewer copy to keep in sync.
+  3. `type: type || ""` and `reviewStatus: reviewStatus || ""` in
+     `buildTransactionListFilters`'s return value were dead code — both variables are
+     already guaranteed non-null strings from `String(...).trim().toLowerCase()`
+     earlier in the function, so the fallback could never fire. Simplified to `type,`
+     and `reviewStatus,`.
+
+  Also verified, while investigating a claim that CI status wasn't visible, that CI
+  *is* visible via the GitHub Actions API and *did* run on both prior PRs — and found
+  a real, pre-existing gap in the process (see the note under Phase 1 above) rather
+  than one introduced by this PR sequence. Full test suite: 1278/1279 passing (same
+  pre-existing, unrelated failure).
