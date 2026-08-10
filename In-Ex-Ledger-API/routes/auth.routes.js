@@ -5,7 +5,6 @@
 
 const express = require("express");
 const crypto = require("crypto");
-const bcrypt = require("bcrypt");
 const { Resend } = require("resend");
 const { signToken, verifyToken, requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
@@ -59,6 +58,21 @@ const {
   markDeletedAccountReactivated
 } = require("../services/deletedAccountService.js");
 const { normalizeEmail } = require("../utils/emailNormalization.js");
+const {
+  hashPassword,
+  isStrongPassword,
+  isTransientLoginInfrastructureError,
+  buildPublicSessionPayload,
+  ensureArrayValue,
+  hashMfaEmailCode,
+  generateMfaEmailCode,
+  maskEmail,
+  buildMfaStatusPayload,
+  getLoginLockExpiry,
+  isLoginLocked,
+  hashRefreshToken,
+  hashMfaTrustToken
+} = require("../services/authSecurityService.js");
 
 const router = express.Router();
 
@@ -169,19 +183,6 @@ async function consumeVerificationToken(token) {
     [token]
   );
   return result.rows[0]?.email ?? null;
-}
-
-function isTransientLoginInfrastructureError(err) {
-  const code = String(err?.code || "").trim().toUpperCase();
-  return (
-    code.startsWith("08")
-    || code === "53"
-    || code === "57P01"
-    || code === "57P03"
-    || code === "ETIMEDOUT"
-    || code === "ECONNRESET"
-    || code === "ECONNREFUSED"
-  );
 }
 
 /* =========================================================
@@ -473,20 +474,6 @@ async function sendEmailChangedConfirmationEmails({ userId, oldEmail, newEmail }
 /* =========================================================
    6. CRYPTOGRAPHY & SECURITY
    ========================================================= */
-async function hashPassword(password) {
-  return bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
-}
-
-function isStrongPassword(password) {
-  const value = String(password || "");
-  return (
-    value.length >= 8 &&
-    /\d/.test(value) &&
-    /[A-Z]/.test(value) &&
-    /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
-  );
-}
-
 async function findUserByEmail(email) {
   const result = await pool.query(
     `SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at,
@@ -584,26 +571,6 @@ async function resetCurrentRefreshSession(res, user, { mfaAuthenticated = false,
   return accessPayload;
 }
 
-function buildPublicSessionPayload(session) {
-  if (!session || typeof session !== "object") {
-    return {};
-  }
-  const { token, ...publicPayload } = session;
-  return publicPayload;
-}
-
-function ensureArrayValue(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function hashMfaEmailCode(code) {
-  return crypto.createHash("sha256").update(String(code || "")).digest("hex");
-}
-
-function generateMfaEmailCode() {
-  return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
-}
-
 function createPendingMfaToken(user, businessId, challengeId, purpose = "mfa_pending", extraPayload = {}) {
   return signToken(
     {
@@ -619,50 +586,8 @@ function createPendingMfaToken(user, businessId, challengeId, purpose = "mfa_pen
   );
 }
 
-function buildMfaStatusPayload(user) {
-  return {
-    enabled: !!user?.mfa_enabled,
-    enabled_at: user?.mfa_enabled_at || null,
-    delivery: "email",
-    recovery_email_masked: maskEmailAddress(user?.recovery_email),
-    recovery_email_verified: !!user?.recovery_email_verified
-  };
-}
-
-function maskEmailAddress(email) {
-  const normalized = normalizeEmail(email);
-  if (!normalized) {
-    return "";
-  }
-  const [local, domain] = normalized.split("@");
-  const localPrefix = local.length <= 2 ? local[0] || "*" : `${local.slice(0, 2)}${"*".repeat(Math.max(local.length - 2, 2))}`;
-  const domainParts = domain.split(".");
-  const domainName = domainParts.shift() || "";
-  const maskedDomain = domainName.length <= 2
-    ? `${domainName[0] || "*"}*`
-    : `${domainName.slice(0, 2)}${"*".repeat(Math.max(domainName.length - 2, 2))}`;
-  return `${localPrefix}@${[maskedDomain, ...domainParts].join(".")}`;
-}
-
-function maskEmail(email) {
-  return maskEmailAddress(email);
-}
-
 function buildRecoveryEmailVerificationLink(req, token) {
   return `${getAppBaseUrl(req)}/api/auth/confirm-recovery-email?token=${token}`;
-}
-
-function getLoginLockExpiry(user) {
-  const value = user?.login_locked_until ? new Date(user.login_locked_until) : null;
-  if (!value || Number.isNaN(value.getTime())) {
-    return null;
-  }
-  return value;
-}
-
-function isLoginLocked(user) {
-  const lockedUntil = getLoginLockExpiry(user);
-  return !!lockedUntil && lockedUntil.getTime() > Date.now();
 }
 
 async function clearLoginFailureState(userId) {
@@ -878,14 +803,6 @@ function hasValidGlobalMfaTrustCookie(req) {
   } catch (_) {
     return false;
   }
-}
-
-function hashRefreshToken(token) {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
-
-function hashMfaTrustToken(token) {
-  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 async function createRefreshToken(userId, { mfaAuthenticated = false, req = null } = {}) {
