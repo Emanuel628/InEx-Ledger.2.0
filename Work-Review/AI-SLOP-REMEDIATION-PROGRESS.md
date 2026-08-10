@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 21.0 / 54 action items (~39%)
+## Overall: 22.0 / 54 action items (~41%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -77,22 +77,29 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [ ] Direct URL behavior explicit for `/app`, V3 routes, blocked legacy routes, static
   assets
 
-## Phase 7 - Route And Service Decomposition — 1.0 / 4
-- [x] **Landed this PR**: consolidated the repeated account/category join SQL in
-  `transactions.routes.js` (was duplicated across 7 call sites: GET list, GET single,
-  POST, PUT, and the `cleared`/`review-status`/`receipt-status` PATCH routes) into one
-  shared fragment. In the process, found and fixed the same "Uncategorized until
-  refresh" bug (bare `RETURNING *`, no account/category join) on the `cleared` and
-  `review-status` PATCH routes — the ones that mark a transaction cleared or change its
-  review status from the UI previously lost the category display until the next full
-  list reload, same bug class as the earlier Add-Transaction fix.
-- [ ] Move transaction list filter-parsing and review-summary logic into a tested
-  service (still open — the `GET /` handler still builds filters, review-summary, and
-  pagination inline)
-- [ ] Codify dynamic-SQL rules (values as params, identifiers from constants only,
-  no request-derived text interpolated)
-- [ ] SQL-shape/parameter tests for mileage date-column mode, tax-region columns,
-  usage-limit thresholds, review date filters
+## Phase 7 - Route And Service Decomposition — 2.0 / 4
+- [x] Consolidated the repeated account/category join SQL in `transactions.routes.js`
+  (was duplicated across 7 call sites: GET list, GET single, POST, PUT, and the
+  `cleared`/`review-status`/`receipt-status` PATCH routes) into one shared fragment.
+  In the process, found and fixed the same "Uncategorized until refresh" bug (bare
+  `RETURNING *`, no account/category join) on the `cleared` and `review-status` PATCH
+  routes — the ones that mark a transaction cleared or change its review status from
+  the UI previously lost the category display until the next full list reload, same
+  bug class as the earlier Add-Transaction fix.
+- [~] **Landed this PR**: moved transaction list filter-parsing (`buildTransactionListFilters`,
+  `buildTransactionListWhereClause`, `getTransactionPeriodBounds`) out of
+  `transactions.routes.js` into a new `services/transactionListQueryService.js`, with
+  13 new direct unit tests. Half credit: the filter-parsing half of this item is done;
+  the review-summary orchestration (the three-query dance — review-source query, review
+  filtering, building the final `WHERE` clause with the review-filtered ID list — still
+  lives inline in the `GET /` handler) is not yet extracted.
+- [ ] Codify dynamic-SQL rules (values as params, identifiers from constants only, no
+  request-derived text interpolated) — the new service module follows this discipline
+  already (demonstrated, not yet written down as an enforced repo-wide rule)
+- [~] SQL-shape/parameter tests — added for transaction list filters/where-clause
+  (covers the "review date filters" part of this item); mileage date-column mode,
+  tax-region columns, and usage-limit thresholds (different files) are still untested
+  at this level
 
 ## Phase 8 - V3 React Cleanup — 0.5 / 7
 - [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
@@ -134,3 +141,18 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   discovering the target queries' `WHERE` clause is dynamically built and can reference
   `a.name`/`c.name` for search/name filters — removing those joins would have broken
   filtered requests; caught before running tests, not shipped.
+
+- **PR 2** (`chore/extract-transaction-list-service`): Phase 7. Extracted
+  `buildTransactionListFilters`, `buildTransactionListWhereClause`, and
+  `getTransactionPeriodBounds` out of `routes/transactions.routes.js` into a new
+  `services/transactionListQueryService.js` — moved verbatim, no logic changes. Added
+  13 direct unit tests for the extracted functions (limit clamping, validation
+  branches, id-vs-name filter precedence, search clause, v3Status clauses, period
+  bounds), which the route-only HTTP tests didn't cover directly before. The route file
+  now imports these instead of defining them inline. Full test suite: 1278/1279 passing
+  (same pre-existing, unrelated failure as PR 1). The review-summary orchestration in
+  `GET /` (the review-source query, review-filtering, and final `WHERE`-clause
+  assembly) was deliberately left in the route file for a follow-up PR rather than
+  combined with this change — it threads request-scoped state (query results feeding
+  back into a second query's parameters) that deserves its own careful, isolated pass
+  rather than being bundled into a pure-function extraction.
