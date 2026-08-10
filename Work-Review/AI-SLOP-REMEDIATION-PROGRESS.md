@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 26.5 / 54 action items (~49%)
+## Overall: 28.5 / 54 action items (~53%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -40,13 +40,39 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
     frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
     rather than silently working around it.
 
-## Phase 2 - Security Contract Cleanup — 3.0 / 7
+## Phase 2 - Security Contract Cleanup — 5.0 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
 - [~] Bearer-token acceptance removed from normal app auth paths
 - [~] Internal support shared-secret access hardened (commits `25026802`, `2ae677c9`)
 - [~] CSRF/origin tests for representative mutating routes (`c665b36b`)
-- [ ] MFA/signup transient tokens confirmed short-lived/single-purpose
-- [ ] V3 check that persistent auth tokens aren't stored in browser storage
+- [x] MFA/signup transient tokens confirmed short-lived/single-purpose — read
+  `routes/auth.routes.js` end to end rather than assuming. Every non-final auth
+  token carries a `purpose` claim that's checked with strict equality on
+  verification (`mfa_pending`, `mfa_sensitive_reauth`, `verified_signup_bootstrap`,
+  `verify_email_status`, `global_mfa_trust`) — none of them double as a general
+  session credential. Expiry is bounded in all cases:
+  `MFA_PENDING_TOKEN_EXPIRY_SECONDS` defaults to the 15-minute email-code window
+  (`MFA_EMAIL_CODE_EXPIRY_MINUTES * 60`), `VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS`
+  defaults to 24 hours. The signup bootstrap token additionally binds a device
+  fingerprint hash, checked against the current request before it can be
+  redeemed. The generic JWT mechanics (`signToken`/`verifyToken`: expiry
+  enforcement, tampering, malformed input) already have direct unit tests in
+  `tests/authFlows.test.js`; the purpose-scoping itself is a simple, visible
+  strict-equality check at each call site, not something that needed a new
+  bespoke test harness to trust.
+- [x] V3 check that persistent auth tokens aren't stored in browser storage —
+  verified `apiClient.ts` uses `credentials: 'include'` everywhere and never
+  builds an `Authorization` header from stored state; the only cookie it reads
+  via JS is the intentionally-non-httpOnly CSRF cookie. `utils/authUtils.js`
+  sets the real session cookie `httpOnly: true`, so V3 code can't touch it even
+  if it tried. Read every `localStorage`/`sessionStorage.setItem(` call site in
+  `frontend-v3/src` (16 total) — the only token-shaped value stored anywhere is
+  the transient MFA challenge token covered by the item above; everything else
+  is a UI preference, a plain status string, or a dismissal flag. Turned this
+  from a one-time read into an enforced check: added
+  `tests/v3AuthTokenStorage.test.js`, which fails if any future `setItem` call
+  writes a key outside an explicit allowlist, or writes an
+  access/refresh/session/auth/jwt-token-shaped key under any name.
 - [~] Route-local error/log paths sanitized (`25df086b`)
 
 ## Phase 3 - Startup, Deployment, Migration Safety — 4.5 / 6
@@ -294,3 +320,20 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   exercises `GET /api/transactions` (191 tests across 6 files) — all passing
   unchanged — on top of the full suite: 1296/1297 passing (same pre-existing,
   unrelated failure as every prior PR).
+
+- **PR 8** (`security/verify-mfa-signup-tokens-and-storage`): Phase 2, its two
+  unstarted items. Read `routes/auth.routes.js`'s token issuance/verification
+  paths and `frontend-v3/src/lib/apiClient.ts` end to end before concluding
+  anything. Found both items were already true in production code — every
+  transient auth token is purpose-scoped and time-bounded, and the persistent
+  session credential is cookie-only (`httpOnly`, never touched by V3 JS) — but
+  neither property was enforced by a test, so either could silently regress.
+  Closed that gap with `tests/v3AuthTokenStorage.test.js`: scans every
+  `localStorage`/`sessionStorage.setItem(` call site in `frontend-v3/src`
+  against an explicit allowlist of the (non-auth-token) keys the app is
+  actually allowed to write, plus a standalone check that no call site ever
+  writes an access/refresh/session/auth/jwt-token-shaped key under any name.
+  Verified the regex actually catches a violation (not just vacuously passing)
+  with an isolated sample file before trusting it. No production code changes
+  — the underlying behavior was already correct. Full test suite: 1299/1300
+  passing (same pre-existing, unrelated failure as every prior PR).
