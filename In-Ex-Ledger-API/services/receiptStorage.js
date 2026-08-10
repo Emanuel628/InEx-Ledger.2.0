@@ -120,7 +120,10 @@ function normalizeReceiptStorageCandidate(filePath) {
     return null;
   }
 
-  const candidate = path.resolve(storageDir, path.basename(rawPath));
+  // path.basename() only treats "\" as a separator on win32; normalize it to
+  // "/" first so a Windows-style traversal string is stripped down to a bare
+  // filename on every host OS, not just Windows.
+  const candidate = path.resolve(storageDir, path.basename(rawPath.replace(/\\/g, "/")));
   const storageRoot = `${storageDir}${path.sep}`;
   if (!candidate.startsWith(storageRoot)) {
     return null;
