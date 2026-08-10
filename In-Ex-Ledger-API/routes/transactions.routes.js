@@ -59,9 +59,12 @@ const {
 } = require("../services/receiptStatusService.js");
 const { AUDIT_ACTIONS, recordAuditEventForRequest } = require("../services/auditEventService.js");
 const {
-  getTransactionPeriodBounds,
   buildTransactionListFilters,
-  buildTransactionListWhereClause
+  buildTransactionListWhereClause,
+  buildTransactionReviewSourceQuery,
+  buildFinalTransactionWhereClause,
+  buildTransactionListQuery,
+  buildTransactionSummaryQuery
 } = require("../services/transactionListQueryService.js");
 const {
   isTransactionReviewStatus,
@@ -619,189 +622,34 @@ router.get("/", async (req, res) => {
     }
 
     const { whereSql, params: filterParams } = buildTransactionListWhereClause(scope.businessIds, filters);
-    const reviewSourceResult = await pool.query(
-  `SELECT t.id,
-          t.business_id,
-          b.region AS business_region,
-          t.category_id,
-          c.name AS category_name,
-          c.tax_map_us,
-          c.tax_map_ca,
-          t.amount,
-          t.type,
-          t.note,
-          t.date,
-          t.tax_treatment,
-          t.personal_use_pct,
-          t.review_status,
-          t.payer_name,
-          t.tax_form_type,
-          COALESCE(rc.receipt_count, 0)::int AS receipt_count
-     FROM transactions t
-     JOIN businesses b ON b.id = t.business_id
-     LEFT JOIN accounts a ON a.id = t.account_id
-     LEFT JOIN categories c ON c.id = t.category_id
-     LEFT JOIN (
-       SELECT transaction_id, COUNT(*)::int AS receipt_count
-         FROM receipts
-        WHERE business_id = ANY($1::uuid[])
-        GROUP BY transaction_id
-     ) rc ON rc.transaction_id = t.id
-    WHERE ${whereSql}
-    ORDER BY t.date DESC, t.created_at DESC
-    LIMIT 50000`,
-  filterParams
-);
+    const reviewSourceQuery = buildTransactionReviewSourceQuery(whereSql, filterParams);
+    const reviewSourceResult = await pool.query(reviewSourceQuery.sql, reviewSourceQuery.params);
 
-const reviewSourceRows = reviewSourceResult.rows || [];
-const reviewSummary = buildReviewSummary(reviewSourceRows);
-const reviewFilteredRows = filters.review
-  ? reviewSourceRows.filter((row) => matchesReviewFilter(row, filters.review))
-  : reviewSourceRows;
-const reviewFilteredIds = reviewFilteredRows.map((row) => row.id);
-    
-    let finalWhereSql = whereSql;
-let finalFilterParams = [...filterParams];
+    const reviewSourceRows = reviewSourceResult.rows || [];
+    const reviewSummary = buildReviewSummary(reviewSourceRows);
+    const reviewFilteredRows = filters.review
+      ? reviewSourceRows.filter((row) => matchesReviewFilter(row, filters.review))
+      : reviewSourceRows;
+    const reviewFilteredIds = reviewFilteredRows.map((row) => row.id);
 
-if (filters.review) {
-  if (reviewFilteredIds.length === 0) {
-    finalWhereSql = `${whereSql}\n         AND false`;
-  } else {
-    finalFilterParams.push(reviewFilteredIds);
-    finalWhereSql = `${whereSql}\n         AND t.id = ANY($${finalFilterParams.length}::uuid[])`;
-  }
-}
-
-    const params = [...finalFilterParams];
-    params.push(filters.limit, filters.offset);
-    const limitParamIdx = params.length - 1;
-    const offsetParamIdx = params.length;
-
-    const now = new Date();
-    const currentMonthBounds = getTransactionPeriodBounds("this-month", now);
-    const currentYearBounds = getTransactionPeriodBounds("ytd", now);
-    const previousYearStart = new Date(Date.UTC(now.getUTCFullYear() - 1, 0, 1, 0, 0, 0, 0)).toISOString().slice(0, 10);
-    const previousYearEnd = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0)).toISOString().slice(0, 10);
-
-    const summaryParams = [
-      ...finalFilterParams,
-      currentMonthBounds.start,
-      currentMonthBounds.end,
-      currentYearBounds.start,
-      currentYearBounds.end,
-      previousYearStart,
-      previousYearEnd
-    ];
-    const summaryMonthStartParam = `$${finalFilterParams.length + 1}`;
-    const summaryMonthEndParam = `$${finalFilterParams.length + 2}`;
-    const summaryCurrentYearStartParam = `$${finalFilterParams.length + 3}`;
-    const summaryCurrentYearEndParam = `$${finalFilterParams.length + 4}`;
-    const summaryPreviousYearStartParam = `$${finalFilterParams.length + 5}`;
-    const summaryPreviousYearEndParam = `$${finalFilterParams.length + 6}`;
-
-    const result = await pool.query(
-      `SELECT t.id,
-              t.business_id,
-              b.name AS business_name,
-              t.account_id,
-              a.name AS account_name,
-              t.category_id,
-              c.name AS category_name,
-              c.kind AS category_kind,
-              c.color AS category_color,
-              t.amount,
-               b.region AS business_region,
-               c.tax_map_us,
-               c.tax_map_ca,
-               COALESCE(rc.receipt_count, 0)::int AS receipt_count,
-              t.type,
-              t.cleared,
-              t.description,
-              t.description_encrypted,
-              t.date,
-              t.note,
-              t.currency,
-              t.source_amount,
-              t.exchange_rate,
-              t.exchange_date,
-              t.converted_amount,
-              t.tax_treatment,
-              t.indirect_tax_amount,
-              t.indirect_tax_recoverable,
-              t.personal_use_pct,
-              t.review_status,
-              t.review_notes,
-              t.payer_name,
-              t.tax_form_type,
-              t.recurring_transaction_id,
-              t.recurring_occurrence_date,
-              t.is_adjustment,
-              t.original_transaction_id,
-              t.created_at,
-              t.receipt_status,
-              t.receipt_missing_reason,
-              t.business_purpose,
-              t.supporting_evidence,
-              t.receipt_status_confirmed_at,
-              t.receipt_status_confirmed_by
-       FROM transactions t
-       JOIN businesses b ON b.id = t.business_id
-       LEFT JOIN (
-      SELECT transaction_id, COUNT(*)::int AS receipt_count
-      FROM receipts
-      WHERE business_id = ANY($1::uuid[])
-      GROUP BY transaction_id
-      ) rc ON rc.transaction_id = t.id
-       ${TRANSACTION_JOIN_CLAUSE_SQL}
-       WHERE ${finalWhereSql}
-       ORDER BY t.date DESC, t.created_at DESC
-       LIMIT $${limitParamIdx} OFFSET $${offsetParamIdx}`,
-      params
+    const { whereSql: finalWhereSql, params: finalFilterParams } = buildFinalTransactionWhereClause(
+      whereSql,
+      filterParams,
+      filters.review,
+      reviewFilteredIds
     );
 
-    const summaryResult = await pool.query(
-      `SELECT COUNT(*)::int AS transaction_count,
-              COALESCE(SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END), 0)::numeric AS income_total,
-              COALESCE(SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END), 0)::numeric AS expense_total,
-              COUNT(*) FILTER (
-                WHERE t.date >= ${summaryMonthStartParam}
-                  AND t.date < ${summaryMonthEndParam}
-              )::int AS current_month_count,
-              COALESCE(SUM(CASE
-                WHEN t.type = 'income'
-                 AND t.date >= ${summaryCurrentYearStartParam}
-                 AND t.date < ${summaryCurrentYearEndParam}
-                THEN ABS(t.amount)
-                ELSE 0
-              END), 0)::numeric AS current_year_income,
-              COALESCE(SUM(CASE
-                WHEN t.type = 'expense'
-                 AND t.date >= ${summaryCurrentYearStartParam}
-                 AND t.date < ${summaryCurrentYearEndParam}
-                THEN ABS(t.amount)
-                ELSE 0
-              END), 0)::numeric AS current_year_expenses,
-              COALESCE(SUM(CASE
-                WHEN t.type = 'income'
-                 AND t.date >= ${summaryPreviousYearStartParam}
-                 AND t.date < ${summaryPreviousYearEndParam}
-                THEN ABS(t.amount)
-                ELSE 0
-              END), 0)::numeric AS previous_year_income,
-              COALESCE(SUM(CASE
-                WHEN t.type = 'expense'
-                 AND t.date >= ${summaryPreviousYearStartParam}
-                 AND t.date < ${summaryPreviousYearEndParam}
-                THEN ABS(t.amount)
-                ELSE 0
-              END), 0)::numeric AS previous_year_expenses
-         FROM transactions t
-         JOIN businesses b ON b.id = t.business_id
-         LEFT JOIN accounts a ON a.id = t.account_id
-         LEFT JOIN categories c ON c.id = t.category_id
-         WHERE ${finalWhereSql}`,
-      summaryParams
+    const listQuery = buildTransactionListQuery(
+      finalWhereSql,
+      finalFilterParams,
+      filters.limit,
+      filters.offset,
+      TRANSACTION_JOIN_CLAUSE_SQL
     );
+    const result = await pool.query(listQuery.sql, listQuery.params);
+
+    const summaryQuery = buildTransactionSummaryQuery(finalWhereSql, finalFilterParams);
+    const summaryResult = await pool.query(summaryQuery.sql, summaryQuery.params);
 
     const summaryRow = summaryResult.rows[0] || {};
     const total = filters.review
