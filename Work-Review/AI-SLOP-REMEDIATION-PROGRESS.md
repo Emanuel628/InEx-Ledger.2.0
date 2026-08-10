@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 28.5 / 54 action items (~53%)
+## Overall: 29.5 / 54 action items (~55%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -40,9 +40,26 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
     frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
     rather than silently working around it.
 
-## Phase 2 - Security Contract Cleanup — 5.0 / 7
+## Phase 2 - Security Contract Cleanup — 6.0 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
-- [~] Bearer-token acceptance removed from normal app auth paths
+- [x] Bearer-token acceptance removed from normal app auth paths — verified via
+  `git log -p` that commit `6a075ad1` (the same commit credited for the item
+  above) removed `Authorization: Bearer` parsing from both
+  `middleware/auth.middleware.js`'s `getRequestToken` and
+  `routes/consent.routes.js`'s own `resolveAuthenticatedUserId`; confirmed on
+  current `main` that neither reads `req.headers.authorization` anymore, and an
+  exhaustive repo grep for bearer/authorization header handling found only
+  outbound calls to Stripe's API (unrelated). This was two separate audit
+  findings (Pass 7 and Pass 31) satisfied by one fix, which is why the tracker
+  had it split into two checklist items with different scores. Added
+  `tests/bearerTokenRejection.test.js` so the property is enforced going
+  forward, not just true as of this read: a validly-signed token sent only as
+  a Bearer header is asserted to produce byte-identical 401 responses to no
+  auth at all, and can't rescue a request carrying an invalid cookie either.
+  Also extended `tests/v3AuthTokenStorage.test.js` with a check that no V3
+  frontend source file ever constructs an `Authorization` header, closing the
+  audit's own suggested CI check (Pass 31) for the client side of this
+  contract.
 - [~] Internal support shared-secret access hardened (commits `25026802`, `2ae677c9`)
 - [~] CSRF/origin tests for representative mutating routes (`c665b36b`)
 - [x] MFA/signup transient tokens confirmed short-lived/single-purpose — read
@@ -337,3 +354,23 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   with an isolated sample file before trusting it. No production code changes
   — the underlying behavior was already correct. Full test suite: 1299/1300
   passing (same pre-existing, unrelated failure as every prior PR).
+
+- **PR 9** (`security/verify-bearer-token-removal`): Phase 2, its last
+  half-credit item. Started from the audit's own claim (Pass 7/31) that
+  `auth.middleware.js` still accepted `Authorization: Bearer`, and checked it
+  against current `main` before assuming the finding still applied — it
+  didn't. `git log -p` showed commit `6a075ad1` had already removed bearer
+  parsing from both places the audit flagged
+  (`auth.middleware.js::getRequestToken` and
+  `consent.routes.js::resolveAuthenticatedUserId`); a repo-wide grep confirmed
+  no inbound bearer/authorization handling remains anywhere. That commit was
+  already credited for the separate "cookie-only V3 auth contract" item, which
+  is why this item had been sitting at half credit rather than zero — same fix,
+  two checklist entries. Closed the "not independently re-verified" half with
+  `tests/bearerTokenRejection.test.js` (a validly-signed Bearer-only token
+  produces byte-identical 401s to no auth at all, and can't override an invalid
+  cookie) and one more check added to `tests/v3AuthTokenStorage.test.js` (no V3
+  source file ever constructs an `Authorization` header — the audit's own
+  suggested client-side CI check for this same contract). No production code
+  changes. Full test suite: 1303/1304 passing (same pre-existing, unrelated
+  failure as every prior PR).
