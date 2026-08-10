@@ -31,14 +31,27 @@ const {
   AUDIT_ACTIONS,
   recordAuditEventForRequest
 } = require("../services/auditEventService.js");
+const {
+  BILLING_CURRENCIES,
+  BillingValidationError,
+  isEnvFlagEnabled,
+  normalizeTrialEndForCheckout,
+  normalizeBillingInterval,
+  normalizeCurrency,
+  normalizeOptionalBillingInterval,
+  normalizeOptionalCurrency,
+  normalizeAdditionalBusinesses,
+  normalizeInternalReturnPath,
+  buildCheckoutReturnPath,
+  isTrialReupgradeAttempt,
+  normalizeCountryCode,
+  resolveCurrencyForCountry
+} = require("../services/billingInputValidationService.js");
 
 const router = express.Router();
 
 const billingMutationLimiter = createBillingMutationLimiter();
 
-const BILLING_INTERVALS = new Set(["monthly", "yearly"]);
-const BILLING_CURRENCIES = new Set(["usd", "cad"]);
-const MAX_ADDITIONAL_BUSINESSES = 100;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
 const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
@@ -49,13 +62,6 @@ const {
 } = buildStripePriceLookup();
 let resendClient = null;
 const portalConfigurationCache = new Map();
-
-class BillingValidationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "BillingValidationError";
-  }
-}
 
 function getResend() {
   if (!resendClient) {
@@ -82,19 +88,6 @@ const webhookLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: () => "stripe-webhook"
 });
-
-function isEnvFlagEnabled(name, defaultValue = false) {
-  const raw = String(process.env[name] ?? "").trim().toLowerCase();
-  if (!raw) return defaultValue;
-  return !["0", "false", "no", "off"].includes(raw);
-}
-
-function normalizeTrialEndForCheckout(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  date.setHours(23, 59, 59, 999);
-  return Math.floor(date.getTime() / 1000);
-}
 
 // Stripe can retry failed deliveries for up to 72 h; keep IDs for 7 days so a
 // late retry is never treated as a new event.
@@ -157,118 +150,8 @@ function getConfiguredPriceId(envName, unavailableMessage) {
   }
 }
 
-function normalizeBillingInterval(input) {
-  if (!input) {
-    return "monthly";
-  }
-  const value = String(input).toLowerCase();
-  if (!BILLING_INTERVALS.has(value)) {
-    throw new BillingValidationError("Invalid billing interval.");
-  }
-  return value;
-}
-
-function normalizeCurrency(input) {
-  if (!input) {
-    return "usd";
-  }
-  const value = String(input).toLowerCase();
-  if (!BILLING_CURRENCIES.has(value)) {
-    throw new BillingValidationError("Invalid currency.");
-  }
-  return value;
-}
-
-function normalizeOptionalBillingInterval(input) {
-  if (!input) {
-    return null;
-  }
-  try {
-    return normalizeBillingInterval(input);
-  } catch (_) {
-    return null;
-  }
-}
-
-function normalizeOptionalCurrency(input) {
-  if (!input) {
-    return null;
-  }
-  try {
-    return normalizeCurrency(input);
-  } catch (_) {
-    return null;
-  }
-}
-
-function normalizeAdditionalBusinesses(input) {
-  if (input === undefined || input === null || input === "") {
-    return 0;
-  }
-  const value = Number(input);
-  if (!Number.isSafeInteger(value)) {
-    throw new BillingValidationError("Additional businesses must be a whole number.");
-  }
-  if (value < 0 || value > MAX_ADDITIONAL_BUSINESSES) {
-    throw new BillingValidationError(
-      `Additional businesses must be between 0 and ${MAX_ADDITIONAL_BUSINESSES}.`
-    );
-  }
-  return value;
-}
-
-function normalizeInternalReturnPath(value, fallback = "/subscription") {
-  const next = String(value || "").trim();
-  if (!next.startsWith("/") || next.startsWith("//") || /[\r\n]/.test(next)) {
-    return fallback;
-  }
-  return next;
-}
-
-function buildCheckoutReturnPath(returnPath, checkoutState) {
-  const normalizedPath = normalizeInternalReturnPath(returnPath, "/subscription");
-  const parsed = new URL(normalizedPath, "https://app.inexledger.local");
-  parsed.searchParams.set("checkout", checkoutState);
-  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-}
-
-function isTrialReupgradeAttempt(subscription) {
-  return Boolean(
-    subscription?.isTrialing &&
-    (
-      subscription.cancelAtPeriodEnd ||
-      subscription.isTrialDowngradedToFree ||
-      subscription.selectedPlanCode !== "v1" ||
-      subscription.trialPlanSelection === "free"
-    )
-  );
-}
-
 function getVerifiedClientIp(req) {
   return normalizeIpAddress(req?.ip || req?.socket?.remoteAddress || "");
-}
-
-function normalizeCountryCode(country) {
-  const value = String(country || "").trim().toLowerCase();
-  if (!value) {
-    return null;
-  }
-  if (value === "ca" || value === "canada") {
-    return "ca";
-  }
-  if (
-    value === "us" ||
-    value === "usa" ||
-    value === "united states" ||
-    value === "united states of america"
-  ) {
-    return "us";
-  }
-  return null;
-}
-
-function resolveCurrencyForCountry(countryCode) {
-  return countryCode === "ca" ? "cad" : "usd";
 }
 
 // The business's own configured region (set once at onboarding and rarely
