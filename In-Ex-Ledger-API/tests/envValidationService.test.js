@@ -23,6 +23,11 @@ const PRODUCTION_ENV_FIXTURE = {
   EXPORT_GRANT_SECRET: "test-export-grant-secret",
   RECEIPT_STORAGE_DIR: "storage/receipts",
   INEX_LEDGER_SUPPORT_SECRET: "support-secret-test",
+  REDIS_URL: "redis://localhost:6379",
+  PDF_WORKER_URL: "https://pdf-worker.example.com",
+  PDF_WORKER_SECRET: "pdf-worker-secret-test",
+  EXPORT_PUBLIC_KEY_JWK: "{\"kty\":\"RSA\"}",
+  EXPORT_PRIVATE_KEY_JWK: "{\"kty\":\"RSA\"}",
   STRIPE_PRO_M_US: "price_pro_m_us",
   STRIPE_PRO_Y_US: "price_pro_y_us",
   STRIPE_PRO_M_CA: "price_pro_m_ca",
@@ -76,7 +81,12 @@ test("collectRequiredEnvironmentVariables('production') includes core production
     "STRIPE_WEBHOOK_SECRET",
     "EXPORT_GRANT_SECRET",
     "RECEIPT_STORAGE_DIR",
-    "INEX_LEDGER_SUPPORT_SECRET"
+    "INEX_LEDGER_SUPPORT_SECRET",
+    "REDIS_URL",
+    "PDF_WORKER_URL",
+    "PDF_WORKER_SECRET",
+    "EXPORT_PUBLIC_KEY_JWK",
+    "EXPORT_PRIVATE_KEY_JWK"
   ];
   for (const name of expected) {
     assert.ok(
@@ -142,6 +152,25 @@ test("validateEnvironmentOrThrow('production') requires the mounted internal sup
       }
     );
   });
+});
+
+test("validateEnvironmentOrThrow('production') requires Redis, the PDF worker, and the export encryption keys", () => {
+  for (const name of ["REDIS_URL", "PDF_WORKER_URL", "PDF_WORKER_SECRET", "EXPORT_PUBLIC_KEY_JWK", "EXPORT_PRIVATE_KEY_JWK"]) {
+    const incomplete = { ...PRODUCTION_ENV_FIXTURE };
+    delete incomplete[name];
+
+    withSyntheticEnv(incomplete, () => {
+      assert.throws(
+        () => validateEnvironmentOrThrow("production"),
+        (err) => {
+          assert.equal(err.code, "ENV_VALIDATION_FAILED");
+          assert.ok(err.missing.includes(name), `Expected ${name} to appear in the missing list`);
+          return true;
+        },
+        `Removing ${name} should have failed production validation`
+      );
+    });
+  }
 });
 
 test("validateEnvironmentOrThrow('production') throws when any Stripe price env is missing", () => {
