@@ -289,6 +289,32 @@ function first rather than trusting my own arithmetic. Route file:
 2,634 → 2,551 lines. Full auth-adjacent test suite (218 tests across 10
 files) passes unchanged.
 
+**Third pass, same reasoning, more caution given real financial risk**:
+`routes/billing.routes.js` (1,981 lines) is Stripe/payment code — a wrong
+extraction here has a different consequence class than a wrong extraction in
+static-asset cleanup or even auth (money moving incorrectly, not just a bug).
+Read all 60 of its top-level functions before choosing anything, and scoped
+this pass narrower than the auth one on purpose: only the input
+normalization/validation group, not the Stripe-object-shape functions
+(`parseStripeUnitAmount`, `getStripeProductIdFromPrice`,
+`assertStripePriceMatchesBillingInterval`, etc.) which need their exact
+Stripe API assumptions verified more carefully first, and not
+`verifyWebhookSignature` (calls the Stripe SDK's signature verification
+directly — core security surface, stays put). Extracted 12 pure functions
+plus the `BillingValidationError` class they throw (billing interval/currency
+normalization and validation, additional-business-count bounds checking,
+internal-return-path sanitization against protocol-relative/CRLF injection,
+checkout-return-path building, trial-reupgrade detection, US/Canada country
+and currency resolution) into `services/billingInputValidationService.js`,
+with 11 new direct unit tests — none of these had any direct test coverage
+before, only indirect coverage through 7 HTTP-level billing test files.
+`BillingValidationError` moved with its throwers since it's the connective
+tissue between them and the route-level `catch` blocks that check
+`err instanceof BillingValidationError`; the route file imports it back for
+those. Route file: 1,981 → 1,864 lines. Full billing-adjacent HTTP suite (169
+tests across 7 files, including the real Stripe checkout/webhook/portal
+flows) passes unchanged.
+
 ## Phase 8 - V3 React Cleanup — 0.5 / 7
 - [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
 - [ ] Large controller pages split by workflow
@@ -624,3 +650,31 @@ files) passes unchanged.
   10 files, all real HTTP-level flows) passes unchanged. Full suite:
   1317/1318 passing (same pre-existing, unrelated failure as every prior PR).
   Not counted toward Phase 7's score, same reasoning as PR 13.
+
+- **PR 15** (`refactor/extract-billing-input-normalization`): same path,
+  `routes/billing.routes.js` (1,981 lines). This one is Stripe/payment code,
+  a different risk class than the last two — a wrong extraction here means
+  money moving incorrectly, not just a bug. Read all 60 top-level functions
+  before choosing anything, and scoped deliberately narrower than the auth
+  pass: only pure input normalization/validation
+  (`normalizeBillingInterval`, `normalizeCurrency`, their optional variants,
+  `normalizeAdditionalBusinesses`, `normalizeInternalReturnPath`,
+  `buildCheckoutReturnPath`, `isTrialReupgradeAttempt`, `normalizeCountryCode`,
+  `resolveCurrencyForCountry`, `isEnvFlagEnabled`,
+  `normalizeTrialEndForCheckout`) plus the `BillingValidationError` class they
+  throw. Left the Stripe-object-shape functions
+  (`parseStripeUnitAmount`, `getStripeProductIdFromPrice`,
+  `assertStripePriceMatchesBillingInterval`, and similar) and
+  `verifyWebhookSignature` untouched — those need their exact Stripe API
+  assumptions verified more carefully before moving, a follow-up rather than
+  bundled into this pass. 12 functions + 1 error class extracted into
+  `services/billingInputValidationService.js`, with 11 new direct unit tests
+  (all passed on the first run, unlike the auth PR's two self-caught bugs).
+  `BillingValidationError` moved with its throwers since the route file's own
+  `catch` blocks check `err instanceof BillingValidationError` — imported back
+  for that. Route file: 1,981 → 1,864 lines. Full billing-adjacent HTTP suite
+  (169 tests across 7 files: addon management, currency resolution, mock
+  routes, subscription recovery, webhooks, critical flows, CSRF) passes
+  unchanged. Full suite: 1328/1329 passing (same pre-existing, unrelated
+  failure as every prior PR). Not counted toward Phase 7's score, same
+  reasoning as PR 13/14.
