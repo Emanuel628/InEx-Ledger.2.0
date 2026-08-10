@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 23.0 / 54 action items (~43%)
+## Overall: 24.0 / 54 action items (~44%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -94,7 +94,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [ ] Direct URL behavior explicit for `/app`, V3 routes, blocked legacy routes, static
   assets
 
-## Phase 7 - Route And Service Decomposition — 2.0 / 4
+## Phase 7 - Route And Service Decomposition — 3.0 / 4
 - [x] Consolidated the repeated account/category join SQL in `transactions.routes.js`
   (was duplicated across 7 call sites: GET list, GET single, POST, PUT, and the
   `cleared`/`review-status`/`receipt-status` PATCH routes) into one shared fragment.
@@ -110,13 +110,15 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   the review-summary orchestration (the three-query dance — review-source query, review
   filtering, building the final `WHERE` clause with the review-filtered ID list — still
   lives inline in the `GET /` handler) is not yet extracted.
-- [ ] Codify dynamic-SQL rules (values as params, identifiers from constants only, no
-  request-derived text interpolated) — the new service module follows this discipline
-  already (demonstrated, not yet written down as an enforced repo-wide rule)
-- [~] SQL-shape/parameter tests — added for transaction list filters/where-clause
-  (covers the "review date filters" part of this item); mileage date-column mode,
-  tax-region columns, and usage-limit thresholds (different files) are still untested
-  at this level
+- [x] Codify dynamic-SQL rules (values as params, identifiers from constants only, no
+  request-derived text interpolated) — written down in `Docs/DYNAMIC_SQL_RULES.md`,
+  citing the existing modules that already follow it.
+- [~] SQL-shape/parameter tests — added for transaction list filters/where-clause and
+  now for mileage's `date`/`trip_date` column-mode selection (`mileageQueryService.js`,
+  9 tests: coalesce/trip_date-only/date-only column choice, insert SQL column list and
+  positional-param shift under each mode, insert values array under each mode). Tax
+  region column selection (`taxSummaryService.js`) and usage-limit thresholds
+  (`usageLimitEmailService.js`) are still untested at this level.
 
 ## Phase 8 - V3 React Cleanup — 0.5 / 7
 - [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
@@ -196,12 +198,27 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   than one introduced by this PR sequence. Full test suite: 1278/1279 passing (same
   pre-existing, unrelated failure).
 
-- **PR 4** (`chore/extract-mileage-query-service`, open as of this PR): Phase 7,
-  its remaining two items. Extracted `mileage.routes.js`'s dynamic `date`/`trip_date`
-  column-mode SQL builders into `services/mileageQueryService.js` (same pattern as
-  PR 2), added `Docs/DYNAMIC_SQL_RULES.md`, and added 9 direct unit tests. See that
-  PR's own description for detail; not folded into this file's Phase 7 section yet
-  since it hasn't merged.
+- **PR 4** (`chore/extract-mileage-query-service`): Phase 7, remaining two items.
+  Extracted `mileage.routes.js`'s dynamic date-column SQL builders
+  (`mileageDateSelect`/`mileageDateOrderBy`/`buildMileageInsertSql`/
+  `buildMileageInsertValues`) into a new `services/mileageQueryService.js`, same
+  pattern as PR 2. Two small changes made in the move (not pure copy, both verified
+  behavior-preserving by the new tests): `mileageDateSelect` and `mileageDateOrderBy`
+  had byte-identical bodies, so they're collapsed into one `mileageDateColumn`
+  function used at all 5 former call sites; `buildMileageInsertValues` previously
+  called `crypto.randomUUID()` internally (a side effect inside an otherwise-pure
+  function), so it now takes the id as a parameter and the route generates it,
+  matching the module's own "side-effect-free" design goal. Added 9 direct unit
+  tests covering all three column-mode combinations (date-only, trip_date-only,
+  both). Also added `Docs/DYNAMIC_SQL_RULES.md`, a short policy note (values as
+  params, identifiers from constants/closed maps only, structural fragments from
+  closed enums, never request-derived text in a SQL template) citing the modules
+  that already follow it, closing the "codify dynamic-SQL rules" item. Tax-region
+  column selection and usage-limit threshold SQL are still untested at this level —
+  left for a follow-up rather than growing this PR further. Full test suite (glob
+  run across `tests/*.test.js`, matching `test:all`'s `--test-concurrency=1`):
+  1287/1288 passing, same pre-existing, unrelated Windows-path-traversal failure as
+  every prior PR in this sequence.
 
 - **PR 5** (`chore/archive-legacy-frontend-guardrails`): Phase 6, its first item.
   Before writing anything, checked what actually serves `legacy/public-html` —
