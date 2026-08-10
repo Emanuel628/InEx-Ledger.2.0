@@ -243,6 +243,23 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   region column selection (`taxSummaryService.js`) and usage-limit thresholds
   (`usageLimitEmailService.js`) are still untested at this level.
 
+**Beyond the four original items** (not counted in this phase's score — real
+work, but not one of the audit-derived checklist items, so it's logged here
+rather than inflating the denominator): extracted `transactions.routes.js`'s
+CSV-import parsing/detection helpers (`parseCsv`, `normalizeDate`,
+`detectColumns`, `derivePseudoMerchant`, `collectCsvTextFields`,
+`extractRowData`, `parseImportDateRange`, `isPlannedCsvDuplicate`,
+`countImportableCsvRows`) into `services/transactionCsvImportService.js`.
+These functions previously only existed inside the route file and were reached
+by two separate test files through a `module.exports.__private = {...}`
+escape hatch — a testing-shaped wart that existed purely to let tests see
+inside an unexported implementation detail. Moving them to a real module
+eliminates that hack for these 7 functions (3 category-resolution functions
+that are genuinely shared across POST/PUT/CSV-import stay in the route file
+and keep their narrower `__private` export, since bundling them in would have
+been a different, broader-scoped extraction than this one). Route file:
+2,450 → 2,108 lines. Test files updated to import from the service directly.
+
 ## Phase 8 - V3 React Cleanup — 0.5 / 7
 - [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
 - [ ] Large controller pages split by workflow
@@ -512,3 +529,32 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   with PR 11: 15 files, 4,293 lines of confirmed-dead legacy static assets
   removed across this pair. The remaining 43 `public/js` and 26
   `public/css/pages` files stay open for the larger archive/delete call.
+
+- **PR 13** (`refactor/extract-csv-import-parsing`): continuing the same real
+  simplification path, this time on `transactions.routes.js` itself rather
+  than the static-asset surface. The CSV import endpoint's helper functions
+  (`parseCsv`, `normalizeDate`, `detectColumns`, `derivePseudoMerchant`,
+  `collectCsvTextFields`, `extractRowData`, `parseImportDateRange`,
+  `isPlannedCsvDuplicate`, `countImportableCsvRows`) had been sitting unexported
+  in the route file, reachable by two test files only through a
+  `module.exports.__private = {...}` escape hatch — itself a small AI-slop
+  tell, since it exists purely to let tests peek inside code that should have
+  had its own module boundary from the start. Extracted all 9 into
+  `services/transactionCsvImportService.js`, moved verbatim (same logic, same
+  branches, only the DB-access functions' default injected dependencies
+  changed source location). Left `getCategoryCacheEntryId`,
+  `ensureCategoryTemplateFields`, and `resolveCategoryId` in the route file —
+  confirmed via grep they're called from POST and PUT as well as CSV import,
+  so bundling them into a CSV-specific service would have been a wrong,
+  broader-scoped move; they keep their own narrower `__private` export.
+  Updated `tests/transactionCsvImportHelpers.test.js` and
+  `tests/transactionsCsvImportLimit.test.js` to import directly from the new
+  service instead of reaching through `__private`. Route file: 2,450 → 2,108
+  lines (342 lines removed). Full CSV-import test coverage (26 tests across
+  the 4 files that touch this endpoint, including the real HTTP-level route
+  test) passes unchanged. Full suite: 1305/1306 passing (same pre-existing,
+  unrelated failure as every prior PR) — zero regressions. Not counted toward
+  Phase 7's score (see the phase's own note) since it goes beyond the four
+  audit-derived checklist items, but it's real: another ~340 lines off the
+  file the audit called "too complex for a route file," with no new
+  scope-inflation to the tracker's denominator.
