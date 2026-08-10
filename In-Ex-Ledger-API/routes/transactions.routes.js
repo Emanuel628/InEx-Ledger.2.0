@@ -58,6 +58,7 @@ const {
   ReceiptStatusValidationError
 } = require("../services/receiptStatusService.js");
 const { AUDIT_ACTIONS, recordAuditEventForRequest } = require("../services/auditEventService.js");
+const { buildRouteErrorContext } = require("../utils/routeErrorContext.js");
 const {
   buildTransactionListFilters,
   buildTransactionListWhereClause,
@@ -691,15 +692,16 @@ router.get("/", async (req, res) => {
       }
     });
   } catch (err) {
-    logError("GET /transactions error:", err);
+    logError("GET /transactions error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load transactions." });
   }
 });
 
 router.post("/", async (req, res) => {
   let client = null;
+  let businessId = null;
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    businessId = await resolveBusinessIdForUser(req.user);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
@@ -805,7 +807,7 @@ router.post("/", async (req, res) => {
     res.status(201).json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     if (client) await client.query("ROLLBACK").catch(() => {});
-    logError("POST /transactions error:", err);
+    logError("POST /transactions error", buildRouteErrorContext(req, err, { businessId }));
     return handleTransactionMutationError(res, err, "Failed to save transaction.");
   } finally {
     if (client) client.release();
@@ -836,7 +838,7 @@ router.get("/mapping-rules", async (req, res) => {
     );
     res.json({ rules: result.rows });
   } catch (err) {
-    logError("GET /transactions/mapping-rules error:", err);
+    logError("GET /transactions/mapping-rules error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load mapping rules." });
   }
 });
@@ -875,7 +877,7 @@ router.get("/:id", async (req, res, next) => {
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
-    logError("GET /transactions/:id error:", err);
+    logError("GET /transactions/:id error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load transaction." });
   }
 });
@@ -898,7 +900,7 @@ router.delete("/mapping-rules/:ruleId", async (req, res) => {
     }
     res.json({ deleted: true, id: req.params.ruleId });
   } catch (err) {
-    logError("DELETE /transactions/mapping-rules/:ruleId error:", err);
+    logError("DELETE /transactions/mapping-rules/:ruleId error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to delete mapping rule." });
   }
 });
@@ -907,8 +909,9 @@ router.put("/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid transaction ID." });
   }
+  let businessId = null;
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    businessId = await resolveBusinessIdForUser(req.user);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
@@ -1053,7 +1056,7 @@ router.put("/:id", async (req, res) => {
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
-    logError("PUT /transactions/:id error:", err);
+    logError("PUT /transactions/:id error", buildRouteErrorContext(req, err, { businessId }));
     return handleTransactionMutationError(res, err, "Failed to update transaction.");
   }
 });
@@ -1136,7 +1139,7 @@ router.delete("/bulk-delete-all", async (req, res) => {
     }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
     res.json({ message: `Deleted ${result.rowCount} transaction(s).`, count: result.rowCount });
   } catch (err) {
-    logError("DELETE /transactions/bulk-delete-all error:", err);
+    logError("DELETE /transactions/bulk-delete-all error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to delete transactions." });
   }
 });
@@ -1145,8 +1148,9 @@ router.delete("/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid transaction ID." });
   }
+  let businessId = null;
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    businessId = await resolveBusinessIdForUser(req.user);
     const existing = await pool.query(
       "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL AND (is_adjustment = false OR is_adjustment IS NULL) AND (is_void = false OR is_void IS NULL) LIMIT 1",
       [req.params.id, businessId]
@@ -1175,14 +1179,15 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ message: "Transaction deleted." });
   } catch (err) {
-    logError("DELETE /transactions/:id error:", err);
+    logError("DELETE /transactions/:id error", buildRouteErrorContext(req, err, { businessId }));
     return handleTransactionMutationError(res, err, "Failed to delete transaction.");
   }
 });
 
 router.post("/undo-delete", async (req, res) => {
+  let businessId = null;
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    businessId = await resolveBusinessIdForUser(req.user);
     const candidate = await pool.query(
       `SELECT id, date
          FROM transactions
@@ -1230,7 +1235,7 @@ router.post("/undo-delete", async (req, res) => {
       reason: "Transactions changed after export."
     }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
   } catch (err) {
-    logError("POST /transactions/undo-delete error:", err);
+    logError("POST /transactions/undo-delete error", buildRouteErrorContext(req, err, { businessId }));
     return handleTransactionMutationError(res, err, "Failed to restore transaction.");
   }
 });
@@ -1249,7 +1254,7 @@ router.get("/undo-delete-status", async (req, res) => {
       undo_stack_limit: TRANSACTION_UNDO_STACK_LIMIT
     });
   } catch (err) {
-    logError("GET /transactions/undo-delete-status error:", err);
+    logError("GET /transactions/undo-delete-status error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load undo status." });
   }
 });
@@ -1329,7 +1334,7 @@ router.get("/exchange-rate-reference", async (req, res) => {
       logWarn("GET /transactions/exchange-rate-reference timed out", err);
       return res.status(504).json({ error: "Reference exchange rate lookup timed out." });
     }
-    logError("GET /transactions/exchange-rate-reference error:", err);
+    logError("GET /transactions/exchange-rate-reference error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load the reference exchange rate." });
   }
 });
@@ -1343,8 +1348,9 @@ router.patch("/:id/review-status", async (req, res) => {
     return res.status(400).json({ error: `review_status must be one of ${transactionReviewStatusList()}` });
   }
 
+  let businessId = null;
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    businessId = await resolveBusinessIdForUser(req.user);
     const existing = await pool.query(
       `SELECT id, date
          FROM transactions
@@ -1384,7 +1390,7 @@ router.patch("/:id/review-status", async (req, res) => {
     }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
-    logError("PATCH /transactions/:id/review-status error:", err);
+    logError("PATCH /transactions/:id/review-status error", buildRouteErrorContext(req, err, { businessId }));
     return handleTransactionMutationError(res, err, "Failed to update review status.");
   }
 });
@@ -1397,8 +1403,9 @@ router.patch("/:id/cleared", async (req, res) => {
     return res.status(400).json({ error: "cleared must be true or false" });
   }
 
+  let businessId = null;
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    businessId = await resolveBusinessIdForUser(req.user);
     const existing = await pool.query(
       "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
       [req.params.id, businessId]
@@ -1437,7 +1444,7 @@ router.patch("/:id/cleared", async (req, res) => {
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
-    logError("PATCH /transactions/:id/cleared error:", err);
+    logError("PATCH /transactions/:id/cleared error", buildRouteErrorContext(req, err, { businessId }));
     return handleTransactionMutationError(res, err, "Failed to update cleared status.");
   }
 });
@@ -1550,7 +1557,7 @@ router.patch("/:id/receipt-status", async (req, res) => {
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
-    logError("PATCH /transactions/:id/receipt-status error:", err);
+    logError("PATCH /transactions/:id/receipt-status error", buildRouteErrorContext(req, err));
     return handleTransactionMutationError(res, err, "Failed to update receipt status.");
   }
 });
@@ -1944,7 +1951,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         ]
       });
     }
-    logError("POST /transactions/import/csv error:", err);
+    logError("POST /transactions/import/csv error", buildRouteErrorContext(req, err, { businessId }));
     res.status(500).json({ error: "CSV import failed." });
   } finally {
     if (client) client.release();
@@ -1960,7 +1967,7 @@ router.get("/import/history", async (req, res) => {
     const batches = await listImportBatches(pool, businessId, { limit: req.query.limit });
     res.json({ batches });
   } catch (err) {
-    logError("GET /transactions/import/history error:", err);
+    logError("GET /transactions/import/history error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load import history." });
   }
 });
@@ -2001,7 +2008,7 @@ router.post("/import/:id/revert", async (req, res) => {
     if (err && err.code === "accounting_period_locked") {
       return res.status(409).json({ error: err.message, code: err.code });
     }
-    logError("POST /transactions/import/:id/revert error:", err);
+    logError("POST /transactions/import/:id/revert error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to revert import batch." });
   }
 });
@@ -2025,7 +2032,7 @@ router.get("/tax-summary/payers", async (req, res) => {
     const summary = await getPayerSummaryForYear(pool, { businessId, year, region, fiscalYearStart });
     res.json(summary);
   } catch (err) {
-    logError("GET /transactions/tax-summary/payers error:", err);
+    logError("GET /transactions/tax-summary/payers error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load payer summary." });
   }
 });
@@ -2047,7 +2054,7 @@ router.get("/tax-summary/tax-lines", async (req, res) => {
     });
     res.json(summary);
   } catch (err) {
-    logError("GET /transactions/tax-summary/tax-lines error:", err);
+    logError("GET /transactions/tax-summary/tax-lines error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load tax-line summary." });
   }
 });
@@ -2067,7 +2074,7 @@ router.get("/tax-summary/quarterly", async (req, res) => {
     const reminders = getQuarterlyReminders(region);
     res.json(reminders);
   } catch (err) {
-    logError("GET /transactions/tax-summary/quarterly error:", err);
+    logError("GET /transactions/tax-summary/quarterly error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load quarterly tax reminders." });
   }
 });
@@ -2097,7 +2104,7 @@ router.get("/tax-summary/dashboard", async (req, res) => {
     });
     res.json(dashboard);
   } catch (err) {
-    logError("GET /transactions/tax-summary/dashboard error:", err);
+    logError("GET /transactions/tax-summary/dashboard error", buildRouteErrorContext(req, err));
     res.status(500).json({ error: "Failed to load tax dashboard." });
   }
 });
