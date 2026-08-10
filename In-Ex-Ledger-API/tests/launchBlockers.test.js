@@ -227,7 +227,34 @@ function loadTransactionsRouter(options = {}) {
                     review_status: params[0],
                     date: "2026-05-01",
                     description: "Client A",
-                    description_encrypted: null
+                    description_encrypted: null,
+                    account_name: "Checking",
+                    category_name: "Income",
+                    category_kind: "income",
+                    category_color: "emerald",
+                    tax_map_us: "other_income",
+                    tax_map_ca: null
+                  }
+                ]
+              };
+            }
+            if (/UPDATE transactions\s+SET cleared = \$1/i.test(sql)) {
+              return {
+                rowCount: 1,
+                rows: [
+                  {
+                    id: TEST_TRANSACTION_ID,
+                    business_id: TEST_BUSINESS_ID,
+                    cleared: params[0],
+                    date: "2026-05-01",
+                    description: "Client A",
+                    description_encrypted: null,
+                    account_name: "Checking",
+                    category_name: "Income",
+                    category_kind: "income",
+                    category_color: "emerald",
+                    tax_map_us: "other_income",
+                    tax_map_ca: null
                   }
                 ]
               };
@@ -535,6 +562,49 @@ test("transactions PUT returns the updated category name/kind/color and tax maps
     assert.equal(response.body.account_name, "Checking");
     assert.equal(response.body.tax_map_us, "other_income");
     assert.equal(response.body.tax_map_ca, null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("transactions PATCH /:id/cleared returns the category name/kind/color and tax maps immediately, without requiring a refresh", async () => {
+  const fixture = loadTransactionsRouter();
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .patch(`/api/transactions/${TEST_TRANSACTION_ID}/cleared`)
+      .send({ cleared: true });
+
+    assert.equal(response.status, 200);
+    // Same bug class as the POST/PUT fix above: this route used a bare
+    // `RETURNING *` with no account/category join, so marking a transaction
+    // cleared from the UI showed "Uncategorized" until the next refresh.
+    assert.equal(response.body.category_name, "Income");
+    assert.equal(response.body.category_kind, "income");
+    assert.equal(response.body.category_color, "emerald");
+    assert.equal(response.body.account_name, "Checking");
+    assert.equal(response.body.tax_map_us, "other_income");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("transactions PATCH /:id/review-status returns the category name/kind/color and tax maps immediately, without requiring a refresh", async () => {
+  const fixture = loadTransactionsRouter();
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .patch(`/api/transactions/${TEST_TRANSACTION_ID}/review-status`)
+      .send({ review_status: "ready" });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.category_name, "Income");
+    assert.equal(response.body.category_kind, "income");
+    assert.equal(response.body.category_color, "emerald");
+    assert.equal(response.body.account_name, "Checking");
+    assert.equal(response.body.tax_map_us, "other_income");
   } finally {
     fixture.cleanup();
   }
