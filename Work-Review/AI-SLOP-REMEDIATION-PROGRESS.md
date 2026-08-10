@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 29.5 / 54 action items (~55%)
+## Overall: 30.0 / 54 action items (~56%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -136,7 +136,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [ ] Account type/currency assumptions reviewed for closed-set constraints
 - [~] Migration tests for new invariants (`c44d08b1` guards destructive migrations)
 
-## Phase 6 - Product Truth And Legacy/Static Cleanup — 3.0 / 5
+## Phase 6 - Product Truth And Legacy/Static Cleanup — 3.5 / 5
 - [x] Archived legacy frontend confirmed reference-only, not runtime-reachable —
   independently verified: `server.js` only mounts `publicDir` (`public/`) and
   `htmlDir` (`public/html`) as static roots; `legacy/public-html` is a sibling
@@ -147,8 +147,31 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   verify a legacy file that isn't served and a `public/html/settings.html` file
   that doesn't exist at all (retired, 301-redirects to `/settings`) — replaced
   with a check against the actual served V3 bundle and static SEO pages.
-- [ ] Inventory of active `public/js`/static HTML paths still directly serveable
-  (73 tracked files as of this pass)
+- [~] Inventory of active `public/js`/static HTML paths still directly serveable
+  (73 tracked files as of this pass) — built the actual classification the
+  audit asked for instead of another verify-only pass. Confirmed via
+  `grep` that zero of the 49 `public/js` files are `<script src>`-referenced
+  by any currently-active `public/html` page. Rather than trusting a naive
+  "not mentioned by filename" check (these are pre-module browser-global
+  scripts with real hidden coupling — confirmed the hard way when a first-pass
+  heuristic wrongly flagged `escape-html.js` and `global.js` as orphaned when
+  they're actually depended on by several still-referenced files), extracted
+  the real historical `<script>` co-load graph from the archived
+  `legacy/public-html/**/*.html` pages (the only reliable source of truth for
+  which files were ever meant to load together) and cross-referenced it
+  against what tests still load directly. 43 of the 49 files are either
+  loaded by a test or appear in that co-load graph and are therefore still
+  entangled with other files; the remaining 6 —
+  `dashboard.js`, `filters.js`, `review.js` (961 lines — its own review-queue
+  UI, fully superseded by the `review.html` meta-refresh stub that now points
+  to V3's Exports page), `settings-mobile-redirect.js`, `tax-widget.js`,
+  `theme-boot.js` — appear in **zero** archived page's script list, are loaded
+  by no test, and (verified by checking every identifier each one defines)
+  are called by no other file in the directory. Deleted those 6. Half credit:
+  this is real, verified deletion, not the full inventory — the other 43
+  files and the 36 files in `public/css/pages` are still open, and deciding
+  their fate (archive vs. delete vs. keep as historical CSS parity reference)
+  is a bigger, more careful pass than fits in one PR.
 - [ ] Old auth scripts / V2 placeholders quarantined or removed
 - [x] V3 canonical routing tests kept current — already enforced by
   `tests/routeInventory.test.js`, which fails if any `V3_APP_PAGES` entry in
@@ -413,3 +436,35 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   make inside a remediation PR, so the item stays at half credit with that gap
   explicitly documented rather than silently claimed done. Full test suite:
   1305/1306 passing (same pre-existing, unrelated failure as every prior PR).
+
+- **PR 11** (`chore/remove-orphaned-legacy-page-scripts`): Phase 6, a genuine
+  first slice of the `public/js` inventory item, prompted directly by user
+  feedback that the last several PRs kept adding tests instead of removing
+  the AI-slop/legacy code this whole effort is supposed to be cutting down.
+  That feedback was accurate — PRs 6, 8, and 9 touched zero production code,
+  and this PR corrects course with an actual deletion, done carefully rather
+  than rushed: confirmed via `grep` that none of the 49 `public/js` files are
+  reachable from any active `public/html` page, then built the real
+  dependency graph before deleting anything, because these are pre-module
+  browser-global scripts with real hidden coupling (a first-pass identifier
+  heuristic wrongly flagged `escape-html.js` and `global.js` — both are
+  quietly depended on by several still-live files — which is exactly the
+  mistake a rushed pass here would make). Used the archived
+  `legacy/public-html/**/*.html` pages' own `<script>` tag lists as the
+  reliable source of the real historical co-load graph, cross-referenced
+  against what tests still load directly. Of 49 files, 43 are entangled with
+  something else and stay untouched. The other 6 — `dashboard.js`,
+  `filters.js`, `review.js` (961 lines of a review-queue UI now fully
+  superseded by the `review.html` meta-refresh stub that points at V3's
+  Exports page), `settings-mobile-redirect.js`, `tax-widget.js`,
+  `theme-boot.js` — appear in zero archived page's script list, are loaded by
+  no test, and define no identifier called anywhere else in the directory.
+  Deleted all 6 (1,141 total lines removed) and fixed a stale comment in
+  `public/css/core/dark-mode.css` that referenced the now-deleted
+  `theme-boot.js` by name. No new tests added — this PR is net negative on
+  line count. Full test suite: 1305/1306 passing, identical pass/fail count to
+  before the deletion (same pre-existing, unrelated failure as every prior
+  PR), confirming zero regressions. The other 43 `public/js` files and the 36
+  files in `public/css/pages` remain open — deciding their fate (archive vs.
+  delete vs. keep for historical CSS parity) is a bigger, more careful pass
+  than fits in one PR.
