@@ -1,19 +1,15 @@
 "use strict";
 
-// Pure query-building helpers for GET /api/transactions, split out of
-// routes/transactions.routes.js (Phase 7 of the audit remediation:
-// Work-Review/AI-SLOP-REMEDIATION-PROGRESS.md). No behavior change from the
-// route-local versions these replace -- moved verbatim so the route file
-// reads as request handling + response shaping, not query-builder logic.
+// Pure query-building helpers for GET /api/transactions: turning request
+// query params into a validated filter set and the resulting SQL WHERE
+// clause. Kept side-effect-free (no db access) so they're directly testable
+// without a database or mocked pool.
 
 const { isTransactionReviewStatus } = require("../config/transactionReviewStatus.js");
 const { normalizeReviewFilter } = require("./transactionReviewFlagService.js");
-
-// Duplicated intentionally rather than imported from the route file: this is
-// a private input-validation constant, not shared mutable state, and the
-// route file uses its own copy for the dozen other :id params it validates.
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Despite the filename, this validates a plain UUID string and has no v2-specific
+// behavior -- it's the same shared helper the v2 business routes already use.
+const { isUuid } = require("../api/utils/v2HttpValidators.js");
 
 const TRANSACTIONS_HARD_CAP = 50000;
 const TRANSACTIONS_DEFAULT_LIMIT = 100;
@@ -65,10 +61,10 @@ function buildTransactionListFilters(query, now = new Date()) {
   const endDate = String(query.end_date || "").trim();
   const v3Status = String(query.v3_status || "").trim().toLowerCase();
 
-  if (accountId && !UUID_REGEX.test(accountId)) {
+  if (accountId && !isUuid(accountId)) {
     return { valid: false, error: "Invalid account_id." };
   }
-  if (categoryId && !UUID_REGEX.test(categoryId)) {
+  if (categoryId && !isUuid(categoryId)) {
     return { valid: false, error: "Invalid category_id." };
   }
   if (type && type !== "income" && type !== "expense") {
@@ -104,14 +100,14 @@ function buildTransactionListFilters(query, now = new Date()) {
     accountName,
     categoryId,
     categoryName,
-    type: type || "",
+    type,
     search: String(query.search || "").trim(),
     period,
     periodBounds: getTransactionPeriodBounds(period, now),
     startDate,
     endDate,
     v3Status,
-    reviewStatus: reviewStatus || "",
+    reviewStatus,
     review: normalizeReviewFilter(query.review)
   };
 }

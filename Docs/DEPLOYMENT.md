@@ -43,8 +43,10 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 - [ ] Migration rollback plan is documented for this release
 
 ### Frontend Bundle
-- [ ] Verify `In-Ex-Ledger-API/legacy/public-html/auth-public/landing.html` is present and up to date
-- [ ] Verify `In-Ex-Ledger-API/public/html/settings.html` is present and up to date
+- [ ] Verify `In-Ex-Ledger-API/public/app-v3/index.html` and its built assets (the V3 SPA,
+  the canonical logged-in product) are present and up to date
+- [ ] Verify static SEO/marketing pages in `In-Ex-Ledger-API/public/html/` are present and
+  up to date
 - [ ] Verify static assets (CSS, JS, images) are present in `In-Ex-Ledger-API/public/`
 
 ---

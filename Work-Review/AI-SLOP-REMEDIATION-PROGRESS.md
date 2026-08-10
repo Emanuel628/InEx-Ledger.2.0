@@ -18,13 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 23.0 / 54 action items (~43%)
-
-**Note on concurrent PRs**: this file is edited by `chore/fix-review-followups`
-(open, not yet merged as of this PR) as well as this PR. Both branch from the
-same pre-PR-3 `main`, so this file will conflict on merge if both land — that's
-expected; the second one to merge should re-read `main`'s copy and fold its own
-section in rather than overwrite.
+## Overall: 24.0 / 54 action items (~44%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -37,6 +31,14 @@ section in rather than overwrite.
 - [x] Ignores for runtime/browser/session artifacts — verified (`test-results/` etc.)
 - [x] CI coverage for V3 lint/type/i18n/build + backend/frontend-v3/pdf-worker audits —
   verified (`phase7-guardrails.yml`, `dependency-security.yml`)
+  - **Known gap, verified by reading actual workflow run logs (not just the YAML) on
+    PRs #287 and #288**: `dependency-security.yml`'s `dependency-review` job fails on
+    every PR with `Dependency review is not supported on this repository. Please
+    ensure that Dependency graph is enabled`. This predates this PR sequence and isn't
+    fixable by a code change — it's a GitHub repo setting (Settings → Security →
+    Dependency graph). The three `npm-audit` jobs in the same workflow (api,
+    frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
+    rather than silently working around it.
 
 ## Phase 2 - Security Contract Cleanup — 3.0 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
@@ -74,8 +76,17 @@ section in rather than overwrite.
 - [ ] Account type/currency assumptions reviewed for closed-set constraints
 - [~] Migration tests for new invariants (`c44d08b1` guards destructive migrations)
 
-## Phase 6 - Product Truth And Legacy/Static Cleanup — 0 / 5
-- [ ] Archived legacy frontend confirmed reference-only, not runtime-reachable
+## Phase 6 - Product Truth And Legacy/Static Cleanup — 1.0 / 5
+- [x] Archived legacy frontend confirmed reference-only, not runtime-reachable —
+  independently verified: `server.js` only mounts `publicDir` (`public/`) and
+  `htmlDir` (`public/html`) as static roots; `legacy/public-html` is a sibling
+  directory, not a descendant of either, and is not referenced by any
+  `express.static`/`app.use` call. Added `In-Ex-Ledger-API/legacy/public-html/README.md`
+  stating this explicitly (Pass 4's suggested guardrail). Also fixed
+  `Docs/DEPLOYMENT.md`'s "Frontend Bundle" checklist, which told deployers to
+  verify a legacy file that isn't served and a `public/html/settings.html` file
+  that doesn't exist at all (retired, 301-redirects to `/settings`) — replaced
+  with a check against the actual served V3 bundle and static SEO pages.
 - [ ] Inventory of active `public/js`/static HTML paths still directly serveable
   (73 tracked files as of this pass)
 - [ ] Old auth scripts / V2 placeholders quarantined or removed
@@ -165,6 +176,28 @@ section in rather than overwrite.
   back into a second query's parameters) that deserves its own careful, isolated pass
   rather than being bundled into a pure-function extraction.
 
+- **PR 3** (`chore/fix-review-followups`): quality follow-up on PR 1/2, no new phase
+  progress (percentage unchanged). A review of the previous two PRs against this
+  file's own scoring — re-checked against `PROGRAMMING-QUALITY-RESEARCH-2026-08-09.md`
+  — surfaced three real, narrow issues, all fixed here:
+  1. `transactionListQueryService.js`'s header comment referenced "Phase 7," this
+     tracker file, and "moved verbatim" — process history, not durable documentation.
+     Rewritten to explain what the module does and why it's side-effect-free.
+  2. The module duplicated a UUID-validation regex that already exists as `isUuid` in
+     `api/utils/v2HttpValidators.js` (used by the v2 business routes). Switched to
+     importing it instead — same regex, same behavior, one fewer copy to keep in sync.
+  3. `type: type || ""` and `reviewStatus: reviewStatus || ""` in
+     `buildTransactionListFilters`'s return value were dead code — both variables are
+     already guaranteed non-null strings from `String(...).trim().toLowerCase()`
+     earlier in the function, so the fallback could never fire. Simplified to `type,`
+     and `reviewStatus,`.
+
+  Also verified, while investigating a claim that CI status wasn't visible, that CI
+  *is* visible via the GitHub Actions API and *did* run on both prior PRs — and found
+  a real, pre-existing gap in the process (see the note under Phase 1 above) rather
+  than one introduced by this PR sequence. Full test suite: 1278/1279 passing (same
+  pre-existing, unrelated failure).
+
 - **PR 4** (`chore/extract-mileage-query-service`): Phase 7, remaining two items.
   Extracted `mileage.routes.js`'s dynamic date-column SQL builders
   (`mileageDateSelect`/`mileageDateOrderBy`/`buildMileageInsertSql`/
@@ -186,3 +219,20 @@ section in rather than overwrite.
   run across `tests/*.test.js`, matching `test:all`'s `--test-concurrency=1`):
   1287/1288 passing, same pre-existing, unrelated Windows-path-traversal failure as
   every prior PR in this sequence.
+
+- **PR 5** (`chore/archive-legacy-frontend-guardrails`): Phase 6, its first item.
+  Before writing anything, checked what actually serves `legacy/public-html` —
+  confirmed by reading `server.js`'s static-mount setup directly (`publicDir` =
+  `public/`, `htmlDir` = `public/html`, only those two are passed to
+  `express.static`) that the directory is never served, matching the audit's Pass 4
+  claim. Then, rather than treating "not reachable" as good enough on its own, went
+  looking for anywhere the archived status wasn't actually reflected — found
+  `Docs/DEPLOYMENT.md`'s pre-deploy checklist telling deployers to verify a legacy
+  landing page that's never served, and a `public/html/settings.html` that doesn't
+  exist on disk at all (that page was retired in favor of V3's `/settings`, confirmed
+  via `tests/v3LegacyHtmlRetirement.test.js` and a direct `ls`). Fixed the checklist
+  to check the actual served V3 bundle and static SEO pages instead. Added
+  `legacy/public-html/README.md` per the audit's suggested guardrail, so the archive
+  status is stated in the directory itself, not just implied by omission from
+  routing. No source/behavior changes — docs and one new README only. Full test
+  suite: 1287/1288 passing (same pre-existing, unrelated failure as every prior PR).
