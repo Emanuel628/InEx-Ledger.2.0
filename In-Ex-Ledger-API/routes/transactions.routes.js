@@ -257,12 +257,14 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
   return existingAfterInsert.rows[0]?.id || null;
 }
 
+const VALID_CURRENCY_CODES = new Set(Intl.supportedValuesOf("currency"));
+
 function normalizeCurrencyCode(value, fallbackCurrency) {
   const raw = String(value ?? "").trim().toUpperCase();
   if (!raw) {
     return fallbackCurrency;
   }
-  if (/^[A-Z]{3}$/.test(raw)) {
+  if (VALID_CURRENCY_CODES.has(raw)) {
     return raw;
   }
   return fallbackCurrency;
@@ -2104,5 +2106,6 @@ module.exports = router;
 module.exports.__private = {
   getCategoryCacheEntryId,
   ensureCategoryTemplateFields,
-  resolveCategoryId
+  resolveCategoryId,
+  normalizeCurrencyCode
 };
