@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 24.0 / 54 action items (~44%)
+## Overall: 26.0 / 54 action items (~48%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -76,7 +76,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [ ] Account type/currency assumptions reviewed for closed-set constraints
 - [~] Migration tests for new invariants (`c44d08b1` guards destructive migrations)
 
-## Phase 6 - Product Truth And Legacy/Static Cleanup — 1.0 / 5
+## Phase 6 - Product Truth And Legacy/Static Cleanup — 3.0 / 5
 - [x] Archived legacy frontend confirmed reference-only, not runtime-reachable —
   independently verified: `server.js` only mounts `publicDir` (`public/`) and
   `htmlDir` (`public/html`) as static roots; `legacy/public-html` is a sibling
@@ -90,9 +90,22 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [ ] Inventory of active `public/js`/static HTML paths still directly serveable
   (73 tracked files as of this pass)
 - [ ] Old auth scripts / V2 placeholders quarantined or removed
-- [ ] V3 canonical routing tests kept current
-- [ ] Direct URL behavior explicit for `/app`, V3 routes, blocked legacy routes, static
-  assets
+- [x] V3 canonical routing tests kept current — already enforced by
+  `tests/routeInventory.test.js`, which fails if any `V3_APP_PAGES` entry in
+  `server.js` isn't documented in `Docs/V3_ROUTE_INVENTORY.md`, and asserts the
+  doc's required sections and temporary-legacy-overlap classifications exist.
+  Read and independently verified against current `main` rather than assumed.
+- [x] Direct URL behavior explicit for `/app`, V3 routes, blocked legacy routes,
+  static assets — `tests/staticAssetCacheHeaders.test.js` already covers V3
+  canonical routes, static asset caching, and `/app-v3/*` legacy redirects with
+  real HTTP requests against the live `app`. The one real gap found by reading
+  it against `server.js`: nothing exercised `isBlockedV2PageRequest`'s actual
+  redirect (V2 business placeholder pages — `ar-ap`, `billable-expenses`,
+  `bills`, `customers`, `projects`, `vendors` — 302 to
+  `/settings?feature=v2-business` when `ENABLE_V2_BUSINESS` isn't `'true'`, the
+  production default). Closed with a new `tests/blockedV2PageRedirects.test.js`
+  covering all 6 pages across all 4 URL aliases (bare, `.html`, `/html/*`,
+  `/html/*.html`).
 
 ## Phase 7 - Route And Service Decomposition — 3.0 / 4
 - [x] Consolidated the repeated account/category join SQL in `transactions.routes.js`
@@ -236,3 +249,21 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   status is stated in the directory itself, not just implied by omission from
   routing. No source/behavior changes — docs and one new README only. Full test
   suite: 1287/1288 passing (same pre-existing, unrelated failure as every prior PR).
+
+- **PR 6** (`test/blocked-v2-page-redirects`): Phase 6, its last two items.
+  Read `server.js`'s routing stack end to end before writing anything, and
+  cross-referenced it against the existing test files that already exercise it
+  (`tests/routeInventory.test.js`, `tests/staticAssetCacheHeaders.test.js`)
+  rather than assuming those items were untouched just because the tracker
+  still showed them unstarted. Found both were already substantially covered:
+  `routeInventory.test.js` fails if `server.js`'s `V3_APP_PAGES` set drifts
+  from `Docs/V3_ROUTE_INVENTORY.md`, and `staticAssetCacheHeaders.test.js`
+  already makes real HTTP requests against V3 canonical routes, static asset
+  caching, and `/app-v3/*` legacy redirects. The one real, verified gap: no
+  test exercised `isBlockedV2PageRequest`'s actual redirect behavior for the
+  six V2 business placeholder pages. Added
+  `tests/blockedV2PageRedirects.test.js` (test-only, no source changes) — 3
+  tests confirming all 6 pages 302-redirect to `/settings?feature=v2-business`
+  across all 4 URL aliases they're reachable under, never serve their raw HTML
+  while gated, and don't affect unrelated canonical pages. Full test suite:
+  1290/1291 passing (same pre-existing, unrelated failure as every prior PR).
