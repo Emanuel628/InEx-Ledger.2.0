@@ -2,9 +2,7 @@
    Dark mode is intentionally disabled right now.
 
    This file exists so there is one clear CSS owner for that decision instead
-   of several drift files layered on top of each other. The actual theme boot
-   lock still happens in public/js/theme-boot.js and runtime theme behavior is
-   still owned by public/js/global.js.
+   of several drift files layered on top of each other.
 
    When dark mode is redesigned properly, rebuild it from the main theme tokens
    and page owner styles instead of reintroducing patch files.
