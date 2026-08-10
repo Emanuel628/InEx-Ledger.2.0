@@ -260,6 +260,35 @@ and keep their narrower `__private` export, since bundling them in would have
 been a different, broader-scoped extraction than this one). Route file:
 2,450 → 2,108 lines. Test files updated to import from the service directly.
 
+**Follow-up, same reasoning**: `routes/auth.routes.js` overtook
+`transactions.routes.js` as the largest route file (2,634 lines) once the CSV
+work landed. Read all 70 of its top-level functions before touching anything,
+given how security-sensitive this file is. Found 13 genuinely pure/near-pure
+functions with zero DB, cookie, or `req`/`res` coupling — password
+hashing/strength, login-lockout timing, email masking for logs and MFA
+status, MFA-code generation/hashing, refresh/MFA-trust-token hashing, and two
+small response-shaping helpers — none of which had any direct unit test
+coverage anywhere (only reachable indirectly through full HTTP-level auth
+flow tests). Left everything that issues JWTs, touches `pool`, or builds
+links from `req` in the route file — that's the actual security-decision
+surface, not utility code, and higher risk to move. Extracted the 13 into
+`services/authSecurityService.js` with 12 new direct unit tests. Also found
+and fixed a real small duplicate along the way: `maskEmailAddress` and
+`maskEmail` were two names for the identical function, with `maskEmail` used
+at ~19 call sites and `maskEmailAddress` at effectively none outside its own
+alias — collapsed to the one name already in wide use, `maskEmail`, so
+existing call sites needed no changes. Considered collapsing
+`hashRefreshToken`/`hashMfaTrustToken` too (identical bodies) but kept them
+separate: unlike the mileage/mask cases, these hash conceptually distinct
+token types, and collapsing them would silently couple two security
+boundaries that happen to use the same algorithm today but have no reason to
+stay coupled. Caught two bugs in my own new tests before shipping —
+miscalculated `isStrongPassword`'s lowercase requirement (it has none) and
+`maskEmail`'s exact masking output — by running them against the real
+function first rather than trusting my own arithmetic. Route file:
+2,634 → 2,551 lines. Full auth-adjacent test suite (218 tests across 10
+files) passes unchanged.
+
 ## Phase 8 - V3 React Cleanup — 0.5 / 7
 - [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
 - [ ] Large controller pages split by workflow
@@ -558,3 +587,40 @@ been a different, broader-scoped extraction than this one). Route file:
   audit-derived checklist items, but it's real: another ~340 lines off the
   file the audit called "too complex for a route file," with no new
   scope-inflation to the tracker's denominator.
+
+- **PR 14** (`refactor/extract-auth-security-utils`): same path, one file
+  over. `routes/auth.routes.js` (2,634 lines) is now the largest route file in
+  the repo, having overtaken `transactions.routes.js` once PR 13 shrank that
+  one. Given how security-sensitive this file is, read all 70 of its
+  top-level functions in full before deciding what, if anything, was safe to
+  touch — this is not a file to extract from on a quick pattern-match.
+  Identified 13 functions with zero database, cookie, or `req`/`res`
+  coupling — `hashPassword`, `isStrongPassword`,
+  `isTransientLoginInfrastructureError`, `buildPublicSessionPayload`,
+  `ensureArrayValue`, `hashMfaEmailCode`, `generateMfaEmailCode`, `maskEmail`,
+  `buildMfaStatusPayload`, `getLoginLockExpiry`, `isLoginLocked`,
+  `hashRefreshToken`, `hashMfaTrustToken` — none of which had any direct unit
+  test anywhere; they were only exercised indirectly through full HTTP auth
+  flow tests. Left every function that signs a JWT, queries `pool`, or builds
+  a link from `req` in the route file — that's the actual security-decision
+  surface (MFA token issuance, session creation, device fingerprinting), not
+  interchangeable utility code, and a wrong call there is a very different
+  risk category than a wrong call in a password-strength regex. Extracted the
+  13 into `services/authSecurityService.js` with 12 new direct unit tests.
+  While doing this, found `maskEmailAddress` and `maskEmail` were two names
+  for one identical function (`maskEmail` used at ~19 call sites,
+  `maskEmailAddress` at none outside its own now-removed alias) — collapsed
+  to `maskEmail`, the name already in use everywhere, so no call sites needed
+  changing. Deliberately did *not* collapse `hashRefreshToken`/
+  `hashMfaTrustToken` despite identical bodies — they hash conceptually
+  distinct token types, and merging them would silently couple two security
+  boundaries that only coincidentally share an algorithm today. Caught two
+  real bugs in my own new tests before running them for real — wrongly
+  assumed `isStrongPassword` required a lowercase letter (it doesn't) and
+  miscalculated `maskEmail`'s exact masking output by hand — both fixed by
+  checking against the actual function output rather than trusting my own
+  arithmetic, same discipline as the regex sanity-checks in earlier PRs. Route
+  file: 2,634 → 2,551 lines. Full auth-adjacent test suite (218 tests across
+  10 files, all real HTTP-level flows) passes unchanged. Full suite:
+  1317/1318 passing (same pre-existing, unrelated failure as every prior PR).
+  Not counted toward Phase 7's score, same reasoning as PR 13.
