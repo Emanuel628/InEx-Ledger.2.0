@@ -342,6 +342,50 @@ HTTP-request level). All 18 passed on the first run. Route file:
 files) passes unchanged; full backend suite went from 1,328 to 1,346 tests
 (the 18 new ones), same 1 pre-existing unrelated failure as always.
 
+**Fifth pass, plus a real dedup**: `routes/businesses.routes.js`
+(1,383 lines) is the same risk class as billing — Stripe subscription slot
+management and business deletion, real money and real data-loss
+consequences. Read all 27 top-level functions before choosing anything.
+Extracted 9 pure/near-pure functions into `services/businessProfileService.js`
+(`buildAppUrl`, `normalizeBillingCurrency`, `normalizeBillingInterval`,
+`normalizeOptionalBillingInterval`, `normalizeOptionalCurrency`,
+`formatBillingCurrencyAmount`, `normalizeBusinessPayload`,
+`normalizeOptionalTrimmedString`, `normalizeBusinessProfileRow`,
+`buildBusinessLimitError`) — all ten are re-imported back since the route
+file's remaining handlers still call them. Left every Stripe-object-shape
+function in place (`getStripeBaseItem`, `getStripeAddonItem`,
+`resolveStripeAdditionalBusinesses`, `resolveStripeSubscriptionBillingTerms`,
+`resolveAddonPriceIdForTerms`) and every DB/Stripe-API-touching function
+(`buildVerifiedPricingTable`, `sendBusinessLifecycleEmail`,
+`syncStripeSubscriptionForBusinessInTransaction`,
+`setStripeBusinessSlotState`, `applyStripeBusinessSlotState`,
+`migrateBillingAnchorSubscription`, `fetchOwnedBusinessProfile`,
+`updateOwnedBusinessProfile`) — same caution as the billing pass, for the
+same reason.
+
+Along the way, found a genuine byte-identical duplicate: `parseStripeUnitAmount`
+existed verbatim in both `billing.routes.js` and `businesses.routes.js`, not
+a "looks similar" judgment call like the ones deliberately left alone
+earlier in this effort — actually the same function, copy-pasted. Moved it
+into the already-shared `services/stripePriceConfig.js` (both route files
+already imported other things from it) and had both route files import the
+one copy instead. This surfaced a real gap while re-running tests: one
+existing test file (`businessLifecycleNotifications.test.js`) mocks
+`stripePriceConfig.js` via `Module._load` and its mock didn't have
+`parseStripeUnitAmount`, so two tests were silently swallowing a
+`TypeError` inside `sendBusinessLifecycleEmail`'s catch-all and asserting
+"0 emails sent" was actually 1 — fixed by adding the missing export to the
+test's mock. Added 16 new direct unit tests across
+`businessProfileService.test.js` and a new `stripePriceConfig.test.js`
+(covering `parseStripeUnitAmount`, which also had zero direct coverage
+before), all passing on the first run. Route file: 1,383 → 1,266 lines
+(plus `billing.routes.js` loses its 8-line duplicate). Full
+business/billing-adjacent HTTP suite (226 tests across 12 files) passes
+unchanged. Full backend suite: **1,363/1,363 passing** — the first fully
+green full-suite run in this entire remediation effort (see also the
+standalone `fix/backslash-path-traversal-basename` PR that fixed the one
+test that had been failing identically since PR 13).
+
 ## Phase 8 - V3 React Cleanup — 0.5 / 7
 - [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
 - [ ] Large controller pages split by workflow
@@ -732,3 +776,61 @@ files) passes unchanged; full backend suite went from 1,328 to 1,346 tests
   integration flows, plan catalog) passes unchanged. Full suite: 1346/1347
   passing (same pre-existing, unrelated failure as every prior PR). Not
   counted toward Phase 7's score, same reasoning as PR 13/14/15.
+
+- **PR 17** (`fix/backslash-path-traversal-basename`): not a decomposition
+  PR — a real fix for the one test that had been failing identically across
+  every single PR in this effort (`tests/securityRegressionSuite.test.js`:
+  "support-artifact and receipt storage resolvers confine traversal
+  candidates to their managed roots"). Root cause:
+  `normalizeSupportArtifactCandidate`/`normalizeReceiptStorageCandidate`
+  (`services/supportArtifactStorage.js`, `services/receiptStorage.js`) both
+  sanitize a filename via `path.resolve(storageDir, path.basename(rawPath))`,
+  but `path.basename()` only treats `\` as a separator on `win32` — on this
+  repo's POSIX dev/CI environment a Windows-style traversal string like
+  `..\..\Windows\system32\drivers\etc\hosts` wasn't being collapsed to a
+  bare filename the way the sanitizer is designed to. It never actually
+  escaped the storage directory (POSIX `path.resolve` doesn't treat `\` as a
+  separator either), so there was no real vulnerability, but the resolvers
+  weren't neutralizing the traversal string the way the regression test
+  (correctly) expects, since request/DB data isn't guaranteed to match the
+  host OS's path format. Fix: normalize `\` to `/` before calling
+  `path.basename()` in both resolvers. Checked the only real call sites
+  (`routes/supportArtifacts.routes.js`, `routes/receipts.routes.js`) — both
+  only ever pass in a path the app generates and stores itself using
+  forward slashes, so the fix changes nothing for real stored paths. Full
+  backend suite: **1347/1347 passing** — first fully green run in this
+  entire remediation effort.
+
+- **PR 18** (`refactor/extract-business-profile-helpers`): same
+  decomposition path, `routes/businesses.routes.js` (1,383 lines), same
+  risk class as billing — Stripe subscription slot management plus business
+  deletion, real money and real data-loss consequences. Read all 27
+  top-level functions before choosing anything. Extracted 10 pure/near-pure
+  functions into `services/businessProfileService.js` (`buildAppUrl`,
+  `normalizeBillingCurrency`, `normalizeBillingInterval`,
+  `normalizeOptionalBillingInterval`, `normalizeOptionalCurrency`,
+  `formatBillingCurrencyAmount`, `normalizeBusinessPayload`,
+  `normalizeOptionalTrimmedString`, `normalizeBusinessProfileRow`,
+  `buildBusinessLimitError`) — all re-imported back since the route file's
+  remaining handlers still call every one of them. Left every
+  Stripe-object-shape function (`getStripeBaseItem`, `getStripeAddonItem`,
+  `resolveStripeAdditionalBusinesses`, `resolveStripeSubscriptionBillingTerms`,
+  `resolveAddonPriceIdForTerms`) and every DB/Stripe-API-touching function
+  untouched, same caution as PR 15's billing pass. Also found and fixed a
+  genuine byte-identical duplicate along the way: `parseStripeUnitAmount`
+  existed verbatim in both `billing.routes.js` and `businesses.routes.js` —
+  moved into the already-shared `services/stripePriceConfig.js` so both
+  route files import the one copy. That surfaced a real gap in
+  `tests/businessLifecycleNotifications.test.js`: its `Module._load` mock of
+  `stripePriceConfig.js` didn't have `parseStripeUnitAmount`, so two tests
+  were silently swallowing a `TypeError` inside
+  `sendBusinessLifecycleEmail`'s catch-all and passing on a false "0 emails
+  sent" assertion instead of the real "1 email sent" — fixed by adding the
+  missing export to the test's mock. 16 new direct unit tests across
+  `tests/businessProfileService.test.js` and a new
+  `tests/stripePriceConfig.test.js` (covering `parseStripeUnitAmount`,
+  which also had zero direct coverage before), all passing on the first
+  run. Route file: 1,383 → 1,266 lines. Full business/billing-adjacent HTTP
+  suite (226 tests across 12 files) passes unchanged. Full suite:
+  **1363/1363 passing**. Not counted toward Phase 7's score, same reasoning
+  as PR 13/14/15/16.

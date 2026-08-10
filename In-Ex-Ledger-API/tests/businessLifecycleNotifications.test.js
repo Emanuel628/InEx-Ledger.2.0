@@ -98,7 +98,15 @@ function loadBusinessesRouterFixture(options = {}) {
             monthly: { usd: "STRIPE_ADDL_M_US" },
             yearly: { usd: "STRIPE_ADDL_Y_US" }
           }
-        })
+        }),
+        parseStripeUnitAmount: (price) => {
+          const raw = price?.unit_amount_decimal ?? price?.unit_amount;
+          const numeric = Number(raw);
+          if (!Number.isFinite(numeric)) {
+            throw new Error("Stripe price is missing a valid unit amount");
+          }
+          return numeric / 100;
+        }
       };
     }
 

@@ -15,7 +15,11 @@ const {
   setTrialPlanSelectionForBusiness,
   setFreePlanForBusiness
 } = require("../services/subscriptionService.js");
-const { buildStripePriceEnvMap, buildStripePriceLookup } = require("../services/stripePriceConfig.js");
+const {
+  buildStripePriceEnvMap,
+  buildStripePriceLookup,
+  parseStripeUnitAmount
+} = require("../services/stripePriceConfig.js");
 const {
   getPreferredLanguageForUser,
   buildBillingLifecycleEmail
@@ -234,15 +238,6 @@ function buildFallbackPricingTable(currency) {
     monthly: { ...pricing.monthly },
     yearly: { ...pricing.yearly }
   };
-}
-
-function parseStripeUnitAmount(price) {
-  const raw = price?.unit_amount_decimal ?? price?.unit_amount;
-  const numeric = Number(raw);
-  if (!Number.isFinite(numeric)) {
-    throw new Error("Stripe price is missing a valid unit amount");
-  }
-  return numeric / 100;
 }
 
 function expectedStripeRecurringInterval(billingInterval) {
