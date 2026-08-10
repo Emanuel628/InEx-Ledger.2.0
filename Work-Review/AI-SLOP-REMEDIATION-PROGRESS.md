@@ -167,11 +167,30 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   to V3's Exports page), `settings-mobile-redirect.js`, `tax-widget.js`,
   `theme-boot.js` — appear in **zero** archived page's script list, are loaded
   by no test, and (verified by checking every identifier each one defines)
-  are called by no other file in the directory. Deleted those 6. Half credit:
-  this is real, verified deletion, not the full inventory — the other 43
-  files and the 36 files in `public/css/pages` are still open, and deciding
-  their fate (archive vs. delete vs. keep as historical CSS parity reference)
-  is a bigger, more careful pass than fits in one PR.
+  are called by no other file in the directory. Deleted those 6.
+
+  **Follow-up pass, same PR sequence**: did the equivalent classification for
+  `public/css/pages` (36 files). CSS coupling is simpler to prove than the JS
+  case — `@import` is explicit and grep-able, no hidden global-scope calls —
+  but still cross-referenced the same archived-HTML `<link>` manifest rather
+  than trusting a bare "not imported elsewhere" check. `seo-page.css` is
+  actively linked by the SEO pages (kept, obviously); 26 more files correspond
+  to an archived page that still exists in `legacy/public-html` and are linked
+  from it (kept, bundled with that larger not-yet-made archive/delete
+  decision). The remaining 9 — `business-profile.css`, `change-password.css`,
+  `landing-responsive-fixes.css`, `landing-rolodex.css`, `review.css`,
+  `security.css`, `settings-mobile-native.css`,
+  `subscription-premium-bridge.css`, `subscription-premium.css` (3,152 lines
+  total) — aren't linked by any active or archived page, aren't `@import`ed by
+  any other CSS file, and don't even have a corresponding archived HTML file
+  in `legacy/public-html` the way the kept 26 do — these were vestigial before
+  the archive was even created. Deleted all 9.
+
+  Still half credit: 43 `public/js` files and 26 `public/css/pages` files
+  remain, all legitimately entangled with the still-existing (if archived)
+  legacy HTML pages. Deciding their fate — archive the whole legacy bundle
+  more formally, or delete it outright now that V3 fully supersedes it — is a
+  bigger product/scope call than fits inside this file-by-file safety pass.
 - [ ] Old auth scripts / V2 placeholders quarantined or removed
 - [x] V3 canonical routing tests kept current — already enforced by
   `tests/routeInventory.test.js`, which fails if any `V3_APP_PAGES` entry in
@@ -468,3 +487,28 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   files in `public/css/pages` remain open — deciding their fate (archive vs.
   delete vs. keep for historical CSS parity) is a bigger, more careful pass
   than fits in one PR.
+
+- **PR 12** (`chore/remove-orphaned-page-css`): Phase 6, continuing the same
+  path directly ("continue on this path" after PR 11's course-correction).
+  Did the CSS equivalent of PR 11's classification for `public/css/pages` (36
+  files). `@import` is explicit and grep-able — no hidden global-scope
+  coupling risk the way `public/js` has — but still cross-referenced the
+  archived-HTML `<link>` manifest rather than trusting a bare
+  not-imported-elsewhere check, for consistency and rigor. `seo-page.css` is
+  actively linked by the live SEO pages; 26 files are linked from an archived
+  page that still exists in `legacy/public-html` and stay bundled with that
+  larger, not-yet-made archive/delete decision. The remaining 9 —
+  `business-profile.css`, `change-password.css`,
+  `landing-responsive-fixes.css`, `landing-rolodex.css`, `review.css`,
+  `security.css`, `settings-mobile-native.css`,
+  `subscription-premium-bridge.css`, `subscription-premium.css` — are linked
+  by nothing, `@import`ed by nothing, and (unlike the 26 kept files) don't
+  even have a corresponding archived HTML file in `legacy/public-html` — they
+  predate the archive itself being vestigial. Deleted all 9 (3,152 lines).
+  Repo-wide grep after the deletion found zero remaining references. Full
+  test suite: 1305/1306 passing, identical pass/fail count to before the
+  deletion (same pre-existing, unrelated failure as every prior PR) — zero
+  regressions. No new tests added; net negative on line count again. Combined
+  with PR 11: 15 files, 4,293 lines of confirmed-dead legacy static assets
+  removed across this pair. The remaining 43 `public/js` and 26
+  `public/css/pages` files stay open for the larger archive/delete call.
