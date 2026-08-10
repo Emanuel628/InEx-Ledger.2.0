@@ -196,6 +196,17 @@ test("child business integrity migration enforces composite tenant links safely"
   assert.doesNotMatch(sqlWithoutComments(sql), /\bVALIDATE\s+CONSTRAINT\b/i);
 });
 
+test("child business integrity follow-up preserves original delete actions", () => {
+  const sql = readMigration("20260810_fix_child_business_fk_delete_actions.sql");
+
+  assert.match(sql, /destructive-migration-reviewed:/i);
+  assert.match(sql, /DROP CONSTRAINT IF EXISTS fk_support_artifacts_transaction_business/i);
+  assert.match(sql, /FOREIGN KEY \(transaction_id, business_id\)\s+REFERENCES transactions \(id, business_id\)\s+ON DELETE SET NULL \(transaction_id\)\s+NOT VALID/i);
+  assert.match(sql, /FOREIGN KEY \(legacy_receipt_id, business_id\)\s+REFERENCES receipts \(id, business_id\)\s+ON DELETE SET NULL \(legacy_receipt_id\)\s+NOT VALID/i);
+  assert.match(sql, /FOREIGN KEY \(transaction_id, business_id\)\s+REFERENCES transactions \(id, business_id\)\s+ON DELETE CASCADE\s+NOT VALID/i);
+  assert.doesNotMatch(sqlWithoutComments(sql), /\bVALIDATE\s+CONSTRAINT\b/i);
+});
+
 test("new destructive migrations require an explicit review marker", () => {
   const unreviewed = fs
     .readdirSync(migrationsDir)
