@@ -9,13 +9,14 @@ function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
-test("root build script builds the v3 SPA", () => {
+test("root build script builds the v3 SPA", async () => {
   const pkg = JSON.parse(read("package.json"));
+  const runner = await import("../scripts/run-all-node-tests.mjs");
 
   assert.equal(pkg.scripts.build, "npm run build:frontend-v3");
   assert.match(pkg.scripts["build:frontend-v3"], /scripts\/build-v3-phrase-catalog\.mjs/);
   assert.match(pkg.scripts["build:frontend-v3"], /npm --prefix frontend-v3 run build/);
-  assert.match(pkg.scripts["test:all"], /tests\/frontendV3BuildPipeline\.test\.js/);
+  assert.ok(runner.listNodeTestFiles(repoRoot).includes("tests/frontendV3BuildPipeline.test.js"));
 });
 
 test("Railway Nixpacks installs and builds the v3 frontend before start", () => {
