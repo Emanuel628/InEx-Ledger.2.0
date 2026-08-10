@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const fs = require("node:fs");
 
 const ROUTE_PATH = require.resolve("../routes/internalSupport.routes.js");
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -103,6 +104,19 @@ function loadInternalSupportRouterFixture() {
     }
   };
 }
+
+test("internal support routes apply their rate limiter before the secret check, so failed guesses are also throttled", () => {
+  const source = fs.readFileSync(ROUTE_PATH, "utf8");
+  const limiterIndex = source.indexOf("createInternalSupportLimiter()");
+  const secretCheckIndex = source.indexOf("router.use(requireSupportSecret)");
+
+  assert.ok(limiterIndex >= 0, "createInternalSupportLimiter() should be wired into the router");
+  assert.ok(secretCheckIndex >= 0, "requireSupportSecret should be wired into the router");
+  assert.ok(
+    limiterIndex < secretCheckIndex,
+    "the rate limiter must run before the secret check, or a failed-secret guessing loop would never be throttled"
+  );
+});
 
 test("internal support routes reject invalid secrets before any DB query", async () => {
   process.env.INEX_LEDGER_SUPPORT_SECRET = "support-secret-test";

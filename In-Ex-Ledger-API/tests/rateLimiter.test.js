@@ -74,6 +74,21 @@ test("auth-style limiter blocks after 20 requests per IP", async () => {
   );
 });
 
+test("internal-support-style limiter blocks after 30 requests per IP, tighter than the 300/min global tier", async () => {
+  process.env.RATE_LIMIT_ENABLED = "true";
+  const limiter = await createLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    keyPrefix: "rl:support",
+    keyStrategy: "ip",
+    storeOverride: new MemoryStore()
+  });
+  const app = createApp(limiter);
+
+  await sendRequests(app, 30);
+  await request(app).get("/").expect(429);
+});
+
 test("user-scoped limiter enforces authenticated windows", async () => {
   process.env.RATE_LIMIT_ENABLED = "true";
   const limiter = await createLimiter({

@@ -60,7 +60,24 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   frontend source file ever constructs an `Authorization` header, closing the
   audit's own suggested CI check (Pass 31) for the client side of this
   contract.
-- [~] Internal support shared-secret access hardened (commits `25026802`, `2ae677c9`)
+- [~] Internal support shared-secret access hardened (commits `25026802`,
+  `2ae677c9`, this PR) — the audit's suggested fix has four parts: agent
+  identity, role/scope checks, a limiter, and durable audit. Read
+  `routes/internalSupport.routes.js` and `middleware/requireSupportSecret.js`
+  directly rather than assuming the prior commits' scope: durable audit was
+  already done (every access is logged, with the log helper auto-sanitizing
+  emails) and the secret comparison already uses `crypto.timingSafeEqual`
+  (constant-time, no timing side-channel). A limiter was missing — every
+  `/internal/support/*` request only got the generic 300/min global tier sized
+  for ordinary app traffic. Added `createInternalSupportLimiter()` (30
+  requests/15 min, IP-keyed) and wired it ahead of the secret check so
+  failed-guess attempts count toward the same window, not just successful
+  ones. **Still open, and staying at half credit because of it**: per-agent
+  identity and role/scope checks. That's the audit's actual "High" severity
+  concern (no accountability beyond an IP+URL log line if the shared secret
+  leaks or is misused) and it's explicitly a product decision — "decide
+  whether the internal support API is production-required" — not something to
+  make unilaterally inside a remediation PR.
 - [~] CSRF/origin tests for representative mutating routes (`c665b36b`)
 - [x] MFA/signup transient tokens confirmed short-lived/single-purpose — read
   `routes/auth.routes.js` end to end rather than assuming. Every non-final auth
@@ -374,3 +391,25 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   suggested client-side CI check for this same contract). No production code
   changes. Full test suite: 1303/1304 passing (same pre-existing, unrelated
   failure as every prior PR).
+
+- **PR 10** (`security/rate-limit-internal-support`): Phase 2's last remaining
+  half-credit item, following up on the user's request to keep working through
+  `Work-Review/CODEBASE-100PCT-AUDIT-2026-08-09.md`. Read
+  `routes/internalSupport.routes.js` and `middleware/requireSupportSecret.js`
+  directly rather than assuming what the two cited commits already covered:
+  timing-safe secret comparison and per-access audit logging were both already
+  in place; a dedicated rate limiter was not — the router only got the generic
+  300/min global tier. Added `createInternalSupportLimiter()` (30 req/15 min,
+  IP-keyed) to `middleware/rateLimitTiers.js`, matching the existing
+  auth/password/MFA limiter pattern, and wired it in *ahead of* the secret
+  check so a failed-guess loop is throttled too, not just successful requests.
+  Added a source-order test confirming that wiring (the limiter line appears
+  before the secret-check line in the router file) plus a limiter-configuration
+  test in `tests/rateLimiter.test.js` replicating the exact tier and proving it
+  blocks at request 31. Deliberately did not attempt the audit's other two
+  suggested pieces (per-agent identity, role/scope checks) — that's the
+  finding's actual "High" severity core, and it requires a product decision
+  ("is the internal support API even production-required") that isn't mine to
+  make inside a remediation PR, so the item stays at half credit with that gap
+  explicitly documented rather than silently claimed done. Full test suite:
+  1305/1306 passing (same pre-existing, unrelated failure as every prior PR).
