@@ -101,12 +101,28 @@ function createTokenRefreshLimiter() {
   });
 }
 
+// The internal support API is gated by a single shared secret (see
+// requireSupportSecret) rather than per-agent identity, so it gets its own
+// tight, IP-keyed window on top of the shared-secret check itself -- cutting
+// the effective guess/replay ceiling well below the generic global limiter,
+// which is sized for ordinary app traffic rather than a single ops surface.
+function createInternalSupportLimiter() {
+  return createRouteLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    keyPrefix: "rl:support",
+    keyStrategy: "ip",
+    message: "Too many internal support requests, please try again later."
+  });
+}
+
 module.exports = {
   createAuthLimiter,
   createBillingMutationLimiter,
   createBusinessDeleteLimiter,
   createExportGrantLimiter,
   createGlobalLimiter,
+  createInternalSupportLimiter,
   createMfaVerifyLimiter,
   createPasswordLimiter,
   createReceiptLimiter,

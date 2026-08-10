@@ -1,6 +1,7 @@
 const express = require("express");
 const { pool } = require("../db.js");
 const { requireSupportSecret } = require("../middleware/requireSupportSecret.js");
+const { createInternalSupportLimiter } = require("../middleware/rateLimitTiers.js");
 const {
   findBillingAnchorBusinessIdForUser,
   getSubscriptionSnapshotForBusiness
@@ -9,6 +10,10 @@ const { getTrustedClientIp } = require("../services/requestIpService.js");
 const { logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
+// The limiter runs ahead of the secret check so failed-secret attempts count
+// toward the same window as successful ones -- otherwise an attacker probing
+// the secret would never be throttled.
+router.use(createInternalSupportLimiter());
 router.use(requireSupportSecret);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
