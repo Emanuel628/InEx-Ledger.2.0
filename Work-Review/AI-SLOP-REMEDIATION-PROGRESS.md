@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 30.5 / 54 action items (~56%)
+## Overall: 31.0 / 54 action items (~57%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -153,8 +153,37 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [~] Docker/Nixpacks/start scripts reconciled
 - [x] Reproducible installs (`npm ci`) in CI/deployment (`afdefa17`, `6a313ff0`)
 
-## Phase 4 - API Error And Response Consistency — 3.0 / 5
-- [ ] Consolidated `ApiError`/`sendError`/async-route pattern introduced
+## Phase 4 - API Error And Response Consistency — 3.5 / 5
+- [~] Consolidated `ApiError`/`sendError`/async-route pattern introduced — Pass 27's
+  suggested design already had most of its foundation in place and just wasn't being
+  used: `server.js` already has a final Express error handler that derives status
+  from `err.status`/`err.statusCode`, hides 500 details in production, and logs
+  structured fields — it just never received anything, since every route file
+  catches its own errors locally and hand-rolls `res.status(...).json(...)`. Added
+  `utils/apiError.js`: `ApiError` (a typed error carrying `.status`/optional `.code`)
+  and `asyncRoute` (wraps an async handler so both a rejected promise *and* a
+  synchronous throw reach `next(err)` — Express's own dispatcher already catches
+  synchronous throws in ordinary handlers, but a handler invoked directly, e.g. in a
+  test, doesn't get that for free, so `asyncRoute` catches both explicitly; caught
+  by actually running my own unit tests for it, not by inspection — the first
+  version silently dropped synchronous throws and didn't return the promise chain,
+  so a test awaiting the wrapped handler resolved before the async catch ran).
+  Piloted on `routes/business.routes.js` (audit's own cited example: `business.routes.js`
+  logs `err.stack || err` and returns bespoke 500 messages) — replaced every
+  `try/catch` + `res.status(...).json(...)` with `throw new ApiError(status, message)`
+  and `asyncRoute(...)`, keeping local `try/catch` only where it's genuinely needed
+  (translating a DB `CHECK` constraint violation or `accountingLockService`'s date
+  error into an `ApiError`). Every existing 400/404 message is preserved exactly;
+  the only behavior change is that a *truly unexpected* 500 now returns the same
+  generic "Internal server error" text as everywhere else instead of a bespoke
+  per-route message, which is the explicit point of centralizing. This route file
+  had zero HTTP-level test coverage before — added 27 tests
+  (`tests/businessRouteErrors.test.js`) covering every validation branch, both
+  success paths, all 3 `CHECK` constraint mappings, and the date-validation
+  special case, plus 5 direct unit tests for `ApiError`/`asyncRoute` itself
+  (`tests/apiError.test.js`). Staying at half credit: only one of ~15 route files
+  has adopted the pattern so far — the rest still hand-roll local error handling,
+  which is real, larger follow-up work, not something to force into one pass.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1038,3 +1067,46 @@ test that had been failing identically since PR 13).
     corrections already folded into the Phase 2/3/5 entries above (Phase 5's
     correction was a fix to how a prior `[x]` was scored, not new points;
     Phase 1's item was already `[x]` and stays `[x]`, just more robust now).
+
+- **PR 21** (`feat/api-error-async-route-pattern`): back on the checklist,
+  Phase 4's "Consolidated `ApiError`/`sendError`/async-route pattern
+  introduced" (Pass 27), the first fully-unstarted item in that phase.
+  `server.js`'s central Express error handler already does everything Pass
+  27 asks for (derives status from `err.status`, hides 500 details in
+  production, logs structured fields) — it just never receives anything,
+  because every route file catches its own errors locally instead of
+  throwing and calling `next(err)`. Added `utils/apiError.js`: `ApiError`
+  (typed error, `.status` + optional `.code`) and `asyncRoute` (wraps an
+  async handler so `next(err)` fires for both a rejected promise and a
+  synchronous throw). Caught a real bug in my own first version by running
+  its unit tests rather than trusting the design: the wrapper didn't return
+  its promise chain and didn't catch synchronous throws, so a caller
+  awaiting the wrapped handler resolved before the async `.catch(next)`
+  ever ran, and a plain synchronous throw propagated out of the wrapper
+  instead of reaching `next`. Fixed both before writing anything else on
+  top of it.
+
+  Piloted on `routes/business.routes.js` — the audit's own cited example
+  ("`business.routes.js` logs `err.stack || err` and returns bespoke 500
+  messages"), and a good pilot target independent of that: small (314
+  lines), always mounted (no feature flag), and had zero HTTP-level test
+  coverage before this PR. Replaced every `try/catch` +
+  `res.status(...).json(...)` with `throw new ApiError(status, message)`
+  plus `asyncRoute(...)`; kept local `try/catch` only where genuinely
+  needed — translating a DB `CHECK` constraint violation or
+  `accountingLockService`'s date-validation error into an `ApiError`, not
+  swallowing them. Every existing 400/404 message is preserved exactly; the
+  one intentional behavior change is that a truly unexpected 500 now
+  returns the same generic "Internal server error" text used everywhere
+  else instead of 4 different bespoke per-route messages — which is the
+  actual point of centralizing, not an accident. Added 27 HTTP-level tests
+  (`tests/businessRouteErrors.test.js`, all passing) covering every
+  validation branch, both success paths, all 3 `CHECK` constraint
+  mappings, and the date-validation special case, plus 5 direct unit tests
+  for `ApiError`/`asyncRoute` (`tests/apiError.test.js`). Full suite via
+  `npm run test:all` (now trustworthy, see the outside-session entry
+  above): **1407/1407 passing** (plus 3/3 ASVS controls) — 32 more than the
+  prior clean baseline, all new. Phase 4: 3.0/5 → 3.5/5; overall
+  30.5/54 → **31.0/54 (~57%)**. Staying at half credit on the checklist
+  item itself: only 1 of ~15 route files has adopted the pattern; the rest
+  is real, larger follow-up work.
