@@ -107,7 +107,19 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   `tests/v3AuthTokenStorage.test.js`, which fails if any future `setItem` call
   writes a key outside an explicit allowlist, or writes an
   access/refresh/session/auth/jwt-token-shaped key under any name.
-- [~] Route-local error/log paths sanitized (`25df086b`)
+- [~] Route-local error/log paths sanitized (`25df086b`, `24931740`) — still half
+  credit, one more file done. `24931740` (direct commit, outside this PR sequence)
+  adds `utils/routeErrorContext.js` (`buildRouteErrorContext`/`summarizeRouteError`)
+  and rolls it out across every `logError()` call site in
+  `routes/transactions.routes.js` — structured `{ err: { name, message, code,
+  constraint, status }, requestId, method, path, userId, params, businessId }`
+  instead of dumping the raw error object, matching Pass 27's suggested fix
+  ("Log structured fields: request ID, route, user ID, business ID, error code,
+  status, sanitized message"). Includes a self-enforcing guardrail test
+  (`routeErrorContext.test.js`) that scans the route file's source and fails if
+  any `logError(` call site doesn't route through `buildRouteErrorContext`. Only
+  one route file converted so far — the rest of the ~15 route files still log
+  raw `err`/`err.stack` directly.
 
 ## Phase 3 - Startup, Deployment, Migration Safety — 4.5 / 6
 - [x] Checksum repair removed from `prestart` (`391319b9`)
@@ -156,7 +168,30 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 ## Phase 5 - Database Invariants And Multi-Tenant Boundaries — 4.0 / 5
 - [x] `CHECK` constraint for subscription `plan_code`/`status` (`e7e14acb`)
 - [x] `CHECK` constraint for `transactions.review_status` (`01cd219c`)
-- [x] Cross-business child relationships enforced (`e018b6eb`)
+- [x] Cross-business child relationships enforced (`e018b6eb`, `56624845`, `6f9d4477`) —
+  **correction to this file's own earlier scoring**: `e018b6eb` was credited `[x]`
+  (full) when it landed, but it had a real regression that independent re-verification
+  missed. It added composite FKs (`(transaction_id, business_id)` etc.) on
+  `support_artifacts`, `transaction_review_states`, and `vehicle_expense_details`
+  without specifying `ON DELETE`, which defaults to `NO ACTION` — strictly more
+  restrictive than the original single-column FKs on the same tables (`ON DELETE SET
+  NULL` for `support_artifacts`, `ON DELETE CASCADE` for the other two, per
+  `20260523_add_vehicle_claim_fields.sql`/`20260523_create_cpa_export_state.sql`).
+  Net effect: deleting a transaction with any linked support artifact, review state,
+  or vehicle expense detail row would have started failing with an FK violation
+  instead of cascading/nulling the way it always had. Fixed directly on `main`
+  (`56624845`, outside this PR sequence) with a follow-up migration that drops and
+  re-adds each composite FK with its original `ON DELETE` action restored — verified
+  against the original single-column definitions, not guessed. `6f9d4477` adds
+  `scripts/check-child-business-fk-readiness.js` (`npm run db:child-fk-readiness`), a
+  read-only report on whether each `NOT VALID` composite constraint is safe to
+  `VALIDATE` yet (existence, validated status, live violation count + sample rows) —
+  directly answers Pass 24's suggested "backfill/validate with a query that detects
+  mismatched child business IDs before adding constraints." Both have test coverage
+  (`migrationFiles.test.js`, `childBusinessFkReadinessScript.test.js`). Still `[x]`:
+  the underlying constraints are correctly in place and now correctly configured: the
+  earlier credit was right about the destination, wrong about a step along the way,
+  and that step has since been corrected.
 - [~] Account type/currency assumptions reviewed for closed-set constraints — did the
   actual review the audit (Pass 24) asked for, rather than reflexively adding `CHECK`
   constraints the way the plan_code/status/review_status items did, because this one
@@ -967,3 +1002,39 @@ test that had been failing identically since PR 13).
   `Docs/PRODUCTION-READINESS.md` matrix) still isn't built, so this stays at
   half credit — Phase 3's score and the overall percentage are unchanged by
   this PR.
+
+- **Outside this PR sequence** (6 commits pushed directly to `main` on
+  2026-08-10, `a4f29011`..`24931740`, reviewed and reconciled into this file
+  after the fact): real, independent progress, not vibes-checked here before
+  landing since it happened outside this session — verified each one against
+  `main` before writing this entry, same bar as everything else in this file.
+  - `a4f29011` + `3c7c43d0`: fixed the exact "`npm run test:all` has a stale
+    hardcoded file list" gap this file's own prior PR narratives kept
+    working around (running `node --test tests/*.test.js` directly instead
+    of trusting `test:all`). First commit brought the hardcoded list current;
+    second replaced the hardcoded list entirely with
+    `scripts/run-all-node-tests.mjs`, which discovers every `tests/*.test.js`
+    file at runtime. Added `tests/testAllInventory.test.js` as a
+    self-enforcing guardrail — fails if `test:all` and the actual directory
+    listing ever drift again. `npm run test:all` is now trustworthy; no more
+    reason to hand-roll the file glob in this file's own PR checklists going
+    forward.
+  - `56624845` and `6f9d4477`: see the corrected Phase 5 entry above — fixed
+    a real `ON DELETE` regression in `e018b6eb`'s composite FKs and added a
+    readiness-check script for validating them later.
+  - `897b8c1d`: same fix as the now-closed PR #303
+    (`fix/backslash-path-traversal-basename`), independently reimplemented
+    with `path.posix.basename()` instead of the platform `path.basename()`
+    after backslash normalization — equivalent result, landed directly on
+    `main` first. PR #303 closed as superseded rather than merged, since
+    merging it now would just reintroduce a diff against an already-fixed
+    file. **The Windows-path-traversal test that had been the sole failure
+    across every PR in this entire remediation effort is now fixed on
+    `main` for good** — confirmed via a full `npm run test:all` run:
+    **1375/1375 passing** (plus 3/3 ASVS controls).
+  - `24931740`: see the updated Phase 2 "Route-local error/log paths
+    sanitized" entry above.
+  - None of these move the headline percentage on their own beyond the
+    corrections already folded into the Phase 2/3/5 entries above (Phase 5's
+    correction was a fix to how a prior `[x]` was scored, not new points;
+    Phase 1's item was already `[x]` and stays `[x]`, just more robust now).
