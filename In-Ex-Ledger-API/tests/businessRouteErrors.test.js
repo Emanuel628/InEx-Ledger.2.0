@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/business.routes.js");
 
 const BASE_ROW = {
@@ -76,12 +78,7 @@ function loadBusinessRouterFixture({ queryImpl } = {}) {
   const app = express();
   app.use(express.json());
   app.use("/api/business", router);
-  // Minimal stand-in for server.js's real central error handler.
-  app.use((err, req, res, next) => {
-    const status = err.status || err.statusCode || 500;
-    const message = status < 500 ? err.message : "Internal server error";
-    res.status(status).json({ error: message });
-  });
+  attachCentralErrorHandler(app);
 
   return {
     app,

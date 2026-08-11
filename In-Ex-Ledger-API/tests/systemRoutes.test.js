@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const SYSTEM_ROUTE_PATH = require.resolve("../routes/system.routes.js");
 
 function loadSystemRouter() {
@@ -66,14 +68,6 @@ function loadSystemRouter() {
         }
       };
     }
-    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
-      return {
-        logError(message, context) {
-          state.logErrors.push({ message, context });
-        }
-      };
-    }
-
     return originalLoad(requestName, parent, isMain);
   };
 
@@ -81,6 +75,9 @@ function loadSystemRouter() {
   const router = require("../routes/system.routes.js");
   const app = express();
   app.use("/api/system", router);
+  attachCentralErrorHandler(app, {
+    logError: (message, context) => state.logErrors.push({ message, context })
+  });
 
   return {
     app,
@@ -129,8 +126,11 @@ test("system diagnostics logs failures instead of swallowing them", async () => 
       .set("Cookie", "access_token=test");
 
     assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
     assert.equal(fixture.state.logErrors.length, 1);
-    assert.match(fixture.state.logErrors[0].message, /GET \/api\/system\/diagnostics error/);
+    assert.equal(fixture.state.logErrors[0].message, "Unhandled error");
+    assert.equal(fixture.state.logErrors[0].context.path, "/api/system/diagnostics");
+    assert.equal(fixture.state.logErrors[0].context.message, "diagnostics exploded");
   } finally {
     fixture.cleanup();
   }

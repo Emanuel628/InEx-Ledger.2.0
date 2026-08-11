@@ -119,6 +119,36 @@ function buildTestApp(router, mountPath = "/api/test") {
   return app;
 }
 
+/**
+ * Attaches a stand-in for server.js's real final Express error handler:
+ * status from err.status/err.statusCode (default 500), the error's own
+ * message for <500 responses, a generic "Internal server error" for 500s,
+ * and an optional logError(...) call so tests can assert on it.
+ *
+ * Route files using utils/apiError.js's asyncRoute rely on next(err)
+ * reaching a handler shaped like this one -- tests that mount such a route
+ * standalone (without importing all of server.js) need to attach this,
+ * the same way server.js does for the real app.
+ *
+ * @param {import('express').Application} app
+ * @param {{ logError?: Function }} [opts] Pass a spy to assert on log calls.
+ */
+function attachCentralErrorHandler(app, { logError } = {}) {
+  app.use((err, req, res, next) => {
+    const status = err.status || err.statusCode || 500;
+    if (logError) {
+      logError("Unhandled error", {
+        status,
+        method: req.method,
+        path: req.path,
+        message: err.message
+      });
+    }
+    const message = status < 500 ? err.message : "Internal server error";
+    res.status(status).json({ error: message });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Token helpers
 // ---------------------------------------------------------------------------
@@ -274,6 +304,7 @@ module.exports = {
   makeFakePool,
   makeFakePoolSequence,
   buildTestApp,
+  attachCentralErrorHandler,
   makeAuthToken,
   makeMfaToken,
   csrfPair,
