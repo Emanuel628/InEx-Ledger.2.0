@@ -5,7 +5,7 @@ const { getRateLimiterHealth } = require("../middleware/rateLimiter.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { getReceiptStorageStatus } = require("../services/receiptStorage.js");
 const { buildDiagnostics } = require("../services/diagnosticsService.js");
-const { logError } = require("../utils/logger.js");
+const { asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 const publicSystemLimiter = createDataApiLimiter({
@@ -38,18 +38,13 @@ router.get("/links", publicSystemLimiter, (req, res) => {
  * never secrets, IPs, PII, or customer data. Useful for the settings
  * Diagnostics panel and for support.
  */
-router.get("/diagnostics", requireAuth, (req, res) => {
-  try {
-    const diagnostics = buildDiagnostics({
-      migrationStats,
-      rateLimiting: getRateLimiterHealth(),
-      receiptStorage: getReceiptStorageStatus()
-    });
-    res.json(diagnostics);
-  } catch (err) {
-    logError("GET /api/system/diagnostics error:", err.stack || err);
-    res.status(500).json({ error: "Failed to load diagnostics." });
-  }
-});
+router.get("/diagnostics", requireAuth, asyncRoute(async (req, res) => {
+  const diagnostics = buildDiagnostics({
+    migrationStats,
+    rateLimiting: getRateLimiterHealth(),
+    receiptStorage: getReceiptStorageStatus()
+  });
+  res.json(diagnostics);
+}));
 
 module.exports = router;

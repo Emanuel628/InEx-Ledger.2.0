@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/entitlements.routes.js");
 
 function loadRouter({ effectiveTier = "v1", usage = null, businesses = [{ id: "biz-1" }], subscriptionExtra = {} } = {}) {
@@ -67,14 +69,6 @@ function loadRouter({ effectiveTier = "v1", usage = null, businesses = [{ id: "b
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
       return { pool: {} };
     }
-    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
-      return {
-        logError(message, context) {
-          state.logErrors.push({ message, context });
-        }
-      };
-    }
-
     return originalLoad(requestName, parent, isMain);
   };
 
@@ -82,6 +76,9 @@ function loadRouter({ effectiveTier = "v1", usage = null, businesses = [{ id: "b
   const router = require("../routes/entitlements.routes.js");
   const app = express();
   app.use("/api/entitlements", router);
+  attachCentralErrorHandler(app, {
+    logError: (message, context) => state.logErrors.push({ message, context })
+  });
 
   return {
     app,
@@ -171,8 +168,11 @@ test("plan-context route logs failures and returns 500", async () => {
       .set("Cookie", "access_token=test");
 
     assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
     assert.equal(fixture.state.logErrors.length, 1);
-    assert.match(fixture.state.logErrors[0].message, /GET \/entitlements\/plan-context error/);
+    assert.equal(fixture.state.logErrors[0].message, "Unhandled error");
+    assert.equal(fixture.state.logErrors[0].context.path, "/api/entitlements/plan-context");
+    assert.equal(fixture.state.logErrors[0].context.message, "subscription exploded");
   } finally {
     fixture.cleanup();
   }

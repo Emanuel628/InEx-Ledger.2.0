@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/homeOffice.routes.js");
 
 function loadHomeOfficeRouterFixture() {
@@ -72,6 +74,7 @@ function loadHomeOfficeRouterFixture() {
   const app = express();
   app.use(express.json());
   app.use("/api/home-office-worksheet", router);
+  attachCentralErrorHandler(app);
   return { app, state };
 }
 
@@ -107,4 +110,90 @@ test("DELETE removes the worksheet for the tax year", async () => {
   const response = await request(app).delete("/api/home-office-worksheet?tax_year=2026");
   assert.equal(response.status, 200);
   assert.equal(response.body.ok, true);
+});
+
+test("DELETE returns 404 when there is no worksheet for the tax year", async () => {
+  const originalLoad = Module._load.bind(Module);
+  Module._load = function (requestName, parent, isMain) {
+    if (/db\.js$/.test(requestName)) {
+      return { pool: { async query() { return { rows: [], rowCount: 0 }; } } };
+    }
+    if (/auth\.middleware\.js$/.test(requestName)) {
+      return { requireAuth(req, _res, next) { req.user = { id: "user_1" }; next(); } };
+    }
+    if (/csrf\.middleware\.js$/.test(requestName)) {
+      return { requireCsrfProtection: (_req, _res, next) => next() };
+    }
+    if (/resolveBusinessIdForUser\.js$/.test(requestName)) {
+      return { resolveBusinessIdForUser: async () => "biz_1" };
+    }
+    if (/exportSnapshotService\.js$/.test(requestName)) {
+      return { invalidateSnapshotsForBusiness: async () => {} };
+    }
+    if (/utils\/logger\.js$/.test(requestName)) {
+      return { logError() {}, logWarn() {}, logInfo() {} };
+    }
+    return originalLoad(requestName, parent, isMain);
+  };
+
+  delete require.cache[ROUTE_PATH];
+  delete require.cache[require.resolve("../services/homeOfficeService.js")];
+  const router = require(ROUTE_PATH);
+  Module._load = originalLoad;
+
+  const app = express();
+  app.use(express.json());
+  app.use("/api/home-office-worksheet", router);
+  attachCentralErrorHandler(app);
+
+  try {
+    const response = await request(app).delete("/api/home-office-worksheet?tax_year=1999");
+    assert.equal(response.status, 404);
+    assert.equal(response.body.error, "Home-office worksheet not found.");
+  } finally {
+    delete require.cache[ROUTE_PATH];
+  }
+});
+
+test("GET returns a generic 500 for an unexpected DB failure", async () => {
+  const originalLoad = Module._load.bind(Module);
+  Module._load = function (requestName, parent, isMain) {
+    if (/db\.js$/.test(requestName)) {
+      return { pool: { async query() { throw new Error("connection reset"); } } };
+    }
+    if (/auth\.middleware\.js$/.test(requestName)) {
+      return { requireAuth(req, _res, next) { req.user = { id: "user_1" }; next(); } };
+    }
+    if (/csrf\.middleware\.js$/.test(requestName)) {
+      return { requireCsrfProtection: (_req, _res, next) => next() };
+    }
+    if (/resolveBusinessIdForUser\.js$/.test(requestName)) {
+      return { resolveBusinessIdForUser: async () => "biz_1" };
+    }
+    if (/exportSnapshotService\.js$/.test(requestName)) {
+      return { invalidateSnapshotsForBusiness: async () => {} };
+    }
+    if (/utils\/logger\.js$/.test(requestName)) {
+      return { logError() {}, logWarn() {}, logInfo() {} };
+    }
+    return originalLoad(requestName, parent, isMain);
+  };
+
+  delete require.cache[ROUTE_PATH];
+  delete require.cache[require.resolve("../services/homeOfficeService.js")];
+  const router = require(ROUTE_PATH);
+  Module._load = originalLoad;
+
+  const app = express();
+  app.use(express.json());
+  app.use("/api/home-office-worksheet", router);
+  attachCentralErrorHandler(app);
+
+  try {
+    const response = await request(app).get("/api/home-office-worksheet?tax_year=2026");
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
+  } finally {
+    delete require.cache[ROUTE_PATH];
+  }
 });

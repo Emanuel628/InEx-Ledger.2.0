@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/bank-connections.routes.js");
 
 function loadRouter() {
@@ -71,14 +73,6 @@ function loadRouter() {
         }
       };
     }
-    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
-      return {
-        logError(message, context) {
-          state.logErrors.push({ message, context });
-        }
-      };
-    }
-
     return originalLoad(requestName, parent, isMain);
   };
 
@@ -87,6 +81,9 @@ function loadRouter() {
   const app = express();
   app.use(express.json());
   app.use("/api/bank-connections", router);
+  attachCentralErrorHandler(app, {
+    logError: (message, context) => state.logErrors.push({ message, context })
+  });
 
   return {
     app,
@@ -149,8 +146,11 @@ test("bank-connections list logs failures and returns 500", async () => {
       .set("x-csrf-token", "test-csrf");
 
     assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
     assert.equal(fixture.state.logErrors.length, 1);
-    assert.match(fixture.state.logErrors[0].message, /GET \/bank-connections error/);
+    assert.equal(fixture.state.logErrors[0].message, "Unhandled error");
+    assert.equal(fixture.state.logErrors[0].context.path, "/api/bank-connections");
+    assert.equal(fixture.state.logErrors[0].context.message, "connections exploded");
   } finally {
     fixture.cleanup();
   }

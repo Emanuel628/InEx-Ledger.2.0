@@ -181,9 +181,28 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   (`tests/businessRouteErrors.test.js`) covering every validation branch, both
   success paths, all 3 `CHECK` constraint mappings, and the date-validation
   special case, plus 5 direct unit tests for `ApiError`/`asyncRoute` itself
-  (`tests/apiError.test.js`). Staying at half credit: only one of ~15 route files
-  has adopted the pattern so far — the rest still hand-roll local error handling,
-  which is real, larger follow-up work, not something to force into one pass.
+  (`tests/apiError.test.js`). **Follow-up, same PR sequence**: converted 4 more
+  small, always-mounted route files — `system.routes.js`, `bank-connections.routes.js`,
+  `homeOffice.routes.js`, `entitlements.routes.js`. `homeOffice.routes.js` was a
+  useful data point: `services/homeOfficeService.js` already threw plain `Error`s
+  with a `.status` property (`Object.assign(new Error(...), { status: 400 })`) —
+  functionally identical to `ApiError` in shape — so the route's manual
+  `if (err?.status === 400) return res.status(400)...` re-wrap was pure boilerplate
+  once `asyncRoute` lets it propagate straight to the central handler. Along the
+  way, found real duplication forming across route-specific test files: 4 of them
+  were about to grow an identical 6-line "minimal stand-in for server.js's central
+  error handler" snippet. Extracted `attachCentralErrorHandler` into the shared
+  `tests/helpers/testPool.js` (alongside the existing `buildTestApp`) instead,
+  with 5 new direct unit tests (`tests/testPoolHelpers.test.js`), and switched
+  `businessRouteErrors.test.js`'s already-existing inline copy over to it too so
+  there's one canonical version, not one exception. Updated the 4 route files'
+  existing test files to match centralized behavior (checking `logError`'s new
+  structured `{status, method, path, message}` shape instead of a route-specific
+  log-string regex) and added 2 previously-missing tests for
+  `homeOffice.routes.js` (a 404 and a 500 path that had no coverage before).
+  Now 5 of 41 route files use the pattern. Staying at half credit — the
+  remaining 36 still hand-roll local error handling, which is real, larger
+  follow-up work, not something to force into one pass.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1110,3 +1129,38 @@ test that had been failing identically since PR 13).
   30.5/54 → **31.0/54 (~57%)**. Staying at half credit on the checklist
   item itself: only 1 of ~15 route files has adopted the pattern; the rest
   is real, larger follow-up work.
+
+- **PR 22** (`chore/expand-api-error-rollout`): same phase, same item,
+  no new checklist points (correctly stays at half credit — see below).
+  Converted 4 more small, always-mounted route files to the `ApiError`/
+  `asyncRoute` pattern: `system.routes.js`, `bank-connections.routes.js`,
+  `homeOffice.routes.js`, `entitlements.routes.js`. `homeOffice.routes.js`
+  was a useful data point for the pattern's value: its service layer
+  (`services/homeOfficeService.js`) already threw plain `Error`s with a
+  `.status` property set — functionally identical to `ApiError` — so the
+  route's `if (err?.status === 400) return res.status(400)...` re-wrap was
+  pure boilerplate once `asyncRoute` let the error propagate straight to
+  the central handler; deleted it rather than keeping a redundant
+  translation step.
+
+  Along the way, caught real duplication forming before it multiplied:
+  4 route-specific test files were each about to grow an identical 6-line
+  "minimal stand-in for server.js's central error handler" snippet (the
+  same one `businessRouteErrors.test.js` already had inline from PR 21).
+  Extracted `attachCentralErrorHandler` into the shared
+  `tests/helpers/testPool.js` next to the existing `buildTestApp`, added
+  5 direct unit tests for it (`tests/testPoolHelpers.test.js`), and
+  switched `businessRouteErrors.test.js` over to the shared version too —
+  one canonical implementation, not one exception plus four new copies.
+  Updated the 4 route files' existing test files to match: the log
+  assertions now check the central handler's structured
+  `{status, method, path, message}` shape instead of each route's own
+  log-string regex (which no longer exists, since the routes don't call
+  `logError` locally anymore). Added 2 tests that had no coverage before
+  (`homeOffice.routes.js`'s DELETE-404 and GET-500 paths). Full suite via
+  `npm run test:all`: **1414/1414 passing** (plus 3/3 ASVS controls) — 7
+  more than PR 21's baseline, all new (5 helper tests + 2 home-office
+  tests). Now 5 of 41 route files use the pattern; the checklist item
+  stays at half credit since the remaining 36 don't yet, but the pattern
+  itself (plus its test infrastructure) is now proven across more than
+  one shape of route file, not just the original pilot.

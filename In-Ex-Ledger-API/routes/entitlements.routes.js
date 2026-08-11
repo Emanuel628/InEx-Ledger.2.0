@@ -5,7 +5,7 @@ const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require(
 const { getUsageSummary } = require('../services/basicPlanUsageService.js');
 const { getPlanDefinition } = require('../config/planCatalog.js');
 const { pool } = require('../db.js');
-const { logError } = require('../utils/logger.js');
+const { asyncRoute } = require('../utils/apiError.js');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -25,72 +25,62 @@ function resolveResetsAt(now = new Date()) {
   return next.toISOString();
 }
 
-router.get('/plan-context', async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    const definition = getPlanDefinition(subscription?.effectiveTier);
-    const usage = await getUsageSummary(pool, businessId, { subscription });
-    const resetsAt = resolveResetsAt();
+router.get('/plan-context', asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+  const definition = getPlanDefinition(subscription?.effectiveTier);
+  const usage = await getUsageSummary(pool, businessId, { subscription });
+  const resetsAt = resolveResetsAt();
 
-    const businesses = await listBusinessesForUser(req.user.id).catch(() => []);
-    const activeBusinessCount = businesses.length || 1;
+  const businesses = await listBusinessesForUser(req.user.id).catch(() => []);
+  const activeBusinessCount = businesses.length || 1;
 
-    res.json({
-      plan: {
-        code: definition.code,
-        name: definition.name,
-        status: subscription?.effectiveStatus || subscription?.status || 'free',
-        isPaid: Boolean(subscription?.isPaid),
-        isTrialing: Boolean(subscription?.isTrialing),
-        cancelAtPeriodEnd: Boolean(subscription?.cancelAtPeriodEnd)
-      },
-      features: definition.features,
-      usage: {
-        transactions: { ...jsonSafeMetric(usage.transactions), resetsAt },
-        receipts: { ...jsonSafeMetric(usage.receipts), resetsAt }
-      },
-      businessCapacity: {
-        included: 1,
-        additional: Number(subscription?.additionalBusinesses || 0),
-        maximum: Number(subscription?.maxBusinessesAllowed || 1),
-        active: activeBusinessCount
-      },
-      upgrade: {
-        available: definition.code === PLAN_PRO || definition.code === PLAN_BUSINESS ? false : true,
-        targetPlan: PLAN_PRO,
-        targetName: 'Pro'
-      }
-    });
-  } catch (err) {
-    logError('GET /entitlements/plan-context error:', err.stack || err);
-    res.status(500).json({ error: 'Failed to load plan context.' });
-  }
-});
+  res.json({
+    plan: {
+      code: definition.code,
+      name: definition.name,
+      status: subscription?.effectiveStatus || subscription?.status || 'free',
+      isPaid: Boolean(subscription?.isPaid),
+      isTrialing: Boolean(subscription?.isTrialing),
+      cancelAtPeriodEnd: Boolean(subscription?.cancelAtPeriodEnd)
+    },
+    features: definition.features,
+    usage: {
+      transactions: { ...jsonSafeMetric(usage.transactions), resetsAt },
+      receipts: { ...jsonSafeMetric(usage.receipts), resetsAt }
+    },
+    businessCapacity: {
+      included: 1,
+      additional: Number(subscription?.additionalBusinesses || 0),
+      maximum: Number(subscription?.maxBusinessesAllowed || 1),
+      active: activeBusinessCount
+    },
+    upgrade: {
+      available: definition.code === PLAN_PRO || definition.code === PLAN_BUSINESS ? false : true,
+      targetPlan: PLAN_PRO,
+      targetName: 'Pro'
+    }
+  });
+}));
 
 // Deprecated: kept temporarily for backward compatibility. Derives from the
 // same canonical plan catalog as /plan-context so the two never contradict
 // each other -- do not add fields here that aren't backed by the catalog.
-router.get('/features', async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    const definition = getPlanDefinition(subscription?.effectiveTier);
-    const f = definition.features;
+router.get('/features', asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+  const definition = getPlanDefinition(subscription?.effectiveTier);
+  const f = definition.features;
 
-    res.json({
-      effective_tier: subscription?.effectiveTier || null,
-      recurring_templates_enabled: f.recurring_transactions,
-      export_history_enabled: f.export_history,
-      receipts_enabled: f.receipts,
-      edge_case_tools_enabled: f.edge_case_tools,
-      tax_estimates_enabled: f.tax_estimates,
-      advanced_exports_enabled: f.advanced_exports
-    });
-  } catch (err) {
-    logError('GET /entitlements/features error:', err.stack || err);
-    res.status(500).json({ error: 'Failed to load feature entitlements.' });
-  }
-});
+  res.json({
+    effective_tier: subscription?.effectiveTier || null,
+    recurring_templates_enabled: f.recurring_transactions,
+    export_history_enabled: f.export_history,
+    receipts_enabled: f.receipts,
+    edge_case_tools_enabled: f.edge_case_tools,
+    tax_estimates_enabled: f.tax_estimates,
+    advanced_exports_enabled: f.advanced_exports
+  });
+}));
 
 module.exports = router;

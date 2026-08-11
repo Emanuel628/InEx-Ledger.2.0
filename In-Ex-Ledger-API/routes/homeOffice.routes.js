@@ -11,6 +11,7 @@ const {
 } = require("../services/homeOfficeService.js");
 const { logError } = require("../utils/logger.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -29,49 +30,36 @@ function invalidateHomeOfficeSnapshots(businessId) {
 }
 
 // GET /api/home-office-worksheet?tax_year=2026
-router.get("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const taxYear = resolveTaxYear(req.query.tax_year);
-    const worksheet = await getHomeOfficeWorksheet(businessId, taxYear);
-    res.json({ worksheet: worksheet || null, taxYear });
-  } catch (err) {
-    logError("GET /home-office-worksheet error:", err.stack || err);
-    res.status(500).json({ error: "Server error loading home-office worksheet." });
-  }
-});
+router.get("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const taxYear = resolveTaxYear(req.query.tax_year);
+  const worksheet = await getHomeOfficeWorksheet(businessId, taxYear);
+  res.json({ worksheet: worksheet || null, taxYear });
+}));
 
 // PUT /api/home-office-worksheet  (upsert for the given tax year)
-router.put("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const body = req.body ?? {};
-    const taxYear = resolveTaxYear(body.tax_year);
-    const worksheet = await upsertHomeOfficeWorksheet(businessId, taxYear, body);
-    invalidateHomeOfficeSnapshots(businessId);
-    res.json({ worksheet, taxYear });
-  } catch (err) {
-    if (err?.status === 400) {
-      return res.status(400).json({ error: err.message });
-    }
-    logError("PUT /home-office-worksheet error:", err.stack || err);
-    res.status(500).json({ error: "Server error saving home-office worksheet." });
-  }
-});
+// upsertHomeOfficeWorksheet already throws Error instances carrying a
+// .status (e.g. 400 for invalid area inputs), so no translation is needed
+// here -- they reach the central handler already in ApiError-compatible shape.
+router.put("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const body = req.body ?? {};
+  const taxYear = resolveTaxYear(body.tax_year);
+  const worksheet = await upsertHomeOfficeWorksheet(businessId, taxYear, body);
+  invalidateHomeOfficeSnapshots(businessId);
+  res.json({ worksheet, taxYear });
+}));
 
 // DELETE /api/home-office-worksheet?tax_year=2026
-router.delete("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const taxYear = resolveTaxYear(req.query.tax_year);
-    const deleted = await deleteHomeOfficeWorksheet(businessId, taxYear);
-    if (!deleted) return res.status(404).json({ error: "Home-office worksheet not found." });
-    invalidateHomeOfficeSnapshots(businessId);
-    res.json({ ok: true, taxYear });
-  } catch (err) {
-    logError("DELETE /home-office-worksheet error:", err.stack || err);
-    res.status(500).json({ error: "Server error deleting home-office worksheet." });
+router.delete("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const taxYear = resolveTaxYear(req.query.tax_year);
+  const deleted = await deleteHomeOfficeWorksheet(businessId, taxYear);
+  if (!deleted) {
+    throw new ApiError(404, "Home-office worksheet not found.");
   }
-});
+  invalidateHomeOfficeSnapshots(businessId);
+  res.json({ ok: true, taxYear });
+}));
 
 module.exports = router;
