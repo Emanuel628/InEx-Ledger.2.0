@@ -200,9 +200,23 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   structured `{status, method, path, message}` shape instead of a route-specific
   log-string regex) and added 2 previously-missing tests for
   `homeOffice.routes.js` (a 404 and a 500 path that had no coverage before).
-  Now 5 of 41 route files use the pattern. Staying at half credit — the
-  remaining 36 still hand-roll local error handling, which is real, larger
-  follow-up work, not something to force into one pass.
+  Now 5 of 41 route files use the pattern. **Follow-up, same PR sequence**:
+  converted 4 more — `vehicleClaims.routes.js`, `sessions.routes.js`,
+  `consent.routes.js`, `capitalAssets.routes.js`. `vehicleClaims.routes.js`
+  was the interesting one: `services/vehicleClaimService.js` throws plain
+  `Error`s with no `.status` for its 3 domain-validation cases (a claim
+  method conflict, and two CRA-region rules), unlike `homeOfficeService.js`
+  which already had `.status`. Rather than reshaping the service (bigger,
+  separate change) or losing the route's existing message-substring
+  detection, kept the same detection logic, just throwing `ApiError(400, ...)`
+  instead of responding directly — same behavior, still gets the pattern's
+  benefit for the other paths in the file. `vehicleClaims.routes.js` and
+  `capitalAssets.routes.js` had zero test coverage before (28 tests added
+  between them: 13 + 19 — some overlap since capitalAssets got 19 across
+  4 endpoints incl. every validation branch); added 4 more to
+  `sessions.routes.js` (400/404/500 paths that existed in the code but not
+  in tests) and 3 more to `consent.routes.js` (400 + two 500s). Now 9 of 41
+  route files use the pattern. Staying at half credit — 32 to go.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1164,3 +1178,30 @@ test that had been failing identically since PR 13).
   stays at half credit since the remaining 36 don't yet, but the pattern
   itself (plus its test infrastructure) is now proven across more than
   one shape of route file, not just the original pilot.
+
+- **PR 23** (`chore/expand-api-error-rollout-2`): same phase, same item,
+  no new checklist points. Converted 4 more route files:
+  `vehicleClaims.routes.js`, `sessions.routes.js`, `consent.routes.js`,
+  `capitalAssets.routes.js`. `vehicleClaims.routes.js` was a different data
+  point than `homeOffice.routes.js`'s: its service
+  (`services/vehicleClaimService.js`) throws plain `Error`s with no
+  `.status` for 3 domain-validation cases (a same-tax-year claim-method
+  conflict, and two CRA-region rules), so the route already had to detect
+  these by matching on `err.message` substrings. Left that detection logic
+  exactly as it was rather than reshaping the service (a bigger, separate
+  change) or silently dropping the distinction — just throws
+  `ApiError(400, err.message)` on a match now instead of responding
+  directly, so the file still gets the pattern's benefit everywhere else.
+  `consent.routes.js` is notable for being the one public (no `requireAuth`)
+  route file converted so far — confirms the pattern isn't auth-specific.
+
+  `vehicleClaims.routes.js` and `capitalAssets.routes.js` had zero test
+  coverage before this PR — added 13 and 19 tests respectively, covering
+  every validation branch, both 404 paths, and the domain-error
+  translations. Added 4 more tests to `sessions.routes.js` (the 400/404/500
+  paths existed in the code already but had no test) and 3 more to
+  `consent.routes.js` (the 400 path plus two 500s). Full suite via
+  `npm run test:all`: **1453/1453 passing** (plus 3/3 ASVS controls) — 39
+  more than PR 22's baseline, all new. Now **9 of 41** route files use the
+  pattern; checklist item stays at half credit — 32 to go, and that's
+  still real, larger follow-up work rather than something to rush.
