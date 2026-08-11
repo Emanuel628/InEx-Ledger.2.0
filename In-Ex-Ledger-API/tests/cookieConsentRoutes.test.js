@@ -7,6 +7,8 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const CONSENT_ROUTE_PATH = require.resolve("../routes/consent.routes.js");
 
 function loadConsentRouterFixture(overrides = {}) {
@@ -22,6 +24,9 @@ function loadConsentRouterFixture(overrides = {}) {
         pool: {
           async query(sql, params) {
             state.queries.push({ sql, params });
+            if (overrides.forceQueryError) {
+              throw new Error("connection reset");
+            }
             if (/FROM refresh_tokens/i.test(sql)) {
               if (overrides.refreshUserId === null) {
                 return { rowCount: 0, rows: [] };
@@ -81,12 +86,6 @@ function loadConsentRouterFixture(overrides = {}) {
       };
     }
 
-    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
-      return {
-        logError() {}
-      };
-    }
-
     return originalLoad(requestName, parent, isMain);
   };
 
@@ -96,6 +95,7 @@ function loadConsentRouterFixture(overrides = {}) {
   app.use(cookieParser());
   app.use(express.json());
   app.use("/api/consent", router);
+  attachCentralErrorHandler(app);
 
   return {
     app,
@@ -194,6 +194,54 @@ test("GET /api/consent/cookie falls back to the existing browser cookie when no 
     assert.equal(response.status, 200);
     assert.equal(response.body?.record?.decision, "accepted");
     assert.equal(response.body?.record?.version, "1");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("POST /api/consent/cookie rejects an invalid decision value", async () => {
+  const fixture = loadConsentRouterFixture();
+
+  try {
+    const response = await request(fixture.app)
+      .post("/api/consent/cookie")
+      .set("x-csrf-token", "test-csrf")
+      .send({ decision: "maybe", version: "1" });
+
+    assert.equal(response.status, 400);
+    assert.equal(response.body.error, "Invalid decision value.");
+    assert.equal(fixture.state.inserted, null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("POST /api/consent/cookie returns a generic 500 for an unexpected DB failure", async () => {
+  const fixture = loadConsentRouterFixture({ forceQueryError: true });
+
+  try {
+    const response = await request(fixture.app)
+      .post("/api/consent/cookie")
+      .set("x-csrf-token", "test-csrf")
+      .send({ decision: "accepted", version: "1" });
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("GET /api/consent/cookie returns a generic 500 for an unexpected DB failure", async () => {
+  const fixture = loadConsentRouterFixture({ forceQueryError: true });
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/consent/cookie")
+      .set("Cookie", "access_token=valid_access_token");
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
   } finally {
     fixture.cleanup();
   }

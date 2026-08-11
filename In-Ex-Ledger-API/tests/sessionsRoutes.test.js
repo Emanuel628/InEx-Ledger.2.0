@@ -7,6 +7,8 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/sessions.routes.js");
 
 function loadSessionsRouter({ queryImpl } = {}) {
@@ -63,6 +65,7 @@ function loadSessionsRouter({ queryImpl } = {}) {
   const app = express();
   app.use(cookieParser());
   app.use("/api/sessions", router);
+  attachCentralErrorHandler(app);
 
   return {
     app,
@@ -174,6 +177,55 @@ test("sessions DELETE all clears the refresh cookie when the caller has a curren
       (response.headers["set-cookie"] || []).some((cookie) => cookie.startsWith("refresh_token=")),
       "revoke-all should clear the refresh cookie"
     );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("sessions DELETE :id rejects a non-UUID session id", async () => {
+  const fixture = loadSessionsRouter();
+  try {
+    const response = await request(fixture.app).delete("/api/sessions/not-a-uuid");
+    assert.equal(response.status, 400);
+    assert.equal(response.body.error, "Invalid session ID.");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("sessions DELETE :id returns 404 when the session doesn't belong to the caller", async () => {
+  const fixture = loadSessionsRouter({ queryImpl: async () => ({ rowCount: 0, rows: [] }) });
+  try {
+    const response = await request(fixture.app)
+      .delete("/api/sessions/11111111-1111-4111-8111-111111111111");
+    assert.equal(response.status, 404);
+    assert.equal(response.body.error, "Session not found.");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("sessions GET returns a generic 500 for an unexpected DB failure", async () => {
+  const fixture = loadSessionsRouter({
+    queryImpl: async () => { throw new Error("connection reset"); }
+  });
+  try {
+    const response = await request(fixture.app).get("/api/sessions");
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("sessions DELETE all returns a generic 500 for an unexpected DB failure", async () => {
+  const fixture = loadSessionsRouter({
+    queryImpl: async () => { throw new Error("connection reset"); }
+  });
+  try {
+    const response = await request(fixture.app).delete("/api/sessions");
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
   } finally {
     fixture.cleanup();
   }

@@ -6,7 +6,7 @@ const { verifyToken } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { ACCESS_TOKEN_COOKIE } = require("../utils/authUtils.js");
 const { getTrustedClientIp } = require("../services/requestIpService.js");
-const { logError } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 
@@ -91,42 +91,37 @@ async function resolveAuthenticatedUserId(req) {
   }
 }
 
-router.get("/cookie", consentLimiter, async (req, res) => {
-  try {
-    const userId = await resolveAuthenticatedUserId(req);
-    if (userId) {
-      const result = await pool.query(
-        `SELECT decision, version, created_at
-           FROM cookie_consent_log
-          WHERE user_id = $1
-          ORDER BY created_at DESC
-          LIMIT 1`,
-        [userId]
+router.get("/cookie", consentLimiter, asyncRoute(async (req, res) => {
+  const userId = await resolveAuthenticatedUserId(req);
+  if (userId) {
+    const result = await pool.query(
+      `SELECT decision, version, created_at
+         FROM cookie_consent_log
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [userId]
+    );
+    if (result.rows[0]) {
+      const record = buildConsentRecord(
+        result.rows[0].decision,
+        result.rows[0].version,
+        result.rows[0].created_at
       );
-      if (result.rows[0]) {
-        const record = buildConsentRecord(
-          result.rows[0].decision,
-          result.rows[0].version,
-          result.rows[0].created_at
-        );
-        setConsentCookie(res, record);
-        return res.json({ record });
-      }
+      setConsentCookie(res, record);
+      return res.json({ record });
     }
-
-    const cookieRecord = parseConsentCookie(req.cookies?.[CONSENT_COOKIE_NAME]);
-    return res.json({ record: cookieRecord });
-  } catch (err) {
-    logError("cookie_consent_lookup_failed", err);
-    return res.status(500).json({ error: "Failed to load consent." });
   }
-});
 
-router.post("/cookie", consentLimiter, requireCsrfProtection, async (req, res) => {
+  const cookieRecord = parseConsentCookie(req.cookies?.[CONSENT_COOKIE_NAME]);
+  return res.json({ record: cookieRecord });
+}));
+
+router.post("/cookie", consentLimiter, requireCsrfProtection, asyncRoute(async (req, res) => {
   const { decision, version } = req.body || {};
 
   if (!VALID_DECISIONS.has(decision)) {
-    return res.status(400).json({ error: "Invalid decision value." });
+    throw new ApiError(400, "Invalid decision value.");
   }
 
   const record = buildConsentRecord(decision, version);
@@ -134,18 +129,13 @@ router.post("/cookie", consentLimiter, requireCsrfProtection, async (req, res) =
   const userAgent = String(req.headers["user-agent"] || "").slice(0, MAX_USER_AGENT_LENGTH);
   const userId = await resolveAuthenticatedUserId(req);
 
-  try {
-    await pool.query(
-      `INSERT INTO cookie_consent_log (id, user_id, decision, version, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [crypto.randomUUID(), userId, record.decision, record.version, ipAddress || null, userAgent || null]
-    );
-    setConsentCookie(res, record);
-    return res.json({ ok: true, record });
-  } catch (err) {
-    logError("cookie_consent_insert_failed", err);
-    return res.status(500).json({ error: "Failed to record consent." });
-  }
-});
+  await pool.query(
+    `INSERT INTO cookie_consent_log (id, user_id, decision, version, ip_address, user_agent)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [crypto.randomUUID(), userId, record.decision, record.version, ipAddress || null, userAgent || null]
+  );
+  setConsentCookie(res, record);
+  return res.json({ ok: true, record });
+}));
 
 module.exports = router;
