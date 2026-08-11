@@ -15,6 +15,7 @@ const {
 } = require("../services/gstHstNumberService.js");
 const { logError } = require("../utils/logger.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -126,189 +127,184 @@ async function updateBusinessRow(businessId, payload) {
 /**
  * GET /api/business
  */
-router.get("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    res.json(await fetchBusinessRow(businessId));
-  } catch (err) {
-    logError("GET /business error:", err.stack || err);
-    res.status(500).json({ error: "Server error loading business profile." });
-  }
-});
+router.get("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  res.json(await fetchBusinessRow(businessId));
+}));
 
 /**
  * PUT /api/business
  */
-router.put("/", async (req, res) => {
+router.put("/", asyncRoute(async (req, res) => {
   const body = req.body ?? {};
 
   // --- Input validation ---
   if (body.region && !VALID_REGIONS.has(body.region)) {
-    return res.status(400).json({ error: "Invalid region. Must be 'US' or 'CA'." });
+    throw new ApiError(400, "Invalid region. Must be 'US' or 'CA'.");
   }
   if (body.language && !VALID_LANGUAGES.has(body.language)) {
-    return res.status(400).json({ error: "language must be 'en', 'es', or 'fr'." });
+    throw new ApiError(400, "language must be 'en', 'es', or 'fr'.");
   }
   if (body.accounting_method && !VALID_ACCOUNTING_METHODS.has(body.accounting_method.toLowerCase())) {
-    return res.status(400).json({ error: "Invalid accounting method. Must be 'cash' or 'accrual'." });
+    throw new ApiError(400, "Invalid accounting method. Must be 'cash' or 'accrual'.");
   }
   if (body.business_activity_code && !/^[0-9]{6}$/.test(body.business_activity_code)) {
-    return res.status(400).json({ error: "Business Activity Code must be a 6-digit NAICS code." });
+    throw new ApiError(400, "Business Activity Code must be a 6-digit NAICS code.");
   }
   if (body.business_type && !VALID_ENTITY_TYPES.has(body.business_type)) {
-    return res.status(400).json({ error: "Invalid legal entity structure." });
+    throw new ApiError(400, "Invalid legal entity structure.");
   }
   if (body.gst_hst_method && !VALID_GST_HST_METHODS.has(body.gst_hst_method.toLowerCase())) {
-    return res.status(400).json({ error: "gst_hst_method must be 'regular' or 'quick'." });
+    throw new ApiError(400, "gst_hst_method must be 'regular' or 'quick'.");
   }
   if (body.material_participation != null && typeof body.material_participation !== "boolean") {
-    return res.status(400).json({ error: "material_participation must be a boolean value." });
+    throw new ApiError(400, "material_participation must be a boolean value.");
   }
   if (body.gst_hst_registered != null && typeof body.gst_hst_registered !== "boolean") {
-    return res.status(400).json({ error: "gst_hst_registered must be a boolean value." });
+    throw new ApiError(400, "gst_hst_registered must be a boolean value.");
   }
 
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const current = await fetchBusinessRow(businessId);
+  if (!current) {
+    throw new ApiError(404, "Business not found.");
+  }
+
+  const region = (body.region || current.region || "US").toUpperCase();
+  const businessType = body.business_type || current.business_type;
+
+  // Geographic structural compliance: Single-Member LLC is a US-only classification
+  if (region === "CA" && businessType === "single_member_llc") {
+    throw new ApiError(400, "Single-Member LLC is not a valid CRA tax classification for Canada.");
+  }
+
+  // CA requires a valid province code
+  const province = region === "CA"
+    ? String(body.province || current.province || "").toUpperCase() || null
+    : null;
+  if (region === "CA" && !province) {
+    throw new ApiError(400, "Province is required for Canadian businesses.");
+  }
+  if (province && !CA_PROVINCES.has(province)) {
+    throw new ApiError(400, "Invalid Canadian province code.");
+  }
+
+  // Sole proprietorships must use the standard calendar fiscal year (Jan 1 start)
+  // This applies in both the US (Schedule C requires calendar year for most filers)
+  // and Canada (T2125 sole props use Dec 31 year-end = Jan 1 start).
+  let fiscalYearStart = ('fiscal_year_start' in body)
+    ? normalizeOptionalTrimmedString(body.fiscal_year_start)
+    : current.fiscal_year_start;
+  if (businessType === "sole_proprietorship" && fiscalYearStart !== "01-01") {
+    fiscalYearStart = "01-01";
+  }
+
+  if (region === "CA" && !fiscalYearStart) {
+    throw new ApiError(400, "fiscal_year_start is required for Canadian businesses.");
+  }
+
+  const resolvedAccountingMethod = ('accounting_method' in body)
+    ? normalizeOptionalTrimmedString(String(body.accounting_method || "").toLowerCase())
+    : current.accounting_method;
+
+  const resolvedContactFullName = ('contact_full_name' in body)
+    ? normalizeOptionalTrimmedString(body.contact_full_name)
+    : current.contact_full_name;
+  if (!resolvedContactFullName) {
+    throw new ApiError(400, "contact_full_name is required.");
+  }
+
+  const resolvedMaterialParticipation = ('material_participation' in body)
+    ? body.material_participation
+    : current.material_participation;
+  if (region === "US" && typeof resolvedMaterialParticipation !== "boolean") {
+    throw new ApiError(400, "material_participation is required for US businesses.");
+  }
+
+  // Resolve GST/HST fields using the final registered state, not the raw body value,
+  // so that a partial profile update does not wipe existing registration details.
+  const resolvedGstHstRegistered = typeof body.gst_hst_registered === "boolean"
+    ? body.gst_hst_registered
+    : Boolean(current.gst_hst_registered);
+  const resolvedGstHstNumber = resolvedGstHstRegistered
+    ? ('gst_hst_number' in body ? normalizeOptionalTrimmedString(body.gst_hst_number) : current.gst_hst_number)
+    : null;
+  const resolvedGstHstMethod = resolvedGstHstRegistered
+    ? ('gst_hst_method' in body ? normalizeOptionalTrimmedString(body.gst_hst_method) : current.gst_hst_method)
+    : null;
+
+  const payload = {
+    name: normalizeOptionalTrimmedString(body.name) || current.name,
+    region,
+    language: body.language || current.language,
+    fiscal_year_start: fiscalYearStart,
+    province,
+    business_type: businessType,
+    tax_id: 'tax_id' in body ? normalizeOptionalTrimmedString(body.tax_id) : current.tax_id,
+    address: 'address' in body ? normalizeOptionalTrimmedString(body.address) : current.address,
+    contact_full_name: resolvedContactFullName,
+    operating_name: 'operating_name' in body
+      ? normalizeOptionalTrimmedString(body.operating_name)
+      : current.operating_name,
+    business_activity_code: 'business_activity_code' in body
+      ? normalizeOptionalTrimmedString(body.business_activity_code)
+      : current.business_activity_code,
+    accounting_method: resolvedAccountingMethod || null,
+    material_participation: resolvedMaterialParticipation,
+    gst_hst_registered: resolvedGstHstRegistered,
+    gst_hst_number: region === "CA" ? resolvedGstHstNumber : null,
+    gst_hst_method: region === "CA" ? resolvedGstHstMethod : null
+  };
+
+  let updated;
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const current = await fetchBusinessRow(businessId);
-    if (!current) return res.status(404).json({ error: "Business not found." });
-
-    const region = (body.region || current.region || "US").toUpperCase();
-    const businessType = body.business_type || current.business_type;
-
-    // Geographic structural compliance: Single-Member LLC is a US-only classification
-    if (region === "CA" && businessType === "single_member_llc") {
-      return res.status(400).json({ error: "Single-Member LLC is not a valid CRA tax classification for Canada." });
-    }
-
-    // CA requires a valid province code
-    const province = region === "CA"
-      ? String(body.province || current.province || "").toUpperCase() || null
-      : null;
-    if (region === "CA" && !province) {
-      return res.status(400).json({ error: "Province is required for Canadian businesses." });
-    }
-    if (province && !CA_PROVINCES.has(province)) {
-      return res.status(400).json({ error: "Invalid Canadian province code." });
-    }
-
-    // Sole proprietorships must use the standard calendar fiscal year (Jan 1 start)
-    // This applies in both the US (Schedule C requires calendar year for most filers)
-    // and Canada (T2125 sole props use Dec 31 year-end = Jan 1 start).
-    let fiscalYearStart = ('fiscal_year_start' in body)
-      ? normalizeOptionalTrimmedString(body.fiscal_year_start)
-      : current.fiscal_year_start;
-    if (businessType === "sole_proprietorship" && fiscalYearStart !== "01-01") {
-      fiscalYearStart = "01-01";
-    }
-
-    if (region === "CA" && !fiscalYearStart) {
-      return res.status(400).json({ error: "fiscal_year_start is required for Canadian businesses." });
-    }
-
-    const resolvedAccountingMethod = ('accounting_method' in body)
-      ? normalizeOptionalTrimmedString(String(body.accounting_method || "").toLowerCase())
-      : current.accounting_method;
-
-    const resolvedContactFullName = ('contact_full_name' in body)
-      ? normalizeOptionalTrimmedString(body.contact_full_name)
-      : current.contact_full_name;
-    if (!resolvedContactFullName) {
-      return res.status(400).json({ error: "contact_full_name is required." });
-    }
-
-    const resolvedMaterialParticipation = ('material_participation' in body)
-      ? body.material_participation
-      : current.material_participation;
-    if (region === "US" && typeof resolvedMaterialParticipation !== "boolean") {
-      return res.status(400).json({ error: "material_participation is required for US businesses." });
-    }
-
-    // Resolve GST/HST fields using the final registered state, not the raw body value,
-    // so that a partial profile update does not wipe existing registration details.
-    const resolvedGstHstRegistered = typeof body.gst_hst_registered === "boolean"
-      ? body.gst_hst_registered
-      : Boolean(current.gst_hst_registered);
-    const resolvedGstHstNumber = resolvedGstHstRegistered
-      ? ('gst_hst_number' in body ? normalizeOptionalTrimmedString(body.gst_hst_number) : current.gst_hst_number)
-      : null;
-    const resolvedGstHstMethod = resolvedGstHstRegistered
-      ? ('gst_hst_method' in body ? normalizeOptionalTrimmedString(body.gst_hst_method) : current.gst_hst_method)
-      : null;
-
-    const payload = {
-      name: normalizeOptionalTrimmedString(body.name) || current.name,
-      region,
-      language: body.language || current.language,
-      fiscal_year_start: fiscalYearStart,
-      province,
-      business_type: businessType,
-      tax_id: 'tax_id' in body ? normalizeOptionalTrimmedString(body.tax_id) : current.tax_id,
-      address: 'address' in body ? normalizeOptionalTrimmedString(body.address) : current.address,
-      contact_full_name: resolvedContactFullName,
-      operating_name: 'operating_name' in body
-        ? normalizeOptionalTrimmedString(body.operating_name)
-        : current.operating_name,
-      business_activity_code: 'business_activity_code' in body
-        ? normalizeOptionalTrimmedString(body.business_activity_code)
-        : current.business_activity_code,
-      accounting_method: resolvedAccountingMethod || null,
-      material_participation: resolvedMaterialParticipation,
-      gst_hst_registered: resolvedGstHstRegistered,
-      gst_hst_number: region === "CA" ? resolvedGstHstNumber : null,
-      gst_hst_method: region === "CA" ? resolvedGstHstMethod : null
-    };
-
-    const updated = await updateBusinessRow(businessId, payload);
-    void invalidateSnapshotsForBusiness({
-      businessId,
-      reason: "Business filing profile changed after export."
-    }).catch((error) => logError("Business snapshot invalidation failed:", error));
-    res.json(updated);
+    updated = await updateBusinessRow(businessId, payload);
   } catch (err) {
     const constraint = err.constraint || "";
     if (constraint === "chk_business_activity_code") {
-      return res.status(400).json({ error: "Business Activity Code must be exactly 6 digits (e.g. 541511)." });
+      throw new ApiError(400, "Business Activity Code must be exactly 6 digits (e.g. 541511).");
     }
     if (constraint === "chk_business_type") {
-      return res.status(400).json({ error: "The selected entity type is not valid for this region." });
+      throw new ApiError(400, "The selected entity type is not valid for this region.");
     }
     if (constraint === "chk_ca_entity_match") {
-      return res.status(400).json({ error: "Single-member LLC is not a recognized entity type in Canada. Use Sole Proprietorship or another supported type." });
+      throw new ApiError(400, "Single-member LLC is not a recognized entity type in Canada. Use Sole Proprietorship or another supported type.");
     }
-    logError("PUT /business error:", err.stack || err);
-    res.status(500).json({ error: "Server error updating profile." });
+    throw err;
   }
-});
 
-router.get("/accounting-lock", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const lock = await loadAccountingLockState(pool, businessId);
-    res.json({ lock });
-  } catch (err) {
-    logError("GET /business/accounting-lock error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while loading the accounting lock." });
-  }
-});
+  void invalidateSnapshotsForBusiness({
+    businessId,
+    reason: "Business filing profile changed after export."
+  }).catch((error) => logError("Business snapshot invalidation failed:", error));
+  res.json(updated);
+}));
 
-router.put("/accounting-lock", async (req, res) => {
+router.get("/accounting-lock", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const lock = await loadAccountingLockState(pool, businessId);
+  res.json({ lock });
+}));
+
+router.put("/accounting-lock", asyncRoute(async (req, res) => {
   const { locked_through_date, note } = req.body ?? {};
+
+  let normalizedLockDate;
   try {
-    const normalizedLockDate = normalizeDateOnly(locked_through_date);
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const lock = await saveAccountingLockState(pool, businessId, req.user.id, {
-      lockedThroughDate: normalizedLockDate,
-      note
-    });
-    res.json({ lock, locked: lock?.isLocked ?? false });
+    normalizedLockDate = normalizeDateOnly(locked_through_date);
   } catch (err) {
     if (err.message === "Date value is invalid.") {
-      return res.status(400).json({ error: "locked_through_date must be a valid date." });
+      throw new ApiError(400, "locked_through_date must be a valid date.");
     }
-    logError("PUT /business/accounting-lock error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while updating the accounting lock." });
+    throw err;
   }
-});
+
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const lock = await saveAccountingLockState(pool, businessId, req.user.id, {
+    lockedThroughDate: normalizedLockDate,
+    note
+  });
+  res.json({ lock, locked: lock?.isLocked ?? false });
+}));
 
 module.exports = router;
