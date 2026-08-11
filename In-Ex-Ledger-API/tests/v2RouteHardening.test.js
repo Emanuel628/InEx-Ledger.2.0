@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const PROJECTS_ROUTE_PATH = require.resolve("../routes/projects.routes.js");
 const VENDORS_ROUTE_PATH = require.resolve("../routes/vendors.routes.js");
 const CUSTOMERS_ROUTE_PATH = require.resolve("../routes/customers.routes.js");
@@ -252,6 +254,9 @@ function loadRouter(routePath, routeName) {
     const app = express();
     app.use(express.json());
     app.use("/api/test", router);
+    attachCentralErrorHandler(app, {
+      logError: (message, context) => state.logErrors.push({ message, context })
+    });
     return {
       app,
       state,
@@ -492,8 +497,8 @@ test("projects list logs service failures instead of swallowing them silently", 
 
     assert.equal(response.status, 500);
     assert.equal(fixture.state.logErrors.length, 1);
-    assert.match(fixture.state.logErrors[0].message, /GET \/projects failed/);
-    assert.match(String(fixture.state.logErrors[0].context?.err || ""), /project list exploded/);
+    assert.equal(fixture.state.logErrors[0].message, "Unhandled error");
+    assert.match(String(fixture.state.logErrors[0].context?.message || ""), /project list exploded/);
   } finally {
     fixture.cleanup();
   }
@@ -507,7 +512,7 @@ test("projects create service failures return 500, not validation-shaped 400", a
       .send({ name: "Website refresh" });
 
     assert.equal(response.status, 500);
-    assert.equal(response.body.error, "Failed to create project");
+    assert.equal(response.body.error, "Internal server error");
     assert.equal(fixture.state.serviceCalls.length, 1);
   } finally {
     fixture.cleanup();
@@ -542,7 +547,7 @@ test("billable expense create service failures return 500, not validation-shaped
       .send(validBillableExpensePayload());
 
     assert.equal(response.status, 500);
-    assert.equal(response.body.error, "Failed to create billable expense");
+    assert.equal(response.body.error, "Internal server error");
     assert.equal(fixture.state.serviceCalls.length, 1);
   } finally {
     fixture.cleanup();

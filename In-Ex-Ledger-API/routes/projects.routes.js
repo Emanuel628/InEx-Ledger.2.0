@@ -7,7 +7,7 @@ const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 const { isUuid } = require('../api/utils/v2HttpValidators');
-const { logError } = require('../utils/logger.js');
+const { ApiError, asyncRoute } = require('../utils/apiError.js');
 
 // All routes require V2 feature flag and entitlement
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
@@ -31,89 +31,60 @@ function validateMetadata(body) {
   return normalized;
 }
 
-function formatRouteError(err) {
-  return err instanceof Error ? err.message : String(err || 'unknown_error');
-}
-
 // List projects
-router.get('/', async (req, res) => {
-  try {
-    const projects = await ProjectService.listProjects(req.business.id);
-    res.json({ projects });
-  } catch (err) {
-    logError('GET /projects failed', { err: formatRouteError(err), businessId: req.business?.id });
-    res.status(500).json({ error: 'Failed to list projects' });
-  }
-});
+router.get('/', asyncRoute(async (req, res) => {
+  const projects = await ProjectService.listProjects(req.business.id);
+  res.json({ projects });
+}));
 
 // Get project by id
-router.get('/:id', async (req, res) => {
+router.get('/:id', asyncRoute(async (req, res) => {
   if (!isUuid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid project id.' });
+    throw new ApiError(400, 'Invalid project id.');
   }
-  try {
-    const project = await ProjectService.getProject(req.business.id, req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    res.json({ project });
-  } catch (err) {
-    logError('GET /projects/:id failed', { err: formatRouteError(err), businessId: req.business?.id, projectId: req.params.id });
-    res.status(500).json({ error: 'Failed to get project' });
-  }
-});
+  const project = await ProjectService.getProject(req.business.id, req.params.id);
+  if (!project) throw new ApiError(404, 'Project not found');
+  res.json({ project });
+}));
 
 // Create project
-router.post('/', async (req, res) => {
+router.post('/', asyncRoute(async (req, res) => {
   if (!hasProjectPayload(req.body)) {
-    return res.status(400).json({ error: 'Project name is required.' });
+    throw new ApiError(400, 'Project name is required.');
   }
   const metadataCheck = validateMetadata(req.body);
   if (!metadataCheck.ok) {
-    return res.status(400).json({ error: metadataCheck.error });
+    throw new ApiError(400, metadataCheck.error);
   }
-  try {
-    const project = await ProjectService.createProject(req.business.id, req.body);
-    res.status(201).json({ project });
-  } catch (err) {
-    logError('POST /projects failed', { err: formatRouteError(err), businessId: req.business?.id });
-    res.status(500).json({ error: 'Failed to create project' });
-  }
-});
+  const project = await ProjectService.createProject(req.business.id, req.body);
+  res.status(201).json({ project });
+}));
 
 // Update project
-router.put('/:id', async (req, res) => {
+router.put('/:id', asyncRoute(async (req, res) => {
   if (!isUuid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid project id.' });
+    throw new ApiError(400, 'Invalid project id.');
   }
   if (!hasProjectPayload(req.body)) {
-    return res.status(400).json({ error: 'Project name is required.' });
+    throw new ApiError(400, 'Project name is required.');
   }
   const metadataCheck = validateMetadata(req.body);
   if (!metadataCheck.ok) {
-    return res.status(400).json({ error: metadataCheck.error });
+    throw new ApiError(400, metadataCheck.error);
   }
-  try {
-    const project = await ProjectService.updateProject(req.business.id, req.params.id, req.body);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    res.json({ project });
-  } catch (err) {
-    logError('PUT /projects/:id failed', { err: formatRouteError(err), businessId: req.business?.id, projectId: req.params.id });
-    res.status(500).json({ error: 'Failed to update project' });
-  }
-});
+  const project = await ProjectService.updateProject(req.business.id, req.params.id, req.body);
+  if (!project) throw new ApiError(404, 'Project not found');
+  res.json({ project });
+}));
 
 // Delete project
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', asyncRoute(async (req, res) => {
   if (!isUuid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid project id.' });
+    throw new ApiError(400, 'Invalid project id.');
   }
-  try {
-    const deleted = await ProjectService.deleteProject(req.business.id, req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Project not found' });
-    res.json({ success: true });
-  } catch (err) {
-    logError('DELETE /projects/:id failed', { err: formatRouteError(err), businessId: req.business?.id, projectId: req.params.id });
-    res.status(500).json({ error: 'Failed to delete project' });
-  }
-});
+  const deleted = await ProjectService.deleteProject(req.business.id, req.params.id);
+  if (!deleted) throw new ApiError(404, 'Project not found');
+  res.json({ success: true });
+}));
 
 module.exports = router;

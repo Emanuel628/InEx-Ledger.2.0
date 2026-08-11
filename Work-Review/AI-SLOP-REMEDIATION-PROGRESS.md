@@ -252,6 +252,34 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   **1468/1468 passing** (plus 3/3 ASVS controls) — 15 more than PR 23's
   baseline, all new. Now **11 of 41** route files use the pattern; checklist
   item stays at half credit — 30 to go.
+  **Follow-up, same PR sequence**: converted 4 more — `customers.routes.js`,
+  `vendors.routes.js`, `projects.routes.js`, `billable-expenses.routes.js`
+  — all four V2/Business CRUD routers sharing the exact same shape (uniform
+  `try { ... } catch (err) { logError(...); res.status(500).json({error:...})}`
+  boilerplate on every handler, no unique-constraint mapping or compensation
+  work in any of them). Straightforward conversion: upfront validation/UUID
+  checks became `throw new ApiError(400, ...)`, not-found checks became
+  `throw new ApiError(404, ...)`, the per-route `logError`/500 catch was
+  removed entirely in all four. Correcting an earlier miscount while here:
+  a fresh `find`/`ls` of `routes/*.routes.js` shows **40** route files
+  total, not 41 as previously logged — this batch is **15 of 40**, not
+  "15 of 41"; the discrepancy predates this PR and doesn't reflect a file
+  being added or removed. `tests/v2RouteHardening.test.js` shares all four
+  routers (plus `bills.routes.js` and `invoices.routes.js`, not touched
+  here) through one `loadRouter` fixture with no `attachCentralErrorHandler`
+  wired in, and several of its existing tests asserted the exact custom
+  500 message (`"Failed to create project"`, `"Failed to create billable
+  expense"`) and the old per-route `logError` call shape — both no longer
+  true once the routes throw instead of responding directly. Wired in the
+  central handler and updated those assertions to the generic `"Internal
+  server error"` message and the handler's `{status, method, path, message}`
+  log shape, rather than leaving the fixture out of sync with the routes it
+  tests. Added a new `tests/v2RouteErrors.test.js` (16 tests, table-driven
+  across all four routers: GET/PUT/DELETE 404-for-unknown-id and a
+  non-UUID 400, none of which had any coverage before). Full suite via
+  `npm run test:all`: **1484/1484 passing** (plus 3/3 ASVS controls) — 16
+  more than the prior baseline, all new. Now **15 of 40** route files use
+  the pattern; checklist item stays at half credit — 25 to go.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1285,3 +1313,46 @@ test that had been failing identically since PR 13).
   `npm run test:all`: **1468/1468 passing** (plus 3/3 ASVS controls) — 15
   more than PR 23's baseline, all new. Now **11 of 41** route files use the
   pattern; checklist item stays at half credit — 30 to go.
+
+- **PR 25** (`chore/expand-api-error-rollout-4`): same phase, same item,
+  no new checklist points. Converted 4 more route files —
+  `customers.routes.js`, `vendors.routes.js`, `projects.routes.js`,
+  `billable-expenses.routes.js` — the easiest batch so far: all four are
+  V2/Business CRUD routers with the identical shape (uniform
+  `try/catch { logError(...); res.status(500).json({error}) }` boilerplate
+  on every handler, no unique-constraint mapping, no compensation work).
+  Pure mechanical conversion: validation/UUID checks became
+  `throw new ApiError(400, ...)`, not-found checks became
+  `throw new ApiError(404, ...)`, the per-route catch was deleted outright
+  in all four rather than kept for any special case, because there wasn't
+  one.
+
+  While confirming the true total route-file count for this update, a
+  fresh `find routes/*.routes.js` turned up **40** files, not the 41 this
+  log has been counting against since PR 21 — corrected the running count
+  here rather than perpetuate a stale number; nothing was added or removed,
+  the earlier count was simply off by one.
+
+  `tests/v2RouteHardening.test.js` runs all four of these routers (plus
+  `bills.routes.js` and `invoices.routes.js`, untouched this PR) through
+  one shared `loadRouter` fixture with no `attachCentralErrorHandler`
+  wired in — the same category of gap as PR 24's `criticalFlows`/
+  `integrationFlows` fixtures, just caught before shipping this time
+  instead of after. Several of its existing tests asserted the exact old
+  500 message (`"Failed to create project"`, `"Failed to create billable
+  expense"`) and the route's own `logError` call shape, both of which stop
+  being true once the routes throw instead of responding directly. Wired
+  in the central handler and updated those assertions to the generic
+  `"Internal server error"` message and the handler's
+  `{status, method, path, message}` log shape, rather than leave the
+  fixture asserting behavior the routes no longer have.
+
+  Added `tests/v2RouteErrors.test.js` (new file, 16 tests, table-driven
+  across all four routers): GET/PUT/DELETE 404-for-unknown-id and a
+  non-UUID 400 for each — none of which had any coverage before, since
+  the shared hardening-test file only exercised auth/CSRF/rate-limit
+  boundaries and validation-before-service-call, never the not-found path.
+  Full suite via `npm run test:all`: **1484/1484 passing** (plus 3/3 ASVS
+  controls) — 16 more than PR 24's baseline, all new. Now **15 of 40**
+  route files use the pattern; checklist item stays at half credit — 25
+  to go.

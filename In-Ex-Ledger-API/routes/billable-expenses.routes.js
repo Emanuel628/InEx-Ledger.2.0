@@ -7,7 +7,7 @@ const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 const { isUuid } = require('../api/utils/v2HttpValidators');
-const { logError } = require('../utils/logger.js');
+const { ApiError, asyncRoute } = require('../utils/apiError.js');
 
 // All routes require V2 feature flag and entitlement
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
@@ -39,10 +39,6 @@ function hasBillableExpensePayload(body) {
 	);
 }
 
-function formatRouteError(err) {
-  return err instanceof Error ? err.message : String(err || 'unknown_error');
-}
-
 function validateMetadata(body) {
   const normalized = normalizeV2Metadata(body?.metadata);
   if (!normalized.ok) {
@@ -53,84 +49,59 @@ function validateMetadata(body) {
 }
 
 // List billable expenses
-router.get('/', async (req, res) => {
-  try {
-    const expenses = await BillableExpenseService.listBillableExpenses(req.business.id);
-    res.json({ expenses });
-  } catch (err) {
-    logError('GET /billable-expenses failed', { err: formatRouteError(err), businessId: req.business?.id });
-    res.status(500).json({ error: 'Failed to list billable expenses' });
-  }
-});
+router.get('/', asyncRoute(async (req, res) => {
+  const expenses = await BillableExpenseService.listBillableExpenses(req.business.id);
+  res.json({ expenses });
+}));
 
 // Get billable expense by id
-router.get('/:id', async (req, res) => {
+router.get('/:id', asyncRoute(async (req, res) => {
   if (!isUuid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid billable expense id.' });
+    throw new ApiError(400, 'Invalid billable expense id.');
   }
-  try {
-    const expense = await BillableExpenseService.getBillableExpense(req.business.id, req.params.id);
-    if (!expense) return res.status(404).json({ error: 'Billable expense not found' });
-    res.json({ expense });
-  } catch (err) {
-    logError('GET /billable-expenses/:id failed', { err: formatRouteError(err), businessId: req.business?.id, expenseId: req.params.id });
-    res.status(500).json({ error: 'Failed to get billable expense' });
-  }
-});
+  const expense = await BillableExpenseService.getBillableExpense(req.business.id, req.params.id);
+  if (!expense) throw new ApiError(404, 'Billable expense not found');
+  res.json({ expense });
+}));
 
 // Create billable expense
-router.post('/', async (req, res) => {
+router.post('/', asyncRoute(async (req, res) => {
   if (!hasBillableExpensePayload(req.body)) {
-    return res.status(400).json({ error: 'Missing required billable expense fields.' });
+    throw new ApiError(400, 'Missing required billable expense fields.');
   }
   const metadataCheck = validateMetadata(req.body);
   if (!metadataCheck.ok) {
-    return res.status(400).json({ error: metadataCheck.error });
+    throw new ApiError(400, metadataCheck.error);
   }
-  try {
-    const expense = await BillableExpenseService.createBillableExpense(req.business.id, req.body);
-    res.status(201).json({ expense });
-  } catch (err) {
-    logError('POST /billable-expenses failed', { err: formatRouteError(err), businessId: req.business?.id });
-    res.status(500).json({ error: 'Failed to create billable expense' });
-  }
-});
+  const expense = await BillableExpenseService.createBillableExpense(req.business.id, req.body);
+  res.status(201).json({ expense });
+}));
 
 // Update billable expense
-router.put('/:id', async (req, res) => {
+router.put('/:id', asyncRoute(async (req, res) => {
   if (!isUuid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid billable expense id.' });
+    throw new ApiError(400, 'Invalid billable expense id.');
   }
   if (!hasBillableExpensePayload(req.body)) {
-    return res.status(400).json({ error: 'Missing required billable expense fields.' });
+    throw new ApiError(400, 'Missing required billable expense fields.');
   }
   const metadataCheck = validateMetadata(req.body);
   if (!metadataCheck.ok) {
-    return res.status(400).json({ error: metadataCheck.error });
+    throw new ApiError(400, metadataCheck.error);
   }
-  try {
-    const expense = await BillableExpenseService.updateBillableExpense(req.business.id, req.params.id, req.body);
-    if (!expense) return res.status(404).json({ error: 'Billable expense not found' });
-    res.json({ expense });
-  } catch (err) {
-    logError('PUT /billable-expenses/:id failed', { err: formatRouteError(err), businessId: req.business?.id, expenseId: req.params.id });
-    res.status(500).json({ error: 'Failed to update billable expense' });
-  }
-});
+  const expense = await BillableExpenseService.updateBillableExpense(req.business.id, req.params.id, req.body);
+  if (!expense) throw new ApiError(404, 'Billable expense not found');
+  res.json({ expense });
+}));
 
 // Delete billable expense
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', asyncRoute(async (req, res) => {
   if (!isUuid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid billable expense id.' });
+    throw new ApiError(400, 'Invalid billable expense id.');
   }
-  try {
-    const deleted = await BillableExpenseService.deleteBillableExpense(req.business.id, req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Billable expense not found' });
-    res.json({ success: true });
-  } catch (err) {
-    logError('DELETE /billable-expenses/:id failed', { err: formatRouteError(err), businessId: req.business?.id, expenseId: req.params.id });
-    res.status(500).json({ error: 'Failed to delete billable expense' });
-  }
-});
+  const deleted = await BillableExpenseService.deleteBillableExpense(req.business.id, req.params.id);
+  if (!deleted) throw new ApiError(404, 'Billable expense not found');
+  res.json({ success: true });
+}));
 
 module.exports = router;
