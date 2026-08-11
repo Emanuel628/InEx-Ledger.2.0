@@ -9,6 +9,8 @@ const fs = require("node:fs");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/supportArtifacts.routes.js");
 
 function loadSupportArtifactsRouterFixture() {
@@ -130,6 +132,7 @@ function loadSupportArtifactsRouterFixture() {
   const app = express();
   app.use(express.json());
   app.use("/api/support-artifacts", router);
+  attachCentralErrorHandler(app);
 
   return { app, state, tempDir };
 }
@@ -156,6 +159,107 @@ test("POST /api/support-artifacts/review-note saves a transaction note", async (
 
   assert.equal(response.status, 201);
   assert.equal(response.body.artifact_type, "review_note");
+});
+
+test("GET /api/support-artifacts requires a valid transaction_id", async () => {
+  const { app } = loadSupportArtifactsRouterFixture();
+  const response = await request(app).get("/api/support-artifacts?transaction_id=not-a-uuid");
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error, "transaction_id is required.");
+});
+
+test("POST /api/support-artifacts/review-note returns 404 when the transaction isn't owned by the business", async () => {
+  const originalLoad = Module._load.bind(Module);
+  Module._load = function (requestName, parent, isMain) {
+    if (/db\.js$/.test(requestName)) {
+      return { pool: { async query() { return { rows: [], rowCount: 0 }; } } };
+    }
+    if (/auth\.middleware\.js$/.test(requestName)) {
+      return { requireAuth(req, _res, next) { req.user = { id: "user_1" }; next(); } };
+    }
+    if (/csrf\.middleware\.js$/.test(requestName)) {
+      return { requireCsrfProtection(_req, _res, next) { next(); } };
+    }
+    if (/resolveBusinessIdForUser\.js$/.test(requestName)) {
+      return { resolveBusinessIdForUser: async () => "biz_1" };
+    }
+    if (/logger\.js$/.test(requestName)) {
+      return { logError() {}, logInfo() {}, logWarn() {} };
+    }
+    return originalLoad(requestName, parent, isMain);
+  };
+
+  delete require.cache[ROUTE_PATH];
+  const router = require(ROUTE_PATH);
+  Module._load = originalLoad;
+
+  const app = express();
+  app.use(express.json());
+  app.use("/api/support-artifacts", router);
+  attachCentralErrorHandler(app);
+
+  const response = await request(app)
+    .post("/api/support-artifacts/review-note")
+    .send({ transaction_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", notes: "Some notes" });
+
+  assert.equal(response.status, 404);
+  assert.equal(response.body.error, "Transaction not found.");
+  delete require.cache[ROUTE_PATH];
+});
+
+test("POST /api/support-artifacts/review-note returns a generic 500 for an unexpected DB failure", async () => {
+  const originalLoad = Module._load.bind(Module);
+  Module._load = function (requestName, parent, isMain) {
+    if (/db\.js$/.test(requestName)) {
+      return {
+        pool: {
+          async query(sql) {
+            if (/FROM transactions/i.test(sql)) return { rows: [{ id: "tx_1" }], rowCount: 1 };
+            throw new Error("connection reset");
+          }
+        }
+      };
+    }
+    if (/auth\.middleware\.js$/.test(requestName)) {
+      return { requireAuth(req, _res, next) { req.user = { id: "user_1" }; next(); } };
+    }
+    if (/csrf\.middleware\.js$/.test(requestName)) {
+      return { requireCsrfProtection(_req, _res, next) { next(); } };
+    }
+    if (/resolveBusinessIdForUser\.js$/.test(requestName)) {
+      return { resolveBusinessIdForUser: async () => "biz_1" };
+    }
+    if (/logger\.js$/.test(requestName)) {
+      return { logError() {}, logInfo() {}, logWarn() {} };
+    }
+    return originalLoad(requestName, parent, isMain);
+  };
+
+  delete require.cache[ROUTE_PATH];
+  const router = require(ROUTE_PATH);
+  Module._load = originalLoad;
+
+  const app = express();
+  app.use(express.json());
+  app.use("/api/support-artifacts", router);
+  attachCentralErrorHandler(app);
+
+  const response = await request(app)
+    .post("/api/support-artifacts/review-note")
+    .send({ transaction_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", notes: "Some notes" });
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(response.body, { error: "Internal server error" });
+  delete require.cache[ROUTE_PATH];
+});
+
+test("GET /api/support-artifacts/:id returns 404 when the stored file is missing from disk", async () => {
+  const { app } = loadSupportArtifactsRouterFixture();
+  // Fixture's DB mock always returns a row pointing at tempDir/support.txt,
+  // but nothing has written that file in this test, so resolution 404s.
+  const response = await request(app).get("/api/support-artifacts/3fa85f64-5717-4562-b3fc-2c963f66afa6");
+  assert.equal(response.status, 404);
+  assert.equal(response.body.error, "Support file missing.");
 });
 
 test("POST /api/support-artifacts/upload stores a support file", async () => {

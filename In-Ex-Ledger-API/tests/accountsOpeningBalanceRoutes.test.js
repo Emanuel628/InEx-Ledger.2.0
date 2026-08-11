@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/accounts.routes.js");
 
 function loadRouterWithState() {
@@ -104,6 +106,7 @@ function loadRouterWithState() {
     const app = express();
     app.use(express.json());
     app.use("/api/accounts", router);
+    attachCentralErrorHandler(app);
     return { app, state };
   } finally {
     Module._load = originalLoad;

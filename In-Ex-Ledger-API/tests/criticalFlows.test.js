@@ -61,6 +61,7 @@ const {
   saveAccountingLockState
 } = require("../services/accountingLockService.js");
 const { archiveTransaction } = require("../services/transactionAuditService.js");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const TEST_USER_ID = "00000000-0000-4000-8000-000000000111";
 const TEST_MFA_USER_ID = "00000000-0000-4000-8000-000000000112";
@@ -101,6 +102,7 @@ function buildApp(router, mountPath = "/api/test") {
   app.use(express.json());
   app.use(ensureCsrfCookie);
   app.use(mountPath, router);
+  attachCentralErrorHandler(app);
   return app;
 }
 

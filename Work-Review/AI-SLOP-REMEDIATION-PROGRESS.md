@@ -217,6 +217,41 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   `sessions.routes.js` (400/404/500 paths that existed in the code but not
   in tests) and 3 more to `consent.routes.js` (400 + two 500s). Now 9 of 41
   route files use the pattern. Staying at half credit — 32 to go.
+  **Follow-up, same PR sequence**: converted 2 more — `accounts.routes.js`
+  and `supportArtifacts.routes.js`, both meaningfully more complex than the
+  prior batch (a real DB transaction with rollback, and real filesystem
+  compensation on a failed upload). `accounts.routes.js`'s account-type
+  reclassification path calls `assertNoLockedPeriodTransactionsForAccount`,
+  whose `AccountingPeriodLockedError` carries extra structured fields
+  (`code`, `locked_through_date`) the shared central handler has no
+  mechanism to forward — kept a local catch that responds directly with
+  those fields instead of forcing it through `ApiError`. Its `DELETE /:id`
+  keeps its real `pool.connect()`/`BEGIN`/`COMMIT`/`ROLLBACK` transaction
+  intact (catch → rollback → rethrow → release in `finally`) as true
+  compensation work, not a pattern violation. `supportArtifacts.routes.js`'s
+  `POST /upload` similarly keeps a local catch that unlinks an
+  already-written file from disk if the DB insert after it fails, then
+  rethrows unchanged — and dropping its old bespoke `res.status(status).json(...)`
+  fallback is a real fix, not just a refactor: unmapped errors (e.g. a raw
+  DB failure) no longer leak `err.message` to the client, they now correctly
+  fall through to the central handler's generic "Internal server error".
+  Along the way, found and fixed a real, previously-invisible gap: two large
+  multi-router test files (`tests/criticalFlows.test.js`,
+  `tests/integrationFlows.test.js`) each maintain their own locally-duplicated
+  `buildApp` helper — copy-pasted rather than sharing `testPool.js`'s
+  `buildTestApp` — and neither had `attachCentralErrorHandler` wired in, so
+  3 tests in `integrationFlows.test.js` started failing the moment
+  `accounts.routes.js` began throwing instead of responding directly.
+  Fixed both files' local helpers and proactively audited the other 15
+  files sharing the same duplicated-`buildApp` pattern — confirmed none of
+  them mount an already-converted route file, so no other latent breakage.
+  Added a new `tests/accountsRouteErrors.test.js` (11 tests, including the
+  locked-period extra-fields response and the rollback-then-500 path) and
+  4 new tests to `tests/supportArtifactsRoutes.test.js` (a 400, a 404, a
+  500, and the file-missing-on-disk 404). Full suite via `npm run test:all`:
+  **1468/1468 passing** (plus 3/3 ASVS controls) — 15 more than PR 23's
+  baseline, all new. Now **11 of 41** route files use the pattern; checklist
+  item stays at half credit — 30 to go.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1205,3 +1240,48 @@ test that had been failing identically since PR 13).
   more than PR 22's baseline, all new. Now **9 of 41** route files use the
   pattern; checklist item stays at half credit — 32 to go, and that's
   still real, larger follow-up work rather than something to rush.
+
+- **PR 24** (`chore/expand-api-error-rollout-3`): same phase, same item,
+  no new checklist points. Converted 2 more route files —
+  `accounts.routes.js` and `supportArtifacts.routes.js` — both a step up in
+  complexity from the prior batches: a real DB transaction and real
+  filesystem compensation logic, not just validation-then-CRUD.
+  `accounts.routes.js`'s type-reclassification path surfaced a case the
+  pattern hadn't hit yet: `AccountingPeriodLockedError` carries extra
+  fields (`code`, `locked_through_date`) the shared central handler can't
+  express, since it only ever emits `{error}` (plus `requestId` on 500s).
+  Rather than stretching `ApiError`/the central handler to carry arbitrary
+  extra fields, kept a narrow local catch that responds directly for that
+  one case — the exception is intentional and documented inline, not a gap
+  in the rollout. Its `DELETE /:id` transaction (`BEGIN`/`COMMIT`/`ROLLBACK`)
+  and `supportArtifacts.routes.js`'s upload-then-cleanup-on-failure logic
+  were both left as local try/catch/rethrow, matching the audit's own
+  guidance to keep route-local catches only for true compensation work.
+  One incidental fix worth calling out: `supportArtifacts.routes.js`'s old
+  catch-all used to respond with the raw `err.message` for *any* unexpected
+  error, including a bare DB failure — that leaked internal detail to the
+  client. Now unmapped errors fall through to the central handler's generic
+  message, which is strictly safer, not just more consistent.
+
+  Converting `accounts.routes.js` also surfaced a real test-infrastructure
+  bug: `tests/criticalFlows.test.js` and `tests/integrationFlows.test.js`
+  each hand-roll their own copy of `buildApp` instead of using
+  `testPool.js`'s shared `buildTestApp`, and neither had
+  `attachCentralErrorHandler` wired in — so 3 tests in
+  `integrationFlows.test.js` broke the moment the route started throwing
+  instead of responding directly, despite the PR's diff never touching that
+  file. Fixed both local helpers, then proactively checked the other 15
+  test files sharing the same duplicated pattern against the growing list
+  of converted route files — none of them currently overlap, so no other
+  hidden breakage, but the duplication itself remains a standing risk for
+  future conversions.
+
+  Added `tests/accountsRouteErrors.test.js` (new file, 11 tests — every
+  validation branch, the unique-name 409, the 404s, the locked-period
+  extra-fields response, and the rollback-then-500 path with an explicit
+  assertion that `ROLLBACK` actually ran) and 4 new tests to
+  `tests/supportArtifactsRoutes.test.js` (a 400, an ownership 404, a
+  generic 500, and a file-missing-on-disk 404). Full suite via
+  `npm run test:all`: **1468/1468 passing** (plus 3/3 ASVS controls) — 15
+  more than PR 23's baseline, all new. Now **11 of 41** route files use the
+  pattern; checklist item stays at half credit — 30 to go.

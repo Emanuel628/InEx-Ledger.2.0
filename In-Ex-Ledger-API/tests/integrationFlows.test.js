@@ -46,6 +46,7 @@ const {
   generateCsrfToken,
   ensureCsrfCookie,
 } = require("../middleware/csrf.middleware.js");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -96,6 +97,7 @@ function buildApp(router, mountPath = "/api/test") {
   app.use(express.json());
   app.use(ensureCsrfCookie);
   app.use(mountPath, router);
+  attachCentralErrorHandler(app);
   return app;
 }
 
