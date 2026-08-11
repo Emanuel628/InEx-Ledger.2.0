@@ -622,10 +622,10 @@ test("invoices list logs service failures instead of swallowing them silently", 
     const response = await authed(request(fixture.app).get("/api/test"));
 
     assert.equal(response.status, 500);
-    assert.equal(response.body.error, "Failed to load invoices.");
+    assert.equal(response.body.error, "Internal server error");
     assert.equal(fixture.state.logErrors.length, 1);
-    assert.match(fixture.state.logErrors[0].message, /GET \/invoices failed/);
-    assert.match(String(fixture.state.logErrors[0].context?.err || ""), /invoice list exploded/);
+    assert.equal(fixture.state.logErrors[0].message, "Unhandled error");
+    assert.match(String(fixture.state.logErrors[0].context?.message || ""), /invoice list exploded/);
   } finally {
     fixture.cleanup();
   }
