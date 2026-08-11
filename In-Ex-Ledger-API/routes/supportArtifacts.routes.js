@@ -17,6 +17,7 @@ const {
   ensureSupportArtifactStorageDir,
   resolveSupportArtifactFilePath
 } = require("../services/supportArtifactStorage.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -155,71 +156,61 @@ async function verifyTransactionOwnership(transactionId, businessId) {
   return result.rowCount > 0;
 }
 
-router.get("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const transactionId = String(req.query.transaction_id || "").trim();
-    if (!isUuid(transactionId)) {
-      return res.status(400).json({ error: "transaction_id is required." });
-    }
-
-    const result = await pool.query(
-      `SELECT id, transaction_id, artifact_type, filename, mime_type, review_status, notes, uploaded_at
-         FROM support_artifacts
-        WHERE business_id = $1
-          AND transaction_id = $2
-        ORDER BY uploaded_at DESC, created_at DESC`,
-      [businessId, transactionId]
-    );
-
-    return res.json(result.rows);
-  } catch (err) {
-    logError("GET /support-artifacts error:", err);
-    return res.status(500).json({ error: "Failed to load support artifacts." });
+router.get("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const transactionId = String(req.query.transaction_id || "").trim();
+  if (!isUuid(transactionId)) {
+    throw new ApiError(400, "transaction_id is required.");
   }
-});
 
-router.post("/review-note", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const transactionId = String(req.body?.transaction_id || "").trim();
-    const notes = String(req.body?.notes || "").trim();
+  const result = await pool.query(
+    `SELECT id, transaction_id, artifact_type, filename, mime_type, review_status, notes, uploaded_at
+       FROM support_artifacts
+      WHERE business_id = $1
+        AND transaction_id = $2
+      ORDER BY uploaded_at DESC, created_at DESC`,
+    [businessId, transactionId]
+  );
 
-    if (!isUuid(transactionId)) {
-      return res.status(400).json({ error: "transaction_id must be a valid UUID." });
-    }
-    if (!notes) {
-      return res.status(400).json({ error: "notes are required." });
-    }
-    if (notes.length > MAX_NOTE_LENGTH) {
-      return res.status(400).json({ error: `notes must be ${MAX_NOTE_LENGTH} characters or fewer.` });
-    }
-    if (!(await verifyTransactionOwnership(transactionId, businessId))) {
-      return res.status(404).json({ error: "Transaction not found." });
-    }
+  return res.json(result.rows);
+}));
 
-    const artifactId = crypto.randomUUID();
-    const result = await pool.query(
-      `INSERT INTO support_artifacts (
-         id, business_id, transaction_id, artifact_type, scope_type, scope_id,
-         filename, review_status, notes, uploaded_by_user_id
-       ) VALUES ($1, $2, $3, 'review_note', 'transaction', $3, $4, 'accepted', $5, $6)
-       RETURNING id, transaction_id, artifact_type, filename, mime_type, review_status, notes, uploaded_at`,
-      [artifactId, businessId, transactionId, "Review note", notes, req.user.id]
-    );
-    void invalidateSnapshotsForBusiness({
-      businessId,
-      reason: "Support artifacts changed after export."
-    }).catch((error) => logError("Support artifact snapshot invalidation failed:", error));
+router.post("/review-note", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const transactionId = String(req.body?.transaction_id || "").trim();
+  const notes = String(req.body?.notes || "").trim();
 
-    return res.status(201).json(result.rows[0]);
-  } catch (err) {
-    logError("POST /support-artifacts/review-note error:", err);
-    return res.status(500).json({ error: "Failed to save review note." });
+  if (!isUuid(transactionId)) {
+    throw new ApiError(400, "transaction_id must be a valid UUID.");
   }
-});
+  if (!notes) {
+    throw new ApiError(400, "notes are required.");
+  }
+  if (notes.length > MAX_NOTE_LENGTH) {
+    throw new ApiError(400, `notes must be ${MAX_NOTE_LENGTH} characters or fewer.`);
+  }
+  if (!(await verifyTransactionOwnership(transactionId, businessId))) {
+    throw new ApiError(404, "Transaction not found.");
+  }
 
-router.post("/upload", upload.single("artifact"), async (req, res) => {
+  const artifactId = crypto.randomUUID();
+  const result = await pool.query(
+    `INSERT INTO support_artifacts (
+       id, business_id, transaction_id, artifact_type, scope_type, scope_id,
+       filename, review_status, notes, uploaded_by_user_id
+     ) VALUES ($1, $2, $3, 'review_note', 'transaction', $3, $4, 'accepted', $5, $6)
+     RETURNING id, transaction_id, artifact_type, filename, mime_type, review_status, notes, uploaded_at`,
+    [artifactId, businessId, transactionId, "Review note", notes, req.user.id]
+  );
+  void invalidateSnapshotsForBusiness({
+    businessId,
+    reason: "Support artifacts changed after export."
+  }).catch((error) => logError("Support artifact snapshot invalidation failed:", error));
+
+  return res.status(201).json(result.rows[0]);
+}));
+
+router.post("/upload", upload.single("artifact"), asyncRoute(async (req, res) => {
   let storagePath = null;
 
   try {
@@ -229,19 +220,19 @@ router.post("/upload", upload.single("artifact"), async (req, res) => {
     const notes = String(req.body?.notes || "").trim();
 
     if (!req.file) {
-      return res.status(400).json({ error: "artifact file is required." });
+      throw new ApiError(400, "artifact file is required.");
     }
     if (!isUuid(transactionId)) {
-      return res.status(400).json({ error: "transaction_id must be a valid UUID." });
+      throw new ApiError(400, "transaction_id must be a valid UUID.");
     }
     if (!FILE_ARTIFACT_TYPES.has(artifactType)) {
-      return res.status(400).json({ error: "artifact_type is invalid for file upload." });
+      throw new ApiError(400, "artifact_type is invalid for file upload.");
     }
     if (notes.length > MAX_NOTE_LENGTH) {
-      return res.status(400).json({ error: `notes must be ${MAX_NOTE_LENGTH} characters or fewer.` });
+      throw new ApiError(400, `notes must be ${MAX_NOTE_LENGTH} characters or fewer.`);
     }
     if (!(await verifyTransactionOwnership(transactionId, businessId))) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
 
     storagePath = await writeSupportArtifactFile(req.file.buffer, req.file.originalname);
@@ -274,54 +265,49 @@ router.post("/upload", upload.single("artifact"), async (req, res) => {
 
     return res.status(201).json(result.rows[0]);
   } catch (err) {
+    // True compensation: a file may already be on disk even though the
+    // request as a whole failed (e.g. the DB insert after the write).
     if (storagePath) {
       await fsp.unlink(storagePath).catch(() => {});
     }
-    const status = Number(err?.status || 0) || 500;
-    logError("POST /support-artifacts/upload error:", err);
-    return res.status(status).json({ error: err.message || "Failed to upload support artifact." });
+    throw err;
   }
-});
+}));
 
-router.get("/:id", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const artifactId = String(req.params.id || "").trim();
-    if (!isUuid(artifactId)) {
-      return res.status(400).json({ error: "Invalid support artifact ID." });
-    }
-
-    const result = await pool.query(
-      `SELECT id, filename, mime_type, storage_path
-         FROM support_artifacts
-        WHERE id = $1
-          AND business_id = $2
-        LIMIT 1`,
-      [artifactId, businessId]
-    );
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "Support artifact not found." });
-    }
-
-    const row = result.rows[0];
-    const resolvedPath = resolveSupportArtifactFilePath(row.storage_path);
-    if (!resolvedPath) {
-      return res.status(404).json({ error: "Support file missing." });
-    }
-
-    const responseMimeType = getSafeSupportArtifactResponseMimeType(row.mime_type);
-    const dispositionType = shouldInlineSupportArtifactMimeType(row.mime_type) ? "inline" : "attachment";
-    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-    res.setHeader("Content-Type", responseMimeType);
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Content-Disposition", `${dispositionType}; filename="${String(row.filename || "support-file").replace(/"/g, "")}"`);
-    return res.sendFile(resolvedPath);
-  } catch (err) {
-    logError("GET /support-artifacts/:id error:", err);
-    return res.status(500).json({ error: "Failed to load support artifact." });
+router.get("/:id", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const artifactId = String(req.params.id || "").trim();
+  if (!isUuid(artifactId)) {
+    throw new ApiError(400, "Invalid support artifact ID.");
   }
-});
+
+  const result = await pool.query(
+    `SELECT id, filename, mime_type, storage_path
+       FROM support_artifacts
+      WHERE id = $1
+        AND business_id = $2
+      LIMIT 1`,
+    [artifactId, businessId]
+  );
+  if (!result.rowCount) {
+    throw new ApiError(404, "Support artifact not found.");
+  }
+
+  const row = result.rows[0];
+  const resolvedPath = resolveSupportArtifactFilePath(row.storage_path);
+  if (!resolvedPath) {
+    throw new ApiError(404, "Support file missing.");
+  }
+
+  const responseMimeType = getSafeSupportArtifactResponseMimeType(row.mime_type);
+  const dispositionType = shouldInlineSupportArtifactMimeType(row.mime_type) ? "inline" : "attachment";
+  res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Content-Type", responseMimeType);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Disposition", `${dispositionType}; filename="${String(row.filename || "support-file").replace(/"/g, "")}"`);
+  return res.sendFile(resolvedPath);
+}));
 
 module.exports = router;
