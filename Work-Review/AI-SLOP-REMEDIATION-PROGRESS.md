@@ -280,6 +280,25 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   `npm run test:all`: **1484/1484 passing** (plus 3/3 ASVS controls) — 16
   more than the prior baseline, all new. Now **15 of 40** route files use
   the pattern; checklist item stays at half credit — 25 to go.
+  **Follow-up, same PR sequence**: converted the last 2 files in the
+  V2/Business CRUD family — `bills.routes.js` and `invoices.routes.js` —
+  identical shape to the previous 4, same mechanical conversion, no
+  special cases. This closes out the whole `requireV2BusinessEnabled`
+  router family (customers/vendors/projects/billable-expenses/bills/
+  invoices all now converted). Fixed one more instance of the same
+  `v2RouteHardening.test.js` fixture gap: its "invoices list logs service
+  failures" test asserted the old custom 500 message
+  (`"Failed to load invoices."`) and the route's own `logError` shape;
+  updated to the generic `"Internal server error"` and the central
+  handler's `{status, method, path, message}` log shape, matching the fix
+  already applied to the `projects`/`billable-expenses` tests in this same
+  file. Extended `tests/v2RouteErrors.test.js` to cover `bills` and
+  `invoices` too (8 more tests, same table-driven GET/PUT/DELETE-404 and
+  non-UUID-400 shape as the other four routers — 24 tests total in that
+  file now). Full suite via `npm run test:all`: **1492/1492 passing**
+  (plus 3/3 ASVS controls) — 8 more than the prior baseline, all new. Now
+  **17 of 40** route files use the pattern; checklist item stays at half
+  credit — 23 to go.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1356,3 +1375,35 @@ test that had been failing identically since PR 13).
   controls) — 16 more than PR 24's baseline, all new. Now **15 of 40**
   route files use the pattern; checklist item stays at half credit — 25
   to go.
+
+- **PR 26** (`chore/expand-api-error-rollout-5`): same phase, same item,
+  no new checklist points. Converted the last 2 files in the V2/Business
+  CRUD family — `bills.routes.js` and `invoices.routes.js` — identical
+  shape to PR 25's batch, same mechanical conversion (throw `ApiError` for
+  validation/UUID/not-found, delete the per-route catch, no special case
+  in either file). Between PR 25 and this PR, every router mounted under
+  `requireV2BusinessEnabled` — customers, vendors, projects,
+  billable-expenses, bills, invoices — now uses the pattern, closing out
+  that entire family in two PRs.
+
+  Fixed one more instance of the `v2RouteHardening.test.js` fixture gap
+  PR 25 already found and partially fixed: the file's "invoices list logs
+  service failures" test still asserted the old custom 500 message
+  (`"Failed to load invoices."`) and the route's own `logError` shape —
+  it hadn't been touched in PR 25 because `invoices.routes.js` wasn't
+  converted yet. Updated it to the generic `"Internal server error"` and
+  the central handler's `{status, method, path, message}` log shape,
+  matching the fix already applied to the `projects`/`billable-expenses`
+  tests in the same file.
+
+  Extended `tests/v2RouteErrors.test.js` (added in PR 25) to cover `bills`
+  and `invoices` in the same table-driven fixture — 8 more tests
+  (GET/PUT/DELETE 404-for-unknown-id and a non-UUID 400 for each), 24
+  tests total in that file now. Needed a per-route PUT payload builder
+  since `bills`/`invoices` require a full valid payload
+  (vendor_id/customer_id, number, status, issue_date, total_amount,
+  currency) to reach the not-found check, unlike the simple `{name}`
+  payload the first four routers accept. Full suite via
+  `npm run test:all`: **1492/1492 passing** (plus 3/3 ASVS controls) — 8
+  more than PR 25's baseline, all new. Now **17 of 40** route files use
+  the pattern; checklist item stays at half credit — 23 to go.

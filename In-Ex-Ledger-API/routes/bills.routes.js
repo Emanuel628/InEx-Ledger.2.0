@@ -9,7 +9,7 @@ const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 const { isUuid } = require('../api/utils/v2HttpValidators');
-const { logError } = require('../utils/logger.js');
+const { ApiError, asyncRoute } = require('../utils/apiError.js');
 
 const BILL_STATUS_VALUES = new Set(['draft', 'open', 'sent', 'partial', 'paid', 'void']);
 
@@ -44,10 +44,6 @@ function hasBillPayload(body) {
 	);
 }
 
-function formatRouteError(err) {
-	return err instanceof Error ? err.message : String(err || 'unknown_error');
-}
-
 function validateMetadata(body) {
 	const normalized = normalizeV2Metadata(body?.metadata);
 	if (!normalized.ok) {
@@ -58,95 +54,70 @@ function validateMetadata(body) {
 }
 
 // List bills (GET /bills)
-router.get('/', async (req, res) => {
+router.get('/', asyncRoute(async (req, res) => {
 	const businessId = req.business.id;
-	try {
-		const bills = await billService.listBills(businessId);
-		res.json(bills);
-	} catch (err) {
-		logError('GET /bills failed', { err: formatRouteError(err), businessId });
-		res.status(500).json({ error: 'Failed to load bills.' });
-	}
-});
+	const bills = await billService.listBills(businessId);
+	res.json(bills);
+}));
 
 // Create bill (POST /bills)
-router.post('/', async (req, res) => {
+router.post('/', asyncRoute(async (req, res) => {
 	const businessId = req.business.id;
 	if (!hasBillPayload(req.body)) {
-		return res.status(400).json({ error: 'Missing required bill fields.' });
+		throw new ApiError(400, 'Missing required bill fields.');
 	}
 	const metadataCheck = validateMetadata(req.body);
 	if (!metadataCheck.ok) {
-		return res.status(400).json({ error: metadataCheck.error });
+		throw new ApiError(400, metadataCheck.error);
 	}
-	try {
-		const bill = await billService.createBill(businessId, req.body);
-		res.status(201).json(bill);
-	} catch (err) {
-		logError('POST /bills failed', { err: formatRouteError(err), businessId });
-		res.status(500).json({ error: 'Failed to create bill.' });
-	}
-});
+	const bill = await billService.createBill(businessId, req.body);
+	res.status(201).json(bill);
+}));
 
 // Get bill by ID (GET /bills/:id)
-router.get('/:id', async (req, res) => {
+router.get('/:id', asyncRoute(async (req, res) => {
 	const businessId = req.business.id;
 	if (!isUuid(req.params.id)) {
-		return res.status(400).json({ error: 'Invalid bill id.' });
+		throw new ApiError(400, 'Invalid bill id.');
 	}
-	try {
-		const bill = await billService.getBill(businessId, req.params.id);
-		if (!bill) {
-			return res.status(404).json({ error: 'Bill not found.' });
-		}
-		res.json(bill);
-	} catch (err) {
-		logError('GET /bills/:id failed', { err: formatRouteError(err), businessId, billId: req.params.id });
-		res.status(500).json({ error: 'Failed to load bill.' });
+	const bill = await billService.getBill(businessId, req.params.id);
+	if (!bill) {
+		throw new ApiError(404, 'Bill not found.');
 	}
-});
+	res.json(bill);
+}));
 
 // Update bill (PUT /bills/:id)
-router.put('/:id', async (req, res) => {
+router.put('/:id', asyncRoute(async (req, res) => {
 	const businessId = req.business.id;
 	if (!isUuid(req.params.id)) {
-		return res.status(400).json({ error: 'Invalid bill id.' });
+		throw new ApiError(400, 'Invalid bill id.');
 	}
 	if (!hasBillPayload(req.body)) {
-		return res.status(400).json({ error: 'Missing required bill fields.' });
+		throw new ApiError(400, 'Missing required bill fields.');
 	}
 	const metadataCheck = validateMetadata(req.body);
 	if (!metadataCheck.ok) {
-		return res.status(400).json({ error: metadataCheck.error });
+		throw new ApiError(400, metadataCheck.error);
 	}
-	try {
-		const bill = await billService.updateBill(businessId, req.params.id, req.body);
-		if (!bill) {
-			return res.status(404).json({ error: 'Bill not found.' });
-		}
-		res.json(bill);
-	} catch (err) {
-		logError('PUT /bills/:id failed', { err: formatRouteError(err), businessId, billId: req.params.id });
-		res.status(500).json({ error: 'Failed to update bill.' });
+	const bill = await billService.updateBill(businessId, req.params.id, req.body);
+	if (!bill) {
+		throw new ApiError(404, 'Bill not found.');
 	}
-});
+	res.json(bill);
+}));
 
 // Delete bill (DELETE /bills/:id)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', asyncRoute(async (req, res) => {
 	const businessId = req.business.id;
 	if (!isUuid(req.params.id)) {
-		return res.status(400).json({ error: 'Invalid bill id.' });
+		throw new ApiError(400, 'Invalid bill id.');
 	}
-	try {
-		const deleted = await billService.deleteBill(businessId, req.params.id);
-		if (!deleted) {
-			return res.status(404).json({ error: 'Bill not found.' });
-		}
-		res.json({ success: true });
-	} catch (err) {
-		logError('DELETE /bills/:id failed', { err: formatRouteError(err), businessId, billId: req.params.id });
-		res.status(500).json({ error: 'Failed to delete bill.' });
+	const deleted = await billService.deleteBill(businessId, req.params.id);
+	if (!deleted) {
+		throw new ApiError(404, 'Bill not found.');
 	}
-});
+	res.json({ success: true });
+}));
 
 module.exports = router;

@@ -10,27 +10,55 @@ const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const NOT_FOUND_ID = "00000000-0000-4000-8000-00000000dead";
 
+const NAME_PAYLOAD = { name: "Updated name" };
+const BILLABLE_EXPENSE_PAYLOAD = {
+  project_id: "00000000-0000-4000-8000-000000000001",
+  description: "Travel",
+  amount: 10,
+  currency: "USD",
+  expense_date: "2026-05-14"
+};
+const BILL_PAYLOAD = {
+  vendor_id: "00000000-0000-4000-8000-000000000002",
+  number: "BILL-100",
+  status: "draft",
+  issue_date: "2026-05-14",
+  total_amount: 25,
+  currency: "USD"
+};
+const INVOICE_PAYLOAD = {
+  customer_id: "00000000-0000-4000-8000-000000000003",
+  number: "INV-100",
+  status: "draft",
+  issue_date: "2026-05-14",
+  total_amount: 25,
+  currency: "USD"
+};
+
 const ROUTES = {
   customers: {
     routePath: require.resolve("../routes/customers.routes.js"),
     servicePath: "../services/customerService",
     serviceName: "customerService",
     methods: ["listCustomers", "createCustomer", "getCustomer", "updateCustomer", "deleteCustomer"],
-    notFoundMessage: "Customer not found."
+    notFoundMessage: "Customer not found.",
+    putPayload: NAME_PAYLOAD
   },
   vendors: {
     routePath: require.resolve("../routes/vendors.routes.js"),
     servicePath: "../services/vendorService",
     serviceName: "vendorService",
     methods: ["listVendors", "createVendor", "getVendor", "updateVendor", "deleteVendor"],
-    notFoundMessage: "Vendor not found."
+    notFoundMessage: "Vendor not found.",
+    putPayload: NAME_PAYLOAD
   },
   projects: {
     routePath: require.resolve("../routes/projects.routes.js"),
     servicePath: "../services/projectService",
     serviceName: "projectService",
     methods: ["listProjects", "createProject", "getProject", "updateProject", "deleteProject"],
-    notFoundMessage: "Project not found"
+    notFoundMessage: "Project not found",
+    putPayload: NAME_PAYLOAD
   },
   "billable-expenses": {
     routePath: require.resolve("../routes/billable-expenses.routes.js"),
@@ -43,7 +71,24 @@ const ROUTES = {
       "updateBillableExpense",
       "deleteBillableExpense"
     ],
-    notFoundMessage: "Billable expense not found"
+    notFoundMessage: "Billable expense not found",
+    putPayload: BILLABLE_EXPENSE_PAYLOAD
+  },
+  bills: {
+    routePath: require.resolve("../routes/bills.routes.js"),
+    servicePath: "../services/billService",
+    serviceName: "billService",
+    methods: ["listBills", "createBill", "getBill", "updateBill", "deleteBill"],
+    notFoundMessage: "Bill not found.",
+    putPayload: BILL_PAYLOAD
+  },
+  invoices: {
+    routePath: require.resolve("../routes/invoices.routes.js"),
+    servicePath: "../services/invoiceService",
+    serviceName: "invoiceService",
+    methods: ["listInvoices", "createInvoice", "getInvoice", "updateInvoice", "deleteInvoice"],
+    notFoundMessage: "Invoice not found.",
+    putPayload: INVOICE_PAYLOAD
   }
 };
 
@@ -114,15 +159,7 @@ for (const [routeKey, config] of Object.entries(ROUTES)) {
     try {
       const response = await request(fixture.app)
         .put(`/api/test/${NOT_FOUND_ID}`)
-        .send(routeKey === "billable-expenses"
-          ? {
-            project_id: "00000000-0000-4000-8000-000000000001",
-            description: "Travel",
-            amount: 10,
-            currency: "USD",
-            expense_date: "2026-05-14"
-          }
-          : { name: "Updated name" });
+        .send(config.putPayload);
       assert.equal(response.status, 404);
       assert.equal(response.body.error, config.notFoundMessage);
     } finally {
