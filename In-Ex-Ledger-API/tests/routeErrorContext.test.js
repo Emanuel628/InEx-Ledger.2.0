@@ -56,12 +56,11 @@ test("transaction route error logs include request context", () => {
     "utf8"
   );
 
-  const logLines = source
-    .split(/\r?\n/)
-    .filter((line) => line.includes("logError("));
+  const logErrorCallPattern = /logError\([\s\S]*?\);\r?\n/g;
+  const logErrorCalls = source.match(logErrorCallPattern) || [];
 
-  assert.ok(logLines.length > 0, "expected transaction route error logs");
-  for (const line of logLines) {
-    assert.match(line, /buildRouteErrorContext\(req, err/, line);
+  assert.ok(logErrorCalls.length > 0, "expected transaction route error logs");
+  for (const call of logErrorCalls) {
+    assert.match(call, /buildRouteErrorContext\(req, err/, call);
   }
 });

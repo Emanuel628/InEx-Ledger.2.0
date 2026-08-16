@@ -59,6 +59,7 @@ const {
 } = require("../services/receiptStatusService.js");
 const { AUDIT_ACTIONS, recordAuditEventForRequest } = require("../services/auditEventService.js");
 const { buildRouteErrorContext } = require("../utils/routeErrorContext.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   buildTransactionListFilters,
   buildTransactionListWhereClause,
@@ -623,17 +624,16 @@ function getMappingMetadata(result, overrides = {}) {
   };
 }
 
-router.get("/", async (req, res) => {
-  try {
-    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
-    const filters = buildTransactionListFilters(req.query);
-    if (!filters.valid) {
-      return res.status(400).json({ error: filters.error });
-    }
+router.get("/", asyncRoute(async (req, res) => {
+  const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
+  const filters = buildTransactionListFilters(req.query);
+  if (!filters.valid) {
+    throw new ApiError(400, filters.error);
+  }
 
-    const { whereSql, params: filterParams } = buildTransactionListWhereClause(scope.businessIds, filters);
-    const reviewSourceQuery = buildTransactionReviewSourceQuery(whereSql, filterParams);
-    const reviewSourceResult = await pool.query(reviewSourceQuery.sql, reviewSourceQuery.params);
+  const { whereSql, params: filterParams } = buildTransactionListWhereClause(scope.businessIds, filters);
+  const reviewSourceQuery = buildTransactionReviewSourceQuery(whereSql, filterParams);
+  const reviewSourceResult = await pool.query(reviewSourceQuery.sql, reviewSourceQuery.params);
 
     const reviewSourceRows = reviewSourceResult.rows || [];
     const reviewSummary = buildReviewSummary(reviewSourceRows);
@@ -666,36 +666,32 @@ router.get("/", async (req, res) => {
       ? reviewFilteredRows.length
       : Number(summaryRow.transaction_count || 0);
 
-    res.status(200).json({
-      data: result.rows.map(decryptTransactionRow),
-      total,
-      limit: filters.limit,
-      offset: filters.offset,
-      has_more: filters.offset + result.rows.length < total,
-      account_id: filters.accountId || null,
-      category_id: filters.categoryId || null,
-      type: filters.type || "all",
-      search: filters.search || "",
-      period: filters.period,
-      returned_all: filters.wantsAll,
-      review_summary: reviewSummary,
-      review_filter: filters.review || "",
-      summary: {
-        transaction_count: total,
-        income_total: Number(summaryRow.income_total || 0),
-        expense_total: Number(summaryRow.expense_total || 0),
-        current_month_count: Number(summaryRow.current_month_count || 0),
-        current_year_income: Number(summaryRow.current_year_income || 0),
-        current_year_expenses: Number(summaryRow.current_year_expenses || 0),
-        previous_year_income: Number(summaryRow.previous_year_income || 0),
-        previous_year_expenses: Number(summaryRow.previous_year_expenses || 0)
-      }
-    });
-  } catch (err) {
-    logError("GET /transactions error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load transactions." });
-  }
-});
+  res.status(200).json({
+    data: result.rows.map(decryptTransactionRow),
+    total,
+    limit: filters.limit,
+    offset: filters.offset,
+    has_more: filters.offset + result.rows.length < total,
+    account_id: filters.accountId || null,
+    category_id: filters.categoryId || null,
+    type: filters.type || "all",
+    search: filters.search || "",
+    period: filters.period,
+    returned_all: filters.wantsAll,
+    review_summary: reviewSummary,
+    review_filter: filters.review || "",
+    summary: {
+      transaction_count: total,
+      income_total: Number(summaryRow.income_total || 0),
+      expense_total: Number(summaryRow.expense_total || 0),
+      current_month_count: Number(summaryRow.current_month_count || 0),
+      current_year_income: Number(summaryRow.current_year_income || 0),
+      current_year_expenses: Number(summaryRow.current_year_expenses || 0),
+      previous_year_income: Number(summaryRow.previous_year_income || 0),
+      previous_year_expenses: Number(summaryRow.previous_year_expenses || 0)
+    }
+  });
+}));
 
 router.post("/", async (req, res) => {
   let client = null;
@@ -814,10 +810,9 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/mapping-rules", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const result = await pool.query(
+router.get("/mapping-rules", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const result = await pool.query(
       `SELECT r.id,
               r.transaction_kind,
               r.match_field,
@@ -836,14 +831,10 @@ router.get("/mapping-rules", async (req, res) => {
         ORDER BY r.match_field ASC, r.match_value ASC, r.created_at DESC`,
       [businessId]
     );
-    res.json({ rules: result.rows });
-  } catch (err) {
-    logError("GET /transactions/mapping-rules error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load mapping rules." });
-  }
-});
+  res.json({ rules: result.rows });
+}));
 
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", asyncRoute(async (req, res, next) => {
   if (!UUID_REGEX.test(req.params.id)) {
     // Defined below this handler are static GET routes like
     // /exchange-rate-reference and /undo-delete-status. Express matches
@@ -854,8 +845,7 @@ router.get("/:id", async (req, res, next) => {
     return next();
   }
 
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+  const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
       `SELECT t.*,
@@ -871,39 +861,30 @@ router.get("/:id", async (req, res, next) => {
       [req.params.id, businessId]
     );
 
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
-    }
-
-    res.json(decryptTransactionRow(result.rows[0]));
-  } catch (err) {
-    logError("GET /transactions/:id error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load transaction." });
+  if (result.rowCount === 0) {
+    throw new ApiError(404, "Transaction not found.");
   }
-});
 
-router.delete("/mapping-rules/:ruleId", async (req, res) => {
+  res.json(decryptTransactionRow(result.rows[0]));
+}));
+
+router.delete("/mapping-rules/:ruleId", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.ruleId)) {
-    return res.status(400).json({ error: "Invalid mapping rule ID." });
+    throw new ApiError(400, "Invalid mapping rule ID.");
   }
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const result = await pool.query(
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const result = await pool.query(
       `DELETE FROM transaction_mapping_rules
         WHERE id = $1
           AND business_id = $2
       RETURNING id`,
       [req.params.ruleId, businessId]
     );
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "Mapping rule not found." });
-    }
-    res.json({ deleted: true, id: req.params.ruleId });
-  } catch (err) {
-    logError("DELETE /transactions/mapping-rules/:ruleId error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to delete mapping rule." });
+  if (!result.rowCount) {
+    throw new ApiError(404, "Mapping rule not found.");
   }
-});
+  res.json({ deleted: true, id: req.params.ruleId });
+}));
 
 router.put("/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
@@ -1240,24 +1221,19 @@ router.post("/undo-delete", async (req, res) => {
   }
 });
 
-router.get("/undo-delete-status", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const remainingUndoCount = await countRestorableArchivedTransactions({
-      pool,
-      businessId,
-      limit: TRANSACTION_UNDO_STACK_LIMIT
-    });
+router.get("/undo-delete-status", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const remainingUndoCount = await countRestorableArchivedTransactions({
+    pool,
+    businessId,
+    limit: TRANSACTION_UNDO_STACK_LIMIT
+  });
 
-    res.json({
-      remaining_undo_count: remainingUndoCount,
-      undo_stack_limit: TRANSACTION_UNDO_STACK_LIMIT
-    });
-  } catch (err) {
-    logError("GET /transactions/undo-delete-status error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load undo status." });
-  }
-});
+  res.json({
+    remaining_undo_count: remainingUndoCount,
+    undo_stack_limit: TRANSACTION_UNDO_STACK_LIMIT
+  });
+}));
 
 router.get("/exchange-rate-reference", async (req, res) => {
   try {
@@ -1961,16 +1937,11 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 /* =========================================================
    IMPORT BATCH HISTORY  —  GET /transactions/import/history
    ========================================================= */
-router.get("/import/history", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const batches = await listImportBatches(pool, businessId, { limit: req.query.limit });
-    res.json({ batches });
-  } catch (err) {
-    logError("GET /transactions/import/history error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load import history." });
-  }
-});
+router.get("/import/history", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const batches = await listImportBatches(pool, businessId, { limit: req.query.limit });
+  res.json({ batches });
+}));
 
 /* =========================================================
    UNDO IMPORT BATCH  —  POST /transactions/import/:id/revert
@@ -2024,90 +1995,70 @@ function parseYearOrCurrent(value) {
   return new Date().getUTCFullYear();
 }
 
-router.get("/tax-summary/payers", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const { region, fiscalYearStart } = await getBusinessRegionAndCurrency(businessId);
-    const year = parseYearOrCurrent(req.query.year);
-    const summary = await getPayerSummaryForYear(pool, { businessId, year, region, fiscalYearStart });
-    res.json(summary);
-  } catch (err) {
-    logError("GET /transactions/tax-summary/payers error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load payer summary." });
-  }
-});
+router.get("/tax-summary/payers", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const { region, fiscalYearStart } = await getBusinessRegionAndCurrency(businessId);
+  const year = parseYearOrCurrent(req.query.year);
+  const summary = await getPayerSummaryForYear(pool, { businessId, year, region, fiscalYearStart });
+  res.json(summary);
+}));
 
-router.get("/tax-summary/tax-lines", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const businessContext = await getBusinessRegionAndCurrency(businessId);
-    const requestedRegion = String(req.query.region || "").toUpperCase();
-    const region = requestedRegion === "CA" || requestedRegion === "US"
-      ? requestedRegion
-      : businessContext.region;
-    const year = parseYearOrCurrent(req.query.year);
-    const summary = await getTaxLineSummaryForYear(pool, {
-      businessId,
-      year,
-      region,
-      fiscalYearStart: businessContext.fiscalYearStart
-    });
-    res.json(summary);
-  } catch (err) {
-    logError("GET /transactions/tax-summary/tax-lines error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load tax-line summary." });
-  }
-});
+router.get("/tax-summary/tax-lines", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const businessContext = await getBusinessRegionAndCurrency(businessId);
+  const requestedRegion = String(req.query.region || "").toUpperCase();
+  const region = requestedRegion === "CA" || requestedRegion === "US"
+    ? requestedRegion
+    : businessContext.region;
+  const year = parseYearOrCurrent(req.query.year);
+  const summary = await getTaxLineSummaryForYear(pool, {
+    businessId,
+    year,
+    region,
+    fiscalYearStart: businessContext.fiscalYearStart
+  });
+  res.json(summary);
+}));
 
 /* =========================================================
    QUARTERLY ESTIMATED TAX REMINDERS  —  GET /transactions/tax-summary/quarterly
    ========================================================= */
 
-router.get("/tax-summary/quarterly", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const businessContext = await getBusinessRegionAndCurrency(businessId);
-    const requestedRegion = String(req.query.region || "").toUpperCase();
-    const region = requestedRegion === "CA" || requestedRegion === "US"
-      ? requestedRegion
-      : businessContext.region;
-    const reminders = getQuarterlyReminders(region);
-    res.json(reminders);
-  } catch (err) {
-    logError("GET /transactions/tax-summary/quarterly error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load quarterly tax reminders." });
-  }
-});
+router.get("/tax-summary/quarterly", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const businessContext = await getBusinessRegionAndCurrency(businessId);
+  const requestedRegion = String(req.query.region || "").toUpperCase();
+  const region = requestedRegion === "CA" || requestedRegion === "US"
+    ? requestedRegion
+    : businessContext.region;
+  const reminders = getQuarterlyReminders(region);
+  res.json(reminders);
+}));
 
 /* =========================================================
    YEAR-END TAX DASHBOARD  —  GET /transactions/tax-summary/dashboard
    ========================================================= */
 
-router.get("/tax-summary/dashboard", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const businessContext = await getBusinessRegionAndCurrency(businessId);
-    const requestedRegion = String(req.query.region || "").toUpperCase();
-    const region = requestedRegion === "CA" || requestedRegion === "US"
-      ? requestedRegion
-      : businessContext.region;
-    const year = parseYearOrCurrent(req.query.year);
-    const taxRateRaw = parseFloat(req.query.tax_rate);
-    const taxRateOverride = Number.isFinite(taxRateRaw) ? taxRateRaw : null;
-    const dashboard = await getTaxDashboard(pool, {
-      businessId,
-      year,
-      region,
-      province: businessContext.province,
-      fiscalYearStart: businessContext.fiscalYearStart,
-      taxRateOverride
-    });
-    res.json(dashboard);
-  } catch (err) {
-    logError("GET /transactions/tax-summary/dashboard error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to load tax dashboard." });
-  }
-});
+router.get("/tax-summary/dashboard", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const businessContext = await getBusinessRegionAndCurrency(businessId);
+  const requestedRegion = String(req.query.region || "").toUpperCase();
+  const region = requestedRegion === "CA" || requestedRegion === "US"
+    ? requestedRegion
+    : businessContext.region;
+  const year = parseYearOrCurrent(req.query.year);
+  const taxRateRaw = parseFloat(req.query.tax_rate);
+  const taxRateOverride = Number.isFinite(taxRateRaw) ? taxRateRaw : null;
+  const dashboard = await getTaxDashboard(pool, {
+    businessId,
+    year,
+    region,
+    province: businessContext.province,
+    fiscalYearStart: businessContext.fiscalYearStart,
+    taxRateOverride
+  });
+  res.json(dashboard);
+}));
 
 module.exports = router;
 module.exports.__private = {

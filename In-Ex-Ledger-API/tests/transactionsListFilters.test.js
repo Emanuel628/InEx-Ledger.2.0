@@ -17,6 +17,7 @@ const {
   CSRF_HEADER_NAME,
   ensureCsrfCookie
 } = require("../middleware/csrf.middleware.js");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const TEST_USER_ID = "00000000-0000-4000-8000-000000000311";
 const VALID_ACCOUNT_ID = "11111111-1111-4111-8111-111111111111";
@@ -41,6 +42,7 @@ function buildApp(router) {
   app.use(express.json());
   app.use(ensureCsrfCookie);
   app.use("/api/transactions", router);
+  attachCentralErrorHandler(app);
   return app;
 }
 

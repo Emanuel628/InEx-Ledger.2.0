@@ -5,12 +5,14 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ROUTE_PATH = require.resolve("../routes/transactions.routes.js");
 
 function loadRouter() {
   const originalLoad = Module._load.bind(Module);
   const queries = [];
+  const state = { deleteRowCount: 1 };
 
   Module._load = function(requestName, parent, isMain) {
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
@@ -36,7 +38,10 @@ function loadRouter() {
               };
             }
             if (/DELETE FROM transaction_mapping_rules/i.test(sql)) {
-              return { rows: [{ id: params[0] }], rowCount: 1 };
+              return {
+                rows: state.deleteRowCount > 0 ? [{ id: params[0] }] : [],
+                rowCount: state.deleteRowCount
+              };
             }
             return { rows: [], rowCount: 0 };
           }
@@ -113,8 +118,10 @@ function loadRouter() {
     const app = express();
     app.use(express.json());
     app.use("/api/transactions", router);
+    attachCentralErrorHandler(app);
     return {
       app,
+      state,
       queries,
       cleanup() {
         delete require.cache[ROUTE_PATH];
@@ -147,6 +154,19 @@ test("mapping rule delete endpoint removes a rule by id", async () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.deleted, true);
     assert.equal(res.body.id, ruleId);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("mapping rule delete endpoint returns 404 when the rule is not owned by the business", async () => {
+  const fixture = loadRouter();
+  try {
+    fixture.state.deleteRowCount = 0;
+    const ruleId = "33333333-3333-4333-8333-333333333333";
+    const res = await request(fixture.app).delete(`/api/transactions/mapping-rules/${ruleId}`);
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error, "Mapping rule not found.");
   } finally {
     fixture.cleanup();
   }
