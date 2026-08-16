@@ -7,6 +7,7 @@ const fs = require("fs");
 require("dotenv").config();
 const { seedDefaultCategoriesForBusiness } = require("../../api/utils/seedDefaultsForBusiness");
 const { generateCsrfToken } = require("../../middleware/csrf.middleware.js");
+const { buildSslConfig } = require("../../utils/dbSslConfig.js");
 
 const BASE = "http://localhost:8080";
 const SS_PATH = path.join(__dirname, "screenshots", "auth.json");
@@ -141,7 +142,7 @@ module.exports = async function globalSetup() {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: buildSslConfig()
   });
 
   await pool.query("UPDATE users SET email_verified = true WHERE email = $1", [email]);

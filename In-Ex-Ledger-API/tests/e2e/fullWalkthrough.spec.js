@@ -17,12 +17,13 @@
 const { test, expect, chromium } = require('@playwright/test');
 const { Pool } = require('pg');
 require('dotenv').config();
+const { buildSslConfig } = require('../../utils/dbSslConfig.js');
 
 const BASE = 'http://localhost:8080';
 const TEST_EMAIL = `pw-audit-${Date.now()}@inexledger.test`;
 const TEST_PASS  = 'Audit#2026!';
 const CURRENT_YEAR = new Date().getFullYear();
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: buildSslConfig() });
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

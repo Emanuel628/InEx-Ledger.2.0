@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
 const { seedDefaultCategoriesForBusiness } = require("../../api/utils/seedDefaultsForBusiness");
+const { buildSslConfig } = require("../../utils/dbSslConfig.js");
 
 const BASE = "http://localhost:8080";
 const CURRENT_YEAR = new Date().getFullYear();
@@ -73,7 +74,7 @@ async function setupCanadaUser() {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ssl: buildSslConfig(),
   });
 
   try {
