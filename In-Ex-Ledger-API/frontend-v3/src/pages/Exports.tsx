@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import {
   deleteExportHistoryItem,
   downloadCsvExport,
@@ -62,6 +63,7 @@ function Exports(props: PageProps) {
   const [dataError, setDataError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [generating, setGenerating] = useState<'PDF' | 'CSV' | ''>('')
+  useBodyModalLock(pdfModalOpen)
 
   async function refreshPageData() {
     setLoadingData(true)
@@ -82,12 +84,6 @@ function Exports(props: PageProps) {
   useEffect(() => {
     void refreshPageData()
   }, [endDate, startDate])
-
-  useEffect(() => {
-    document.body.classList.toggle('modal-is-open', pdfModalOpen)
-
-    return () => document.body.classList.remove('modal-is-open')
-  }, [pdfModalOpen])
 
   const readinessItems = useMemo(() => [
     { label: 'Business profile', detail: `${summary.taxForm} context is available for this range.`, ready: true },

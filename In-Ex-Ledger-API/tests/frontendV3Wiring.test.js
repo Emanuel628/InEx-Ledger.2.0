@@ -171,6 +171,33 @@ test("v3 row action menus are positioned against the viewport to avoid table cli
   assert.match(cssSource, /max-height: calc\(100vh - 24px\)/);
 });
 
+test("v3 pages share modal body-lock behavior through one hook", () => {
+  const hookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useBodyModalLock.ts"), "utf8");
+  const pageSources = readFrontendFiles()
+    .filter(({ file }) => file.includes(`${path.sep}pages${path.sep}`))
+    .map(({ source }) => source)
+    .join("\n");
+
+  assert.match(hookSource, /function useBodyModalLock\(locked: boolean\)/);
+  assert.match(hookSource, /document\.body\.classList\.toggle\('modal-is-open', locked\)/);
+  assert.match(hookSource, /document\.body\.classList\.remove\('modal-is-open'\)/);
+  assert.doesNotMatch(pageSources, /document\.body\.classList\.(toggle|remove)\('modal-is-open'/);
+  for (const page of [
+    "Accounts.tsx",
+    "BusinessWorkspaces.tsx",
+    "Categories.tsx",
+    "Exports.tsx",
+    "Invoices.tsx",
+    "Messages.tsx",
+    "Mileage.tsx",
+    "Receipts.tsx",
+    "Transactions.tsx"
+  ]) {
+    const source = fs.readFileSync(path.join(frontendRoot, "pages", page), "utf8");
+    assert.match(source, /useBodyModalLock\(/, `${page} should use the shared modal lock hook`);
+  }
+});
+
 test("v3 frontend dependencies are pinned", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "frontend-v3", "package.json"), "utf8"));
   for (const section of ["dependencies", "devDependencies"]) {

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
@@ -56,6 +57,7 @@ function Accounts(props: PageProps) {
   const creditCardCount = accountRows.filter((account) => account.type === 'Credit Card').length
   const needsDetailsCount = accountRows.filter((account) => account.status === 'Needs details').length
   const accountCurrency = resolveAccountCurrency(props.authUser?.business?.currency, props.authUser?.business?.region || props.authUser?.business?.type)
+  useBodyModalLock(drawerOpen)
 
   async function refreshAccounts() {
     setDataError('')
@@ -67,12 +69,6 @@ function Accounts(props: PageProps) {
       setAccountRows([])
     }
   }
-
-  useEffect(() => {
-    document.body.classList.toggle('modal-is-open', drawerOpen)
-
-    return () => document.body.classList.remove('modal-is-open')
-  }, [drawerOpen])
 
   useEffect(() => {
     void refreshAccounts()

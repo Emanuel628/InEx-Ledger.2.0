@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
@@ -38,6 +39,7 @@ function Categories(props: PageProps) {
   const [dataError, setDataError] = useState('')
   const [noticeVisible, dismissNotice] = useSessionDismissed('categories-review')
   useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
+  useBodyModalLock(drawerOpen)
   const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
   const filteredCategories = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -69,12 +71,6 @@ function Categories(props: PageProps) {
       setCategoryRows([])
     }
   }
-
-  useEffect(() => {
-    document.body.classList.toggle('modal-is-open', drawerOpen)
-
-    return () => document.body.classList.remove('modal-is-open')
-  }, [drawerOpen])
 
   useEffect(() => {
     void refreshCategories()

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import {
   blankInvoiceDraft,
@@ -49,6 +50,7 @@ function Invoices(props: PageProps) {
     setActionMenuId(null)
     setFiltersOpen(false)
   })
+  useBodyModalLock(drawerOpen)
 
   async function refreshInvoices() {
     setLoadingData(true)
@@ -66,12 +68,6 @@ function Invoices(props: PageProps) {
   useEffect(() => {
     void refreshInvoices()
   }, [])
-
-  useEffect(() => {
-    document.body.classList.toggle('modal-is-open', drawerOpen)
-
-    return () => document.body.classList.remove('modal-is-open')
-  }, [drawerOpen])
 
   useEffect(() => {
     setCurrentPage(1)

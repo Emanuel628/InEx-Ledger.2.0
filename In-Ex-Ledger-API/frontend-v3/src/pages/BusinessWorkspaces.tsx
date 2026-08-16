@@ -3,6 +3,7 @@ import { AlertTriangle, CreditCard, Plus, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { usePlan } from '../context/PlanContext'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import {
   formatSubscriptionMoney,
   loadBillingOverview,
@@ -39,6 +40,7 @@ function BusinessWorkspaces(props: PageProps) {
   const [modal, setModal] = useState<WorkspaceModal>(null)
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessRecord | null>(null)
   const interval: BillingInterval = readPreferredBillingInterval()
+  useBodyModalLock(Boolean(modal))
 
   const businesses: WorkspaceRow[] = businessRows.length
     ? businessRows.map((business) => ({
@@ -91,11 +93,6 @@ function BusinessWorkspaces(props: PageProps) {
     void refreshOverview()
     void refreshBusinesses()
   }, [])
-
-  useEffect(() => {
-    document.body.classList.toggle('modal-is-open', Boolean(modal))
-    return () => document.body.classList.remove('modal-is-open')
-  }, [modal])
 
   const subscription = overview?.subscription
   const isProActive = Boolean(isPro && (subscription?.isPaid || subscription?.isTrialing))

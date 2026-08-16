@@ -26,6 +26,7 @@ import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import BankCsvHelpGuide from '../components/BankCsvHelp'
 import LoadingDots from '../components/LoadingDots'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
@@ -150,6 +151,15 @@ function Transactions(props: PageProps) {
   const netTotal = incomeTotal - expenseTotal
   const estimatedTax = Math.max(0, netTotal) * (taxProfile?.rate ?? 0.24)
   const reviewCount = reviewQueue.summary?.total ?? transactionRows.filter((row) => row.status !== 'Cleared' || row.receipt === 'Missing').length
+  useBodyModalLock(
+    drawerOpen
+    || Boolean(selectedTransaction)
+    || Boolean(receiptTransaction)
+    || Boolean(receiptStatusTransaction)
+    || Boolean(recurringEditorTemplate)
+    || filtersOpen
+    || csvImportOpen,
+  )
 
   function updatePageSize(value: number) {
     const normalized = [10, 20, 50].includes(value) ? value : 20
@@ -184,15 +194,6 @@ function Transactions(props: PageProps) {
       setDataError(error instanceof Error ? error.message : 'Unable to restore transaction.')
     }
   }
-
-  useEffect(() => {
-    document.body.classList.toggle(
-      'modal-is-open',
-      drawerOpen || Boolean(selectedTransaction) || Boolean(receiptTransaction) || Boolean(receiptStatusTransaction) || Boolean(recurringEditorTemplate) || filtersOpen || csvImportOpen,
-    )
-
-    return () => document.body.classList.remove('modal-is-open')
-  }, [csvImportOpen, drawerOpen, filtersOpen, receiptTransaction, receiptStatusTransaction, recurringEditorTemplate, selectedTransaction])
 
   return (
     <AppShell

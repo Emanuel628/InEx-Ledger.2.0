@@ -13,6 +13,7 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import LoadingDots from '../components/LoadingDots'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
@@ -39,6 +40,7 @@ function Receipts(props: PageProps) {
   const [dataError, setDataError] = useState('')
   const [noticeVisible, dismissNotice] = useSessionDismissed('receipts-review')
   useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
+  useBodyModalLock(drawerOpen || Boolean(linkingReceipt))
   const filteredReceipts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
     return receiptRows.filter((receipt) => {
@@ -71,12 +73,6 @@ function Receipts(props: PageProps) {
       setTransactionOptions([])
     }
   }
-
-  useEffect(() => {
-    document.body.classList.toggle('modal-is-open', drawerOpen || Boolean(linkingReceipt))
-
-    return () => document.body.classList.remove('modal-is-open')
-  }, [drawerOpen, linkingReceipt])
 
   useEffect(() => {
     void refreshReceipts()

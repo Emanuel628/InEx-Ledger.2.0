@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import {
   archiveMessage,
@@ -72,6 +73,7 @@ function Messages(props: PageProps) {
     setActionMenuId(null)
     setFiltersOpen(false)
   })
+  useBodyModalLock(detailOpen || composeOpen)
 
   async function refreshMessages() {
     setLoadingData(true)
@@ -100,12 +102,6 @@ function Messages(props: PageProps) {
   useEffect(() => {
     void refreshMessages()
   }, [])
-
-  useEffect(() => {
-    document.body.classList.toggle('modal-is-open', detailOpen || composeOpen)
-
-    return () => document.body.classList.remove('modal-is-open')
-  }, [detailOpen, composeOpen])
 
   const lanes = useMemo(() => {
     const supportCount = inbox.filter((message) => message.type === 'Support').length

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
@@ -60,6 +61,7 @@ function Mileage(props: PageProps) {
     setActionMenuId(null)
     setFiltersOpen(false)
   })
+  useBodyModalLock(drawerOpen)
   const usesKilometers = isCanadaBusiness(props.authUser?.business?.region || props.authUser?.business?.type, props.authUser?.business?.currency)
   const unitLabel = usesKilometers ? 'Kilometers' : 'Miles'
   const unitShort = usesKilometers ? 'km' : 'mi'
@@ -87,12 +89,6 @@ function Mileage(props: PageProps) {
   useEffect(() => {
     void refreshPageData()
   }, [])
-
-  useEffect(() => {
-    document.body.classList.toggle('modal-is-open', drawerOpen)
-
-    return () => document.body.classList.remove('modal-is-open')
-  }, [drawerOpen])
 
   useEffect(() => {
     setCurrentPage(1)
