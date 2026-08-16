@@ -29,6 +29,12 @@ const {
   buildBillingLifecycleEmail,
 } = require("../services/emailI18nService.js");
 const {
+  buildEmailDedupeKey,
+  reserveEmailDelivery,
+  markEmailDeliverySent,
+  markEmailDeliveryFailed,
+} = require("../services/emailDeliveryDedupeService.js");
+const {
   normalizeIpAddress,
   fetchIpLocation,
 } = require("../services/signInSecurityService.js");
@@ -942,13 +948,59 @@ async function sendBillingEmail({
       invoiceUrl,
       billingUrl,
     });
-    await getResend().emails.send({
-      from: RESEND_FROM_EMAIL,
-      to: contact.email,
-      subject: emailContent.subject,
-      html: emailContent.html,
-      text: emailContent.text,
+    const dedupeKey = buildEmailDedupeKey(
+      "billing-lifecycle",
+      businessId,
+      [
+        kind,
+        contact.email,
+        emailContent.subject,
+        JSON.stringify(details || []),
+        actionUrl || "",
+        invoiceUrl || "",
+      ],
+    );
+    const reserved = await reserveEmailDelivery(pool, {
+      dedupeKey,
+      category: "billing.lifecycle",
+      businessId,
+      recipientEmail: contact.email,
+      metadata: { kind, actionUrl: actionUrl || null, invoiceUrl: invoiceUrl || null },
     });
+    if (!reserved) {
+      logInfo("Billing lifecycle email skipped by dedupe", {
+        businessId,
+        kind,
+      });
+      return;
+    }
+
+    try {
+      const result = await getResend().emails.send({
+        from: RESEND_FROM_EMAIL,
+        to: contact.email,
+        subject: emailContent.subject,
+        html: emailContent.html,
+        text: emailContent.text,
+      });
+      if (result?.error) {
+        await markEmailDeliveryFailed(pool, dedupeKey, result.error);
+        logWarn("Billing lifecycle email provider error", {
+          businessId,
+          kind,
+          err: result.error.message,
+        });
+        return;
+      }
+      await markEmailDeliverySent(
+        pool,
+        dedupeKey,
+        result?.data?.id || result?.id || null,
+      );
+    } catch (sendErr) {
+      await markEmailDeliveryFailed(pool, dedupeKey, sendErr);
+      throw sendErr;
+    }
     logInfo("Billing lifecycle email sent", {
       businessId,
       kind,

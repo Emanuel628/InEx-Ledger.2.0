@@ -68,6 +68,18 @@ test("migration 049 creates persistent Stripe webhook idempotency table", () => 
   assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_processed_at/i);
 });
 
+test("migration 20260816 creates durable email delivery dedupe table", () => {
+  const sql = readMigration("20260816_create_email_delivery_dedupe.sql");
+
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS email_delivery_dedupe/i);
+  assert.match(sql, /dedupe_key\s+TEXT\s+PRIMARY KEY/i);
+  assert.match(sql, /status\s+TEXT\s+NOT NULL\s+DEFAULT 'reserved'/i);
+  assert.match(sql, /CHECK \(status IN \('reserved', 'sent', 'failed'\)\)/i);
+  assert.match(sql, /provider_message_id\s+TEXT\s+NULL/i);
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS email_delivery_dedupe_business_category_idx/i);
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS email_delivery_dedupe_status_updated_idx/i);
+});
+
 test("migration 050 drops cpa_audit_logs grant_id FK to prevent XX000 on account deletion", () => {
   const sql = readMigration("050_drop_cpa_audit_grant_id_fk.sql");
 

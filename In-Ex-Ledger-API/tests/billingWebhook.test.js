@@ -48,6 +48,9 @@ function loadBillingRouter(options = {}) {
     freePlanCalls: [],
     customerUpdates: [],
     emailSends: [],
+    emailDeliveryReservations: [],
+    emailDeliveryUpdates: [],
+    emailDedupeReserveResult: options.emailDedupeReserveResult ?? true,
     reserveResult: options.reserveResult ?? true,
     releaseCalls: [],
     processingError: options.processingError || null,
@@ -89,6 +92,17 @@ function loadBillingRouter(options = {}) {
             if (/DELETE FROM stripe_webhook_events/i.test(sql)) {
               state.releaseCalls.push({ sql, params });
               return { rowCount: 1 };
+            }
+            if (/INSERT INTO email_delivery_dedupe/i.test(sql)) {
+              state.emailDeliveryReservations.push({ sql, params });
+              return {
+                rowCount: state.emailDedupeReserveResult ? 1 : 0,
+                rows: state.emailDedupeReserveResult ? [{ dedupe_key: params[0] }] : []
+              };
+            }
+            if (/UPDATE email_delivery_dedupe/i.test(sql)) {
+              state.emailDeliveryUpdates.push({ sql, params });
+              return { rowCount: 1, rows: [] };
             }
             if (/SELECT business_id\s+FROM business_subscriptions\s+WHERE stripe_customer_id = \$1/i.test(sql)) {
               return { rows: state.customerBusinessId ? [{ business_id: state.customerBusinessId }] : [], rowCount: state.customerBusinessId ? 1 : 0 };
@@ -522,6 +536,39 @@ test("webhook: invoice.payment_failed sends an email that directs the user to up
     assert.equal(fixture.state.emailSends.length, 1);
     assert.equal(fixture.state.emailSends[0].to, "owner@example.com");
     assert.equal(fixture.state.emailSends[0].from, "InEx Ledger <noreply@inexledger.com>");
+    assert.equal(fixture.state.emailDeliveryReservations.length, 1);
+    assert.match(fixture.state.emailDeliveryReservations[0].params[0], /^billing-lifecycle:biz_test_lookup:/);
+    assert.equal(fixture.state.emailDeliveryReservations[0].params[1], "billing.lifecycle");
+    assert.equal(fixture.state.emailDeliveryUpdates.length, 1);
+    assert.match(fixture.state.emailDeliveryUpdates[0].sql, /SET status = 'sent'/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: billing lifecycle email dedupe skips an already reserved delivery", async () => {
+  const fixture = loadBillingRouter({
+    customerBusinessId: "biz_test_lookup",
+    emailDedupeReserveResult: false
+  });
+
+  try {
+    const { event } = buildWebhookEvent("invoice.payment_failed", {
+      id: "in_test_failed_duplicate",
+      object: "invoice",
+      customer: "cus_test123",
+      amount_due: 4200,
+      currency: "usd",
+      number: "INV-2026-001",
+      created: Math.floor(Date.now() / 1000),
+      hosted_invoice_url: "https://billing.stripe.com/invoice/test_123"
+    });
+
+    const res = await sendWebhook(fixture.app, event);
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.emailDeliveryReservations.length, 1);
+    assert.equal(fixture.state.emailSends.length, 0);
+    assert.equal(fixture.state.emailDeliveryUpdates.length, 0);
   } finally {
     fixture.cleanup();
   }
