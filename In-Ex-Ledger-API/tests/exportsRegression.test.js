@@ -184,6 +184,10 @@ function loadExportsRouter(options = {}) {
     exportCleanupCalls: [],
     deletedExportMetadata: null,
     deletedExport: null,
+    auditEvents: [],
+    generatedEmails: [],
+    failedEmails: [],
+    warnings: [],
     vehicleCostQueryCount: 0,
   };
   const grantPayload = options.grantPayload || {
@@ -239,6 +243,24 @@ function loadExportsRouter(options = {}) {
             payload,
           },
         verifyExportGrant: async () => grantPayload,
+      };
+    }
+    if (/exportEmailService\.js$/.test(requestName)) {
+      return {
+        sendExportGeneratedEmail: async (payload) => {
+          state.generatedEmails.push(payload);
+          if (options.generatedEmailError) {
+            throw new Error(options.generatedEmailError);
+          }
+          return { sent: true };
+        },
+        sendExportFailedEmail: async (payload) => {
+          state.failedEmails.push(payload);
+          if (options.failedEmailError) {
+            throw new Error(options.failedEmailError);
+          }
+          return { sent: true };
+        },
       };
     }
     if (/exportStorage\.js$/.test(requestName)) {
@@ -403,7 +425,25 @@ function loadExportsRouter(options = {}) {
       };
     }
     if (/logger\.js$/.test(requestName)) {
-      return { logError() {}, logInfo() {}, logWarn() {} };
+      return {
+        logError() {},
+        logInfo() {},
+        logWarn(message, context) {
+          state.warnings.push({ message, context });
+        }
+      };
+    }
+    if (/auditEventService\.js$/.test(requestName)) {
+      return {
+        AUDIT_ACTIONS: { EXPORT_GENERATED: "export.generated" },
+        recordAuditEventForRequest: async (_pool, _req, payload) => {
+          state.auditEvents.push(payload);
+          if (options.auditError) {
+            throw new Error(options.auditError);
+          }
+          return "audit-1";
+        }
+      };
     }
     if (/logSanitizer\.js$/.test(requestName)) {
       return {
@@ -1017,6 +1057,43 @@ test("route generate stores nonzero page count metadata and saves only the redac
     assert.equal(fixture.state.insertedSnapshot[5], "pdf");
     assert.ok(Array.isArray(fixture.state.insertedSnapshotItems));
     assert.equal(fixture.state.released, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("route generate does not fail completed exports when audit or email side effects fail", async () => {
+  const fixture = loadExportsRouter({
+    auditError: "audit unavailable",
+    generatedEmailError: "email unavailable",
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/exports/generate")
+      .buffer(true)
+      .parse(parseBinaryResponse)
+      .send({
+        grantToken: "grant_token_123",
+        taxId_jwe: "encrypted_tax_id",
+        certifiedByUser: true,
+      });
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers["content-type"], "application/pdf");
+    assert.match(response.body.toString("latin1"), /^%PDF-/);
+    assert.equal(fixture.state.auditEvents.length, 1);
+    assert.equal(fixture.state.generatedEmails.length, 1);
+    assert.equal(
+      fixture.state.warnings.some((entry) => entry.message === "Export audit event failed"),
+      true
+    );
+    assert.equal(
+      fixture.state.warnings.some((entry) => entry.message === "Export generated email failed"),
+      true
+    );
   } finally {
     fixture.cleanup();
   }

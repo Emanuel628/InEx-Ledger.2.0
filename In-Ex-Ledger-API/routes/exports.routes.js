@@ -86,6 +86,17 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 
+function runBestEffortExportSideEffect(label, task, context = {}) {
+  Promise.resolve()
+    .then(task)
+    .catch((err) => {
+      logWarn(label, {
+        ...context,
+        err: err?.message || String(err)
+      });
+    });
+}
+
 function requireEmailVerified(req, res, next) {
   if (!req.user?.email_verified) {
     return res
@@ -879,7 +890,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         endDate: grantEndDate,
         exportType,
       });
-      await recordAuditEventForRequest(pool, req, {
+      runBestEffortExportSideEffect("Export audit event failed", () => recordAuditEventForRequest(pool, req, {
         action: AUDIT_ACTIONS.EXPORT_GENERATED,
         businessId,
         metadata: {
@@ -892,14 +903,14 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
           includeTaxId: false,
           route: "grant_generate",
         },
-      });
-      await sendExportGeneratedEmail({
+      }), { userId: user.id, businessId, exportType, route: "grant_generate" });
+      runBestEffortExportSideEffect("Export generated email failed", () => sendExportGeneratedEmail({
         businessId,
         userId: user.id,
         exportType,
         startDate: grantStartDate,
         endDate: grantEndDate,
-      });
+      }), { userId: user.id, businessId, exportType, route: "grant_generate" });
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader(
         "Content-Disposition",
@@ -956,7 +967,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       includeTaxId,
       exportLang,
     });
-    await recordAuditEventForRequest(pool, req, {
+    runBestEffortExportSideEffect("Export audit event failed", () => recordAuditEventForRequest(pool, req, {
       action: AUDIT_ACTIONS.EXPORT_GENERATED,
       businessId,
       metadata: {
@@ -969,14 +980,14 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         includeTaxId,
         route: "grant_generate",
       },
-    });
-    await sendExportGeneratedEmail({
+    }), { userId: user.id, businessId, exportType: "pdf", route: "grant_generate" });
+    runBestEffortExportSideEffect("Export generated email failed", () => sendExportGeneratedEmail({
       businessId,
       userId: user.id,
       exportType: "pdf",
       startDate: grantStartDate,
       endDate: grantEndDate,
-    });
+    }), { userId: user.id, businessId, exportType: "pdf", route: "grant_generate" });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -994,14 +1005,14 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
           : undefined,
       });
     }
-    await sendExportFailedEmail({
+    runBestEffortExportSideEffect("Export failed email failed", () => sendExportFailedEmail({
       businessId,
       userId: user?.id,
       exportType: grantPayload?.exportType || "pdf",
       startDate: grantPayload?.dateRange?.startDate || null,
       endDate: grantPayload?.dateRange?.endDate || null,
       reason: err.message,
-    });
+    }), { userId: user?.id, businessId, exportType: grantPayload?.exportType || "pdf", route: "grant_generate" });
     logError("Export generation error", {
       body: sanitizedBody,
       err: err.message,
@@ -1774,7 +1785,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       includeTaxId,
       exportLang,
     });
-    await recordAuditEventForRequest(pool, req, {
+    runBestEffortExportSideEffect("Export audit event failed", () => recordAuditEventForRequest(pool, req, {
       action: AUDIT_ACTIONS.EXPORT_GENERATED,
       businessId,
       metadata: {
@@ -1787,14 +1798,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
         includeTaxId,
         route: "secure_export",
       },
-    });
-    await sendExportGeneratedEmail({
+    }), { userId: user.id, businessId, exportType: "pdf", route: "secure_export" });
+    runBestEffortExportSideEffect("Export generated email failed", () => sendExportGeneratedEmail({
       businessId,
       userId: user.id,
       exportType: "pdf",
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
-    });
+    }), { userId: user.id, businessId, exportType: "pdf", route: "secure_export" });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -1812,14 +1823,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
           : undefined,
       });
     }
-    await sendExportFailedEmail({
+    runBestEffortExportSideEffect("Export failed email failed", () => sendExportFailedEmail({
       businessId,
       userId: user?.id,
       exportType: "pdf",
       startDate: req.body?.dateRange?.startDate || null,
       endDate: req.body?.dateRange?.endDate || null,
       reason: err.message,
-    });
+    }), { userId: user?.id, businessId, exportType: "pdf", route: "secure_export" });
     logError("Secure export error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate secure export." });
   }

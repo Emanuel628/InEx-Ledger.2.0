@@ -714,12 +714,12 @@ test that had been failing identically since PR 13).
 - [x] Hard reloads replaced with state updates where SPA behavior expected
 - [x] `PlanGate` usage normalized against backend feature keys
 
-## Phase 9 - Integrations, Idempotency, Side Effects — 3.5 / 5
+## Phase 9 - Integrations, Idempotency, Side Effects — 4.5 / 5
 - [x] Stripe mutation idempotency keys reviewed beyond checkout (`buildStripeMutationIdempotencyKey` covers customer create, portal config create, subscription cancel/resume/switch, and direct additional-business subscription updates)
 - [~] Durable dedupe/outbox behavior for important emails (`email_delivery_dedupe` + billing lifecycle email dedupe; remaining email families still need review)
 - [x] Plaid partial-failure/cursor/retry behavior hardened (row-level failures and unknown accounts mark the batch partial, keep the prior cursor, and surface connection error state)
 - [x] Export/receipt cleanup paths made explicit and testable (export history deletion commits DB cleanup before best-effort file cleanup and returns cleanup status; receipt delete pending-rename path rechecked)
-- [ ] Required vs. best-effort side effects separated
+- [x] Required vs. best-effort side effects separated (completed export generation no longer fails or waits on audit/email side effects; failures are logged)
 
 ## Phase 10 - Documentation And Final Stabilization — 0 / 4
 - [ ] Source-of-truth docs updated to match code
