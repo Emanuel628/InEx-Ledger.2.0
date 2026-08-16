@@ -118,7 +118,7 @@ function resolveSettingsThemePreference() {
   try {
     const storedVersion = localStorage.getItem("lb_theme_version");
     const storedTheme = localStorage.getItem("lb_theme");
-    const normalizedTheme = storedTheme === "dark" ? "dark" : SETTINGS_DEFAULT_THEME;
+    const normalizedTheme = SETTINGS_DEFAULT_THEME;
     if (storedVersion !== SETTINGS_THEME_VERSION || storedTheme !== normalizedTheme) {
       localStorage.setItem("lb_theme", normalizedTheme);
       localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
@@ -1691,9 +1691,9 @@ async function initPreferences() {
     if (typeof setGlobalTheme === "function") {
       setGlobalTheme(nextPreferences.theme);
     } else {
-      localStorage.setItem("lb_theme", nextPreferences.theme);
+      localStorage.setItem("lb_theme", SETTINGS_DEFAULT_THEME);
       localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
-      document.documentElement.setAttribute("data-theme", nextPreferences.theme);
+      document.documentElement.setAttribute("data-theme", SETTINGS_DEFAULT_THEME);
     }
 
     localStorage.setItem("lb_unit_metric", String(nextPreferences.distance === "km"));

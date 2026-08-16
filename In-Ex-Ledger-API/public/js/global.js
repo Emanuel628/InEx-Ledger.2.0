@@ -74,7 +74,7 @@ function resolveSavedTheme() {
   try {
     const storedVersion = localStorage.getItem("lb_theme_version");
     const storedTheme = localStorage.getItem("lb_theme");
-    const normalizedTheme = storedTheme === "dark" ? "dark" : DEFAULT_THEME;
+    const normalizedTheme = DEFAULT_THEME;
     if (storedVersion !== THEME_VERSION || storedTheme !== normalizedTheme) {
       localStorage.setItem("lb_theme", normalizedTheme);
       localStorage.setItem("lb_theme_version", THEME_VERSION);
@@ -89,7 +89,7 @@ function applyGlobalTheme() {
 }
 
 function setGlobalTheme(theme) {
-  const normalized = theme === "dark" ? "dark" : DEFAULT_THEME;
+  const normalized = DEFAULT_THEME;
   persistDefaultTheme();
   applyThemeToDocument(normalized);
   if (typeof window !== "undefined" && typeof CustomEvent === "function") {

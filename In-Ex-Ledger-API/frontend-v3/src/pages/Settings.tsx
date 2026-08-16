@@ -20,7 +20,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import type { PageProps, ThemeMode } from '../App'
+import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { usePlan } from '../context/PlanContext'
 import { normalizeLanguage as normalizeLanguageValue } from '../lib/i18n'
@@ -265,7 +265,7 @@ function Settings(props: PageProps) {
             ) : null}
             {activeSection === 'Billing' ? <BillingSettings onNavigate={props.onNavigate} /> : null}
             {activeSection === 'Security' ? <SecuritySettings onNavigate={props.onNavigate} authUser={props.authUser} onAuthChange={props.onAuthChange} /> : null}
-            {activeSection === 'Preferences' ? <PreferenceSettings privacySettings={privacySettings} updatePrivacy={updatePrivacy} theme={props.theme} setTheme={props.setTheme} /> : null}
+            {activeSection === 'Preferences' ? <PreferenceSettings privacySettings={privacySettings} updatePrivacy={updatePrivacy} /> : null}
             {activeSection === 'Data' ? (
               <DataSettings
                 privacySettings={privacySettings}
@@ -644,18 +644,14 @@ function MfaSettingsModal({
 function PreferenceSettings({
   privacySettings,
   updatePrivacy,
-  theme,
-  setTheme,
 }: {
   privacySettings: PrivacySettings | null
   updatePrivacy: <K extends keyof PrivacySettings>(key: K, value: PrivacySettings[K]) => void
-  theme: ThemeMode
-  setTheme: PageProps['setTheme']
 }) {
   return (
     <SettingsPanel eyebrow="Preferences" title="Defaults" description="Set the interface and privacy choices used across the app.">
       <div className="settings-form-grid">
-        <SelectField label="Theme" value={theme === 'dark' ? 'Dark' : 'Light'} options={['Light', 'Dark']} onChange={(value) => setTheme(value === 'Dark' ? 'dark' : 'light')} />
+        <Field label="Theme" value="Light" readOnly />
         <Field label="Data residency" value={privacySettings?.dataResidency || ''} readOnly placeholder="Not set" />
       </div>
       <SettingsRow icon={Bell} title="Marketing email" description="Receive product updates and billing-adjacent announcements.">

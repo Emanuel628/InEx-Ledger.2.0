@@ -289,6 +289,20 @@ test("v3 settings normalizes business profile fields before saving", () => {
   assert.match(cssSource, /\.settings-field\.is-invalid/);
 });
 
+test("v3 theme remains light-only until dark mode is redesigned", () => {
+  const appSource = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
+  const settingsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Settings.tsx"), "utf8");
+
+  assert.match(appSource, /export type ThemeMode = 'light'/);
+  assert.match(appSource, /const theme: ThemeMode = 'light'/);
+  assert.match(appSource, /localStorage\.setItem\('inex-theme', 'light'\)/);
+  assert.doesNotMatch(appSource, /setTheme:/);
+  assert.doesNotMatch(appSource, /localStorage\.getItem\('inex-theme'\) === 'dark'/);
+  assert.doesNotMatch(settingsSource, /options=\{\['Light', 'Dark'\]\}/);
+  assert.doesNotMatch(settingsSource, /setTheme\(value === 'Dark'/);
+  assert.match(settingsSource, /<Field label="Theme" value="Light" readOnly \/>/);
+});
+
 test("v3 transactions CSV import requires legacy account and date range fields", () => {
   const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");

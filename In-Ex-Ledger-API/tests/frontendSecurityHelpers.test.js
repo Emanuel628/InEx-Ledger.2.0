@@ -517,7 +517,7 @@ test("subscription helpers preserve millisecond timestamps and reject non-Stripe
   );
 });
 
-test("settings helpers preserve a valid stored theme during version migration and normalize multiline addresses", () => {
+test("settings helpers reset stale dark theme during version migration and normalize multiline addresses", () => {
   const localStorage = {
     _store: new Map([
       ["lb_theme", "dark"],
@@ -548,8 +548,8 @@ test("settings helpers preserve a valid stored theme during version migration an
     t(key) { return key; }
   });
 
-  assert.equal(context.resolveSavedTheme(), "dark");
-  assert.equal(localStorage.getItem("lb_theme"), "dark");
+  assert.equal(context.resolveSavedTheme(), "light");
+  assert.equal(localStorage.getItem("lb_theme"), "light");
   assert.equal(localStorage.getItem("lb_theme_version"), "3");
   assert.equal(
     context.serializeBusinessAddress(["123 Main St\nSuite 1", "", "Toronto", "ON", "", "CA"]),

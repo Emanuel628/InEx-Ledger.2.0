@@ -499,21 +499,21 @@ Old localStorage dark setting -> app resets to light
 
 - `theme-boot.js` does not exist on current `main`; do not recreate it as a sidecar.
 - `tokens.css` still contains a full `[data-theme="dark"]` block.
-- `global.js` still contains `setGlobalTheme(theme)` and can accept `"dark"`.
+- `global.js` still exposes `setGlobalTheme(theme)`, but it normalizes every input to light while dark mode is disabled.
 - Duplicate dark-mode drift CSS was later found under `In-Ex-Ledger-API/public/css/core/` and is tracked in the Additional Cleanup Candidates section.
 
-## Remaining Work
+## Completed Work
 
-Keep theme behavior owned by V3/app code until the later redesign pass resumes.
+Theme behavior is owned by app/global code until the later redesign pass resumes.
 
 Preferred final architecture:
 
 - Keep force-light behavior in owner code rather than a public sidecar.
 - Do not recreate `theme-boot.js` unless the team explicitly accepts a permanent early anti-flash layer.
-- Prevent `setGlobalTheme("dark")` from applying dark mode while dark mode is disabled.
-- Remove or hide any visible dark-mode toggle while dark mode is disabled.
-- Reset stale `lb_theme=dark` values to `light`.
-- Do not rely on OS/browser `prefers-color-scheme`.
+- `setGlobalTheme("dark")` does not apply dark mode while dark mode is disabled.
+- V3 Settings shows a read-only Light value instead of a visible dark-mode selector.
+- Stale `lb_theme=dark` and `inex-theme=dark` values are reset to light.
+- Theme code does not rely on OS/browser `prefers-color-scheme`.
 - Do not delete dark-mode tokens unless the team decides the future redesign will start from scratch.
 
 ## Phase 5 Definition of Done

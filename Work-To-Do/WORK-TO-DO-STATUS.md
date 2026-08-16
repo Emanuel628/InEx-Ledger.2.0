@@ -151,7 +151,7 @@ Status: ✅ complete. All 28 task rows checked off `[x]`. Moved to `Work-Complet
 - DONE - No active `theme-boot.js` reference remains.
 - DONE - No active early theme boot sidecar remains.
 - DONE - Active theme behavior is owned by V3/app code, not a hidden public sidecar.
-- PARTIAL - Optional: a runtime UI spot-check that no visible toggle re-enables dark mode.
+- DONE - V3 shows a read-only Light setting, stale dark preferences are reset, and public theme helpers force light.
 
 ### Phase 6 - Final Audit
 

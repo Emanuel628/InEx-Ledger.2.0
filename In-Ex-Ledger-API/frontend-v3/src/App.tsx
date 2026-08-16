@@ -71,7 +71,7 @@ export type AppPage =
   | 'Onboarding'
   | 'Help'
 
-export type ThemeMode = 'light' | 'dark'
+export type ThemeMode = 'light'
 
 export type PageProps = {
   activePage: AppPage
@@ -84,7 +84,6 @@ export type PageProps = {
   sidebarCollapsed: boolean
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>
   theme: ThemeMode
-  setTheme: Dispatch<SetStateAction<ThemeMode>>
   language: AppLanguage
   onLanguageChange: (language: AppLanguage) => void
 }
@@ -241,15 +240,13 @@ function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [theme, setTheme] = useState<ThemeMode>(() => (
-    window.localStorage.getItem('inex-theme') === 'dark' ? 'dark' : 'light'
-  ))
+  const theme: ThemeMode = 'light'
   const [language, setLanguage] = useState(getStoredLanguage)
   const languageRef = useRef(language)
 
   useEffect(() => {
-    window.localStorage.setItem('inex-theme', theme)
-  }, [theme])
+    window.localStorage.setItem('inex-theme', 'light')
+  }, [])
 
   useEffect(() => {
     languageRef.current = language
@@ -434,7 +431,6 @@ function App() {
     sidebarCollapsed,
     setSidebarCollapsed,
     theme,
-    setTheme,
     language,
     onLanguageChange: handleLanguageChange,
   }
