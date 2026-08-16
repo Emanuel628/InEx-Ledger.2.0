@@ -76,7 +76,10 @@ function loadBillingRouter(options = {}) {
         };
       }
       const body = new URLSearchParams(opts?.body || "");
-      state.stripeUpdates.push(Object.fromEntries(body.entries()));
+      state.stripeUpdates.push({
+        body: Object.fromEntries(body.entries()),
+        headers: opts?.headers || {},
+      });
       return {
         ok: true,
         async json() {
@@ -398,10 +401,14 @@ test("PATCH /additional-businesses — active Pro user can increase slots", asyn
     assert.ok(res.body.subscription);
     assert.equal(state.syncCalls.length, 1);
     assert.equal(state.stripeUpdates.length, 1);
-    const update = state.stripeUpdates[0];
+    const update = state.stripeUpdates[0].body;
     assert.equal(update["items[0][price]"], ADDON_PRICE_ID);
     assert.equal(update["items[0][quantity]"], "2");
     assert.equal(update["proration_behavior"], "create_prorations");
+    assert.match(
+      state.stripeUpdates[0].headers["Idempotency-Key"],
+      /^billing:additional-businesses-update:biz_addon_001:/,
+    );
   } finally {
     cleanup();
   }
@@ -432,9 +439,13 @@ test("PATCH /additional-businesses — active Pro user can decrease existing add
       .send({ additionalBusinesses: 1 });
     assert.equal(res.status, 200);
     assert.equal(state.stripeUpdates.length, 1);
-    const update = state.stripeUpdates[0];
+    const update = state.stripeUpdates[0].body;
     assert.equal(update["items[0][id]"], ADDON_ITEM_ID);
     assert.equal(update["items[0][quantity]"], "1");
+    assert.match(
+      state.stripeUpdates[0].headers["Idempotency-Key"],
+      /^billing:additional-businesses-update:biz_addon_001:/,
+    );
   } finally {
     cleanup();
   }
@@ -465,9 +476,13 @@ test("PATCH /additional-businesses — quantity 0 removes existing addon item", 
       .send({ additionalBusinesses: 0 });
     assert.equal(res.status, 200);
     assert.equal(state.stripeUpdates.length, 1);
-    const update = state.stripeUpdates[0];
+    const update = state.stripeUpdates[0].body;
     assert.equal(update["items[0][id]"], ADDON_ITEM_ID);
     assert.equal(update["items[0][deleted]"], "true");
+    assert.match(
+      state.stripeUpdates[0].headers["Idempotency-Key"],
+      /^billing:additional-businesses-update:biz_addon_001:/,
+    );
   } finally {
     cleanup();
   }
@@ -522,7 +537,7 @@ test("PATCH /additional-businesses — existing addon item is updated, not dupli
       1,
       "should make exactly one Stripe write",
     );
-    const update = state.stripeUpdates[0];
+    const update = state.stripeUpdates[0].body;
     assert.equal(
       update["items[0][id]"],
       ADDON_ITEM_ID,
@@ -533,6 +548,10 @@ test("PATCH /additional-businesses — existing addon item is updated, not dupli
       update["items[0][price]"],
       undefined,
       "should not add a second price entry",
+    );
+    assert.match(
+      state.stripeUpdates[0].headers["Idempotency-Key"],
+      /^billing:additional-businesses-update:biz_addon_001:/,
     );
   } finally {
     cleanup();
@@ -559,7 +578,7 @@ test("PATCH /additional-businesses ? trialing Pro user can increase slots", asyn
     assert.ok(res.body.subscription);
     assert.equal(state.syncCalls.length, 1);
     assert.equal(state.stripeUpdates.length, 1);
-    const update = state.stripeUpdates[0];
+    const update = state.stripeUpdates[0].body;
     assert.equal(update["items[0][price]"], ADDON_PRICE_ID);
     assert.equal(update["items[0][quantity]"], "2");
     assert.equal(update["proration_behavior"], "create_prorations");
@@ -614,7 +633,7 @@ test("PATCH /additional-businesses — infers pricing terms from Stripe subscrip
       .send({ additionalBusinesses: 2 });
     assert.equal(res.status, 200);
     assert.equal(state.stripeUpdates.length, 1);
-    const update = state.stripeUpdates[0];
+    const update = state.stripeUpdates[0].body;
     assert.equal(update["items[0][price]"], ADDON_PRICE_ID);
     assert.equal(update["items[0][quantity]"], "2");
   } finally {

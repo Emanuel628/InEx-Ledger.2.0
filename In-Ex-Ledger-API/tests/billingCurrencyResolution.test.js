@@ -763,6 +763,10 @@ test("legacy billing cancel portal endpoint schedules cancellation directly", as
       cancelRequest,
       "Stripe subscription should be scheduled to cancel in place",
     );
+    assert.match(
+      cancelRequest.headers["Idempotency-Key"],
+      /^billing:subscription-cancel:22222222-2222-4222-8222-222222222222:/,
+    );
   } finally {
     fixture.cleanup();
   }
@@ -799,6 +803,10 @@ test("billing portal sessions use a configuration with monthly and yearly plan c
     assert.ok(
       configRequest,
       "Stripe portal configuration should be created by the app",
+    );
+    assert.match(
+      configRequest.headers["Idempotency-Key"],
+      /^billing:portal-configuration:usd:/,
     );
     assert.equal(
       configRequest.body.get("features[subscription_update][enabled]"),
@@ -1207,6 +1215,10 @@ test("billing checkout persists a created Stripe customer even when the subscrip
     assert.ok(
       customerInsert,
       "Stripe customer should still be created and persisted",
+    );
+    assert.match(
+      customerInsert.headers["Idempotency-Key"],
+      /^billing:customer-create:22222222-2222-4222-8222-222222222222:/,
     );
   } finally {
     fixture.cleanup();
@@ -1645,6 +1657,10 @@ test("billing resume clears cancel_at_period_end on the existing Stripe subscrip
     );
 
     assert.ok(resumeRequest, "Stripe subscription should be resumed in place");
+    assert.match(
+      resumeRequest.headers["Idempotency-Key"],
+      /^billing:subscription-resume:22222222-2222-4222-8222-222222222222:/,
+    );
   } finally {
     fixture.cleanup();
   }
@@ -1726,6 +1742,10 @@ test("billing resume can switch a canceling yearly subscription to monthly", asy
       resumeRequest.body.get("metadata[billing_interval]"),
       "monthly",
     );
+    assert.match(
+      resumeRequest.headers["Idempotency-Key"],
+      /^billing:subscription-resume-switch:22222222-2222-4222-8222-222222222222:/,
+    );
   } finally {
     fixture.cleanup();
   }
@@ -1796,6 +1816,10 @@ test("billing resume switches an already-active (non-canceled) subscription's in
     assert.equal(
       switchRequest.body.get("metadata[billing_interval]"),
       "yearly",
+    );
+    assert.match(
+      switchRequest.headers["Idempotency-Key"],
+      /^billing:subscription-resume-switch:22222222-2222-4222-8222-222222222222:/,
     );
 
     // No Stripe-hosted portal/checkout session should be created for this --

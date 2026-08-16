@@ -82,6 +82,19 @@ const {
 let resendClient = null;
 const portalConfigurationCache = new Map();
 
+function buildStripeMutationIdempotencyKey(operation, scope, parts = []) {
+  const digest = crypto
+    .createHash("sha256")
+    .update(
+      [operation, scope, ...parts]
+        .map((part) => String(part ?? ""))
+        .join(":"),
+    )
+    .digest("hex")
+    .slice(0, 32);
+  return `billing:${operation}:${scope}:${digest}`;
+}
+
 function getResend() {
   if (!resendClient) {
     if (!process.env.RESEND_API_KEY) {
@@ -455,12 +468,22 @@ async function ensureStripeCustomer(businessId, user) {
       });
     }
 
-    const customer = await stripeRequest("/customers", {
-      email: user.email,
-      name: user.display_name || user.full_name || user.email,
-      "metadata[business_id]": businessId,
-      "metadata[user_id]": user.id,
-    });
+    const customer = await stripeRequest(
+      "/customers",
+      {
+        email: user.email,
+        name: user.display_name || user.full_name || user.email,
+        "metadata[business_id]": businessId,
+        "metadata[user_id]": user.id,
+      },
+      {
+        idempotencyKey: buildStripeMutationIdempotencyKey(
+          "customer-create",
+          businessId,
+          [user.id, user.email],
+        ),
+      },
+    );
 
     await persistStripeCustomerIdForBusiness(client, businessId, customer.id);
     await client.query("COMMIT");
@@ -648,6 +671,13 @@ async function buildBillingPortalConfiguration(currency, purpose = "general") {
   const configuration = await stripeRequest(
     "/billing_portal/configurations",
     payload,
+    {
+      idempotencyKey: buildStripeMutationIdempotencyKey(
+        "portal-configuration",
+        normalizedCurrency,
+        [purpose, ...priceSpecs.map((spec) => spec.priceId)],
+      ),
+    },
   );
   if (!configuration?.id) {
     throw new Error("Stripe Billing Portal configuration was not created.");
@@ -1359,6 +1389,13 @@ router.post(
         {
           cancel_at_period_end: true,
         },
+        {
+          idempotencyKey: buildStripeMutationIdempotencyKey(
+            "subscription-cancel",
+            billingBusinessId,
+            [subscription.stripeSubscriptionId, "cancel_at_period_end:true"],
+          ),
+        },
       );
       const stripeSub = await stripeGet(
         `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
@@ -1501,6 +1538,23 @@ router.post(
       await stripeRequest(
         `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
         updatePayload,
+        {
+          idempotencyKey: buildStripeMutationIdempotencyKey(
+            requestedBillingInterval
+              ? "subscription-resume-switch"
+              : "subscription-resume",
+            billingBusinessId,
+            [
+              subscription.stripeSubscriptionId,
+              targetBillingInterval,
+              targetCurrency,
+              updatePayload["items[0][id]"] || "",
+              updatePayload["items[0][price]"] || "",
+              updatePayload["items[1][id]"] || "",
+              updatePayload["items[1][price]"] || "",
+            ],
+          ),
+        },
       );
       const updatedStripeSubscription = await stripeGet(
         `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
@@ -1562,6 +1616,13 @@ router.post(
         `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
         {
           cancel_at_period_end: true,
+        },
+        {
+          idempotencyKey: buildStripeMutationIdempotencyKey(
+            "subscription-cancel",
+            billingBusinessId,
+            [subscription.stripeSubscriptionId, "cancel_at_period_end:true"],
+          ),
         },
       );
 
@@ -1685,31 +1746,6 @@ function getCheckoutBlockingStatus(subscription = {}) {
   return String(subscription?.effectiveStatus || subscription?.status || "")
     .trim()
     .toLowerCase();
-}
-
-function buildCheckoutIdempotencyKey({
-  businessId,
-  billingInterval,
-  currency,
-  additionalBusinesses,
-  userId,
-}) {
-  const digest = crypto
-    .createHash("sha256")
-    .update(
-      [
-        "checkout",
-        businessId,
-        billingInterval,
-        currency,
-        String(additionalBusinesses),
-        userId || "anonymous",
-      ].join(":"),
-    )
-    .digest("hex")
-    .slice(0, 32);
-
-  return `checkout:${businessId}:${digest}`;
 }
 
 // Sends an existing Stripe subscriber to a Stripe-hosted confirmation page
@@ -1933,6 +1969,17 @@ router.patch(
             "items[0][deleted]": "true",
             proration_behavior: "create_prorations",
           },
+          {
+            idempotencyKey: buildStripeMutationIdempotencyKey(
+              "additional-businesses-update",
+              billingBusinessId,
+              [
+                subscription.stripeSubscriptionId,
+                existingAddonItem.id,
+                "delete",
+              ],
+            ),
+          },
         );
       } else if (existingAddonItem) {
         updatedSub = await stripeRequest(
@@ -1941,6 +1988,17 @@ router.patch(
             "items[0][id]": existingAddonItem.id,
             "items[0][quantity]": additionalBusinesses,
             proration_behavior: "create_prorations",
+          },
+          {
+            idempotencyKey: buildStripeMutationIdempotencyKey(
+              "additional-businesses-update",
+              billingBusinessId,
+              [
+                subscription.stripeSubscriptionId,
+                existingAddonItem.id,
+                additionalBusinesses,
+              ],
+            ),
           },
         );
       } else {
@@ -1954,6 +2012,17 @@ router.patch(
             "items[0][price]": addonPriceId,
             "items[0][quantity]": additionalBusinesses,
             proration_behavior: "create_prorations",
+          },
+          {
+            idempotencyKey: buildStripeMutationIdempotencyKey(
+              "additional-businesses-update",
+              billingBusinessId,
+              [
+                subscription.stripeSubscriptionId,
+                addonPriceId,
+                additionalBusinesses,
+              ],
+            ),
           },
         );
       }
