@@ -9,6 +9,7 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { verifyPassword } = require("../utils/authUtils.js");
 const { logError } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const { decrypt } = require("../services/encryptionService.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 const { neutralizeFormulaCell } = require("../services/csvExportService.js");
@@ -87,39 +88,30 @@ function toCsv(rows) {
 /**
  * GET /api/privacy/settings
  */
-router.get("/settings", async (req, res) => {
-  try {
-    const [privacyResult, userResult] = await Promise.all([
-      pool.query(
-        "SELECT data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in FROM user_privacy_settings WHERE user_id = $1",
-        [req.user.id]
-      ),
-      pool.query(
-        "SELECT data_residency FROM users WHERE id = $1 LIMIT 1",
-        [req.user.id]
-      )
-    ]);
+router.get("/settings", asyncRoute(async (req, res) => {
+  const [privacyResult, userResult] = await Promise.all([
+    pool.query(
+      "SELECT data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in FROM user_privacy_settings WHERE user_id = $1",
+      [req.user.id]
+    ),
+    pool.query(
+      "SELECT data_residency FROM users WHERE id = $1 LIMIT 1",
+      [req.user.id]
+    )
+  ]);
 
-    const row = privacyResult.rows[0];
-    const dataResidency = userResult.rows[0]?.data_residency || "US";
-    const isQuebec = dataResidency === "CA-QC";
+  const row = privacyResult.rows[0];
+  const dataResidency = userResult.rows[0]?.data_residency || "US";
+  const defaultOptOut = dataResidency === "CA-QC";
 
-    // Quebec Privacy Default: if no row exists yet, default data sharing to OFF
-    const defaultOptOut = isQuebec;
-
-    res.json({
-      dataSharingOptOut: row ? row.data_sharing_opt_out : defaultOptOut,
-      consentGiven: row ? row.consent_given : !defaultOptOut,
-      // analyticsOptIn is the Quebec-specific explicit opt-in; defaults to false (off)
-      analyticsOptIn: row ? Boolean(row.analytics_opt_in) : false,
-      marketingEmailOptIn: row ? Boolean(row.marketing_email_opt_in) : false,
-      dataResidency
-    });
-  } catch (err) {
-    logError("GET /privacy/settings error", { err: err.message });
-    res.status(500).json({ error: "Failed to load privacy settings." });
-  }
-});
+  res.json({
+    dataSharingOptOut: row ? row.data_sharing_opt_out : defaultOptOut,
+    consentGiven: row ? row.consent_given : !defaultOptOut,
+    analyticsOptIn: row ? Boolean(row.analytics_opt_in) : false,
+    marketingEmailOptIn: row ? Boolean(row.marketing_email_opt_in) : false,
+    dataResidency
+  });
+}));
 
 async function savePrivacySettings(req, res) {
   const dataSharingOptOut = typeof req.body?.dataSharingOptOut === "boolean" ? req.body.dataSharingOptOut : false;
@@ -133,103 +125,88 @@ async function savePrivacySettings(req, res) {
     ? req.body.marketingEmailOptIn
     : null;
 
-  try {
-    // Fetch the user's data_residency to determine if consent logging is required
-    const userResult = await pool.query(
-      "SELECT data_residency FROM users WHERE id = $1 LIMIT 1",
-      [req.user.id]
-    );
-    const dataResidency = userResult.rows[0]?.data_residency || "US";
-    const isQuebec = dataResidency === "CA-QC";
+  const userResult = await pool.query(
+    "SELECT data_residency FROM users WHERE id = $1 LIMIT 1",
+    [req.user.id]
+  );
+  const dataResidency = userResult.rows[0]?.data_residency || "US";
 
-    // Fetch existing privacy row to detect changes for consent logging
-    const existingResult = await pool.query(
-      `SELECT data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in
-         FROM user_privacy_settings
-        WHERE user_id = $1`,
-      [req.user.id]
-    );
-    const previousDataSharingOptOut = existingResult.rows[0]?.data_sharing_opt_out;
-    const previousConsentGiven = existingResult.rows[0]?.consent_given;
-    const previousAnalyticsOptIn = existingResult.rows[0]?.analytics_opt_in ?? false;
-    const previousMarketingEmailOptIn = existingResult.rows[0]?.marketing_email_opt_in ?? false;
+  const existingResult = await pool.query(
+    `SELECT data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in
+       FROM user_privacy_settings
+      WHERE user_id = $1`,
+    [req.user.id]
+  );
+  const previousDataSharingOptOut = existingResult.rows[0]?.data_sharing_opt_out;
+  const previousConsentGiven = existingResult.rows[0]?.consent_given;
+  const previousAnalyticsOptIn = existingResult.rows[0]?.analytics_opt_in ?? false;
+  const previousMarketingEmailOptIn = existingResult.rows[0]?.marketing_email_opt_in ?? false;
+  const nextAnalyticsOptIn = analyticsOptIn !== null ? analyticsOptIn : previousAnalyticsOptIn;
+  const nextMarketingEmailOptIn = marketingEmailOptIn !== null
+    ? marketingEmailOptIn
+    : previousMarketingEmailOptIn;
 
-    // Determine the analytics_opt_in value to persist.
-    // Only update it if a value was explicitly provided; otherwise keep the existing value.
-    const nextAnalyticsOptIn = analyticsOptIn !== null ? analyticsOptIn : previousAnalyticsOptIn;
-    const nextMarketingEmailOptIn = marketingEmailOptIn !== null ? marketingEmailOptIn : previousMarketingEmailOptIn;
-    
-    await pool.query(
-  `INSERT INTO user_privacy_settings
-     (user_id, data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in, updated_at)
-   VALUES ($1, $2, $3, $4, $5, NOW())
-   ON CONFLICT (user_id) DO UPDATE
-     SET data_sharing_opt_out = EXCLUDED.data_sharing_opt_out,
-         consent_given = EXCLUDED.consent_given,
-         analytics_opt_in = EXCLUDED.analytics_opt_in,
-         marketing_email_opt_in = EXCLUDED.marketing_email_opt_in,
-         updated_at = NOW()`,
-  [
-    req.user.id,
-    dataSharingOptOut,
-    consentGiven,
-    nextAnalyticsOptIn,
-    nextMarketingEmailOptIn
-  ]
-);
+  await pool.query(
+    `INSERT INTO user_privacy_settings
+       (user_id, data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in, updated_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())
+     ON CONFLICT (user_id) DO UPDATE
+       SET data_sharing_opt_out = EXCLUDED.data_sharing_opt_out,
+           consent_given = EXCLUDED.consent_given,
+           analytics_opt_in = EXCLUDED.analytics_opt_in,
+           marketing_email_opt_in = EXCLUDED.marketing_email_opt_in,
+           updated_at = NOW()`,
+    [
+      req.user.id,
+      dataSharingOptOut,
+      consentGiven,
+      nextAnalyticsOptIn,
+      nextMarketingEmailOptIn
+    ]
+  );
 
-    // Log explicit consent changes for Quebec users (Law 25 requirement).
-    // Always log data-sharing opt-out changes.
-    if (dataResidency === "CA-QC") {
-      const ipAddress = req.ip || req.connection?.remoteAddress || null;
-      const userAgent = String(req.get("user-agent") || "").slice(0, MAX_USER_AGENT_LENGTH) || null;
+  if (dataResidency === "CA-QC") {
+    const ipAddress = req.ip || req.connection?.remoteAddress || null;
+    const userAgent = String(req.get("user-agent") || "").slice(0, MAX_USER_AGENT_LENGTH) || null;
+    const privacyChoiceChanged =
+      previousDataSharingOptOut === undefined
+      || previousDataSharingOptOut === null
+      || previousDataSharingOptOut !== dataSharingOptOut
+      || previousConsentGiven === undefined
+      || previousConsentGiven === null
+      || previousConsentGiven !== consentGiven;
 
-      const privacyChoiceChanged =
-        previousDataSharingOptOut === undefined
-        || previousDataSharingOptOut === null
-        || previousDataSharingOptOut !== dataSharingOptOut
-        || previousConsentGiven === undefined
-        || previousConsentGiven === null
-        || previousConsentGiven !== consentGiven;
-
-      if (privacyChoiceChanged) {
-        const action = dataSharingOptOut ? "opt_out" : "opt_in";
-        await pool.query(
-          `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [req.user.id, dataResidency, action, ipAddress, userAgent]
-        );
-      }
-
-      // Log analytics opt-in consent separately when the QC user explicitly enables/disables
-      // tracking.  This block is already scoped to QC (outer if above); the extra
-      // change-detection guard prevents duplicate log rows on no-op saves.
-      if (analyticsOptIn !== null && analyticsOptIn !== previousAnalyticsOptIn) {
-        const analyticsAction = analyticsOptIn ? "opt_in" : "opt_out";
-        await pool.query(
-          `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [req.user.id, `${dataResidency}:analytics`, analyticsAction, ipAddress, userAgent]
-        );
-      }
+    if (privacyChoiceChanged) {
+      const action = dataSharingOptOut ? "opt_out" : "opt_in";
+      await pool.query(
+        `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [req.user.id, dataResidency, action, ipAddress, userAgent]
+      );
     }
 
-    res.json({ ok: true });
-  } catch (err) {
-    logError("POST /privacy/settings error", { err: err.message });
-    res.status(500).json({ error: "Failed to save privacy settings." });
+    if (analyticsOptIn !== null && analyticsOptIn !== previousAnalyticsOptIn) {
+      const analyticsAction = analyticsOptIn ? "opt_in" : "opt_out";
+      await pool.query(
+        `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [req.user.id, `${dataResidency}:analytics`, analyticsAction, ipAddress, userAgent]
+      );
+    }
   }
+
+  res.json({ ok: true });
 }
 
 /**
  * POST /api/privacy/settings
  */
-router.post("/settings", savePrivacySettings);
+router.post("/settings", asyncRoute(savePrivacySettings));
 
 /**
  * PUT /api/privacy/settings
  */
-router.put("/settings", savePrivacySettings);
+router.put("/settings", asyncRoute(savePrivacySettings));
 
 /**
  * POST /api/privacy/export
@@ -239,276 +216,274 @@ router.put("/settings", savePrivacySettings);
  * Key ledger fields included: TransactionIDs, Amounts, Dates, Categories.
  * Audit trail: every successful export is logged in user_action_audit_log.
  */
-router.post("/export", requireMfaIfEnabled, async (req, res) => {
+router.post("/export", requireMfaIfEnabled, asyncRoute(async (req, res) => {
   const format = String(req.query.format || req.body?.format || "json").toLowerCase();
   if (format !== "json" && format !== "csv") {
-    return res.status(400).json({ error: "Unsupported format. Use 'json' or 'csv'." });
+    throw new ApiError(400, "Unsupported format. Use 'json' or 'csv'.");
   }
 
-  try {
-    const allBusinesses = await listBusinessesForUser(req.user.id);
-    const businessIds = allBusinesses.map((b) => b.id);
+  const allBusinesses = await listBusinessesForUser(req.user.id);
+  const businessIds = allBusinesses.map((b) => b.id);
 
-    const [
-      userResult,
-      businessesResult,
-      txResult,
-      adjustmentsResult,
-      accountsResult,
-      categoriesResult,
-      auditLogResult,
-      mileageResult,
-      vehicleCostResult,
-      recurringResult,
-      receiptsResult,
-      exportHistoryResult,
-      bankConnectionsResult,
-      invoicesResult,
-      privacySettingsResult,
-      consentLogResult
-    ] = await Promise.all([
-      pool.query(
-        "SELECT id, email, full_name, display_name, created_at FROM users WHERE id = $1",
-        [req.user.id]
-      ),
-      pool.query(
-        "SELECT id, name, region, language, created_at FROM businesses WHERE id = ANY($1::uuid[])",
-        [businessIds]
-      ),
-      // Standard (non-adjustment) transactions
-      pool.query(
-        `SELECT t.id        AS transaction_id,
-                a.name      AS account,
-                c.name      AS category,
-                t.amount,
-                t.type,
-                t.description,
-                t.description_encrypted,
-                t.date,
-                t.note,
-                t.cleared,
-                t.business_id,
-                t.created_at
-           FROM transactions t
-           LEFT JOIN accounts   a ON a.id = t.account_id
-           LEFT JOIN categories c ON c.id = t.category_id
-          WHERE t.business_id = ANY($1::uuid[])
-            AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
-          ORDER BY t.date DESC`,
-        [businessIds]
-      ),
-      // Adjustment / audit-pivot entries
-      pool.query(
-        `SELECT t.id                        AS adjustment_id,
-                t.original_transaction_id,
-                a.name                      AS account,
-                c.name                      AS category,
-                t.amount,
-                t.type,
-                t.description,
-                t.date,
-                t.note,
-                t.business_id,
-                t.adjusted_at,
-                t.created_at
-           FROM transactions t
-           LEFT JOIN accounts   a ON a.id = t.account_id
-           LEFT JOIN categories c ON c.id = t.category_id
-          WHERE t.business_id = ANY($1::uuid[])
-            AND t.is_adjustment = true
-          ORDER BY t.adjusted_at DESC`,
-        [businessIds]
-      ),
-      pool.query(
-        "SELECT id, name, type, business_id, created_at FROM accounts WHERE business_id = ANY($1::uuid[])",
-        [businessIds]
-      ),
-      pool.query(
-        "SELECT id, name, kind, business_id, created_at FROM categories WHERE business_id = ANY($1::uuid[])",
-        [businessIds]
-      ),
-      // User's own governance audit log
-      pool.query(
-        `SELECT action, format, created_at
-           FROM user_action_audit_log
-          WHERE user_id = $1
-          ORDER BY created_at DESC`,
-        [req.user.id]
-      ),
-      // Mileage records
-      pool.query(
-        `SELECT id, business_id, trip_date, purpose, destination, miles, km,
-                odometer_start, odometer_end, created_at
-           FROM mileage
-          WHERE business_id = ANY($1::uuid[])
-          ORDER BY trip_date DESC`,
-        [businessIds]
-      ),
-      // Vehicle expense and maintenance records
-      pool.query(
-        `SELECT id, business_id, entry_type, entry_date, title, vendor, amount, notes, created_at
-           FROM vehicle_costs
-          WHERE business_id = ANY($1::uuid[])
-          ORDER BY entry_date DESC, created_at DESC`,
-        [businessIds]
-      ),
-      // Recurring transaction templates
-      pool.query(
-        `SELECT id, business_id, amount, type, description, note, cadence,
-                start_date, end_date, next_run_date, last_run_date,
-                cleared_default, active, created_at, updated_at
-           FROM recurring_transactions
-          WHERE business_id = ANY($1::uuid[])
-          ORDER BY created_at DESC`,
-        [businessIds]
-      ),
-      pool.query(
-        `SELECT id, business_id, transaction_id, filename, mime_type, uploaded_at, file_hash
-           FROM receipts
-          WHERE business_id = ANY($1::uuid[])
-          ORDER BY uploaded_at DESC`,
-        [businessIds]
-      ),
-      pool.query(
-        `SELECT e.id,
-                e.business_id,
-                e.user_id,
-                e.export_type,
-                e.status,
-                e.created_at,
-                e.completed_at,
-                COALESCE(
-                  jsonb_object_agg(m.key, m.value) FILTER (WHERE m.key IS NOT NULL),
-                  '{}'::jsonb
-                ) AS metadata
-           FROM exports e
-           LEFT JOIN export_metadata m ON m.export_id = e.id
-          WHERE e.business_id = ANY($1::uuid[])
-          GROUP BY e.id
-          ORDER BY e.created_at DESC`,
-        [businessIds]
-      ),
-      pool.query(
-        `SELECT id, business_id, provider, external_item_id, institution_name,
-                institution_logo_url, status, last_synced_at, last_error,
-                created_at, updated_at
-           FROM bank_connections
-          WHERE business_id = ANY($1::uuid[])
-          ORDER BY created_at DESC`,
-        [businessIds]
-      ),
-      pool.query(
-        `SELECT id, business_id, invoice_number, customer_name, customer_email,
-                issue_date, due_date, status, currency, line_items,
-                subtotal, tax_rate, tax_amount, total_amount, notes,
-                deleted_at, created_at, updated_at
-           FROM invoices_v1
-          WHERE business_id = ANY($1::uuid[])
-          ORDER BY created_at DESC`,
-        [businessIds]
-      ),
-      // Privacy preferences
-      pool.query(
-        "SELECT data_sharing_opt_out, consent_given, analytics_opt_in, updated_at FROM user_privacy_settings WHERE user_id = $1",
-        [req.user.id]
-      ),
-      pool.query(
-        `SELECT data_residency, action, ip_address, user_agent, created_at
-           FROM privacy_consent_log
-          WHERE user_id = $1
-          ORDER BY created_at DESC`,
-        [req.user.id]
-      )
-    ]);
+  const [
+    userResult,
+    businessesResult,
+    txResult,
+    adjustmentsResult,
+    accountsResult,
+    categoriesResult,
+    auditLogResult,
+    mileageResult,
+    vehicleCostResult,
+    recurringResult,
+    receiptsResult,
+    exportHistoryResult,
+    bankConnectionsResult,
+    invoicesResult,
+    privacySettingsResult,
+    consentLogResult
+  ] = await Promise.all([
+    pool.query(
+      "SELECT id, email, full_name, display_name, created_at FROM users WHERE id = $1",
+      [req.user.id]
+    ),
+    pool.query(
+      "SELECT id, name, region, language, created_at FROM businesses WHERE id = ANY($1::uuid[])",
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT t.id        AS transaction_id,
+              a.name      AS account,
+              c.name      AS category,
+              t.amount,
+              t.type,
+              t.description,
+              t.description_encrypted,
+              t.date,
+              t.note,
+              t.cleared,
+              t.business_id,
+              t.created_at
+         FROM transactions t
+         LEFT JOIN accounts   a ON a.id = t.account_id
+         LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.business_id = ANY($1::uuid[])
+          AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+        ORDER BY t.date DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT t.id                        AS adjustment_id,
+              t.original_transaction_id,
+              a.name                      AS account,
+              c.name                      AS category,
+              t.amount,
+              t.type,
+              t.description,
+              t.date,
+              t.note,
+              t.business_id,
+              t.adjusted_at,
+              t.created_at
+         FROM transactions t
+         LEFT JOIN accounts   a ON a.id = t.account_id
+         LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.business_id = ANY($1::uuid[])
+          AND t.is_adjustment = true
+        ORDER BY t.adjusted_at DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      "SELECT id, name, type, business_id, created_at FROM accounts WHERE business_id = ANY($1::uuid[])",
+      [businessIds]
+    ),
+    pool.query(
+      "SELECT id, name, kind, business_id, created_at FROM categories WHERE business_id = ANY($1::uuid[])",
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT action, format, created_at
+         FROM user_action_audit_log
+        WHERE user_id = $1
+        ORDER BY created_at DESC`,
+      [req.user.id]
+    ),
+    pool.query(
+      `SELECT id, business_id, trip_date, purpose, destination, miles, km,
+              odometer_start, odometer_end, created_at
+         FROM mileage
+        WHERE business_id = ANY($1::uuid[])
+        ORDER BY trip_date DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT id, business_id, entry_type, entry_date, title, vendor, amount, notes, created_at
+         FROM vehicle_costs
+        WHERE business_id = ANY($1::uuid[])
+        ORDER BY entry_date DESC, created_at DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT id, business_id, amount, type, description, note, cadence,
+              start_date, end_date, next_run_date, last_run_date,
+              cleared_default, active, created_at, updated_at
+         FROM recurring_transactions
+        WHERE business_id = ANY($1::uuid[])
+        ORDER BY created_at DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT id, business_id, transaction_id, filename, mime_type, uploaded_at, file_hash
+         FROM receipts
+        WHERE business_id = ANY($1::uuid[])
+        ORDER BY uploaded_at DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT e.id,
+              e.business_id,
+              e.user_id,
+              e.export_type,
+              e.status,
+              e.created_at,
+              e.completed_at,
+              COALESCE(
+                jsonb_object_agg(m.key, m.value) FILTER (WHERE m.key IS NOT NULL),
+                '{}'::jsonb
+              ) AS metadata
+         FROM exports e
+         LEFT JOIN export_metadata m ON m.export_id = e.id
+        WHERE e.business_id = ANY($1::uuid[])
+        GROUP BY e.id
+        ORDER BY e.created_at DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT id, business_id, provider, external_item_id, institution_name,
+              institution_logo_url, status, last_synced_at, last_error,
+              created_at, updated_at
+         FROM bank_connections
+        WHERE business_id = ANY($1::uuid[])
+        ORDER BY created_at DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      `SELECT id, business_id, invoice_number, customer_name, customer_email,
+              issue_date, due_date, status, currency, line_items,
+              subtotal, tax_rate, tax_amount, total_amount, notes,
+              deleted_at, created_at, updated_at
+         FROM invoices_v1
+        WHERE business_id = ANY($1::uuid[])
+        ORDER BY created_at DESC`,
+      [businessIds]
+    ),
+    pool.query(
+      "SELECT data_sharing_opt_out, consent_given, analytics_opt_in, updated_at FROM user_privacy_settings WHERE user_id = $1",
+      [req.user.id]
+    ),
+    pool.query(
+      `SELECT data_residency, action, ip_address, user_agent, created_at
+         FROM privacy_consent_log
+        WHERE user_id = $1
+        ORDER BY created_at DESC`,
+      [req.user.id]
+    )
+  ]);
 
-    // Log this export request (fire-and-forget; do not fail on log error)
-    const ipAddress = req.ip || req.connection?.remoteAddress || null;
-    const userAgent = req.get("user-agent") || null;
-    await logUserAction({
-      userId: req.user.id,
-      action: "data_export",
-      format,
-      ipAddress,
-      userAgent,
-      metadata: { businessIds }
-    });
-    await sendPrivacyActivityEmail({
-      userId: req.user.id,
-      email: userResult.rows[0]?.email || "",
-      kind: "export_completed",
-      details: [
-        { label: "Format", value: format.toUpperCase() },
-        { label: "Businesses included", value: String(businessIds.length) },
-        { label: "Exported on", value: new Date().toISOString().slice(0, 10) }
-      ],
-      actionPath: "/privacy"
-    });
+  const ipAddress = req.ip || req.connection?.remoteAddress || null;
+  const userAgent = req.get("user-agent") || null;
+  await logUserAction({
+    userId: req.user.id,
+    action: "data_export",
+    format,
+    ipAddress,
+    userAgent,
+    metadata: { businessIds }
+  });
+  await sendPrivacyActivityEmail({
+    userId: req.user.id,
+    email: userResult.rows[0]?.email || "",
+    kind: "export_completed",
+    details: [
+      { label: "Format", value: format.toUpperCase() },
+      { label: "Businesses included", value: String(businessIds.length) },
+      { label: "Exported on", value: new Date().toISOString().slice(0, 10) }
+    ],
+    actionPath: "/privacy"
+  });
 
-    if (format === "csv") {
-      // CSV export: primary transactions sheet only (the most common use case).
-      // Flat structure for spreadsheet interoperability.
-      const rows = txResult.rows.map((t) => {
-        let description = t.description || "";
-        if (t.description_encrypted) {
-          try { description = decrypt(t.description_encrypted); } catch (err) { logError("Privacy CSV export: failed to decrypt description", { err: err.message, transactionId: t.transaction_id }); }
+  if (format === "csv") {
+    const rows = txResult.rows.map((t) => {
+      let description = t.description || "";
+      if (t.description_encrypted) {
+        try {
+          description = decrypt(t.description_encrypted);
+        } catch (err) {
+          logError("Privacy CSV export: failed to decrypt description", {
+            err: err.message,
+            transactionId: t.transaction_id
+          });
         }
-        return {
-          transaction_id:  t.transaction_id,
-          date:            t.date,
-          type:            t.type,
-          amount:          t.amount,
-          account:         t.account || "",
-          category:        t.category || "",
-          description,
-          note:            t.note || "",
-          cleared:         t.cleared ? "true" : "false",
-          created_at:      t.created_at
-        };
-      });
-      const csv = toCsv(rows);
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", 'attachment; filename="inex-ledger-transactions.csv"');
-      res.setHeader("Cache-Control", "private, no-store, max-age=0");
-      return res.send(csv);
-    }
-
-    // JSON export: full structured package
-    const exportData = {
-      exportedAt: new Date().toISOString(),
-      schemaVersion: "phase5-v1",
-      user: userResult.rows[0],
-      businesses: businessesResult.rows,
-      accounts: accountsResult.rows,
-      categories: categoriesResult.rows,
-      transactions: txResult.rows.map((t) => {
-        const { description_encrypted, ...rest } = t;
-        if (description_encrypted) {
-          try { rest.description = decrypt(description_encrypted); } catch (err) { logError("Privacy JSON export: failed to decrypt description", { err: err.message, transactionId: rest.transaction_id }); }
-        }
-        return rest;
-      }),
-      adjustmentHistory: adjustmentsResult.rows,
-      mileage: mileageResult.rows,
-      vehicleCosts: vehicleCostResult.rows,
-      recurringTransactions: recurringResult.rows,
-      receipts: receiptsResult.rows,
-      exportHistory: exportHistoryResult.rows,
-      bankConnections: bankConnectionsResult.rows,
-      invoices: invoicesResult.rows,
-      privacySettings: privacySettingsResult.rows[0] || null,
-      privacyConsentLog: consentLogResult.rows,
-      auditLog: auditLogResult.rows
-    };
-
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Content-Disposition", 'attachment; filename="inex-ledger-export.json"');
+      }
+      return {
+        transaction_id: t.transaction_id,
+        date: t.date,
+        type: t.type,
+        amount: t.amount,
+        account: t.account || "",
+        category: t.category || "",
+        description,
+        note: t.note || "",
+        cleared: t.cleared ? "true" : "false",
+        created_at: t.created_at
+      };
+    });
+    const csv = toCsv(rows);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="inex-ledger-transactions.csv"');
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    return res.json(exportData);
-  } catch (err) {
-    logError("POST /privacy/export error", { err: err.message });
-    return res.status(500).json({ error: "Export failed." });
+    return res.send(csv);
   }
-});
+
+  const exportData = {
+    exportedAt: new Date().toISOString(),
+    schemaVersion: "phase5-v1",
+    user: userResult.rows[0],
+    businesses: businessesResult.rows,
+    accounts: accountsResult.rows,
+    categories: categoriesResult.rows,
+    transactions: txResult.rows.map((t) => {
+      const { description_encrypted, ...rest } = t;
+      if (description_encrypted) {
+        try {
+          rest.description = decrypt(description_encrypted);
+        } catch (err) {
+          logError("Privacy JSON export: failed to decrypt description", {
+            err: err.message,
+            transactionId: rest.transaction_id
+          });
+        }
+      }
+      return rest;
+    }),
+    adjustmentHistory: adjustmentsResult.rows,
+    mileage: mileageResult.rows,
+    vehicleCosts: vehicleCostResult.rows,
+    recurringTransactions: recurringResult.rows,
+    receipts: receiptsResult.rows,
+    exportHistory: exportHistoryResult.rows,
+    bankConnections: bankConnectionsResult.rows,
+    invoices: invoicesResult.rows,
+    privacySettings: privacySettingsResult.rows[0] || null,
+    privacyConsentLog: consentLogResult.rows,
+    auditLog: auditLogResult.rows
+  };
+
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="inex-ledger-export.json"');
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  return res.json(exportData);
+}));
 
 /**
  * POST /api/privacy/erase
@@ -519,14 +494,15 @@ router.post("/export", requireMfaIfEnabled, async (req, res) => {
  * Audit trail: the erasure request is logged in user_action_audit_log before
  * any data is modified so that compliance teams have a permanent record.
  */
-router.post("/erase", requireMfaIfEnabled, async (req, res) => {
+router.post("/erase", requireMfaIfEnabled, asyncRoute(async (req, res) => {
   const userId = req.user.id;
   const password = req.body?.password;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;
+  let userEmail = "";
 
   if (typeof password !== "string" || !password.trim()) {
-    return res.status(400).json({ error: "Password is required." });
+    throw new ApiError(400, "Password is required.");
   }
 
   try {
@@ -535,15 +511,19 @@ router.post("/erase", requireMfaIfEnabled, async (req, res) => {
       [userId]
     );
     if (!userResult.rowCount) {
-      return res.status(404).json({ error: "User not found." });
+      throw new ApiError(404, "User not found.");
     }
+    userEmail = String(userResult.rows[0].email || "").trim();
     const { match } = await verifyPassword(password, userResult.rows[0].password_hash);
     if (!match) {
-      return res.status(401).json({ error: "Incorrect password." });
+      throw new ApiError(401, "Incorrect password.");
     }
   } catch (err) {
+    if (err.status && err.status < 500) {
+      throw err;
+    }
     logError("POST /privacy/erase: failed to verify password", { userId, err: err.message });
-    return res.status(500).json({ error: "Erasure failed. Please try again or contact support." });
+    throw err;
   }
 
   // Resolve businesses before starting the transaction so it does not
@@ -555,7 +535,7 @@ router.post("/erase", requireMfaIfEnabled, async (req, res) => {
     businessIds = businesses.map((business) => business.id);
   } catch (err) {
     logError("POST /privacy/erase: could not resolve businesses", { userId, err: err.message });
-    return res.status(500).json({ error: "Erasure failed. Please try again or contact support." });
+    throw err;
   }
 
   // Use a cryptographically random token for the erased email so the erasure
@@ -624,7 +604,7 @@ router.post("/erase", requireMfaIfEnabled, async (req, res) => {
 
     await sendPrivacyActivityEmail({
       userId,
-      email: userResult.rows[0]?.email || "",
+      email: userEmail,
       kind: "erasure_completed",
       details: [
         { label: "Completed on", value: new Date().toISOString().slice(0, 10) },
@@ -639,11 +619,11 @@ router.post("/erase", requireMfaIfEnabled, async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     logError("POST /privacy/erase error", { userId, err: err.message });
-    return res.status(500).json({ error: "Erasure failed. Please try again or contact support." });
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
 /**
  * POST /api/privacy/delete
@@ -651,14 +631,14 @@ router.post("/erase", requireMfaIfEnabled, async (req, res) => {
  * mileage, recurring transactions, accounts, categories, exports) but keeps
  * the user account. Receipt/export files stored on disk are also removed.
  */
-router.post("/delete", requireMfaIfEnabled, async (req, res) => {
+router.post("/delete", requireMfaIfEnabled, asyncRoute(async (req, res) => {
   const userId = req.user.id;
   const password = req.body?.password;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;
 
   if (typeof password !== "string" || !password.trim()) {
-    return res.status(400).json({ error: "Password is required." });
+    throw new ApiError(400, "Password is required.");
   }
 
   const client = await pool.connect();
@@ -670,12 +650,12 @@ router.post("/delete", requireMfaIfEnabled, async (req, res) => {
       [userId]
     );
     if (!userResult.rowCount) {
-      return res.status(404).json({ error: "User not found." });
+      throw new ApiError(404, "User not found.");
     }
     userEmail = String(userResult.rows[0].email || "").trim();
     const { match } = await verifyPassword(password, userResult.rows[0].password_hash);
     if (!match) {
-      return res.status(401).json({ error: "Incorrect password." });
+      throw new ApiError(401, "Incorrect password.");
     }
 
     await client.query("BEGIN");
@@ -689,7 +669,7 @@ router.post("/delete", requireMfaIfEnabled, async (req, res) => {
     if (!businessIds.length) {
       await client.query("ROLLBACK");
       transactionOpen = false;
-      return res.status(404).json({ error: "No business found." });
+      throw new ApiError(404, "No business found.");
     }
 
     // Collect file paths before deleting DB rows.
@@ -791,32 +771,29 @@ router.post("/delete", requireMfaIfEnabled, async (req, res) => {
     if (transactionOpen) {
       await client.query("ROLLBACK");
     }
-    logError("POST /privacy/delete error", { err: err.message });
-    res.status(500).json({ error: "Delete failed." });
+    if (!err.status || err.status >= 500) {
+      logError("POST /privacy/delete error", { err: err.message });
+    }
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
 /**
  * GET /api/privacy/audit-log
  * Returns the caller's own governance audit trail entries (exports, erasures).
  */
-router.get("/audit-log", async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, action, format, ip_address, metadata, created_at
-         FROM user_action_audit_log
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT 200`,
-      [req.user.id]
-    );
-    return res.json(rows);
-  } catch (err) {
-    logError("GET /privacy/audit-log error", { err: err.message });
-    return res.status(500).json({ error: "Could not load audit log." });
-  }
-});
+router.get("/audit-log", asyncRoute(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, action, format, ip_address, metadata, created_at
+       FROM user_action_audit_log
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      LIMIT 200`,
+    [req.user.id]
+  );
+  return res.json(rows);
+}));
 
 module.exports = router;

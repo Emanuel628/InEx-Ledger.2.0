@@ -7,6 +7,7 @@ const path = require("path");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ROUTE_PATH = require.resolve("../routes/privacy.routes.js");
 const MANAGED_EXPORT_PATH = path.resolve(process.cwd(), "storage", "exports", "tax.pdf");
@@ -49,6 +50,9 @@ function loadPrivacyRouter(options = {}) {
 
   function defaultQuery(sql, params) {
     state.queries.push({ sql, params });
+    if (options.queryFailureRegex?.test(sql)) {
+      throw new Error(options.queryFailureMessage || "Injected privacy route query failure");
+    }
 
     if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
       return { rows: [], rowCount: 0 };
@@ -129,6 +133,9 @@ function loadPrivacyRouter(options = {}) {
       return { rows: state.exportPaths.map((file_path) => ({ file_path })), rowCount: state.exportPaths.length };
     }
     if (/^DELETE FROM /i.test(sql)) {
+      return { rows: [], rowCount: 1 };
+    }
+    if (/^UPDATE /i.test(sql)) {
       return { rows: [], rowCount: 1 };
     }
 
@@ -249,9 +256,7 @@ function buildApp(router) {
   const app = express();
   app.use(express.json());
   app.use("/api/privacy", router);
-  app.use((err, _req, res, _next) => {
-    res.status(err.status || 500).json({ error: err.message });
-  });
+  attachCentralErrorHandler(app);
   return app;
 }
 
@@ -352,6 +357,45 @@ test("privacy delete removes invoices, bank connections, subscriptions, and clea
   }
 });
 
+test("privacy erase scrubs personal data and completes activity notification", async () => {
+  const fixture = loadPrivacyRouter();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/privacy/erase")
+      .send({ password: "CorrectHorseBatteryStaple1!" });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.ok, true);
+    assert.ok(
+      fixture.state.queries.some(({ sql }) => /UPDATE users/i.test(sql)),
+      "expected user PII scrub query"
+    );
+    assert.ok(
+      fixture.state.queries.some(({ sql }) => /UPDATE transactions/i.test(sql)),
+      "expected transaction free-text scrub query"
+    );
+    assert.ok(fixture.state.queries.some(({ sql }) => sql === "COMMIT"));
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("privacy export rejects unsupported formats with ApiError", async () => {
+  const fixture = loadPrivacyRouter();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/privacy/export")
+      .send({ format: "xlsx" });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: "Unsupported format. Use 'json' or 'csv'." });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("Quebec privacy settings do not write duplicate consent logs when nothing changed", async () => {
   const fixture = loadPrivacyRouter({
     dataResidency: "CA-QC",
@@ -380,6 +424,22 @@ test("Quebec privacy settings do not write duplicate consent logs when nothing c
       /INSERT INTO privacy_consent_log/i.test(sql)
     );
     assert.equal(consentInsertQueries.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("privacy settings load failures use the central error handler", async () => {
+  const fixture = loadPrivacyRouter({
+    queryFailureRegex: /SELECT data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in/i
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .get("/api/privacy/settings");
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
   } finally {
     fixture.cleanup();
   }
