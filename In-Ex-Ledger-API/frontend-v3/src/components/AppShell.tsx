@@ -268,7 +268,7 @@ function AppShell({
                           await activateBusiness(business.id)
                           const { user } = await getCurrentUser()
                           onAuthChange(user)
-                          window.location.reload()
+                          setBusinessMenuOpen(false)
                         } catch (error) {
                           setBusinessError(error instanceof Error ? error.message : t('shell.business.switchError'))
                         } finally {

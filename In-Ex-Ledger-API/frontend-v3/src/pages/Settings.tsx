@@ -271,6 +271,7 @@ function Settings(props: PageProps) {
                 privacySettings={privacySettings}
                 updatePrivacy={updatePrivacy}
                 setError={setError}
+                setStatusMessage={setStatusMessage}
                 authUser={props.authUser}
                 onAuthChange={props.onAuthChange}
               />
@@ -668,12 +669,14 @@ function DataSettings({
   privacySettings,
   updatePrivacy,
   setError,
+  setStatusMessage,
   authUser,
   onAuthChange,
 }: {
   privacySettings: PrivacySettings | null
   updatePrivacy: <K extends keyof PrivacySettings>(key: K, value: PrivacySettings[K]) => void
   setError: (value: string) => void
+  setStatusMessage: (value: string) => void
   authUser: PageProps['authUser']
   onAuthChange: PageProps['onAuthChange']
 }) {
@@ -728,12 +731,14 @@ function DataSettings({
       return
     }
     setTransactionsDeleteError('')
+    setStatusMessage('')
     setDeletingTransactions(true)
     try {
       const result = await deleteAllTransactions(selectedAccountId === 'ALL' ? undefined : selectedAccountId)
       setShowDeleteTransactionsModal(false)
-      window.alert(`Deleted ${result.count} transaction(s).`)
-      window.location.reload()
+      setTransactionsConfirmText('')
+      setSelectedAccountId('ALL')
+      setStatusMessage(`Deleted ${result.count} transaction(s).`)
     } catch (deleteError) {
       setTransactionsDeleteError(deleteError instanceof Error ? deleteError.message : 'Unable to delete transactions.')
     } finally {

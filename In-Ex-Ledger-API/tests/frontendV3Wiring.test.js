@@ -258,13 +258,15 @@ test("v3 shell has an SPA-owned i18n runtime wired to business language", () => 
 
 test("v3 header business switcher is wired instead of decorative, and the topbar search chrome is gone", () => {
   const shellSource = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
+  const appSource = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
   const transactionsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
 
   assert.match(shellSource, /loadBusinesses/);
   assert.match(shellSource, /activateBusiness\(business\.id\)/);
   assert.match(shellSource, /getCurrentUser\(\)/);
-  assert.match(shellSource, /window\.location\.reload\(\)/);
+  assert.doesNotMatch(shellSource, /window\.location\.reload\(\)/);
+  assert.match(appSource, /key=\{activeBusinessId\}/);
   assert.match(shellSource, /business-dropdown/);
   assert.match(shellSource, /aria-label=\{t\('shell\.business\.switch'\)\}/);
   // The topbar search box was deleted outright (owner decision) -- it never
@@ -279,6 +281,19 @@ test("v3 header business switcher is wired instead of decorative, and the topbar
   assert.match(cssSource, /\.business-dropdown/);
   assert.match(cssSource, /\.topbar-menus/);
   assert.doesNotMatch(cssSource, /\.topbar-search/);
+});
+
+test("v3 app avoids hard reloads for SPA-owned state changes", () => {
+  const sources = readFrontendFiles().map(({ source }) => source).join("\n");
+  const settingsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Settings.tsx"), "utf8");
+  const planProviderSource = fs.readFileSync(path.join(frontendRoot, "context", "PlanContext.tsx"), "utf8");
+
+  assert.doesNotMatch(sources, /window\.location\.reload\(\)/);
+  assert.doesNotMatch(sources, /location\.reload\(\)/);
+  assert.match(settingsSource, /setStatusMessage\(`Deleted \$\{result\.count\} transaction\(s\)\.`\)/);
+  assert.doesNotMatch(settingsSource, /window\.alert\(`Deleted \$\{result\.count\} transaction\(s\)\.`\)/);
+  assert.match(planProviderSource, /const currentBusinessId = authUser\?\.currentBusinessId/);
+  assert.match(planProviderSource, /\[authUserId, currentBusinessId\]/);
 });
 
 test("v3 money formatters use the active business currency on app pages", () => {

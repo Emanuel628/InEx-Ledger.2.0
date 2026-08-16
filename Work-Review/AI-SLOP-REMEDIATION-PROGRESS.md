@@ -705,13 +705,13 @@ green full-suite run in this entire remediation effort (see also the
 standalone `fix/backslash-path-traversal-basename` PR that fixed the one
 test that had been failing identically since PR 13).
 
-## Phase 8 - V3 React Cleanup — 1.5 / 7
+## Phase 8 - V3 React Cleanup — 2.5 / 7
 - [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
 - [ ] Large controller pages split by workflow
 - [ ] API/data orchestration moved into hooks/clients where it reduces local state
 - [ ] DOM-mutation i18n pattern confined/replaced
 - [x] Modal focus/body-scroll handling consolidated (`useBodyModalLock`)
-- [ ] Hard reloads replaced with state updates where SPA behavior expected
+- [x] Hard reloads replaced with state updates where SPA behavior expected
 - [ ] `PlanGate` usage normalized against backend feature keys
 
 ## Phase 9 - Integrations, Idempotency, Side Effects — 0 / 5

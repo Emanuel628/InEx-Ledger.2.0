@@ -412,6 +412,7 @@ function App() {
 
   // Only the identity of authUser should (re)arm the inactivity monitor.
   const authUserId = authUser?.id
+  const activeBusinessId = authUser?.currentBusinessId || 'no-business'
   useEffect(() => {
     if (!authUserId) return undefined
     const stopMonitor = startInactivityMonitor(() => {
@@ -513,7 +514,7 @@ function App() {
     }
   }
 
-  return <PlanProvider authUser={authUser}>{renderPage()}</PlanProvider>
+  return <PlanProvider authUser={authUser} key={activeBusinessId}>{renderPage()}</PlanProvider>
 }
 
 export default App

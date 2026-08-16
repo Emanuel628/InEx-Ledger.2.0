@@ -50,11 +50,13 @@ export function PlanProvider({ authUser, children }: { authUser: AuthUser | null
     }
   }, [authUser])
 
-  // Only the identity (not every field) of authUser should trigger a refetch.
+  // Plan entitlements are scoped to the active business, so switching
+  // businesses must refresh even when the signed-in user id is unchanged.
   const authUserId = authUser?.id
+  const currentBusinessId = authUser?.currentBusinessId
   useEffect(() => {
     void refreshPlanContext()
-  }, [authUserId])
+  }, [authUserId, currentBusinessId])
 
   const hasFeature = useCallback(
     (feature: PlanFeatureKey) => Boolean(plan?.features?.[feature]),
