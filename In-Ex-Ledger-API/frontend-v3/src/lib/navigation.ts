@@ -15,6 +15,15 @@ export function normalizeInternalPath(rawPath: string, fallback = '/transactions
   }
 }
 
+export function normalizeLegacyAppV3Path(rawPath: string, canonicalPath: string) {
+  const path = String(rawPath || '')
+  if (path !== '/app-v3' && (!path.startsWith('/app-v3/') || path.startsWith('/app-v3/assets'))) {
+    return null
+  }
+
+  return normalizeInternalPath(canonicalPath)
+}
+
 export function resolvePageFromInternalPath<Page extends string>(
   rawPath: string,
   pagesBySlug: ReadonlyMap<string, Page>,

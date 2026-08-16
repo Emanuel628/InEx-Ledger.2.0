@@ -133,7 +133,8 @@ test("v3 app routes use bare canonical paths and browser back drives page state"
   assert.match(source, /if \(page === 'Landing'\)[\s\S]*return '\/'/);
   assert.doesNotMatch(source, /return slug \? `\/app-v3\/\$\{slug\}`/);
   assert.match(source, /return requestedPage \? getPathForPage\(requestedPage\) : '\/transactions'/);
-  assert.match(source, /normalizeLegacyAppV3Path/);
+  assert.match(source, /import \{ normalizeInternalPath, normalizeLegacyAppV3Path, resolvePageFromInternalPath \} from '\.\/lib\/navigation'/);
+  assert.match(source, /function replaceLegacyAppV3Path/);
   assert.match(source, /login\?next=\$\{encodeURIComponent\(getPathForPage\(page\)\)\}/);
   assert.match(source, /app-v3-loading/);
   assert.match(source, /window\.addEventListener\('popstate', handlePopState\)/);
@@ -272,6 +273,32 @@ test("v3 transactions page data orchestration stays in its hook", () => {
   assert.match(hookSource, /loadTransactionUndoStatus/);
   assert.match(hookSource, /loadAccountingLock\(\)\.catch\(\(\) => null\)/);
   assert.match(hookSource, /TRANSACTION_PAGE_SIZE_KEY/);
+});
+
+test("v3 messages page data orchestration stays in its hook", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Messages.tsx"), "utf8");
+  const hookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useMessagesPageData.ts"), "utf8");
+
+  assert.match(pageSource, /import useMessagesPageData, \{ type ComposeMessagePayload, type MessagesLaneLabel \} from '\.\.\/hooks\/useMessagesPageData'/);
+  assert.match(pageSource, /\} = useMessagesPageData\(\)/);
+  for (const apiFunction of [
+    "loadInboxMessages",
+    "loadSentMessages",
+    "loadArchivedMessages",
+    "loadUnreadCounts",
+    "loadMessageThread",
+    "markMessageRead",
+    "archiveMessage",
+    "deleteMessage",
+    "replyToMessage",
+    "sendGeneralMessage",
+    "sendSupportMessage"
+  ]) {
+    assert.doesNotMatch(pageSource, new RegExp(`\\b${apiFunction}\\b`));
+    assert.match(hookSource, new RegExp(`\\b${apiFunction}\\b`));
+  }
+  assert.match(hookSource, /export type MessagesLaneLabel/);
+  assert.match(hookSource, /export type ComposeMessagePayload/);
 });
 
 test("v3 frontend dependencies are pinned", () => {

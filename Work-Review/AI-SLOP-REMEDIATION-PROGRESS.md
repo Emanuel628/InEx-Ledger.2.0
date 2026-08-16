@@ -705,10 +705,10 @@ green full-suite run in this entire remediation effort (see also the
 standalone `fix/backslash-path-traversal-basename` PR that fixed the one
 test that had been failing identically since PR 13).
 
-## Phase 8 - V3 React Cleanup — 6.5 / 7
-- [~] Internal path normalization shared for nav/`redirect_to` (`6960331b`)
-- [~] Large controller pages split by workflow (`Transactions` recurring templates/review queue and `Settings` data workflow extracted)
-- [~] API/data orchestration moved into hooks/clients where it reduces local state (`useTransactionsPageData`)
+## Phase 8 - V3 React Cleanup — 7 / 7
+- [x] Internal path normalization shared for nav/`redirect_to` (`6960331b`, `normalizeLegacyAppV3Path`)
+- [x] Large controller pages split by workflow (`Transactions` recurring/review, `Settings` data, `Messages` data workflow)
+- [x] API/data orchestration moved into hooks/clients where it reduces local state (`useTransactionsPageData`, `useMessagesPageData`)
 - [x] DOM-mutation i18n pattern confined/replaced (`useV3PhraseTranslations`)
 - [x] Modal focus/body-scroll handling consolidated (`useBodyModalLock`)
 - [x] Hard reloads replaced with state updates where SPA behavior expected

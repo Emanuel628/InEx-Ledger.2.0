@@ -63,3 +63,13 @@ test("v3 navigation maps safe paths to known pages and blocks auth-flow loops", 
     "Transactions"
   );
 });
+
+test("v3 navigation owns legacy app-v3 path canonicalization", () => {
+  const { normalizeLegacyAppV3Path } = loadNavigationModule();
+
+  assert.equal(normalizeLegacyAppV3Path("/app-v3", "/transactions"), "/transactions");
+  assert.equal(normalizeLegacyAppV3Path("/app-v3/settings", "/settings?tab=profile"), "/settings?tab=profile");
+  assert.equal(normalizeLegacyAppV3Path("/app-v3/assets/index.js", "/transactions"), null);
+  assert.equal(normalizeLegacyAppV3Path("/settings", "/settings"), null);
+  assert.equal(normalizeLegacyAppV3Path("/app-v3/settings", "https://evil.example/settings"), "/transactions");
+});

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import {
   Archive,
   ChevronDown,
@@ -18,30 +18,14 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import useBodyModalLock from '../hooks/useBodyModalLock'
+import useMessagesPageData, { type ComposeMessagePayload, type MessagesLaneLabel } from '../hooks/useMessagesPageData'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
-import {
-  archiveMessage,
-  deleteMessage,
-  loadArchivedMessages,
-  loadInboxMessages,
-  loadMessageThread,
-  loadSentMessages,
-  loadUnreadCounts,
-  markMessageRead,
-  replyToMessage,
-  sendGeneralMessage,
-  sendSupportMessage,
-  type MessageRecord,
-  type MessageType,
-  type UnreadCounts,
-} from '../lib/messagesApi'
+import type { MessageRecord, MessageType } from '../lib/messagesApi'
 
 const MAX_REPLY_ATTACHMENT_BYTES = 10 * 1024 * 1024
 const MAX_MESSAGE_ATTACHMENTS = 5
 
-type LaneLabel = 'Inbox' | 'Invoices' | 'Support' | 'Notices' | 'Sent' | 'Archived'
-
-const laneIcons: Record<LaneLabel, LucideIcon> = {
+const laneIcons: Record<MessagesLaneLabel, LucideIcon> = {
   Inbox: Mail,
   Invoices: FileText,
   Support: Headphones,
@@ -51,160 +35,66 @@ const laneIcons: Record<LaneLabel, LucideIcon> = {
 }
 
 function Messages(props: PageProps) {
-  const [selectedThread, setSelectedThread] = useState<MessageRecord | null>(null)
-  const [threadMessages, setThreadMessages] = useState<MessageRecord[]>([])
   const [detailOpen, setDetailOpen] = useState(false)
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeType, setComposeType] = useState<'general' | 'support'>('general')
   const [lanesCollapsed, setLanesCollapsed] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [activeLane, setActiveLane] = useState<LaneLabel>('Inbox')
-  const [inbox, setInbox] = useState<MessageRecord[]>([])
-  const [sent, setSent] = useState<MessageRecord[]>([])
-  const [archived, setArchived] = useState<MessageRecord[]>([])
-  const [unreadCounts, setUnreadCounts] = useState<UnreadCounts>({ total: 0, messages: 0, support: 0, notifications: 0 })
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Unread'>('All')
-  const [typeFilter, setTypeFilter] = useState<'All' | MessageType>('All')
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
-  const [loadingData, setLoadingData] = useState(true)
-  const [dataError, setDataError] = useState('')
+  const {
+    activeLane,
+    archiveThread,
+    dataError,
+    deleteThread,
+    dismissDataError,
+    lanes,
+    loadingData,
+    openThread,
+    replyToThread,
+    searchTerm,
+    selectedThread,
+    sendMessage,
+    setActiveLane,
+    setSearchTerm,
+    setStatusFilter,
+    setTypeFilter,
+    statusFilter,
+    threadMessages,
+    typeFilter,
+    visibleThreads,
+  } = useMessagesPageData()
   useOutsideActionMenu(Boolean(actionMenuId || filtersOpen), () => {
     setActionMenuId(null)
     setFiltersOpen(false)
   })
   useBodyModalLock(detailOpen || composeOpen)
 
-  async function refreshMessages() {
-    setLoadingData(true)
-    setDataError('')
-    try {
-      const [nextInbox, nextSent, nextArchived, counts] = await Promise.all([
-        loadInboxMessages(),
-        loadSentMessages(),
-        loadArchivedMessages(),
-        loadUnreadCounts(),
-      ])
-      setInbox(nextInbox)
-      setSent(nextSent)
-      setArchived(nextArchived)
-      setUnreadCounts(counts)
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to load messages.')
-      setInbox([])
-      setSent([])
-      setArchived([])
-    } finally {
-      setLoadingData(false)
-    }
-  }
-
-  useEffect(() => {
-    void refreshMessages()
-  }, [])
-
-  const lanes = useMemo(() => {
-    const supportCount = inbox.filter((message) => message.type === 'Support').length
-    const invoiceCount = inbox.filter((message) => message.type === 'Invoice reply').length
-    const noticeCount = inbox.filter((message) => message.type === 'Account notice').length
-
-    return [
-      { label: 'Inbox' as const, count: inbox.length || unreadCounts.messages, icon: laneIcons.Inbox },
-      { label: 'Invoices' as const, count: invoiceCount, icon: laneIcons.Invoices },
-      { label: 'Support' as const, count: supportCount || unreadCounts.support, icon: laneIcons.Support },
-      { label: 'Notices' as const, count: noticeCount || unreadCounts.notifications, icon: laneIcons.Notices },
-      { label: 'Sent' as const, count: sent.length, icon: laneIcons.Sent },
-      { label: 'Archived' as const, count: archived.length, icon: laneIcons.Archived },
-    ]
-  }, [archived.length, inbox, sent.length, unreadCounts])
-
-  const laneMessages = useMemo(() => {
-    if (activeLane === 'Sent') return sent
-    if (activeLane === 'Archived') return archived
-    if (activeLane === 'Invoices') return inbox.filter((message) => message.type === 'Invoice reply')
-    if (activeLane === 'Support') return inbox.filter((message) => message.type === 'Support')
-    if (activeLane === 'Notices') return inbox.filter((message) => message.type === 'Account notice')
-    return inbox
-  }, [activeLane, archived, inbox, sent])
-
-  const visibleThreads = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase()
-    return laneMessages.filter((message) => {
-      const matchesStatus = statusFilter === 'All' || message.unread
-      const matchesType = typeFilter === 'All' || message.type === typeFilter
-      const matchesSearch = !normalizedSearch || [
-        message.sender,
-        message.email,
-        message.subject,
-        message.preview,
-        message.type,
-      ].some((value) => value.toLowerCase().includes(normalizedSearch))
-
-      return matchesStatus && matchesType && matchesSearch
-    })
-  }, [laneMessages, searchTerm, statusFilter, typeFilter])
-
-  async function openThread(thread: MessageRecord) {
-    setSelectedThread(thread)
-    setThreadMessages([])
+  function handleOpenThread(thread: MessageRecord) {
     setDetailOpen(true)
-    try {
-      const messages = await loadMessageThread(thread.id)
-      setThreadMessages(messages)
-      if (thread.unread) {
-        await markMessageRead(thread.id)
-        void refreshMessages()
-      }
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to open message.')
-    }
+    void openThread(thread)
   }
 
   async function handleArchive(thread: MessageRecord) {
-    try {
-      await archiveMessage(thread.id)
-      setDetailOpen(false)
-      await refreshMessages()
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to archive message.')
-    }
+    await archiveThread(thread)
+    setDetailOpen(false)
   }
 
   async function handleDelete(thread: MessageRecord) {
     if (!window.confirm(`Delete "${thread.subject}"?`)) {
       return
     }
-    try {
-      await deleteMessage(thread.id)
-      setDetailOpen(false)
-      await refreshMessages()
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to delete message.')
-    }
+    await deleteThread(thread)
+    setDetailOpen(false)
   }
 
   async function handleReply(thread: MessageRecord, body: string, attachments: File[]) {
-    try {
-      await replyToMessage(thread.id, body, attachments)
-      setDetailOpen(false)
-      await refreshMessages()
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to send reply.')
-    }
+    await replyToThread(thread, body, attachments)
+    setDetailOpen(false)
   }
 
-  async function handleCompose(payload: { to: string; cc: string; subject: string; body: string; attachments: File[] }) {
-    try {
-      if (composeType === 'support') {
-        await sendSupportMessage(payload.subject, payload.body, payload.attachments)
-      } else {
-        await sendGeneralMessage(payload.to, payload.cc, payload.subject, payload.body, payload.attachments)
-      }
-      setComposeOpen(false)
-      await refreshMessages()
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to send message.')
-    }
+  async function handleCompose(payload: ComposeMessagePayload) {
+    await sendMessage(composeType, payload)
+    setComposeOpen(false)
   }
 
   return (
@@ -272,7 +162,7 @@ function Messages(props: PageProps) {
               <strong>{dataError}</strong>
               <span>Try again or refresh the page.</span>
             </div>
-            <button className="top-alert-close" type="button" aria-label="Dismiss message warning" onClick={() => setDataError('')}>
+            <button className="top-alert-close" type="button" aria-label="Dismiss message warning" onClick={dismissDataError}>
               <X size={16} />
             </button>
           </section>
@@ -290,7 +180,9 @@ function Messages(props: PageProps) {
                 <ChevronDown size={17} />
               </button>
             </div>
-            {lanes.map(({ label, count, icon: Icon }) => (
+            {lanes.map(({ label, count }) => {
+              const Icon = laneIcons[label]
+              return (
               <button
                 className={label === activeLane ? 'is-selected' : ''}
                 type="button"
@@ -301,7 +193,8 @@ function Messages(props: PageProps) {
                 <span>{label}</span>
                 <strong>{count}</strong>
               </button>
-            ))}
+              )
+            })}
           </aside>
 
           <section className="message-thread-list" aria-label="Conversation queue">
@@ -353,7 +246,7 @@ function Messages(props: PageProps) {
                   >
                     <span className={`message-unread-dot ${thread.unread ? 'is-visible' : ''}`} />
                     <span className={`merchant-icon merchant-${thread.tone}`}>{getInitials(thread.sender)}</span>
-                    <button className="message-row-open" type="button" onClick={() => void openThread(thread)}>
+                    <button className="message-row-open" type="button" onClick={() => handleOpenThread(thread)}>
                       <span className="message-row-main">
                       <strong>{thread.sender}</strong>
                       <span>{thread.subject}</span>
@@ -381,7 +274,7 @@ function Messages(props: PageProps) {
                             type="button"
                             onClick={() => {
                               setActionMenuId(null)
-                              void openThread(thread)
+                              handleOpenThread(thread)
                             }}
                           >
                             View

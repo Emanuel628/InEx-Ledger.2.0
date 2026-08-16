@@ -32,7 +32,7 @@ import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
 import { startInactivityMonitor } from './lib/inactivityMonitor'
 import useV3PhraseTranslations from './hooks/useV3PhraseTranslations'
 import { getStoredLanguage, getUserLanguage, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
-import { normalizeInternalPath, resolvePageFromInternalPath } from './lib/navigation'
+import { normalizeInternalPath, normalizeLegacyAppV3Path, resolvePageFromInternalPath } from './lib/navigation'
 import { PlanProvider } from './context/PlanContext'
 
 declare global {
@@ -177,14 +177,16 @@ function getCanonicalCurrentPath() {
   return requestedPage ? getPathForPage(requestedPage) : '/transactions'
 }
 
-function normalizeLegacyAppV3Path() {
+function replaceLegacyAppV3Path() {
   const path = window.location.pathname
-  if (path === '/app-v3' || (path.startsWith('/app-v3/') && !path.startsWith('/app-v3/assets'))) {
-    const canonical = getCanonicalCurrentPath()
-    const nextUrl = `${canonical}${window.location.search}${window.location.hash}`
-    if (`${path}${window.location.search}${window.location.hash}` !== nextUrl) {
-      window.history.replaceState({}, '', nextUrl)
-    }
+  const canonical = normalizeLegacyAppV3Path(path, getCanonicalCurrentPath())
+  if (!canonical) {
+    return
+  }
+
+  const nextUrl = `${canonical}${window.location.search}${window.location.hash}`
+  if (`${path}${window.location.search}${window.location.hash}` !== nextUrl) {
+    window.history.replaceState({}, '', nextUrl)
   }
 }
 
@@ -271,7 +273,7 @@ function App() {
   }, [authUser])
 
   useEffect(() => {
-    normalizeLegacyAppV3Path()
+    replaceLegacyAppV3Path()
   }, [])
 
   useEffect(() => {
