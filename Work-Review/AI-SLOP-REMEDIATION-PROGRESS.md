@@ -1599,3 +1599,16 @@ test that had been failing identically since PR 13).
   added focused sync fixture coverage for specific 400s and generic 500s.
   Focused Plaid suites: **38/38 passing**. Now **29 of 40** route files use the
   pattern; Phase 4 remains **3.75/5**.
+
+- **PR 35** (`chore/align-mileage-api-errors`): same phase, same item, no new
+  checklist points. Converted `mileage.routes.js` to `asyncRoute` and `ApiError`
+  for generic validation/not-found paths and removed route-local custom 500
+  responses from mileage listing, summary, trip create/update/delete, and
+  vehicle-cost list/create/update/delete flows. Preserved the special response
+  payloads for Pro feature gating (`pro_feature_required`) and accounting-period
+  lock failures because those responses carry `code`, lock dates, and
+  transaction dates that the central handler does not emit. Updated the mileage
+  route fixture to mount the shared central error helper and added generic 500
+  coverage for unexpected list failures. Focused mileage suites:
+  **26/26 passing**. Now **30 of 40** route files use the pattern; Phase 4
+  remains **3.75/5**.

@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ROUTE_PATH = require.resolve("../routes/mileage.routes.js");
 const VALID_UUID = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
@@ -34,6 +35,9 @@ function loadMileageRouterFixture(options = {}) {
         pool: {
           async query(sql, params = []) {
             state.queries.push({ sql, params });
+            if (options.failList && /SELECT id, COALESCE\(trip_date, date\) AS trip_date/i.test(sql)) {
+              throw new Error("connection reset");
+            }
             if (/information_schema\.columns/i.test(sql)) {
               return { rows: [{ column_name: "date" }, { column_name: "trip_date" }], rowCount: 2 };
             }
@@ -143,6 +147,7 @@ function loadMileageRouterFixture(options = {}) {
   const app = express();
   app.use(express.json());
   app.use("/api/mileage", router);
+  attachCentralErrorHandler(app);
 
   return { app, state };
 }
@@ -225,6 +230,13 @@ test("GET /api/mileage lists trips with a total count", async () => {
   assert.equal(response.body.total, 2);
   assert.equal(response.body.data.length, 1);
   assert.equal(response.body.data[0].purpose, "Client visit");
+});
+
+test("GET /api/mileage hides unexpected database failures", async () => {
+  const { app } = loadMileageRouterFixture({ failList: true });
+  const response = await request(app).get("/api/mileage");
+  assert.equal(response.status, 500);
+  assert.deepEqual(response.body, { error: "Internal server error" });
 });
 
 test("POST /api/mileage/costs gates vehicle cost tracking behind Pro", async () => {

@@ -6,7 +6,8 @@ const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { logError } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 const {
   mileageDateColumn,
@@ -121,126 +122,111 @@ function normalizeVehicleCostPayload(body = {}) {
 /**
  * GET /api/mileage
  */
-router.get("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
-    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
-    const mileageColumns = await getMileageColumnMode();
-    const dateSelect = mileageDateColumn(mileageColumns);
-    const dateOrderBy = mileageDateColumn(mileageColumns);
+router.get("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+  const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+  const mileageColumns = await getMileageColumnMode();
+  const dateSelect = mileageDateColumn(mileageColumns);
+  const dateOrderBy = mileageDateColumn(mileageColumns);
 
-    const result = await pool.query(
-      `SELECT id, ${dateSelect} AS trip_date, purpose, destination, miles, km,
+  const result = await pool.query(
+    `SELECT id, ${dateSelect} AS trip_date, purpose, destination, miles, km,
               odometer_start, odometer_end, created_at
        FROM mileage
        WHERE business_id = $1
        ORDER BY ${dateOrderBy} DESC, created_at DESC
        LIMIT $2 OFFSET $3`,
-      [businessId, limit, offset]
-    );
+    [businessId, limit, offset]
+  );
 
-    const countResult = await pool.query(
-      "SELECT COUNT(*) FROM mileage WHERE business_id = $1",
-      [businessId]
-    );
+  const countResult = await pool.query(
+    "SELECT COUNT(*) FROM mileage WHERE business_id = $1",
+    [businessId]
+  );
 
-    res.json({
-      data: result.rows,
-      total: parseInt(countResult.rows[0].count),
-      limit,
-      offset
-    });
-  } catch (err) {
-    logError("GET /mileage error:", err.message);
-    res.status(500).json({ error: "Failed to load mileage records." });
-  }
-});
+  res.json({
+    data: result.rows,
+    total: parseInt(countResult.rows[0].count),
+    limit,
+    offset
+  });
+}));
 
-router.get("/summary", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const mileageColumns = await getMileageColumnMode();
-    const dateSelect = mileageDateColumn(mileageColumns);
+router.get("/summary", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const mileageColumns = await getMileageColumnMode();
+  const dateSelect = mileageDateColumn(mileageColumns);
 
-    const [mileageResult, costsResult] = await Promise.all([
-      pool.query(
-        `SELECT COUNT(*) AS trip_count,
+  const [mileageResult, costsResult] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*) AS trip_count,
                 COALESCE(SUM(COALESCE(miles, 0)), 0) AS total_miles,
                 COALESCE(SUM(COALESCE(km, 0)), 0) AS total_km,
                 MAX(${dateSelect}) AS last_trip_date
            FROM mileage
           WHERE business_id = $1`,
-        [businessId]
-      ),
-      pool.query(
-        `SELECT COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) AS expense_total,
+      [businessId]
+    ),
+    pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) AS expense_total,
                 COALESCE(SUM(CASE WHEN entry_type = 'maintenance' THEN amount ELSE 0 END), 0) AS maintenance_total,
                 COUNT(*) AS cost_count,
                 MAX(entry_date) AS last_cost_date
            FROM vehicle_costs
           WHERE business_id = $1`,
-        [businessId]
-      )
-    ]);
+      [businessId]
+    )
+  ]);
 
-    const mileageRow = mileageResult.rows[0] || {};
-    const costRow = costsResult.rows[0] || {};
-    return res.json({
-      trip_count: Number(mileageRow.trip_count || 0),
-      total_miles: Number(mileageRow.total_miles || 0),
-      total_km: Number(mileageRow.total_km || 0),
-      vehicle_expense_total: Number(costRow.expense_total || 0),
-      maintenance_total: Number(costRow.maintenance_total || 0),
-      cost_count: Number(costRow.cost_count || 0),
-      last_trip_date: mileageRow.last_trip_date || null,
-      last_cost_date: costRow.last_cost_date || null
-    });
-  } catch (err) {
-    logError("GET /mileage/summary error:", err.message);
-    return res.status(500).json({ error: "Failed to load mileage summary." });
-  }
-});
+  const mileageRow = mileageResult.rows[0] || {};
+  const costRow = costsResult.rows[0] || {};
+  return res.json({
+    trip_count: Number(mileageRow.trip_count || 0),
+    total_miles: Number(mileageRow.total_miles || 0),
+    total_km: Number(mileageRow.total_km || 0),
+    vehicle_expense_total: Number(costRow.expense_total || 0),
+    maintenance_total: Number(costRow.maintenance_total || 0),
+    cost_count: Number(costRow.cost_count || 0),
+    last_trip_date: mileageRow.last_trip_date || null,
+    last_cost_date: costRow.last_cost_date || null
+  });
+}));
 
-router.get("/costs", async (req, res) => {
+router.get("/costs", asyncRoute(async (req, res) => {
   const typeFilter = normalizeVehicleCostType(req.query.type);
   if (typeFilter && !VALID_VEHICLE_COST_TYPES.has(typeFilter)) {
-    return res.status(400).json({ error: "Invalid vehicle cost type." });
+    throw new ApiError(400, "Invalid vehicle cost type.");
   }
 
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 500);
-    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
-    const values = [businessId];
-    let whereSql = "WHERE business_id = $1";
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 500);
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+  const values = [businessId];
+  let whereSql = "WHERE business_id = $1";
 
-    if (typeFilter) {
-      values.push(typeFilter);
-      whereSql += ` AND entry_type = $${values.length}`;
-    }
+  if (typeFilter) {
+    values.push(typeFilter);
+    whereSql += ` AND entry_type = $${values.length}`;
+  }
 
-    values.push(limit, offset);
-    const result = await pool.query(
-      `SELECT id, business_id, entry_type, entry_date, title, vendor, amount, notes, created_at
+  values.push(limit, offset);
+  const result = await pool.query(
+    `SELECT id, business_id, entry_type, entry_date, title, vendor, amount, notes, created_at
          FROM vehicle_costs
          ${whereSql}
         ORDER BY entry_date DESC, created_at DESC
         LIMIT $${values.length - 1} OFFSET $${values.length}`,
-      values
-    );
+    values
+  );
 
-    return res.json({ data: result.rows, limit, offset });
-  } catch (err) {
-    logError("GET /mileage/costs error:", err.message);
-    return res.status(500).json({ error: "Failed to load vehicle costs." });
-  }
-});
+  return res.json({ data: result.rows, limit, offset });
+}));
 
-router.post("/costs", async (req, res) => {
+router.post("/costs", asyncRoute(async (req, res) => {
   const normalized = normalizeVehicleCostPayload(req.body);
   if (normalized.error) {
-    return res.status(400).json({ error: normalized.error });
+    throw new ApiError(400, normalized.error);
   }
 
   try {
@@ -277,15 +263,14 @@ router.post("/costs", async (req, res) => {
         transaction_date: err.transactionDate
       });
     }
-    logError("POST /mileage/costs error:", err.message);
-    return res.status(500).json({ error: "Failed to save vehicle cost." });
+    throw err;
   }
-});
+}));
 
 /**
  * POST /api/mileage
  */
-router.post("/", async (req, res) => {
+router.post("/", asyncRoute(async (req, res) => {
   const { trip_date, date, miles, km, odometer_start, odometer_end } = req.body ?? {};
   const purpose = typeof req.body?.purpose === "string" ? req.body.purpose.trim() : "";
   const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : "";
@@ -296,38 +281,38 @@ router.post("/", async (req, res) => {
     : "";
 
   if (!mileageDate || purpose.length === 0) {
-    return res.status(400).json({ error: "trip_date/date and purpose are required" });
+    throw new ApiError(400, "trip_date/date and purpose are required");
   }
 
   if (Number.isNaN(Date.parse(mileageDate))) {
-    return res.status(400).json({ error: "trip_date must be a valid date." });
+    throw new ApiError(400, "trip_date must be a valid date.");
   }
 
   const parsedMiles = parseOptionalNumber(miles, "miles", MAX_DISTANCE_VALUE);
   if (parsedMiles.error) {
-    return res.status(400).json({ error: parsedMiles.error });
+    throw new ApiError(400, parsedMiles.error);
   }
 
   const parsedKm = parseOptionalNumber(km, "km", MAX_DISTANCE_VALUE);
   if (parsedKm.error) {
-    return res.status(400).json({ error: parsedKm.error });
+    throw new ApiError(400, parsedKm.error);
   }
 
   const parsedOdometerStart = parseOptionalNumber(odometer_start, "odometer_start", MAX_ODOMETER_VALUE);
   if (parsedOdometerStart.error) {
-    return res.status(400).json({ error: parsedOdometerStart.error });
+    throw new ApiError(400, parsedOdometerStart.error);
   }
 
   const parsedOdometerEnd = parseOptionalNumber(odometer_end, "odometer_end", MAX_ODOMETER_VALUE);
   if (parsedOdometerEnd.error) {
-    return res.status(400).json({ error: parsedOdometerEnd.error });
+    throw new ApiError(400, parsedOdometerEnd.error);
   }
 
   let normalizedDistances = { miles: null, km: null };
   if (parsedMiles.value !== null || parsedKm.value !== null) {
     const normalized = normalizeMileageDistances(parsedMiles.value, parsedKm.value);
     if (normalized.error) {
-      return res.status(400).json({ error: normalized.error });
+      throw new ApiError(400, normalized.error);
     }
     normalizedDistances = normalized;
   }
@@ -339,15 +324,11 @@ router.post("/", async (req, res) => {
     parsedOdometerStart.value !== null && parsedOdometerEnd.value !== null;
 
   if (!hasDistance && !hasOdometerRange) {
-    return res.status(400).json({
-      error: "Provide miles, kilometers, or both odometer values."
-    });
+    throw new ApiError(400, "Provide miles, kilometers, or both odometer values.");
   }
 
   if (hasOdometerRange && parsedOdometerEnd.value < parsedOdometerStart.value) {
-    return res.status(400).json({
-      error: "odometer_end must be greater than or equal to odometer_start."
-    });
+    throw new ApiError(400, "odometer_end must be greater than or equal to odometer_start.");
   }
 
   try {
@@ -383,10 +364,9 @@ router.post("/", async (req, res) => {
         transaction_date: err.transactionDate
       });
     }
-    logError("POST /mileage error:", err);
-    res.status(500).json({ error: "Failed to save mileage record." });
+    throw err;
   }
-});
+}));
 
 async function getMileageColumnMode() {
   if (cachedMileageColumnMode && Date.now() - cachedMileageColumnFetchedAt < MILEAGE_SCHEMA_CACHE_MS) {
@@ -444,14 +424,14 @@ function normalizeMileageDistances(miles, km) {
   };
 }
 
-router.put("/costs/:id", async (req, res) => {
+router.put("/costs/:id", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid vehicle cost ID." });
+    throw new ApiError(400, "Invalid vehicle cost ID.");
   }
 
   const normalized = normalizeVehicleCostPayload(req.body);
   if (normalized.error) {
-    return res.status(400).json({ error: normalized.error });
+    throw new ApiError(400, normalized.error);
   }
 
   try {
@@ -467,7 +447,7 @@ router.put("/costs/:id", async (req, res) => {
     );
 
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Vehicle cost not found." });
+      throw new ApiError(404, "Vehicle cost not found.");
     }
 
     const lockState = await loadAccountingLockState(pool, businessId);
@@ -514,14 +494,13 @@ router.put("/costs/:id", async (req, res) => {
       });
     }
 
-    logError("PUT /mileage/costs/:id error:", err.message);
-    return res.status(500).json({ error: "Failed to update vehicle cost." });
+    throw err;
   }
-});
+}));
 
-router.delete("/costs/:id", async (req, res) => {
+router.delete("/costs/:id", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid vehicle cost ID." });
+    throw new ApiError(400, "Invalid vehicle cost ID.");
   }
 
   try {
@@ -535,7 +514,7 @@ router.delete("/costs/:id", async (req, res) => {
     );
 
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Vehicle cost not found." });
+      throw new ApiError(404, "Vehicle cost not found.");
     }
 
     const lockState = await loadAccountingLockState(pool, businessId);
@@ -556,17 +535,16 @@ router.delete("/costs/:id", async (req, res) => {
         transaction_date: err.transactionDate
       });
     }
-    logError("DELETE /mileage/costs/:id error:", err.message);
-    return res.status(500).json({ error: "Failed to delete vehicle cost." });
+    throw err;
   }
-});
+}));
 
 /**
  * PUT /api/mileage/:id
  */
-router.put("/:id", async (req, res) => {
+router.put("/:id", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid mileage record ID." });
+    throw new ApiError(400, "Invalid mileage record ID.");
   }
   const { trip_date, date, miles, km, odometer_start, odometer_end } = req.body ?? {};
   const purpose = typeof req.body?.purpose === "string" ? req.body.purpose.trim() : undefined;
@@ -579,31 +557,31 @@ router.put("/:id", async (req, res) => {
     : undefined;
 
   if (mileageDate !== undefined && Number.isNaN(Date.parse(mileageDate))) {
-    return res.status(400).json({ error: "trip_date must be a valid date." });
+    throw new ApiError(400, "trip_date must be a valid date.");
   }
 
   const parsedMiles = miles !== undefined ? parseOptionalNumber(miles, "miles", MAX_DISTANCE_VALUE) : { value: undefined };
   if (parsedMiles.error) {
-    return res.status(400).json({ error: parsedMiles.error });
+    throw new ApiError(400, parsedMiles.error);
   }
 
   const parsedKm = km !== undefined ? parseOptionalNumber(km, "km", MAX_DISTANCE_VALUE) : { value: undefined };
   if (parsedKm.error) {
-    return res.status(400).json({ error: parsedKm.error });
+    throw new ApiError(400, parsedKm.error);
   }
 
   const parsedOdometerStart = odometer_start !== undefined
     ? parseOptionalNumber(odometer_start, "odometer_start", MAX_ODOMETER_VALUE)
     : { value: undefined };
   if (parsedOdometerStart.error) {
-    return res.status(400).json({ error: parsedOdometerStart.error });
+    throw new ApiError(400, parsedOdometerStart.error);
   }
 
   const parsedOdometerEnd = odometer_end !== undefined
     ? parseOptionalNumber(odometer_end, "odometer_end", MAX_ODOMETER_VALUE)
     : { value: undefined };
   if (parsedOdometerEnd.error) {
-    return res.status(400).json({ error: parsedOdometerEnd.error });
+    throw new ApiError(400, parsedOdometerEnd.error);
   }
 
   // Validate odometer range only when both are being supplied in this request
@@ -612,9 +590,7 @@ router.put("/:id", async (req, res) => {
     parsedOdometerEnd.value !== undefined &&
     parsedOdometerEnd.value < parsedOdometerStart.value
   ) {
-    return res.status(400).json({
-      error: "odometer_end must be greater than or equal to odometer_start."
-    });
+    throw new ApiError(400, "odometer_end must be greater than or equal to odometer_start.");
   }
 
   // Recalculate the complementary distance unit when one side is explicitly provided
@@ -637,7 +613,7 @@ router.put("/:id", async (req, res) => {
     parsedOdometerEnd.value !== undefined;
 
   if (!hasAnyField) {
-    return res.status(400).json({ error: "No valid fields provided for update." });
+    throw new ApiError(400, "No valid fields provided for update.");
   }
 
   try {
@@ -651,7 +627,7 @@ router.put("/:id", async (req, res) => {
     );
 
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Mileage record not found." });
+      throw new ApiError(404, "Mileage record not found.");
     }
 
     // Check lock: block editing a record whose original date falls in a locked period,
@@ -730,17 +706,16 @@ router.put("/:id", async (req, res) => {
         transaction_date: err.transactionDate
       });
     }
-    logError("PUT /mileage/:id error:", err.message);
-    res.status(500).json({ error: "Failed to update mileage record." });
+    throw err;
   }
-});
+}));
 
 /**
  * DELETE /api/mileage/:id
  */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid mileage record ID." });
+    throw new ApiError(400, "Invalid mileage record ID.");
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -753,7 +728,7 @@ router.delete("/:id", async (req, res) => {
     );
 
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Mileage record not found." });
+      throw new ApiError(404, "Mileage record not found.");
     }
 
     const lockState = await loadAccountingLockState(pool, businessId);
@@ -774,9 +749,8 @@ router.delete("/:id", async (req, res) => {
         transaction_date: err.transactionDate
       });
     }
-    logError("DELETE /mileage/:id error:", err.message);
-    res.status(500).json({ error: "Failed to delete mileage record." });
+    throw err;
   }
-});
+}));
 
 module.exports = router;
