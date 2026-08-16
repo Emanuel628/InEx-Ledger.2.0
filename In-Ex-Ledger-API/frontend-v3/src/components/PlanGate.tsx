@@ -1,27 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Sparkles } from 'lucide-react'
 import { usePlan } from '../context/PlanContext'
-import type { PlanFeatureKey } from '../lib/planApi'
+import { PLAN_FEATURE_LABELS, type PlanFeatureKey } from '../lib/planApi'
 import UpgradePrompt from './UpgradePrompt'
-
-const FEATURE_LABELS: Record<PlanFeatureKey, string> = {
-  transactions: 'Transactions',
-  receipts: 'Receipt uploads',
-  csv_imports: 'CSV imports',
-  accounts: 'Accounts',
-  categories: 'Categories',
-  mileage: 'Mileage tracking',
-  invoices: 'Invoicing',
-  basic_analytics: 'Analytics',
-  basic_csv_export: 'CSV export',
-  recurring_transactions: 'Recurring transactions',
-  tax_estimates: 'Tax estimates',
-  pdf_exports: 'PDF exports',
-  advanced_exports: 'Advanced exports',
-  export_history: 'Export history',
-  edge_case_tools: 'Advanced tools',
-  additional_businesses: 'Additional businesses',
-}
 
 export type PlanGateProps = {
   feature: PlanFeatureKey
@@ -55,7 +36,7 @@ function PlanGate({ feature, children, fallback, onUpgrade }: PlanGateProps) {
     return <>{fallback}</>
   }
 
-  const label = FEATURE_LABELS[feature] || 'This feature'
+  const label = PLAN_FEATURE_LABELS[feature] || 'This feature'
 
   return (
     <>

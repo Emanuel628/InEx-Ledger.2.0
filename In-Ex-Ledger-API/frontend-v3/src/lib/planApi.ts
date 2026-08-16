@@ -2,23 +2,46 @@ import { apiRequest } from './apiClient'
 
 export type PlanCode = 'free' | 'v1' | 'business'
 
+export const PLAN_FEATURE_KEYS = [
+  'transactions',
+  'receipts',
+  'csv_imports',
+  'accounts',
+  'categories',
+  'mileage',
+  'invoices',
+  'basic_analytics',
+  'basic_csv_export',
+  'recurring_transactions',
+  'tax_estimates',
+  'pdf_exports',
+  'advanced_exports',
+  'export_history',
+  'edge_case_tools',
+  'additional_businesses',
+] as const
+
 export type PlanFeatureKey =
-  | 'transactions'
-  | 'receipts'
-  | 'csv_imports'
-  | 'accounts'
-  | 'categories'
-  | 'mileage'
-  | 'invoices'
-  | 'basic_analytics'
-  | 'basic_csv_export'
-  | 'recurring_transactions'
-  | 'tax_estimates'
-  | 'pdf_exports'
-  | 'advanced_exports'
-  | 'export_history'
-  | 'edge_case_tools'
-  | 'additional_businesses'
+  typeof PLAN_FEATURE_KEYS[number]
+
+export const PLAN_FEATURE_LABELS: Record<PlanFeatureKey, string> = {
+  transactions: 'Transactions',
+  receipts: 'Receipt uploads',
+  csv_imports: 'CSV imports',
+  accounts: 'Accounts',
+  categories: 'Categories',
+  mileage: 'Mileage tracking',
+  invoices: 'Invoicing',
+  basic_analytics: 'Analytics',
+  basic_csv_export: 'CSV export',
+  recurring_transactions: 'Recurring transactions',
+  tax_estimates: 'Tax estimates',
+  pdf_exports: 'PDF exports',
+  advanced_exports: 'Advanced exports',
+  export_history: 'Export history',
+  edge_case_tools: 'Advanced tools',
+  additional_businesses: 'Additional businesses',
+}
 
 export type PlanFeatures = Record<PlanFeatureKey, boolean>
 

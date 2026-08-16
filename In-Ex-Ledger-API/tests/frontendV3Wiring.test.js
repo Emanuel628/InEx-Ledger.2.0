@@ -208,6 +208,27 @@ test("v3 frontend dependencies are pinned", () => {
   }
 });
 
+test("v3 plan feature keys and labels stay aligned with backend catalog", () => {
+  const planCatalog = require(path.join(repoRoot, "config", "planCatalog.js"));
+  const planApiSource = fs.readFileSync(path.join(frontendRoot, "lib", "planApi.ts"), "utf8");
+  const planGateSource = fs.readFileSync(path.join(frontendRoot, "components", "PlanGate.tsx"), "utf8");
+
+  assert.match(planApiSource, /export const PLAN_FEATURE_KEYS = \[/);
+  assert.match(planApiSource, /export const PLAN_FEATURE_LABELS: Record<PlanFeatureKey, string> = \{/);
+  assert.match(planApiSource, /export type PlanFeatureKey =\s+typeof PLAN_FEATURE_KEYS\[number\]/);
+  assert.match(planGateSource, /import \{ PLAN_FEATURE_LABELS, type PlanFeatureKey \} from '\.\.\/lib\/planApi'/);
+  assert.doesNotMatch(planGateSource, /const FEATURE_LABELS/);
+
+  for (const [name, featureKey] of Object.entries(planCatalog.FEATURE_KEYS)) {
+    assert.match(planApiSource, new RegExp(`['"]${featureKey}['"]`), `frontend is missing FEATURE_KEYS.${name}`);
+    assert.match(
+      planApiSource,
+      new RegExp(`${featureKey}: ['"]${planCatalog.FEATURE_LABELS[featureKey]}['"]`),
+      `frontend label for ${featureKey} should match backend catalog`
+    );
+  }
+});
+
 test("v3 header notifications use real unread message counts without noisy local filler", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
   const i18nSource = fs.readFileSync(path.join(frontendRoot, "lib", "i18n.ts"), "utf8");
