@@ -14,6 +14,7 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { logError, logInfo } = require("../utils/logger.js");
 const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
+const { normalizeAccountCategory } = require("../services/accountTypeService.js");
 const {
   AUDIT_ACTIONS,
   listAuditEventsForUser,
@@ -420,9 +421,15 @@ router.put("/onboarding", asyncRoute(async (req, res) => {
 
     if (existingAccounts.rowCount === 0) {
       await client.query(
-        `INSERT INTO accounts (id, business_id, name, type)
-        VALUES ($1, $2, $3, $4)`,
-        [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
+        `INSERT INTO accounts (id, business_id, name, type, account_category)
+        VALUES ($1, $2, $3, $4, $5)`,
+        [
+          crypto.randomUUID(),
+          businessId,
+          starterName,
+          normalizedStarterAccountType,
+          normalizeAccountCategory(normalizedStarterAccountType)
+        ]
       );
     }
 

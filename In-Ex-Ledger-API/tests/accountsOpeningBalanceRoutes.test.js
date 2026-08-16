@@ -27,8 +27,9 @@ function loadRouterWithState() {
             business_id: "00000000-0000-4000-8000-000000000101",
             name: params[2],
             type: params[3],
-            opening_balance: String(params[4]),
-            opening_balance_as_of: params[5],
+            account_category: params[4],
+            opening_balance: String(params[5]),
+            opening_balance_as_of: params[6],
             created_at: "2026-05-31T00:00:00.000Z"
           }],
           rowCount: 1
@@ -48,12 +49,13 @@ function loadRouterWithState() {
       if (/UPDATE accounts/i.test(sql)) {
         return {
           rows: [{
-            id: params[5],
-            business_id: params[6],
+            id: params[6],
+            business_id: params[7],
             name: params[0] || "Main Checking",
             type: params[1] || "checking",
-            opening_balance: String(params[2] ?? "125.5"),
-            opening_balance_as_of: params[3] ? params[4] : "2026-01-01"
+            account_category: params[2] || "checking",
+            opening_balance: String(params[3] ?? "125.5"),
+            opening_balance_as_of: params[4] ? params[5] : "2026-01-01"
           }],
           rowCount: 1
         };
@@ -128,11 +130,14 @@ test("POST /api/accounts persists opening balance fields", async () => {
   assert.equal(response.status, 201);
   assert.equal(response.body.opening_balance, "125.5");
   assert.equal(response.body.opening_balance_as_of, "2026-01-01");
+  assert.equal(response.body.account_category, "checking");
 
   const insertQuery = state.queries.find(({ sql }) => /INSERT INTO accounts/i.test(sql));
   assert.ok(insertQuery);
-  assert.equal(insertQuery.params[4], 125.5);
-  assert.equal(insertQuery.params[5], "2026-01-01");
+  assert.match(insertQuery.sql, /account_category/i);
+  assert.equal(insertQuery.params[4], "checking");
+  assert.equal(insertQuery.params[5], 125.5);
+  assert.equal(insertQuery.params[6], "2026-01-01");
 });
 
 test("PUT /api/accounts/:id can clear opening_balance_as_of while updating opening balance", async () => {
@@ -151,9 +156,27 @@ test("PUT /api/accounts/:id can clear opening_balance_as_of while updating openi
 
   const updateQuery = state.queries.find(({ sql }) => /UPDATE accounts/i.test(sql));
   assert.ok(updateQuery);
-  assert.equal(updateQuery.params[2], 250);
-  assert.equal(updateQuery.params[3], true);
-  assert.equal(updateQuery.params[4], null);
+  assert.match(updateQuery.sql, /account_category/i);
+  assert.equal(updateQuery.params[3], 250);
+  assert.equal(updateQuery.params[4], true);
+  assert.equal(updateQuery.params[5], null);
+});
+
+test("PUT /api/accounts/:id updates account_category when type changes", async () => {
+  const { app, state } = loadRouterWithState();
+
+  const response = await request(app)
+    .put("/api/accounts/00000000-0000-4000-8000-000000000001")
+    .send({ type: "credit_card" });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.type, "credit_card");
+  assert.equal(response.body.account_category, "credit_card");
+
+  const updateQuery = state.queries.find(({ sql }) => /UPDATE accounts/i.test(sql));
+  assert.ok(updateQuery);
+  assert.equal(updateQuery.params[1], "credit_card");
+  assert.equal(updateQuery.params[2], "credit_card");
 });
 
 test("POST /api/accounts rejects invalid opening_balance", async () => {

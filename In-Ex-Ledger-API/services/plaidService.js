@@ -10,6 +10,8 @@
  * enabled later by setting PLAID_ENV=production or PLAID_ENV=development.
  */
 
+const { normalizeAccountCategory } = require("./accountTypeService.js");
+
 const VALID_ENVS = new Set(["sandbox", "development", "production"]);
 
 let cachedClient = null;
@@ -131,7 +133,8 @@ function plaidAccountToRow(plaidAccount) {
     name: plaidAccount.name || plaidAccount.official_name || "Bank account",
     account_mask: plaidAccount.mask || null,
     account_subtype: plaidAccount.subtype || plaidAccount.type || null,
-    type: plaidAccount.subtype || plaidAccount.type || "depository"
+    type: plaidAccount.subtype || plaidAccount.type || "depository",
+    account_category: normalizeAccountCategory(plaidAccount.subtype || plaidAccount.type)
   };
 }
 

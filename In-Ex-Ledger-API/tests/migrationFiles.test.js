@@ -207,6 +207,20 @@ test("child business integrity follow-up preserves original delete actions", () 
   assert.doesNotMatch(sqlWithoutComments(sql), /\bVALIDATE\s+CONSTRAINT\b/i);
 });
 
+test("account category migration adds a constrained canonical account category", () => {
+  const sql = readMigration("20260816_add_account_category_invariant.sql");
+
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS account_category TEXT/i);
+  assert.match(sql, /SET account_category = CASE/i);
+  assert.match(sql, /ALTER COLUMN account_category SET NOT NULL/i);
+  assert.match(sql, /accounts_account_category_check/i);
+  assert.match(
+    sql,
+    /CHECK \(account_category IN \('checking', 'savings', 'credit_card', 'cash', 'loan', 'custom'\)\)/i
+  );
+  assert.doesNotMatch(sqlWithoutComments(sql), /\bDROP\b|\bDELETE\s+FROM\b|\bTRUNCATE\b/i);
+});
+
 test("new destructive migrations require an explicit review marker", () => {
   const unreviewed = fs
     .readdirSync(migrationsDir)

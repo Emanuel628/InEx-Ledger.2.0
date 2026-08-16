@@ -142,7 +142,8 @@ test("plaidAccountToRow returns the canonical accounts insert shape", () => {
     name: "Plaid Checking",
     account_mask: "0000",
     account_subtype: "checking",
-    type: "checking"
+    type: "checking",
+    account_category: "checking"
   });
 });
 
@@ -155,6 +156,7 @@ test("plaidAccountToRow falls back to official_name and type when subtype missin
   });
   assert.equal(row.name, "Premium Savings Account");
   assert.equal(row.account_subtype, "depository");
+  assert.equal(row.account_category, "cash");
 });
 
 test("describePlaidError extracts message + code from response.data", () => {

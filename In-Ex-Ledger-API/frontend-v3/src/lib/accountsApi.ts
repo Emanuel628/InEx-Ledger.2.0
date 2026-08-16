@@ -20,6 +20,7 @@ type LegacyAccount = {
   id: string
   name: string
   type: string
+  account_category?: string
   transaction_count?: number
 }
 
@@ -60,7 +61,7 @@ export async function requestPlaidLinkToken() {
 }
 
 function mapAccount(row: LegacyAccount, transactionCount = Number(row.transaction_count || 0)): AccountRecord {
-  const type = mapTypeFromLegacy(row.type)
+  const type = mapTypeFromLegacy(row.account_category || row.type)
   return {
     id: row.id,
     name: row.name,

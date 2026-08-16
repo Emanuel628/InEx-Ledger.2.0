@@ -13,10 +13,11 @@ const {
   assertNoLockedPeriodTransactionsForAccount,
   AccountingPeriodLockedError
 } = require("../services/accountingLockService.js");
+const { ACCOUNT_CATEGORIES, normalizeAccountCategory } = require("../services/accountTypeService.js");
 const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card", "cash", "loan", "custom"];
+const ALLOWED_ACCOUNT_TYPES = ACCOUNT_CATEGORIES;
 const MAX_ACCOUNT_NAME_LENGTH = 120;
 const ACCOUNTS_DEFAULT_LIMIT = 500;
 const ACCOUNTS_MAX_LIMIT = 2000;
@@ -147,14 +148,15 @@ router.post("/", asyncRoute(async (req, res) => {
   let result;
   try {
     result = await pool.query(
-      `INSERT INTO accounts (id, business_id, name, type, opening_balance, opening_balance_as_of)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO accounts (id, business_id, name, type, account_category, opening_balance, opening_balance_as_of)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         crypto.randomUUID(),
         businessId,
         normalizedName,
         type,
+        normalizeAccountCategory(type),
         parsedOpeningBalance.value ?? 0,
         parsedOpeningBalanceDate.value ?? null
       ]
@@ -245,13 +247,15 @@ router.put("/:id", asyncRoute(async (req, res) => {
       `UPDATE accounts
           SET name = COALESCE($1, name),
               type = COALESCE($2, type),
-              opening_balance = COALESCE($3, opening_balance),
-              opening_balance_as_of = CASE WHEN $4 THEN $5 ELSE opening_balance_as_of END
-        WHERE id = $6 AND business_id = $7
+              account_category = COALESCE($3, account_category),
+              opening_balance = COALESCE($4, opening_balance),
+              opening_balance_as_of = CASE WHEN $5 THEN $6 ELSE opening_balance_as_of END
+        WHERE id = $7 AND business_id = $8
         RETURNING *`,
       [
         hasName ? normalizedName : null,
         type || null,
+        type ? normalizeAccountCategory(type) : null,
         hasOpeningBalance ? parsedOpeningBalance.value : null,
         hasOpeningBalanceDate,
         hasOpeningBalanceDate ? parsedOpeningBalanceDate.value : null,

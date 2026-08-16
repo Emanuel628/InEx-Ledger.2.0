@@ -281,20 +281,22 @@ authedRouter.post("/exchange-public-token", asyncRoute(async (req, res) => {
     if (!row) continue;
     try {
       const insertResult = await pool.query(
-        `INSERT INTO accounts (id, business_id, name, type, bank_connection_id, external_account_id,
+        `INSERT INTO accounts (id, business_id, name, type, account_category, bank_connection_id, external_account_id,
                                 account_mask, account_subtype, source)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'plaid')
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'plaid')
          ON CONFLICT (bank_connection_id, external_account_id)
            WHERE bank_connection_id IS NOT NULL AND external_account_id IS NOT NULL
            DO UPDATE SET name = EXCLUDED.name,
                          account_mask = EXCLUDED.account_mask,
-                         account_subtype = EXCLUDED.account_subtype
+                         account_subtype = EXCLUDED.account_subtype,
+                         account_category = EXCLUDED.account_category
          RETURNING id, name, account_mask`,
         [
           crypto.randomUUID(),
           businessId,
           row.name,
           row.type,
+          row.account_category,
           connection.id,
           row.external_account_id,
           row.account_mask,

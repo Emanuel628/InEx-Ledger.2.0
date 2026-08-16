@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 31.25 / 54 action items (~58%)
+## Overall: 32.75 / 54 action items (~61%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -382,7 +382,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   validation)
 - [~] Representative tests for error status/code/message
 
-## Phase 5 - Database Invariants And Multi-Tenant Boundaries — 4.0 / 5
+## Phase 5 - Database Invariants And Multi-Tenant Boundaries — 5 / 5
 - [x] `CHECK` constraint for subscription `plan_code`/`status` (`e7e14acb`)
 - [x] `CHECK` constraint for `transactions.review_status` (`01cd219c`)
 - [x] Cross-business child relationships enforced (`e018b6eb`, `56624845`, `6f9d4477`) —
@@ -409,30 +409,17 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   the underlying constraints are correctly in place and now correctly configured: the
   earlier credit was right about the destination, wrong about a step along the way,
   and that step has since been corrected.
-- [~] Account type/currency assumptions reviewed for closed-set constraints — did the
-  actual review the audit (Pass 24) asked for, rather than reflexively adding `CHECK`
-  constraints the way the plan_code/status/review_status items did, because this one
-  genuinely doesn't reduce to that:
-  - **Account type**: `routes/accounts.routes.js`'s `ALLOWED_ACCOUNT_TYPES` is
-    `checking`/`savings`/`credit_card`/`cash`/`loan`/`custom`. But
-    `services/plaidService.js`'s `plaidAccountToRow` writes
-    `plaidAccount.subtype || plaidAccount.type || "depository"` into the same
-    `accounts.type` column — Plaid's real subtype vocabulary (`money market`, `cd`,
-    `mortgage`, `brokerage`, `hsa`, `student`, `depository`, etc.) is much richer than
-    the 6-value route enum, and confirmed live: `INSERT INTO accounts (..., type, ...)`
-    in `routes/plaid.routes.js` writes it unfiltered. A naive
-    `CHECK (type IN (...ALLOWED_ACCOUNT_TYPES))` would reject legitimate live Plaid
-    syncs today, not just theoretical future rows. The frontend already defends against
-    this gracefully — `frontend-v3/src/lib/accountsApi.ts`'s `mapTypeFromLegacy`
-    falls back to displaying `'Other'` for any unrecognized value — so there's no
-    active bug, just the exact "taxonomy split between routes/Plaid/schema" data-quality
-    gap the audit described. Fixing it for real means picking one of: normalize Plaid
-    subtypes into the 6-value taxonomy at write time (losing detail), widen the taxonomy
-    to include Plaid's real subtypes (a UI/copy change), or add a separate constrained
-    "display category" column alongside a freer stored `type`. That's a product decision,
-    not a remediation-PR call — flagging it here rather than picking one silently, same
-    as the internal-support-identity and legacy-archive-vs-delete items already flagged
-    this way.
+- [x] Account type/currency assumptions reviewed for closed-set constraints.
+  - **Account type**: fixed by adding a separate constrained `accounts.account_category`
+    column instead of constraining overloaded provider detail in `accounts.type`.
+    Manual account writes, onboarding starter-account writes, and Plaid account seeding
+    now populate `account_category`; Plaid still preserves raw subtype/type detail in
+    `type` and `account_subtype`. The database enforces
+    `account_category IN ('checking', 'savings', 'credit_card', 'cash', 'loan',
+    'custom')`, so the app has a closed category invariant without rejecting real
+    Plaid subtypes such as `money market`, `mortgage`, `student`, `depository`, or
+    `brokerage`. V3 account mapping now prefers `account_category` when present and
+    falls back to legacy `type` for old responses.
   - **Currency**: found and fixed the one concrete, safe-to-fix piece.
     `routes/transactions.routes.js`'s `normalizeCurrencyCode` validated shape only
     (`/^[A-Z]{3}$/`), so a garbage code like `"ZZZ"` or `"ABC"` — not a real currency,
@@ -451,7 +438,8 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
     `tests/transactionCurrencyNormalization.test.js` (4 tests, including a named
     regression case for the exact `"ZZZ"` bug) — this function had no direct test
     coverage before. Full suite unaffected.
-- [~] Migration tests for new invariants (`c44d08b1` guards destructive migrations)
+- [x] Migration tests for new invariants (`c44d08b1` guards destructive migrations;
+  `migrationFiles.test.js` now also verifies the account-category invariant migration)
 
 ## Phase 6 - Product Truth And Legacy/Static Cleanup — 3.5 / 5
 - [x] Archived legacy frontend confirmed reference-only, not runtime-reachable —
