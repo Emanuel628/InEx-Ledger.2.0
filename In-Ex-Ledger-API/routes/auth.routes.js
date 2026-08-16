@@ -1,6 +1,6 @@
 /**
- * AUTH ROUTES - FULL PRODUCTION VERSION
- * Handles registration, real email verification, login, and password resets.
+ * Auth routes for registration, email verification, session management,
+ * MFA, and account recovery.
  */
 
 const express = require("express");
@@ -77,7 +77,7 @@ const {
 const router = express.Router();
 
 /* =========================================================
-   1. EMAIL API CONFIGURATION (Replaces SMTP)
+   1. EMAIL API CONFIGURATION
    ========================================================= */
 // Lazy init — avoids crash at startup when RESEND_API_KEY is not set
 let _resend = null;
@@ -966,15 +966,15 @@ router.post("/register", authLimiter, async (req, res) => {
   // bypass the front-end checkbox.
   const tosConsent = req.body?.tos_consent === true || req.body?.tosConsent === true;
   const marketingEmailOptIn =
-  req.body?.marketing_email_opt_in === true ||
-  req.body?.marketingEmailOptIn === true;
-  
+    req.body?.marketing_email_opt_in === true ||
+    req.body?.marketingEmailOptIn === true;
+
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
-  
+
   if (!firstName || !lastName) {
-  return res.status(400).json({ error: "First name and last name are required" });
+    return res.status(400).json({ error: "First name and last name are required" });
   }
 
   if (firstName.length < 2 || firstName.length > 80) {
@@ -1032,7 +1032,7 @@ router.post("/register", authLimiter, async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
       RETURNING id, email, full_name, display_name, trial_eligible`,
       [crypto.randomUUID(), email, hashedPassword, fullName, displayName, country, province, !reopenedWithoutTrial]
-      );
+    );
 
     const newUserId = result.rows[0].id;
 
@@ -1043,25 +1043,25 @@ router.post("/register", authLimiter, async (req, res) => {
       });
     }
 
-    // Quebec Privacy Default (Law 25): data sharing is opt-OUT by default for QC residents.
-// Terms/Privacy consent is required for registration. Marketing email consent is optional.
-const isQuebec = country === "CA" && province === "QC";
-await client.query(
-  `INSERT INTO user_privacy_settings
-     (user_id, data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in, updated_at)
-   VALUES ($1, $2, $3, $4, $5, NOW())
-   ON CONFLICT (user_id) DO UPDATE
-     SET consent_given = EXCLUDED.consent_given,
-         marketing_email_opt_in = EXCLUDED.marketing_email_opt_in,
-         updated_at = NOW()`,
-  [
-    newUserId,
-    isQuebec,
-    true,
-    false,
-    marketingEmailOptIn
-  ]
-);
+    // Quebec Privacy Default (Law 25): data sharing is opt-out by default for QC residents.
+    // Terms/Privacy consent is required for registration. Marketing email consent is optional.
+    const isQuebec = country === "CA" && province === "QC";
+    await client.query(
+      `INSERT INTO user_privacy_settings
+         (user_id, data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (user_id) DO UPDATE
+         SET consent_given = EXCLUDED.consent_given,
+             marketing_email_opt_in = EXCLUDED.marketing_email_opt_in,
+             updated_at = NOW()`,
+      [
+        newUserId,
+        isQuebec,
+        true,
+        false,
+        marketingEmailOptIn
+      ]
+    );
     await client.query("COMMIT");
     committed = true;
 
