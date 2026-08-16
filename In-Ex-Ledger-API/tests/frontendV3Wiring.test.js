@@ -198,6 +198,22 @@ test("v3 pages share modal body-lock behavior through one hook", () => {
   }
 });
 
+test("v3 transactions keeps recurring template workflow outside the page controller", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const workflowSource = fs.readFileSync(
+    path.join(frontendRoot, "components", "transactions", "RecurringTemplatesWorkflow.tsx"),
+    "utf8"
+  );
+
+  assert.match(pageSource, /import RecurringTemplatesWorkflow from '\.\.\/components\/transactions\/RecurringTemplatesWorkflow'/);
+  assert.match(pageSource, /<RecurringTemplatesWorkflow/);
+  assert.doesNotMatch(pageSource, /function RecurringTemplatesPanel/);
+  assert.doesNotMatch(pageSource, /function RecurringTemplateModal/);
+  assert.match(workflowSource, /export default function RecurringTemplatesWorkflow/);
+  assert.match(workflowSource, /function RecurringTemplatesPanel/);
+  assert.match(workflowSource, /function RecurringTemplateModal/);
+});
+
 test("v3 frontend dependencies are pinned", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "frontend-v3", "package.json"), "utf8"));
   for (const section of ["dependencies", "devDependencies"]) {
@@ -398,7 +414,7 @@ test("v3 transactions restores tax estimate, review fixes, receipt upload, recur
   assert.match(pageSource, /Estimated tax/);
   assert.match(pageSource, /uploadReceipt\(file, transaction\.id\)/);
   assert.match(pageSource, /ReviewQueuePanel/);
-  assert.match(pageSource, /RecurringTemplatesPanel/);
+  assert.match(pageSource, /RecurringTemplatesWorkflow/);
   assert.match(pageSource, /Manage categories\.\.\./);
   assert.doesNotMatch(pageSource, /Tax set-aside helper/);
   assert.doesNotMatch(pageSource, /Not connected yet/);
