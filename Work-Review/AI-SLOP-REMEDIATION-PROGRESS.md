@@ -526,7 +526,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   covering all 6 pages across all 4 URL aliases (bare, `.html`, `/html/*`,
   `/html/*.html`).
 
-## Phase 7 - Route And Service Decomposition — 3.5 / 4
+## Phase 7 - Route And Service Decomposition — 4 / 4
 - [x] Consolidated the repeated account/category join SQL in `transactions.routes.js`
   (was duplicated across 7 call sites: GET list, GET single, POST, PUT, and the
   `cleared`/`review-status`/`receipt-status` PATCH routes) into one shared fragment.
@@ -553,12 +553,14 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [x] Codify dynamic-SQL rules (values as params, identifiers from constants only, no
   request-derived text interpolated) — written down in `Docs/DYNAMIC_SQL_RULES.md`,
   citing the existing modules that already follow it.
-- [~] SQL-shape/parameter tests — added for transaction list filters/where-clause and
-  now for mileage's `date`/`trip_date` column-mode selection (`mileageQueryService.js`,
-  9 tests: coalesce/trip_date-only/date-only column choice, insert SQL column list and
-  positional-param shift under each mode, insert values array under each mode). Tax
-  region column selection (`taxSummaryService.js`) and usage-limit thresholds
-  (`usageLimitEmailService.js`) are still untested at this level.
+- [x] SQL-shape/parameter tests — added for transaction list filters/where-clause,
+  mileage's `date`/`trip_date` column-mode selection (`mileageQueryService.js`, 9
+  tests), tax-region column selection (`taxSummaryService.js`), and usage-limit
+  threshold claims (`usageLimitEmailService.js`). The tax-summary tests now prove US,
+  CA, and hostile region text can only choose the closed `tax_map_us`/`tax_map_ca`
+  fragments in SELECT/GROUP/ORDER/filter positions. The usage-limit tests now prove
+  threshold-claim SQL updates only configured columns, guards on the highest crossed
+  threshold, and sends copy for the highest newly crossed threshold.
 
 **Beyond the four original items** (not counted in this phase's score — real
 work, but not one of the audit-derived checklist items, so it's logged here

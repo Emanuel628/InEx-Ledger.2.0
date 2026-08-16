@@ -60,3 +60,63 @@ test("claimThresholds is race-safe: claim succeeds once, then reports lost", asy
   assert.equal(first, true);
   assert.equal(second, false);
 });
+
+test("claimThresholds updates only configured columns and guards on the highest crossed threshold", async () => {
+  const queries = [];
+  const db = {
+    async query(sql, params) {
+      queries.push({ sql, params });
+      return { rowCount: 1, rows: [{ id: "period-1" }] };
+    }
+  };
+
+  const won = await __private.claimThresholds(db, "period-1", "receipts", [70, 90]);
+
+  assert.equal(won, true);
+  assert.deepEqual(queries[0].params, ["period-1"]);
+  assert.match(queries[0].sql, /SET receipt_email_70_sent_at = now\(\), receipt_email_90_sent_at = now\(\), updated_at = now\(\)/);
+  assert.match(queries[0].sql, /WHERE id = \$1 AND receipt_email_90_sent_at IS NULL/);
+  assert.doesNotMatch(queries[0].sql, /receipt_email_100_sent_at = now\(\)/);
+  assert.doesNotMatch(queries[0].sql, /transaction_email_/);
+  assert.doesNotMatch(queries[0].sql, /csv_import_email_/);
+});
+
+test("evaluateResource claims all newly crossed thresholds but sends copy for the highest one", async () => {
+  const queries = [];
+  const sent = [];
+  const db = {
+    async query(sql, params) {
+      queries.push({ sql, params });
+      return { rowCount: 1, rows: [{ id: "period-1" }] };
+    }
+  };
+  const resendClient = {
+    emails: {
+      async send(message) {
+        sent.push(message);
+        return { data: { id: "email-1" } };
+      }
+    }
+  };
+
+  await __private.evaluateResource(db, resendClient, {
+    businessId: "biz-1",
+    resource: "transactions",
+    metric: { used: 46, limit: 50 },
+    period: {
+      id: "period-1",
+      transaction_email_70_sent_at: null,
+      transaction_email_90_sent_at: null,
+      transaction_email_100_sent_at: null
+    },
+    recipient: { email: "owner@example.com", businessName: "Ledger Co", userId: "user-1" }
+  });
+
+  assert.equal(sent.length, 1);
+  assert.match(queries[0].sql, /SET transaction_email_70_sent_at = now\(\), transaction_email_90_sent_at = now\(\), updated_at = now\(\)/);
+  assert.match(queries[0].sql, /WHERE id = \$1 AND transaction_email_90_sent_at IS NULL/);
+  assert.doesNotMatch(queries[0].sql, /transaction_email_100_sent_at = now\(\)/);
+  assert.match(sent[0].subject, /heads-up/i);
+  assert.match(sent[0].text, /You've used 46 of your 50 Basic transactions/);
+  assert.doesNotMatch(sent[0].text, /reached your 50 Basic transactions/);
+});

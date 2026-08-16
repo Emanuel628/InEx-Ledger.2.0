@@ -105,6 +105,25 @@ test("getTaxLineSummaryForYear picks tax_map_ca when region is CA", async () => 
   assert.ok(pool.queries[0].sql.includes("c.tax_map_ca"), "should query tax_map_ca for CA region");
 });
 
+test("getTaxLineSummaryForYear uses a closed tax-map column choice in every SQL position", async () => {
+  for (const [region, expectedColumn, forbiddenColumn] of [
+    ["US", "c.tax_map_us", "c.tax_map_ca"],
+    ["CA", "c.tax_map_ca", "c.tax_map_us"],
+    ["CA; DROP TABLE categories; --", "c.tax_map_us", "DROP TABLE"]
+  ]) {
+    const pool = makePool([[]]);
+    await getTaxLineSummaryForYear(pool, { businessId: "biz", year: 2026, region });
+    const { sql, params } = pool.queries[0];
+
+    assert.equal(params.length, 3);
+    assert.deepEqual(params, ["biz", "2026-01-01", "2026-12-31"]);
+    assert.match(sql, new RegExp(`${expectedColumn.replace(/\./g, "\\.")} AS tax_line`));
+    assert.match(sql, new RegExp(`GROUP BY c\\.id, c\\.name, c\\.kind, ${expectedColumn.replace(/\./g, "\\.")}`));
+    assert.match(sql, new RegExp(`ORDER BY ${expectedColumn.replace(/\./g, "\\.")} NULLS LAST`));
+    assert.doesNotMatch(sql, new RegExp(forbiddenColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+  }
+});
+
 test("getPayerSummaryForYear uses the provided fiscal year bounds", async () => {
   const pool = makePool([[]]);
   await getPayerSummaryForYear(pool, { businessId: "biz", year: 2026, region: "CA", fiscalYearStart: "07-01" });
@@ -133,6 +152,22 @@ test("getUnmappedCategories filters by region-specific column", async () => {
   const rows = await getUnmappedCategories(pool, { businessId: "biz", region: "US" });
   assert.equal(rows.length, 1);
   assert.ok(pool.queries[0].sql.includes("tax_map_us"));
+});
+
+test("getUnmappedCategories uses only closed tax-map columns, never request text", async () => {
+  for (const [region, expectedColumn, forbiddenPattern] of [
+    ["US", "tax_map_us", /tax_map_ca/i],
+    ["CA", "tax_map_ca", /tax_map_us/i],
+    ["tax_map_ca) OR TRUE --", "tax_map_us", /OR TRUE/i]
+  ]) {
+    const pool = makePool([[]]);
+    await getUnmappedCategories(pool, { businessId: "biz", region });
+    const { sql, params } = pool.queries[0];
+
+    assert.deepEqual(params, ["biz"]);
+    assert.match(sql, new RegExp(`\\(${expectedColumn} IS NULL OR TRIM\\(${expectedColumn}\\) = ''\\)`));
+    assert.doesNotMatch(sql, forbiddenPattern);
+  }
 });
 
 test("getTaxLineSummaryForYear applies 50% limitation to meals (US) and meals_entertainment (CA)", async () => {
