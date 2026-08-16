@@ -5,7 +5,7 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
@@ -45,33 +45,28 @@ function validateRecurringIdParam(id) {
 // instead of blocking the whole router (a downgraded user must not lose
 // visibility into their own templates).
 
-router.get("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+router.get("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const result = await pool.query(
-       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
-               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
-               created_at, updated_at
-       FROM recurring_transactions
-       WHERE business_id = $1
-         AND deleted_at IS NULL
-       ORDER BY active DESC, next_run_date ASC, created_at DESC
-       LIMIT 500`,
-      [businessId]
-    );
+  const result = await pool.query(
+     `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+             cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+             created_at, updated_at
+     FROM recurring_transactions
+     WHERE business_id = $1
+       AND deleted_at IS NULL
+     ORDER BY active DESC, next_run_date ASC, created_at DESC
+     LIMIT 500`,
+    [businessId]
+  );
 
-    res.json(result.rows.map(mapRecurringRow));
-  } catch (err) {
-    logError("GET /recurring error:", err);
-    res.status(500).json({ error: "Failed to load recurring transactions." });
-  }
-});
+  res.json(result.rows.map(mapRecurringRow));
+}));
 
-router.post("/", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async (req, res) => {
+router.post("/", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), asyncRoute(async (req, res) => {
   const validation = normalizeRecurringPayload(req.body);
   if (!validation.valid) {
-    return res.status(400).json({ error: validation.message });
+    throw new ApiError(400, validation.message);
   }
 
   const client = await pool.connect();
@@ -120,23 +115,22 @@ router.post("/", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async 
     res.status(201).json(mapRecurringRow(refreshed.rows[0]));
   } catch (err) {
     await client.query("ROLLBACK");
-    logError("POST /recurring error:", err);
-    const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
-    res.status(statusCode).json({
-      error: err.message || "Failed to create recurring transaction."
-    });
+    if (err instanceof RecurringTemplateValidationError) {
+      throw new ApiError(err.statusCode, err.message);
+    }
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
-router.put("/:id", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async (req, res) => {
+router.put("/:id", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), asyncRoute(async (req, res) => {
   if (!validateRecurringIdParam(req.params.id)) {
-    return res.status(400).json({ error: "Invalid recurring transaction id." });
+    throw new ApiError(400, "Invalid recurring transaction id.");
   }
   const validation = normalizeRecurringPayload(req.body);
   if (!validation.valid) {
-    return res.status(400).json({ error: validation.message });
+    throw new ApiError(400, validation.message);
   }
 
   const client = await pool.connect();
@@ -157,7 +151,7 @@ router.put("/:id", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), asyn
 
     if (!existing.rowCount) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Recurring transaction not found." });
+      throw new ApiError(404, "Recurring transaction not found.");
     }
 
     await verifyTemplateOwnership(client, businessId, normalized.accountId, normalized.categoryId);
@@ -214,69 +208,63 @@ router.put("/:id", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), asyn
     res.json(mapRecurringRow(refreshed.rows[0] || result.rows[0]));
   } catch (err) {
     await client.query("ROLLBACK");
-    logError("PUT /recurring/:id error:", err);
-    const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
-    res.status(statusCode).json({
-      error: err.message || "Failed to update recurring transaction."
-    });
+    if (err instanceof RecurringTemplateValidationError) {
+      throw new ApiError(err.statusCode, err.message);
+    }
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
-router.patch("/:id/status", async (req, res) => {
+router.patch("/:id/status", asyncRoute(async (req, res) => {
   if (!validateRecurringIdParam(req.params.id)) {
-    return res.status(400).json({ error: "Invalid recurring transaction id." });
+    throw new ApiError(400, "Invalid recurring transaction id.");
   }
   if (typeof req.body?.active !== "boolean") {
-    return res.status(400).json({ error: "active must be true or false" });
+    throw new ApiError(400, "active must be true or false");
   }
 
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    // Deactivating a template is always allowed (Basic must be able to pause
-    // what it already has); only reactivating requires Pro.
-    if (req.body.active) {
-      const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-      if (!hasFeatureAccess(subscription, FEATURE_KEYS.RECURRING_TRANSACTIONS)) {
-        return res.status(403).json({
-          error: "Reactivating recurring transactions is available on Pro.",
-          code: "feature_requires_plan",
-          feature: FEATURE_KEYS.RECURRING_TRANSACTIONS,
-          current_plan: subscription?.effectiveTier || "free",
-          required_plan: "v1",
-          required_plan_name: "Pro"
-        });
-      }
+  const businessId = await resolveBusinessIdForUser(req.user);
+  // Deactivating a template is always allowed (Basic must be able to pause
+  // what it already has); only reactivating requires Pro.
+  if (req.body.active) {
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, FEATURE_KEYS.RECURRING_TRANSACTIONS)) {
+      return res.status(403).json({
+        error: "Reactivating recurring transactions is available on Pro.",
+        code: "feature_requires_plan",
+        feature: FEATURE_KEYS.RECURRING_TRANSACTIONS,
+        current_plan: subscription?.effectiveTier || "free",
+        required_plan: "v1",
+        required_plan_name: "Pro"
+      });
     }
-    const result = await pool.query(
-       `UPDATE recurring_transactions
-       SET active = $1, updated_at = NOW()
-       WHERE id = $2 AND business_id = $3 AND deleted_at IS NULL
-       RETURNING *`,
-      [req.body.active, req.params.id, businessId]
-    );
-
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "Recurring transaction not found." });
-    }
-
-    res.json(mapRecurringRow(result.rows[0]));
-  } catch (err) {
-    logError("PATCH /recurring/:id/status error:", err);
-    res.status(500).json({ error: "Failed to update recurring status." });
   }
-});
+  const result = await pool.query(
+     `UPDATE recurring_transactions
+     SET active = $1, updated_at = NOW()
+     WHERE id = $2 AND business_id = $3 AND deleted_at IS NULL
+     RETURNING *`,
+    [req.body.active, req.params.id, businessId]
+  );
 
-router.post("/:id/run", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async (req, res) => {
+  if (!result.rowCount) {
+    throw new ApiError(404, "Recurring transaction not found.");
+  }
+
+  res.json(mapRecurringRow(result.rows[0]));
+}));
+
+router.post("/:id/run", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), asyncRoute(async (req, res) => {
   if (!validateRecurringIdParam(req.params.id)) {
-    return res.status(400).json({ error: "Invalid recurring transaction id." });
+    throw new ApiError(400, "Invalid recurring transaction id.");
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await materializeNextTemplateRun(businessId, req.params.id);
     if (!result.found) {
-      return res.status(404).json({ error: "Recurring transaction not found." });
+      throw new ApiError(404, "Recurring transaction not found.");
     }
 
     if (result.locked) {
@@ -294,7 +282,7 @@ router.post("/:id/run", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS),
       [req.params.id, businessId]
     );
     if (!template.rowCount) {
-      return res.status(404).json({ error: "Recurring transaction not found." });
+      throw new ApiError(404, "Recurring transaction not found.");
     }
 
     res.json({
@@ -302,106 +290,93 @@ router.post("/:id/run", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS),
       recurring: mapRecurringRow(template.rows[0])
     });
   } catch (err) {
-    logError("POST /recurring/:id/run error:", err);
-    const statusCode =
-      err instanceof RecurringTemplateValidationError || err instanceof BasicPlanLimitError
-        ? err.statusCode
-        : 500;
-    res.status(statusCode).json({
-      error: err.message || "Failed to post recurring transaction.",
-      ...(err instanceof BasicPlanLimitError ? { code: err.code, ...err.details } : {})
-    });
+    if (err instanceof RecurringTemplateValidationError) {
+      throw new ApiError(err.statusCode, err.message);
+    }
+    if (err instanceof BasicPlanLimitError) {
+      return res.status(err.statusCode).json({
+        error: err.message,
+        code: err.code,
+        ...err.details
+      });
+    }
+    throw err;
   }
-});
+}));
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", asyncRoute(async (req, res) => {
   if (!validateRecurringIdParam(req.params.id)) {
-    return res.status(400).json({ error: "Invalid recurring transaction id." });
+    throw new ApiError(400, "Invalid recurring transaction id.");
   }
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const result = await pool.query(
-      `UPDATE recurring_transactions
-       SET deleted_at = NOW(), updated_at = NOW()
-       WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL
-       RETURNING id, description`,
-      [req.params.id, businessId]
-    );
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const result = await pool.query(
+    `UPDATE recurring_transactions
+     SET deleted_at = NOW(), updated_at = NOW()
+     WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL
+     RETURNING id, description`,
+    [req.params.id, businessId]
+  );
 
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "Recurring transaction not found." });
-    }
-
-    res.json({
-      message: "Recurring transaction deleted.",
-      recurring: result.rows[0]
-    });
-  } catch (err) {
-    logError("DELETE /recurring/:id error:", err);
-    res.status(500).json({ error: "Failed to delete recurring transaction." });
+  if (!result.rowCount) {
+    throw new ApiError(404, "Recurring transaction not found.");
   }
-});
 
-router.post("/undo-delete", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const result = await pool.query(
-      `WITH latest_deleted AS (
-         SELECT id
-         FROM recurring_transactions
-         WHERE business_id = $1 AND deleted_at IS NOT NULL
-         ORDER BY deleted_at DESC, updated_at DESC, created_at DESC
-         LIMIT 1
-       )
-       UPDATE recurring_transactions
-       SET deleted_at = NULL, updated_at = NOW()
-       WHERE id IN (SELECT id FROM latest_deleted)
-       RETURNING *`,
-      [businessId]
-    );
+  res.json({
+    message: "Recurring transaction deleted.",
+    recurring: result.rows[0]
+  });
+}));
 
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "No recurring transaction is available to restore." });
-    }
+router.post("/undo-delete", requirePlanFeature(FEATURE_KEYS.RECURRING_TRANSACTIONS), asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const result = await pool.query(
+    `WITH latest_deleted AS (
+       SELECT id
+       FROM recurring_transactions
+       WHERE business_id = $1 AND deleted_at IS NOT NULL
+       ORDER BY deleted_at DESC, updated_at DESC, created_at DESC
+       LIMIT 1
+     )
+     UPDATE recurring_transactions
+     SET deleted_at = NULL, updated_at = NOW()
+     WHERE id IN (SELECT id FROM latest_deleted)
+     RETURNING *`,
+    [businessId]
+  );
 
-    res.json({
-      message: "Recurring transaction restored.",
-      recurring: mapRecurringRow(result.rows[0])
-    });
-  } catch (err) {
-    logError("POST /recurring/undo-delete error:", err);
-    res.status(500).json({ error: "Failed to restore recurring transaction." });
+  if (!result.rowCount) {
+    throw new ApiError(404, "No recurring transaction is available to restore.");
   }
-});
+
+  res.json({
+    message: "Recurring transaction restored.",
+    recurring: mapRecurringRow(result.rows[0])
+  });
+}));
 
 /**
  * GET /api/recurring/:id/runs
  * History of generated runs for a template (most recent first).
  */
-router.get("/:id/runs", async (req, res) => {
+router.get("/:id/runs", asyncRoute(async (req, res) => {
   if (!validateRecurringIdParam(req.params.id)) {
-    return res.status(400).json({ error: "Invalid recurring transaction id." });
+    throw new ApiError(400, "Invalid recurring transaction id.");
   }
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
-    const result = await pool.query(
-      `SELECT r.id, r.occurrence_date, r.transaction_id, r.created_at,
-              t.amount, t.cleared, t.description
-         FROM recurring_transaction_runs r
-    LEFT JOIN transactions t ON t.id = r.transaction_id
-        WHERE r.recurring_transaction_id = $1
-          AND r.business_id = $2
-        ORDER BY r.occurrence_date DESC, r.created_at DESC
-        LIMIT $3`,
-      [req.params.id, businessId, limit]
-    );
-    res.json({ runs: result.rows, count: result.rowCount });
-  } catch (err) {
-    logError("GET /recurring/:id/runs error:", err);
-    res.status(500).json({ error: "Failed to load recurring run history." });
-  }
-});
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+  const result = await pool.query(
+    `SELECT r.id, r.occurrence_date, r.transaction_id, r.created_at,
+            t.amount, t.cleared, t.description
+       FROM recurring_transaction_runs r
+  LEFT JOIN transactions t ON t.id = r.transaction_id
+      WHERE r.recurring_transaction_id = $1
+        AND r.business_id = $2
+      ORDER BY r.occurrence_date DESC, r.created_at DESC
+      LIMIT $3`,
+    [req.params.id, businessId, limit]
+  );
+  res.json({ runs: result.rows, count: result.rowCount });
+}));
 
 /**
  * GET /api/recurring/upcoming?days=30&per_template=5
@@ -409,60 +384,55 @@ router.get("/:id/runs", async (req, res) => {
  * that would land inside a locked accounting period. Useful for a "what's
  * about to post" sidebar / banner.
  */
-router.get("/upcoming", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 365);
-    const perTemplate = Math.min(Math.max(parseInt(req.query.per_template, 10) || 5, 1), 20);
-    const today = new Date().toISOString().slice(0, 10);
-    const cutoff = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+router.get("/upcoming", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 365);
+  const perTemplate = Math.min(Math.max(parseInt(req.query.per_template, 10) || 5, 1), 20);
+  const today = new Date().toISOString().slice(0, 10);
+  const cutoff = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const templatesResult = await pool.query(
-      `SELECT id, description, cadence, next_run_date, end_date, account_id,
-              category_id, type, amount, active
-        FROM recurring_transactions
-        WHERE business_id = $1 AND active = true AND deleted_at IS NULL
-        ORDER BY next_run_date ASC`,
-      [businessId]
-    );
+  const templatesResult = await pool.query(
+    `SELECT id, description, cadence, next_run_date, end_date, account_id,
+            category_id, type, amount, active
+      FROM recurring_transactions
+      WHERE business_id = $1 AND active = true AND deleted_at IS NULL
+      ORDER BY next_run_date ASC`,
+    [businessId]
+  );
 
-    const lockState = await loadAccountingLockState(pool, businessId);
-    const lockedThrough = lockState?.lockedThroughDate || null;
+  const lockState = await loadAccountingLockState(pool, businessId);
+  const lockedThrough = lockState?.lockedThroughDate || null;
 
-    const upcoming = [];
-    for (const template of templatesResult.rows) {
-      const projected = projectUpcomingOccurrences(template, perTemplate);
-      for (const date of projected) {
-        if (date < today) continue;
-        if (date > cutoff) break;
-        upcoming.push({
-          template_id: template.id,
-          description: template.description,
-          cadence: template.cadence,
-          amount: Number(template.amount || 0),
-          type: template.type,
-          account_id: template.account_id,
-          category_id: template.category_id,
-          occurrence_date: date,
-          locked_period: lockedThrough ? isDateLocked(date, lockedThrough) : false
-        });
-      }
+  const upcoming = [];
+  for (const template of templatesResult.rows) {
+    const projected = projectUpcomingOccurrences(template, perTemplate);
+    for (const date of projected) {
+      if (date < today) continue;
+      if (date > cutoff) break;
+      upcoming.push({
+        template_id: template.id,
+        description: template.description,
+        cadence: template.cadence,
+        amount: Number(template.amount || 0),
+        type: template.type,
+        account_id: template.account_id,
+        category_id: template.category_id,
+        occurrence_date: date,
+        locked_period: lockedThrough ? isDateLocked(date, lockedThrough) : false
+      });
     }
-    upcoming.sort((a, b) => (a.occurrence_date < b.occurrence_date ? -1 : 1));
-
-    const blockedCount = upcoming.filter((entry) => entry.locked_period).length;
-
-    res.json({
-      today,
-      cutoff,
-      upcoming,
-      blocked_by_locked_period: blockedCount,
-      template_count: templatesResult.rowCount
-    });
-  } catch (err) {
-    logError("GET /recurring/upcoming error:", err);
-    res.status(500).json({ error: "Failed to load upcoming recurring runs." });
   }
-});
+  upcoming.sort((a, b) => (a.occurrence_date < b.occurrence_date ? -1 : 1));
+
+  const blockedCount = upcoming.filter((entry) => entry.locked_period).length;
+
+  res.json({
+    today,
+    cutoff,
+    upcoming,
+    blocked_by_locked_period: blockedCount,
+    template_count: templatesResult.rowCount
+  });
+}));
 
 module.exports = router;

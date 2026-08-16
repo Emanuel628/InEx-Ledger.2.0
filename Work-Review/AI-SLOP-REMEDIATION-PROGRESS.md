@@ -333,6 +333,17 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   and wired `cryptoRoutes.test.js` to the central error helper. Focused suites:
   **14/14 passing**. Now **23 of 40** route files use the pattern. Phase score
   unchanged at **3.75/5** pending the remaining route families.
+  **Follow-up, same PR sequence**: converted `recurring.routes.js`. Read and
+  preserved the important non-boilerplate paths: transaction wrappers still keep
+  local `try/catch` only for rollback, `RecurringTemplateValidationError` still
+  maps to its expected status, Basic-plan limit responses still include their
+  extra detail fields, and locked-period responses remain explicit. Removed the
+  route-local logging/custom 500 responses from list/status/delete/restore/runs/
+  upcoming flows and moved unexpected failures to the central generic handler.
+  Updated `tests/recurringRouteValidation.test.js` to mount the central error
+  helper and assert that the rollback-on-materialization-failure path no longer
+  leaks the raw internal error message. Focused suite: **12/12 passing**. Now
+  **24 of 40** route files use the pattern. Phase score unchanged at **3.75/5**.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1481,3 +1492,18 @@ test that had been failing identically since PR 13).
   and mounted `cryptoRoutes.test.js` with the central error helper. Focused
   suites: **14/14 passing**. Now **23 of 40** route files use the pattern;
   Phase 4 remains **3.75/5** pending the larger route families.
+
+- **PR 29** (`chore/expand-api-error-rollout-8`): same phase, same item,
+  no new checklist points. Converted `recurring.routes.js` to the shared
+  `asyncRoute`/`ApiError` pattern while keeping local `try/catch` only where it
+  still does real work: transaction rollback, recurring-template domain error
+  translation, and Basic-plan limit detail preservation.
+
+  Removed route-local logging/custom 500 responses from list/status/delete/
+  restore/runs/upcoming handlers and moved unexpected failures to the central
+  generic handler. Preserved specific invalid-id, validation, not-found,
+  locked-period, plan-gate, and Basic-limit responses. Updated
+  `tests/recurringRouteValidation.test.js` to mount the central error helper
+  and assert that the rollback-on-materialization-failure path no longer leaks
+  the raw internal error message. Focused suite: **12/12 passing**. Now
+  **24 of 40** route files use the pattern; Phase 4 remains **3.75/5**.

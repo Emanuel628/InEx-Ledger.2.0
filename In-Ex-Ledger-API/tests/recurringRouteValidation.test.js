@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/recurring.routes.js");
 const REQUIRE_PLAN_FEATURE_PATH = require.resolve("../middleware/requirePlanFeature.js");
 
@@ -210,6 +212,7 @@ function loadRecurringRouter(options = {}) {
     const app = express();
     app.use(express.json());
     app.use("/api/recurring", router);
+    attachCentralErrorHandler(app);
     return {
       app,
       state,
@@ -409,7 +412,7 @@ test("recurring POST rolls back template creation when initial materialization f
       .send({ amount: 1 });
 
     assert.equal(response.status, 500);
-    assert.match(response.body.error, /materialization failed/i);
+    assert.equal(response.body.error, "Internal server error");
     assert.equal(fixture.state.queries.some((sql) => /COMMIT/i.test(String(sql))), false);
     assert.equal(fixture.state.queries.some((sql) => /ROLLBACK/i.test(String(sql))), true);
   } finally {
