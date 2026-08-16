@@ -87,7 +87,7 @@ function loadBillingRouter(options = {}) {
               return { rowCount: state.reserveResult ? 1 : 0 };
             }
             if (/DELETE FROM stripe_webhook_events/i.test(sql)) {
-              state.releaseCalls.push(sql);
+              state.releaseCalls.push({ sql, params });
               return { rowCount: 1 };
             }
             if (/SELECT business_id\s+FROM business_subscriptions\s+WHERE stripe_customer_id = \$1/i.test(sql)) {
@@ -404,7 +404,8 @@ test("webhook: processing failures return 500 so Stripe can retry and release th
 
     const res = await sendWebhook(fixture.app, event);
     assert.equal(res.status, 500);
-    assert.equal(fixture.state.releaseCalls.length, 1, "reserved webhook id should be released on processing failure");
+    const eventReleaseCalls = fixture.state.releaseCalls.filter((call) => call.params[0] === event.id);
+    assert.equal(eventReleaseCalls.length, 1, "reserved webhook id should be released on processing failure");
     assert.equal(fixture.state.syncCalls.length, 0);
   } finally {
     fixture.cleanup();
