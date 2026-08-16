@@ -721,6 +721,23 @@ test that had been failing identically since PR 13).
 - [x] Export/receipt cleanup paths made explicit and testable (export history deletion commits DB cleanup before best-effort file cleanup and returns cleanup status; receipt delete pending-rename path rechecked)
 - [x] Required vs. best-effort side effects separated (completed export generation no longer fails or waits on audit/email side effects; failures are logged)
 
+**NEXT UP for Phase 9 (to reach 5/5):** finish the email dedupe item. Two
+families remain, in priority order:
+1. `exportEmailService.js` (`sendExportGeneratedEmail` / `sendExportFailedEmail`,
+   called from `routes/exports.routes.js`) — no dedupe guard today, so a
+   client-side retry of the export POST resends the email. Likely the more
+   contained fix: wire the same `email_delivery_dedupe` pattern used in
+   `invoiceOwnerEmailService.js` (commit `551fc223`) into these two send
+   paths. `sendExportStaleEmail` in the same file is lower risk (already
+   guarded by an atomic `UPDATE ... WHERE status <> 'invalidated'`).
+2. `emailReminderService.js` (driven by the OS-level cron script
+   `scripts/send-email-reminders.js`) — uses a non-atomic check-then-act
+   (`loadReminderState` SELECT then `saveReminderState` upsert) with no lock
+   between them, so a cron overlap could double-send. Needs either the durable
+   dedupe table or an atomic claim (compare-and-swap), similar to
+   `usageLimitEmailService.js`'s `claimThresholds()`, which is already
+   race-safe and needs no further work.
+
 ## Phase 10 - Documentation And Final Stabilization — 0 / 4
 - [ ] Source-of-truth docs updated to match code
 - [ ] Stale `Work-*` docs contradicting runtime behavior removed/archived
