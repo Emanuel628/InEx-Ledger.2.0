@@ -11,7 +11,7 @@ const ROUTE_PATH = require.resolve("../routes/internalSupport.routes.js");
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const BUSINESS_ID = "22222222-2222-4222-8222-222222222222";
 
-function loadInternalSupportRouterFixture() {
+function loadInternalSupportRouterFixture({ queryImpl } = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = { queryCount: 0 };
 
@@ -21,6 +21,9 @@ function loadInternalSupportRouterFixture() {
         pool: {
           async query(sql, params = []) {
             state.queryCount += 1;
+            if (queryImpl) {
+              return queryImpl(sql, params);
+            }
             if (/SELECT id\s+FROM users\s+WHERE lower\(email\) = lower\(\$1\)/i.test(sql)) {
               if (String(params[0]).toLowerCase() === "owner@example.com") {
                 return { rows: [{ id: USER_ID }], rowCount: 1 };
@@ -151,6 +154,42 @@ test("internal support user lookup returns subscription and locale context", asy
     assert.equal(response.body?.item?.subscriptionStatus, "active");
     assert.equal(response.body?.item?.region, "US");
     assert.equal(response.body?.item?.language, "en");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("internal support user lookup returns 404 with the support envelope", async () => {
+  process.env.INEX_LEDGER_SUPPORT_SECRET = "support-secret-test";
+  const fixture = loadInternalSupportRouterFixture();
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/internal/support/users/missing@example.com")
+      .set("x-support-secret", "support-secret-test");
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { ok: false, message: "User not found." });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("internal support routes hide unexpected failures behind the support envelope", async () => {
+  process.env.INEX_LEDGER_SUPPORT_SECRET = "support-secret-test";
+  const fixture = loadInternalSupportRouterFixture({
+    queryImpl: async () => {
+      throw new Error("connection reset");
+    }
+  });
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/internal/support/users/owner@example.com")
+      .set("x-support-secret", "support-secret-test");
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { ok: false, message: "Internal server error" });
   } finally {
     fixture.cleanup();
   }

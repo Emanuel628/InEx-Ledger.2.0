@@ -3,10 +3,11 @@
 const express = require("express");
 const { pool } = require("../db.js");
 const { verifyUnsubscribeToken } = require("../services/emailPreferencesService.js");
+const { asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/", asyncRoute(async (req, res) => {
   const token = String(req.query?.token || "").trim();
   const payload = verifyUnsubscribeToken(token, "optional_emails");
   if (!payload?.u) {
@@ -206,6 +207,6 @@ router.get("/", async (req, res) => {
   </main>
 </body>
 </html>`);
-});
+}));
 
 module.exports = router;

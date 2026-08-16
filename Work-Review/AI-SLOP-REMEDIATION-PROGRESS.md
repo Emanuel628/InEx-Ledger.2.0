@@ -318,6 +318,21 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   to **3.75/5**; overall moves from **31.0/54 (~57%)** to
   **31.25/54 (~58%)**. Checklist item remains partial because half the route
   files still need conversion.
+  **Follow-up, same PR sequence**: converted 3 more route files —
+  `internalSupport.routes.js`, `unsubscribe.routes.js`, and
+  `crypto.routes.js`. `internalSupport.routes.js` now uses `asyncRoute` and
+  `ApiError` across its support lookup handlers while preserving its support
+  console envelope (`{ ok: false, message }`) through one router-level error
+  mapper; expected 400/404 cases stay specific, unexpected failures return a
+  generic 500. `unsubscribe.routes.js` now wraps its async opt-out write so
+  database failures reach the central handler instead of relying on Express 4
+  to catch an async rejection. `crypto.routes.js` now uses `ApiError(503, ...)`
+  for an unavailable export public key while keeping the existing parse-failure
+  logging and key-rotation behavior intact. Added
+  `tests/unsubscribeRoutes.test.js`, expanded `internalSupportRoutes.test.js`,
+  and wired `cryptoRoutes.test.js` to the central error helper. Focused suites:
+  **14/14 passing**. Now **23 of 40** route files use the pattern. Phase score
+  unchanged at **3.75/5** pending the remaining route families.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1448,3 +1463,21 @@ test that had been failing identically since PR 13).
   `npm run test:all`: **1506/1506 passing** (plus 3/3 ASVS controls). Now
   **20 of 40** route files use the pattern. Phase 4: **3.5/5 → 3.75/5**;
   overall: **31.0/54 (~57%) → 31.25/54 (~58%)**.
+
+- **PR 28** (`chore/expand-api-error-rollout-7`): same phase, same item,
+  no new checklist points. Converted `internalSupport.routes.js`,
+  `unsubscribe.routes.js`, and `crypto.routes.js` to the shared
+  `asyncRoute`/`ApiError` pattern where those routes have async or expected
+  error branches.
+
+  `internalSupport.routes.js` keeps its support-console response contract
+  (`{ ok: false, message }`) through one router-level error mapper rather than
+  per-handler `try/catch` blocks; expected 400/404s remain specific and
+  unexpected failures become generic 500s. `unsubscribe.routes.js` now wraps
+  its async opt-out write so database errors reach the central handler.
+  `crypto.routes.js` now throws `ApiError(503, ...)` for unavailable export
+  public key configuration while preserving parse-failure logging. Added
+  `tests/unsubscribeRoutes.test.js`, expanded `internalSupportRoutes.test.js`,
+  and mounted `cryptoRoutes.test.js` with the central error helper. Focused
+  suites: **14/14 passing**. Now **23 of 40** route files use the pattern;
+  Phase 4 remains **3.75/5** pending the larger route families.

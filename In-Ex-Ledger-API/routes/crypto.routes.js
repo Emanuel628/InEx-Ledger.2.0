@@ -1,6 +1,7 @@
 const express = require("express");
 const { logError } = require("../utils/logger.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 const exportPublicKeyLimiter = createDataApiLimiter({
@@ -37,11 +38,11 @@ function getParsedExportPublicKey() {
   }
 }
 
-router.get("/export-public-key", exportPublicKeyLimiter, (req, res) => {
+router.get("/export-public-key", exportPublicKeyLimiter, asyncRoute((req, res) => {
   const parsedKey = getParsedExportPublicKey();
   const keyKid = process.env.EXPORT_PUBLIC_KEY_KID || "export-key-1";
   if (!parsedKey) {
-    return res.status(503).json({ error: "Export public key not configured." });
+    throw new ApiError(503, "Export public key not configured.");
   }
 
   res.setHeader("Cache-Control", "public, max-age=60, must-revalidate");
@@ -55,6 +56,6 @@ router.get("/export-public-key", exportPublicKeyLimiter, (req, res) => {
     kid: keyKid,
     expiresAt: Date.now() + 60_000
   });
-});
+}));
 
 module.exports = router;

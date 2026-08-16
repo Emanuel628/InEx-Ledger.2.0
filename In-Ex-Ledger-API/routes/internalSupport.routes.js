@@ -7,7 +7,8 @@ const {
   getSubscriptionSnapshotForBusiness
 } = require("../services/subscriptionService.js");
 const { getTrustedClientIp } = require("../services/requestIpService.js");
-const { logInfo } = require("../utils/logger.js");
+const { logError, logInfo } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 // The limiter runs ahead of the secret check so failed-secret attempts count
@@ -90,132 +91,134 @@ async function fetchUserContextById(userId) {
   };
 }
 
-router.get("/users/:email", async (req, res) => {
-  try {
-    const email = String(req.params.email || "").trim();
-    const userLookup = await pool.query(
-      `SELECT id
-         FROM users
-        WHERE lower(email) = lower($1)
-        LIMIT 1`,
-      [email]
-    );
-    const userId = userLookup.rows[0]?.id || null;
-    if (!userId) {
-      return res.status(404).json({ ok: false, message: "User not found." });
-    }
-
-    const context = await fetchUserContextById(userId);
-    if (!context) {
-      return res.status(404).json({ ok: false, message: "User not found." });
-    }
-
-    return res.json({
-      ok: true,
-      item: {
-        userId: context.user.id,
-        email: context.user.email,
-        displayName: context.user.display_name,
-        emailVerified: context.user.email_verified === true,
-        role: context.user.role || "user",
-        plan: context.planSnapshot.plan,
-        subscriptionStatus: context.planSnapshot.subscriptionStatus,
-        region: context.contextBusiness?.region || "US",
-        language: context.contextBusiness?.language || "en",
-        createdAt: new Date(context.user.created_at).toISOString()
-      }
-    });
-  } catch (_err) {
-    return res.status(500).json({ ok: false, message: "Failed to load user." });
+router.get("/users/:email", asyncRoute(async (req, res) => {
+  const email = String(req.params.email || "").trim();
+  const userLookup = await pool.query(
+    `SELECT id
+       FROM users
+      WHERE lower(email) = lower($1)
+      LIMIT 1`,
+    [email]
+  );
+  const userId = userLookup.rows[0]?.id || null;
+  if (!userId) {
+    throw new ApiError(404, "User not found.");
   }
-});
 
-router.get("/businesses/:businessId", async (req, res) => {
+  const context = await fetchUserContextById(userId);
+  if (!context) {
+    throw new ApiError(404, "User not found.");
+  }
+
+  res.json({
+    ok: true,
+    item: {
+      userId: context.user.id,
+      email: context.user.email,
+      displayName: context.user.display_name,
+      emailVerified: context.user.email_verified === true,
+      role: context.user.role || "user",
+      plan: context.planSnapshot.plan,
+      subscriptionStatus: context.planSnapshot.subscriptionStatus,
+      region: context.contextBusiness?.region || "US",
+      language: context.contextBusiness?.language || "en",
+      createdAt: new Date(context.user.created_at).toISOString()
+    }
+  });
+}));
+
+router.get("/businesses/:businessId", asyncRoute(async (req, res) => {
   const businessId = String(req.params.businessId || "").trim();
   if (!UUID_RE.test(businessId)) {
-    return res.status(400).json({ ok: false, message: "Invalid business ID." });
+    throw new ApiError(400, "Invalid business ID.");
   }
 
-  try {
-    const businessResult = await pool.query(
-      `SELECT b.id,
-              b.name,
-              b.user_id,
-              b.region,
-              b.language,
-              b.created_at,
-              u.email AS owner_email,
-              u.active_business_id
-         FROM businesses b
-         JOIN users u
-           ON u.id = b.user_id
-        WHERE b.id = $1
-        LIMIT 1`,
-      [businessId]
-    );
-    const business = businessResult.rows[0] || null;
-    if (!business) {
-      return res.status(404).json({ ok: false, message: "Business not found." });
+  const businessResult = await pool.query(
+    `SELECT b.id,
+            b.name,
+            b.user_id,
+            b.region,
+            b.language,
+            b.created_at,
+            u.email AS owner_email,
+            u.active_business_id
+       FROM businesses b
+       JOIN users u
+         ON u.id = b.user_id
+      WHERE b.id = $1
+      LIMIT 1`,
+    [businessId]
+  );
+  const business = businessResult.rows[0] || null;
+  if (!business) {
+    throw new ApiError(404, "Business not found.");
+  }
+
+  const billingBusinessId =
+    await findBillingAnchorBusinessIdForUser(
+      business.user_id,
+      business.active_business_id || business.id
+    ) || business.id;
+  const subscription = billingBusinessId
+    ? await getSubscriptionSnapshotForBusiness(billingBusinessId)
+    : null;
+  const planSnapshot = buildPlanSnapshot(subscription);
+
+  res.json({
+    ok: true,
+    item: {
+      businessId: business.id,
+      businessName: business.name,
+      ownerUserId: business.user_id,
+      ownerEmail: business.owner_email,
+      plan: planSnapshot.plan,
+      subscriptionStatus: planSnapshot.subscriptionStatus,
+      includedBusinesses: 1,
+      additionalBusinessSlots: planSnapshot.additionalBusinessSlots,
+      businessLimit: planSnapshot.businessLimit,
+      region: business.region || "US",
+      language: business.language || "en",
+      createdAt: new Date(business.created_at).toISOString()
     }
+  });
+}));
 
-    const billingBusinessId =
-      await findBillingAnchorBusinessIdForUser(
-        business.user_id,
-        business.active_business_id || business.id
-      ) || business.id;
-    const subscription = billingBusinessId
-      ? await getSubscriptionSnapshotForBusiness(billingBusinessId)
-      : null;
-    const planSnapshot = buildPlanSnapshot(subscription);
-
-    return res.json({
-      ok: true,
-      item: {
-        businessId: business.id,
-        businessName: business.name,
-        ownerUserId: business.user_id,
-        ownerEmail: business.owner_email,
-        plan: planSnapshot.plan,
-        subscriptionStatus: planSnapshot.subscriptionStatus,
-        includedBusinesses: 1,
-        additionalBusinessSlots: planSnapshot.additionalBusinessSlots,
-        businessLimit: planSnapshot.businessLimit,
-        region: business.region || "US",
-        language: business.language || "en",
-        createdAt: new Date(business.created_at).toISOString()
-      }
-    });
-  } catch (_err) {
-    return res.status(500).json({ ok: false, message: "Failed to load business." });
-  }
-});
-
-router.get("/users/:userId/subscription", async (req, res) => {
+router.get("/users/:userId/subscription", asyncRoute(async (req, res) => {
   const userId = String(req.params.userId || "").trim();
   if (!UUID_RE.test(userId)) {
-    return res.status(400).json({ ok: false, message: "Invalid user ID." });
+    throw new ApiError(400, "Invalid user ID.");
   }
 
-  try {
-    const context = await fetchUserContextById(userId);
-    if (!context) {
-      return res.status(404).json({ ok: false, message: "User not found." });
+  const context = await fetchUserContextById(userId);
+  if (!context) {
+    throw new ApiError(404, "User not found.");
+  }
+
+  res.json({
+    ok: true,
+    item: {
+      userId: context.user.id,
+      plan: context.planSnapshot.plan,
+      subscriptionStatus: context.planSnapshot.subscriptionStatus,
+      currentPeriodEnd: context.planSnapshot.currentPeriodEnd,
+      cancelAtPeriodEnd: context.planSnapshot.cancelAtPeriodEnd,
+      additionalBusinessSlots: context.planSnapshot.additionalBusinessSlots
     }
+  });
+}));
 
-    return res.json({
-      ok: true,
-      item: {
-        userId: context.user.id,
-        plan: context.planSnapshot.plan,
-        subscriptionStatus: context.planSnapshot.subscriptionStatus,
-        currentPeriodEnd: context.planSnapshot.currentPeriodEnd,
-        cancelAtPeriodEnd: context.planSnapshot.cancelAtPeriodEnd,
-        additionalBusinessSlots: context.planSnapshot.additionalBusinessSlots
-      }
+router.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) {
+    logError("Internal support route error", {
+      status,
+      method: req.method,
+      path: req.path,
+      message: err.message
     });
-  } catch (_err) {
-    return res.status(500).json({ ok: false, message: "Failed to load subscription." });
   }
+  const message = status < 500 ? err.message : "Internal server error";
+  res.status(status).json({ ok: false, message });
 });
 
 module.exports = router;

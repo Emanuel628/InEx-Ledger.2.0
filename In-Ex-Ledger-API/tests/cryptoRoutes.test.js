@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const CRYPTO_ROUTE_PATH = require.resolve("../routes/crypto.routes.js");
 
 function loadCryptoRouter() {
@@ -44,6 +46,7 @@ function loadCryptoRouter() {
   const router = require("../routes/crypto.routes.js");
   const app = express();
   app.use("/api/crypto", router);
+  attachCentralErrorHandler(app);
 
   return {
     app,
