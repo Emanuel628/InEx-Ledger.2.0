@@ -258,6 +258,22 @@ test("v3 transactions keeps review queue and review labels outside the page cont
   assert.match(reviewSource, /\^mapped\$/i);
 });
 
+test("v3 transactions page data orchestration stays in its hook", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const hookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useTransactionsPageData.ts"), "utf8");
+
+  assert.match(pageSource, /import useTransactionsPageData from '\.\.\/hooks\/useTransactionsPageData'/);
+  assert.match(pageSource, /\} = useTransactionsPageData\(\)/);
+  assert.doesNotMatch(pageSource, /loadTransactionPageData/);
+  assert.doesNotMatch(pageSource, /loadTransactionUndoStatus/);
+  assert.doesNotMatch(pageSource, /loadAccountingLock/);
+  assert.doesNotMatch(pageSource, /TRANSACTION_PAGE_SIZE_KEY/);
+  assert.match(hookSource, /loadTransactionPageData\(\{/);
+  assert.match(hookSource, /loadTransactionUndoStatus/);
+  assert.match(hookSource, /loadAccountingLock\(\)\.catch\(\(\) => null\)/);
+  assert.match(hookSource, /TRANSACTION_PAGE_SIZE_KEY/);
+});
+
 test("v3 frontend dependencies are pinned", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "frontend-v3", "package.json"), "utf8"));
   for (const section of ["dependencies", "devDependencies"]) {
@@ -469,6 +485,7 @@ test("v3 transactions restores tax estimate, review fixes, receipt upload, recur
 test("v3 transactions render review reasons safely and wire filter date range plus category handoff", () => {
   const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const hookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useTransactionsPageData.ts"), "utf8");
   const reviewSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionReview.ts"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
 
@@ -483,12 +500,12 @@ test("v3 transactions render review reasons safely and wire filter date range pl
   assert.doesNotMatch(apiSource, /params\.set\('account_name'/);
   assert.doesNotMatch(apiSource, /params\.set\('category_name'/);
   assert.doesNotMatch(apiSource, /transactions\.data\.length\)/);
-  assert.match(pageSource, /loadTransactionPageData\(\{/);
-  assert.match(pageSource, /limit: pageSize/);
-  assert.match(pageSource, /offset: \(currentPage - 1\) \* pageSize/);
-  assert.match(pageSource, /categoryId: categoryFilter/);
-  assert.match(pageSource, /accountId: accountFilter/);
-  assert.match(pageSource, /function updateFilter/);
+  assert.match(hookSource, /loadTransactionPageData\(\{/);
+  assert.match(hookSource, /limit: pageSize/);
+  assert.match(hookSource, /offset: \(currentPage - 1\) \* pageSize/);
+  assert.match(hookSource, /categoryId: categoryFilter/);
+  assert.match(hookSource, /accountId: accountFilter/);
+  assert.match(hookSource, /function updateFilter/);
   assert.match(pageSource, /getPaginationPages\(safeCurrentPage, totalPages\)/);
   assert.doesNotMatch(pageSource, /Array\.from\(\{ length: totalPages \}, \(_, index\) => index \+ 1\)\.slice\(0, 5\)/);
   assert.match(pageSource, /onStartDateChange=\{\(value\) => updateFilter\(setStartDateFilter, value\)\}/);
@@ -650,9 +667,10 @@ test("v3 business settings expose the live accounting lock and hide the old busi
 
 test("v3 transactions disable protected actions for locked accounting periods", () => {
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const hookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useTransactionsPageData.ts"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
 
-  assert.match(pageSource, /loadAccountingLock/);
+  assert.match(hookSource, /loadAccountingLock/);
   assert.match(pageSource, /function isTransactionLocked/);
   assert.match(pageSource, /rowLocked/);
   assert.match(pageSource, /row-action-menu-note/);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -31,12 +31,11 @@ import ReviewQueuePanel from '../components/transactions/ReviewQueuePanel'
 import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
+import useTransactionsPageData from '../hooks/useTransactionsPageData'
 import {
   deleteTransaction,
   deleteRecurringTemplate,
   importTransactionsCsv,
-  loadTransactionPageData,
-  loadTransactionUndoStatus,
   runRecurringTemplate,
   saveRecurringTemplateDraft,
   saveTransactionDraft,
@@ -44,21 +43,17 @@ import {
   updateRecurringTemplateStatus,
   updateTransactionReceiptStatus,
   type AccountOption,
-  type BusinessTaxProfile,
   type CategoryOption,
   type Transaction,
   type CsvImportResult,
   type CsvSkippedRow,
   type RecurringTemplate,
-  type ReviewQueueResponse,
   type TransactionDraft,
   type TransactionStatus,
 } from '../lib/transactionsApi'
 import { uploadReceipt } from '../lib/receiptsApi'
-import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
+import type { AccountingLock } from '../lib/settingsApi'
 import { hasReviewFor, normalizeReviewLabels, reviewLabelsFor, reviewText } from '../lib/transactionReview'
-
-const TRANSACTION_PAGE_SIZE_KEY = 'inex-v3-transactions-page-size'
 
 function Transactions(props: PageProps) {
   const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
@@ -67,77 +62,53 @@ function Transactions(props: PageProps) {
   const [recoveryRow, setRecoveryRow] = useState<{ row: CsvSkippedRow; accountName: string } | null>(null)
   const [recoveredSkipRowKeys, setRecoveredSkipRowKeys] = useState<Set<number>>(new Set())
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
-  const [transactionRows, setTransactionRows] = useState<Transaction[]>([])
-  const [transactionTotal, setTransactionTotal] = useState(0)
-  const [transactionSummary, setTransactionSummary] = useState({ incomeTotal: 0, expenseTotal: 0, transactionCount: 0 })
-  const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
-  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
-  const [taxProfile, setTaxProfile] = useState<BusinessTaxProfile | null>(null)
-  const [accountingLock, setAccountingLock] = useState<AccountingLock | null>(null)
-  const [reviewQueue, setReviewQueue] = useState<ReviewQueueResponse>({ queue: [] })
-  const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([])
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [receiptTransaction, setReceiptTransaction] = useState<Transaction | null>(null)
   const [receiptStatusTransaction, setReceiptStatusTransaction] = useState<Transaction | null>(null)
   const [recurringEditorTemplate, setRecurringEditorTemplate] = useState<RecurringTemplate | null | 'new'>(null)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
-  const [loadingData, setLoadingData] = useState(true)
-  const [dataError, setDataError] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [csvImportOpen, setCsvImportOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('All')
-  const [statusFilter, setStatusFilter] = useState('All')
-  const [accountFilter, setAccountFilter] = useState('All')
-  const [startDateFilter, setStartDateFilter] = useState('')
-  const [endDateFilter, setEndDateFilter] = useState('')
-  const [pageSize, setPageSize] = useState(readSavedPageSize)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [undoCount, setUndoCount] = useState(0)
-  const [undoMessage, setUndoMessage] = useState('')
   const [noticeVisible, dismissNotice] = useSessionDismissed('transactions-review')
   useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
-
-  const refreshPageData = useCallback(async () => {
-    setLoadingData(true)
-    setDataError('')
-    try {
-      const [pageData, lockState] = await Promise.all([
-        loadTransactionPageData({
-          limit: pageSize,
-          offset: (currentPage - 1) * pageSize,
-          search: searchTerm,
-          categoryId: categoryFilter,
-          accountId: accountFilter,
-          status: statusFilter,
-          startDate: startDateFilter,
-          endDate: endDateFilter,
-        }),
-        loadAccountingLock().catch(() => null),
-      ])
-      setTransactionRows(pageData.transactions)
-      setTransactionTotal(pageData.total)
-      setTransactionSummary(pageData.summary)
-      setAccountOptions(pageData.accounts)
-      setCategoryOptions(pageData.categories)
-      setTaxProfile(pageData.taxProfile)
-      setAccountingLock(lockState)
-      setReviewQueue(pageData.reviewQueue)
-      setRecurringTemplates(pageData.recurringTemplates)
-      void loadTransactionUndoStatus().then(setUndoCount).catch(() => setUndoCount(0))
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to load transactions.')
-      setTransactionRows([])
-      setTransactionTotal(0)
-      setTransactionSummary({ incomeTotal: 0, expenseTotal: 0, transactionCount: 0 })
-      setAccountOptions([])
-      setCategoryOptions([])
-      setReviewQueue({ queue: [] })
-      setRecurringTemplates([])
-    } finally {
-      setLoadingData(false)
-    }
-  }, [accountFilter, categoryFilter, currentPage, endDateFilter, pageSize, searchTerm, startDateFilter, statusFilter])
+  const {
+    transactionRows,
+    setTransactionRows,
+    transactionTotal,
+    transactionSummary,
+    accountOptions,
+    categoryOptions,
+    taxProfile,
+    accountingLock,
+    reviewQueue,
+    recurringTemplates,
+    setRecurringTemplates,
+    loadingData,
+    dataError,
+    setDataError,
+    searchTerm,
+    setSearchTerm,
+    categoryFilter,
+    setCategoryFilter,
+    statusFilter,
+    setStatusFilter,
+    accountFilter,
+    setAccountFilter,
+    startDateFilter,
+    setStartDateFilter,
+    endDateFilter,
+    setEndDateFilter,
+    pageSize,
+    currentPage,
+    setCurrentPage,
+    undoCount,
+    setUndoCount,
+    undoMessage,
+    setUndoMessage,
+    refreshPageData,
+    updatePageSize,
+    updateFilter,
+  } = useTransactionsPageData()
 
   const filteredRows = transactionRows
   const totalRows = transactionTotal || transactionSummary.transactionCount
@@ -162,24 +133,6 @@ function Transactions(props: PageProps) {
     || filtersOpen
     || csvImportOpen,
   )
-
-  function updatePageSize(value: number) {
-    const normalized = [10, 20, 50].includes(value) ? value : 20
-    setCurrentPage(1)
-    setPageSize(normalized)
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(TRANSACTION_PAGE_SIZE_KEY, String(normalized))
-    }
-  }
-
-  function updateFilter(setter: (value: string) => void, value: string) {
-    setCurrentPage(1)
-    setter(value)
-  }
-
-  useEffect(() => {
-    void refreshPageData()
-  }, [refreshPageData])
 
   async function restoreDeletedTransaction() {
     setDataError('')
@@ -1606,12 +1559,6 @@ function normalizeDateOnly(value?: string | null) {
 
 function getActiveCurrency() {
   return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
-}
-
-function readSavedPageSize() {
-  if (typeof window === 'undefined') return 20
-  const saved = Number(window.localStorage.getItem(TRANSACTION_PAGE_SIZE_KEY))
-  return [10, 20, 50].includes(saved) ? saved : 20
 }
 
 function formatIsoDate(value: string) {
