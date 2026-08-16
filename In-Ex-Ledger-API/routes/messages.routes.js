@@ -5,32 +5,44 @@ const multer = require("multer");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
-const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const {
+  createDataApiLimiter,
+} = require("../middleware/rate-limit.middleware.js");
+const { logInfo } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const { Resend } = require("resend");
-const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
-const { getInvoiceFromEmail, buildReplyToAddress } = require("../services/invoiceEmailService.js");
+const {
+  resolveBusinessIdForUser,
+} = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  getInvoiceFromEmail,
+  buildReplyToAddress,
+} = require("../services/invoiceEmailService.js");
 const {
   buildSupportReplyToAddress,
   getSupportFromEmail,
-  getSupportToEmail
+  getSupportToEmail,
 } = require("../services/supportEmailService.js");
 const {
   AUDIT_ACTIONS,
-  recordAuditEventForRequest
+  recordAuditEventForRequest,
 } = require("../services/auditEventService.js");
-
 
 const router = express.Router();
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createDataApiLimiter({ max: 120 }));
 
-const VALID_MESSAGE_TYPES = new Set(["it_support", "general", "support_request"]);
+const VALID_MESSAGE_TYPES = new Set([
+  "it_support",
+  "general",
+  "support_request",
+]);
 const MAX_SUBJECT_LEN = 200;
 const MAX_BODY_LEN = 10000;
 const MAX_PAGE_SIZE = 50;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -47,17 +59,31 @@ const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
-  ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif",
-  ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx"
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".heic",
+  ".heif",
+  ".txt",
+  ".csv",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
 ]);
 
 function attachmentFileFilter(_req, file, cb) {
   const ext = path.extname(String(file?.originalname || "")).toLowerCase();
   const mime = String(file?.mimetype || "").toLowerCase();
-  if (!ALLOWED_ATTACHMENT_MIME_TYPES.has(mime) || !ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)) {
+  if (
+    !ALLOWED_ATTACHMENT_MIME_TYPES.has(mime) ||
+    !ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)
+  ) {
     const error = new Error("Unsupported attachment type.");
     error.status = 400;
     return cb(error);
@@ -68,14 +94,14 @@ function attachmentFileFilter(_req, file, cb) {
 const messageAttachmentsUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_ATTACHMENT_BYTES, files: MAX_MESSAGE_ATTACHMENTS },
-  fileFilter: attachmentFileFilter
+  fileFilter: attachmentFileFilter,
 });
 
 function buildResendAttachments(files) {
   return (files || []).map((file) => ({
     filename: sanitizeAttachmentFilename(file.originalname),
     content: file.buffer,
-    contentType: file.mimetype
+    contentType: file.mimetype,
   }));
 }
 
@@ -84,7 +110,9 @@ function isUuid(value) {
 }
 
 function sanitizeAttachmentFilename(name) {
-  const base = path.basename(String(name || "attachment")).replace(/[^a-zA-Z0-9._-]/g, "_");
+  const base = path
+    .basename(String(name || "attachment"))
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
   return base.slice(0, 150) || "attachment";
 }
 
@@ -103,7 +131,9 @@ function parseEmailList(value) {
   const seen = new Set();
 
   for (const item of values) {
-    const email = String(item || "").trim().toLowerCase();
+    const email = String(item || "")
+      .trim()
+      .toLowerCase();
     if (!email) continue;
     if (!isEmail(email)) {
       return { ok: false, invalid: email };
@@ -133,10 +163,16 @@ function escapeHtml(value) {
 
 function mapMessageRow(row, viewerId) {
   const isSender = row.sender_id === viewerId;
-  const isArchived = isSender ? row.is_archived_by_sender : row.is_archived_by_receiver;
+  const isArchived = isSender
+    ? row.is_archived_by_sender
+    : row.is_archived_by_receiver;
   // For inbound external email (e.g. invoice_reply from a customer), sender_id
   // is NULL — surface the external sender's name/email instead.
-  const senderName = row.sender_name || row.external_sender_name || row.external_sender_email || null;
+  const senderName =
+    row.sender_name ||
+    row.external_sender_name ||
+    row.external_sender_email ||
+    null;
   const senderEmail = row.sender_email || row.external_sender_email || null;
   return {
     id: row.id,
@@ -172,8 +208,9 @@ function threadKeySql(alias = "m") {
 
 // GET /api/messages/unread-count
 // Lightweight endpoint polled by the frontend for unread badges.
-router.get("/unread-count", async (req, res) => {
-  try {
+router.get(
+  "/unread-count",
+  asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
       `SELECT COUNT(*)::int AS total_count,
@@ -192,28 +229,26 @@ router.get("/unread-count", async (req, res) => {
           AND business_id = $2
           AND is_read = FALSE
           AND is_deleted_by_receiver = FALSE`,
-      [req.user.id, businessId]
+      [req.user.id, businessId],
     );
     const row = result.rows[0] || {};
     res.json({
       total: row.total_count ?? 0,
       messages: row.message_count ?? 0,
       support: row.support_count ?? 0,
-      notifications: row.notification_count ?? 0
+      notifications: row.notification_count ?? 0,
     });
-  } catch (err) {
-    logError("GET /messages/unread-count error:", err.message);
-    res.status(500).json({ error: "Failed to fetch unread count." });
-  }
-});
+  }),
+);
 
 // GET /api/messages/contacts
 // Returns users that the current user is permitted to message.
 // A user may message:
 //   - Anyone who has previously sent them a message (reply flow)
 //   - Users with role = 'it_support' or 'admin' (support channel)
-router.get("/contacts", async (req, res) => {
-  try {
+router.get(
+  "/contacts",
+  asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const { rows } = await pool.query(
       `SELECT DISTINCT u.id,
@@ -237,7 +272,7 @@ router.get("/contacts", async (req, res) => {
           )
         ORDER BY name ASC
         LIMIT 200`,
-      [req.user.id, businessId]
+      [req.user.id, businessId],
     );
 
     const contacts = rows
@@ -246,26 +281,27 @@ router.get("/contacts", async (req, res) => {
         id: r.id,
         name: r.name,
         email: r.email,
-        role: r.role
+        role: r.role,
       }));
 
     res.json({ contacts });
-  } catch (err) {
-    logError("GET /messages/contacts error:", err.message);
-    res.status(500).json({ error: "Failed to fetch contacts." });
-  }
-});
+  }),
+);
 
 // GET /api/messages/inbox
-router.get("/inbox", async (req, res) => {
-  try {
+router.get(
+  "/inbox",
+  asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), MAX_PAGE_SIZE);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 25, 1),
+      MAX_PAGE_SIZE,
+    );
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const archived = req.query.archived === "true";
 
     const { rows } = await pool.query(
-  `WITH visible_messages AS (
+      `WITH visible_messages AS (
       SELECT m.*,
              ${threadKeySql("m")} AS thread_key
         FROM messages m
@@ -297,26 +333,27 @@ router.get("/inbox", async (req, res) => {
      WHERE r.rn = 1
      ORDER BY r.created_at DESC
      LIMIT $3 OFFSET $4`,
-  [req.user.id, archived, limit, offset, businessId]
-);
+      [req.user.id, archived, limit, offset, businessId],
+    );
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
-  } catch (err) {
-    logError("GET /messages/inbox error:", err.message);
-    res.status(500).json({ error: "Failed to fetch inbox." });
-  }
-});
+  }),
+);
 
 // GET /api/messages/sent
-router.get("/sent", async (req, res) => {
-  try {
+router.get(
+  "/sent",
+  asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), MAX_PAGE_SIZE);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 25, 1),
+      MAX_PAGE_SIZE,
+    );
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const archived = req.query.archived === "true";
 
     const { rows } = await pool.query(
-  `WITH visible_messages AS (
+      `WITH visible_messages AS (
       SELECT m.*,
              ${threadKeySql("m")} AS thread_key
         FROM messages m
@@ -348,26 +385,27 @@ router.get("/sent", async (req, res) => {
      WHERE r.rn = 1
      ORDER BY r.created_at DESC
      LIMIT $3 OFFSET $4`,
-  [req.user.id, archived, limit, offset, businessId]
-);
+      [req.user.id, archived, limit, offset, businessId],
+    );
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
-  } catch (err) {
-    logError("GET /messages/sent error:", err.message);
-    res.status(500).json({ error: "Failed to fetch sent messages." });
-  }
-});
+  }),
+);
 
 // GET /api/messages/archived
 // Returns archived messages for both inbox and sent conversations.
-router.get("/archived", async (req, res) => {
-  try {
+router.get(
+  "/archived",
+  asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), MAX_PAGE_SIZE);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 25, 1),
+      MAX_PAGE_SIZE,
+    );
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
     const { rows } = await pool.query(
-  `WITH visible_messages AS (
+      `WITH visible_messages AS (
       SELECT m.*,
              ${threadKeySql("m")} AS thread_key
         FROM messages m
@@ -407,35 +445,36 @@ router.get("/archived", async (req, res) => {
      WHERE r.rn = 1
      ORDER BY r.created_at DESC
      LIMIT $2 OFFSET $3`,
-  [req.user.id, limit, offset, businessId]
-);
+      [req.user.id, limit, offset, businessId],
+    );
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
-  } catch (err) {
-    logError("GET /messages/archived error:", err.message);
-    res.status(500).json({ error: "Failed to fetch archived messages." });
-  }
-});
+  }),
+);
 
 // GET /api/messages/:id
 // Fetches a single message and marks it as read if the current user is the receiver.
 // POST /api/messages/:id/reply-email
-router.post("/:id/reply-email", messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS), async (req, res) => {
-  try {
+router.post(
+  "/:id/reply-email",
+  messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS),
+  asyncRoute(async (req, res) => {
     const messageId = String(req.params.id || "").trim();
-    const replyBody = String(req.body?.body || "").trim().slice(0, 10000);
+    const replyBody = String(req.body?.body || "")
+      .trim()
+      .slice(0, 10000);
 
     if (!isUuid(messageId)) {
-      return res.status(400).json({ error: "Invalid message ID." });
+      throw new ApiError(400, "Invalid message ID.");
     }
 
     if (!replyBody) {
-      return res.status(400).json({ error: "Reply body is required." });
+      throw new ApiError(400, "Reply body is required.");
     }
 
     const resend = getResendClient();
     if (!resend) {
-      return res.status(503).json({ error: "Email service is not configured." });
+      throw new ApiError(503, "Email service is not configured.");
     }
 
     const { rows } = await pool.query(
@@ -455,17 +494,17 @@ router.post("/:id/reply-email", messageAttachmentsUpload.array("attachments", MA
           )
           AND m.external_sender_email IS NOT NULL
         LIMIT 1`,
-      [messageId, req.user.id]
+      [messageId, req.user.id],
     );
 
     if (!rows.length) {
-      return res.status(404).json({ error: "Email reply message not found." });
+      throw new ApiError(404, "Email reply message not found.");
     }
 
     const original = rows[0];
 
     if (original.invoice_id && original.owner_id !== req.user.id) {
-      return res.status(403).json({ error: "You are not allowed to reply to this message." });
+      throw new ApiError(403, "You are not allowed to reply to this message.");
     }
 
     const replyTo = original.invoice_id
@@ -476,14 +515,18 @@ router.post("/:id/reply-email", messageAttachmentsUpload.array("attachments", MA
       .trim()
       .slice(0, 70);
 
-    const subject = String(original.subject || `Re: Invoice ${original.invoice_number}`).startsWith("Re:")
+    const subject = String(
+      original.subject || `Re: Invoice ${original.invoice_number}`,
+    ).startsWith("Re:")
       ? String(original.subject || `Re: Invoice ${original.invoice_number}`)
       : `Re: ${original.subject || `Invoice ${original.invoice_number}`}`;
 
     const references = [
       original.external_references,
-      original.external_message_id
-    ].filter(Boolean).join(" ");
+      original.external_message_id,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     const payload = {
       from: getInvoiceFromEmail(),
@@ -492,9 +535,11 @@ router.post("/:id/reply-email", messageAttachmentsUpload.array("attachments", MA
       text: replyBody,
       html: `<p>${escapeHtml(replyBody).replace(/\n/g, "<br/>")}</p>`,
       headers: {
-        ...(original.external_message_id ? { "In-Reply-To": original.external_message_id } : {}),
-        ...(references ? { References: references } : {})
-      }
+        ...(original.external_message_id
+          ? { "In-Reply-To": original.external_message_id }
+          : {}),
+        ...(references ? { References: references } : {}),
+      },
     };
 
     if (replyTo) {
@@ -511,7 +556,7 @@ router.post("/:id/reply-email", messageAttachmentsUpload.array("attachments", MA
     if (sendResult?.error) {
       return res.status(sendResult.error.statusCode || 502).json({
         error: sendResult.error.message || "Failed to send email reply.",
-        details: sendResult.error
+        details: sendResult.error,
       });
     }
 
@@ -533,8 +578,8 @@ router.post("/:id/reply-email", messageAttachmentsUpload.array("attachments", MA
         original.external_sender_name,
         original.invoice_id || null,
         original.thread_root_id || original.id,
-        original.business_id
-      ]
+        original.business_id,
+      ],
     );
 
     logInfo("invoice reply email sent", {
@@ -543,30 +588,27 @@ router.post("/:id/reply-email", messageAttachmentsUpload.array("attachments", MA
       invoiceId: original.invoice_id || null,
       threadRootId: original.thread_root_id || original.id,
       to: original.external_sender_email,
-      resendId: sendResult?.data?.id || null
+      resendId: sendResult?.data?.id || null,
     });
 
     res.json({
       ok: true,
       message_id: outboundMessageId,
-      resend_id: sendResult?.data?.id || null
+      resend_id: sendResult?.data?.id || null,
     });
-  } catch (err) {
-    logError("POST /messages/:id/reply-email error:", err.message);
-    res.status(500).json({ error: "Failed to send email reply." });
-  }
-});
-
+  }),
+);
 
 // GET /api/messages/:id/thread
 // Returns the full visible conversation for a message.
 // For invoice messages, this groups by invoice_id so the user sees the whole email thread.
-router.get("/:id/thread", async (req, res) => {
-  try {
+router.get(
+  "/:id/thread",
+  asyncRoute(async (req, res) => {
     const messageId = String(req.params.id || "").trim();
 
     if (!isUuid(messageId)) {
-      return res.status(400).json({ error: "Invalid message ID." });
+      throw new ApiError(400, "Invalid message ID.");
     }
 
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -581,11 +623,11 @@ router.get("/:id/thread", async (req, res) => {
             (sender_id = $2 AND is_deleted_by_sender = FALSE)
           )
         LIMIT 1`,
-      [messageId, req.user.id, businessId]
+      [messageId, req.user.id, businessId],
     );
 
     if (!baseResult.rowCount) {
-      return res.status(404).json({ error: "Message not found." });
+      throw new ApiError(404, "Message not found.");
     }
 
     const baseMessage = baseResult.rows[0];
@@ -612,7 +654,7 @@ router.get("/:id/thread", async (req, res) => {
               (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
             )
           ORDER BY m.created_at ASC`,
-        [baseMessage.invoice_id, req.user.id, businessId]
+        [baseMessage.invoice_id, req.user.id, businessId],
       );
 
       rows = result.rows;
@@ -637,7 +679,7 @@ router.get("/:id/thread", async (req, res) => {
               (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
             )
           ORDER BY m.created_at ASC`,
-        [rootId, req.user.id, businessId]
+        [rootId, req.user.id, businessId],
       );
 
       rows = result.rows;
@@ -650,24 +692,21 @@ router.get("/:id/thread", async (req, res) => {
         WHERE id = ANY($1::uuid[])
           AND receiver_id = $2
           AND is_read = FALSE`,
-      [rows.map((row) => row.id), req.user.id]
+      [rows.map((row) => row.id), req.user.id],
     );
 
     res.json({
-      thread: rows.map((row) => mapMessageRow(row, req.user.id))
+      thread: rows.map((row) => mapMessageRow(row, req.user.id)),
     });
-  } catch (err) {
-    logError("GET /messages/:id/thread error:", err.message);
-    res.status(500).json({ error: "Failed to fetch message thread." });
-  }
-});
+  }),
+);
 
-
-router.get("/:id", async (req, res) => {
-  try {
+router.get(
+  "/:id",
+  asyncRoute(async (req, res) => {
     const messageId = String(req.params.id || "").trim();
     if (!isUuid(messageId)) {
-      return res.status(400).json({ error: "Invalid message ID." });
+      throw new ApiError(400, "Invalid message ID.");
     }
     const businessId = await resolveBusinessIdForUser(req.user);
     const { rows } = await pool.query(
@@ -688,11 +727,11 @@ router.get("/:id", async (req, res) => {
             OR (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
           )
         LIMIT 1`,
-      [messageId, req.user.id, businessId]
+      [messageId, req.user.id, businessId],
     );
 
     if (!rows.length) {
-      return res.status(404).json({ error: "Message not found." });
+      throw new ApiError(404, "Message not found.");
     }
 
     const msg = rows[0];
@@ -701,31 +740,34 @@ router.get("/:id", async (req, res) => {
     if (msg.receiver_id === req.user.id && !msg.is_read) {
       await pool.query(
         "UPDATE messages SET is_read = TRUE, updated_at = NOW() WHERE id = $1",
-        [msg.id]
+        [msg.id],
       );
       msg.is_read = true;
     }
 
     res.json({ message: mapMessageRow(msg, req.user.id) });
-  } catch (err) {
-    logError("GET /messages/:id error:", err.message);
-    res.status(500).json({ error: "Failed to fetch message." });
-  }
-});
+  }),
+);
 
-router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS), async (req, res) => {
-  try {
-    const subject = String(req.body?.subject || "Support Request").trim().slice(0, MAX_SUBJECT_LEN);
-    const body = String(req.body?.body || "").trim().slice(0, MAX_BODY_LEN);
+router.post(
+  "/support-email",
+  messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS),
+  asyncRoute(async (req, res) => {
+    const subject = String(req.body?.subject || "Support Request")
+      .trim()
+      .slice(0, MAX_SUBJECT_LEN);
+    const body = String(req.body?.body || "")
+      .trim()
+      .slice(0, MAX_BODY_LEN);
 
     if (!body) {
-      return res.status(400).json({ error: "Message body is required." });
+      throw new ApiError(400, "Message body is required.");
     }
 
     const businessId = await resolveBusinessIdForUser(req.user);
     const resend = getResendClient();
     if (!resend) {
-      return res.status(503).json({ error: "Email service is not configured." });
+      throw new ApiError(503, "Email service is not configured.");
     }
 
     const supportTo = getSupportToEmail();
@@ -736,7 +778,7 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
          FROM users
         WHERE id = $1
         LIMIT 1`,
-      [req.user.id]
+      [req.user.id],
     );
 
     const userRow = userResult.rows[0] || {};
@@ -748,18 +790,18 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
       "Unknown account";
     const userEmail = userRow.email || req.user?.email || "Unknown email";
     const userId = req.user?.id || "Unknown ID";
-    
+
     const messageId = crypto.randomUUID();
     const replyTo = buildSupportReplyToAddress(messageId);
-    
+
     logInfo("support email reply-to debug", {
       messageId,
-       supportReplyBaseEmail: process.env.SUPPORT_REPLY_BASE_EMAIL || null,
+      supportReplyBaseEmail: process.env.SUPPORT_REPLY_BASE_EMAIL || null,
       hasSupportReplyBaseEmail: Boolean(process.env.SUPPORT_REPLY_BASE_EMAIL),
       replyTo,
-      hasReplyTo: Boolean(replyTo)
+      hasReplyTo: Boolean(replyTo),
     });
-    
+
     const text = [
       `Support request from InEx Ledger`,
       ``,
@@ -772,7 +814,7 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
       ``,
       `---`,
       `Technical details`,
-      `User ID: ${userId}`
+      `User ID: ${userId}`,
     ].join("\n");
 
     const html = `<p><strong>Support request from InEx Ledger</strong></p>
@@ -790,7 +832,7 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
       to: supportTo,
       subject: `[InEx Support] ${subject}`,
       text,
-      html
+      html,
     };
 
     if (req.files?.length) {
@@ -805,7 +847,7 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
       logInfo("support email reply-to applied", {
         messageId,
         replyTo,
-        hasPayloadReplyTo: Boolean(payload.replyTo)
+        hasPayloadReplyTo: Boolean(payload.replyTo),
       });
     }
 
@@ -814,7 +856,7 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
     if (sendResult?.error) {
       return res.status(sendResult.error.statusCode || 502).json({
         error: sendResult.error.message || "Failed to send support request.",
-        details: sendResult.error
+        details: sendResult.error,
       });
     }
 
@@ -833,8 +875,8 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
         supportTo,
         "InEx Support",
         sendResult?.data?.id || null,
-        businessId
-      ]
+        businessId,
+      ],
     );
 
     await recordAuditEventForRequest(pool, req, {
@@ -843,8 +885,8 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
         messageId,
         delivery: "email",
         to: supportTo,
-        subject
-      }
+        subject,
+      },
     });
 
     res.status(201).json({
@@ -852,37 +894,43 @@ router.post("/support-email", messageAttachmentsUpload.array("attachments", MAX_
       message_id: messageId,
       delivery: "email",
       to: supportTo,
-      resend_id: sendResult?.data?.id || null
+      resend_id: sendResult?.data?.id || null,
     });
-  } catch (err) {
-    logError("POST /messages/support-email error:", err.message);
-    res.status(500).json({ error: "Failed to send support request." });
-  }
-});
+  }),
+);
 
-router.post("/send-email", messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS), async (req, res) => {
-  try {
+router.post(
+  "/send-email",
+  messageAttachmentsUpload.array("attachments", MAX_MESSAGE_ATTACHMENTS),
+  asyncRoute(async (req, res) => {
     const parsedTo = parseEmailList(req.body?.to_email);
     const messageType = String(req.body?.message_type || "general").trim();
-    const subject = String(req.body?.subject || "Message from InEx Ledger").trim().slice(0, MAX_SUBJECT_LEN);
-    const body = String(req.body?.body || "").trim().slice(0, MAX_BODY_LEN);
+    const subject = String(req.body?.subject || "Message from InEx Ledger")
+      .trim()
+      .slice(0, MAX_SUBJECT_LEN);
+    const body = String(req.body?.body || "")
+      .trim()
+      .slice(0, MAX_BODY_LEN);
 
     if (!parsedTo.ok) {
-      return res.status(400).json({ error: `Invalid recipient email: ${parsedTo.invalid}` });
+      throw new ApiError(400, `Invalid recipient email: ${parsedTo.invalid}`);
     }
     if (!parsedTo.emails.length) {
-      return res.status(400).json({ error: "A valid recipient email is required." });
+      throw new ApiError(400, "A valid recipient email is required.");
     }
     if (!VALID_MESSAGE_TYPES.has(messageType)) {
-      return res.status(400).json({ error: `message_type must be one of: ${[...VALID_MESSAGE_TYPES].join(", ")}.` });
+      throw new ApiError(
+        400,
+        `message_type must be one of: ${[...VALID_MESSAGE_TYPES].join(", ")}.`,
+      );
     }
     if (!body) {
-      return res.status(400).json({ error: "Message body is required." });
+      throw new ApiError(400, "Message body is required.");
     }
 
     const resend = getResendClient();
     if (!resend) {
-      return res.status(503).json({ error: "Email service is not configured." });
+      throw new ApiError(503, "Email service is not configured.");
     }
 
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -896,7 +944,7 @@ router.post("/send-email", messageAttachmentsUpload.array("attachments", MAX_MES
          FROM users
         WHERE id = $1
         LIMIT 1`,
-      [req.user.id]
+      [req.user.id],
     );
 
     const userRow = userResult.rows[0] || {};
@@ -912,21 +960,27 @@ router.post("/send-email", messageAttachmentsUpload.array("attachments", MAX_MES
       `${accountName} sent you a message from InEx Ledger.`,
       userEmail ? `Replying account: ${userEmail}` : null,
       "",
-      body
-    ].filter(Boolean).join("\n");
+      body,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     const html = [
       `<p><strong>${escapeHtml(accountName)}</strong> sent you a message from InEx Ledger.</p>`,
-      userEmail ? `<p><strong>Replying account:</strong> ${escapeHtml(userEmail)}</p>` : "",
-      `<p>${escapeHtml(body).replace(/\n/g, "<br/>")}</p>`
-    ].filter(Boolean).join("");
+      userEmail
+        ? `<p><strong>Replying account:</strong> ${escapeHtml(userEmail)}</p>`
+        : "",
+      `<p>${escapeHtml(body).replace(/\n/g, "<br/>")}</p>`,
+    ]
+      .filter(Boolean)
+      .join("");
 
     const payload = {
       from: supportFrom,
       to: parsedTo.emails,
       subject,
       text,
-      html
+      html,
     };
 
     if (replyTo) {
@@ -943,7 +997,7 @@ router.post("/send-email", messageAttachmentsUpload.array("attachments", MAX_MES
     if (sendResult?.error) {
       return res.status(sendResult.error.statusCode || 502).json({
         error: sendResult.error.message || "Failed to send email.",
-        details: sendResult.error
+        details: sendResult.error,
       });
     }
 
@@ -963,72 +1017,82 @@ router.post("/send-email", messageAttachmentsUpload.array("attachments", MAX_MES
         parsedTo.emails.join(", "),
         accountName,
         sendResult?.data?.id || null,
-        businessId
-      ]
+        businessId,
+      ],
     );
 
     res.status(201).json({
       ok: true,
       message_id: messageId,
       to: parsedTo.emails,
-      resend_id: sendResult?.data?.id || null
+      resend_id: sendResult?.data?.id || null,
     });
-  } catch (err) {
-    logError("POST /messages/send-email error:", err.message);
-    res.status(500).json({ error: "Failed to send email." });
-  }
-});
+  }),
+);
 
 // POST /api/messages
 // Send a new message (or reply when parent_id is provided).
-router.post("/", async (req, res) => {
-  const receiverId = String(req.body?.receiver_id || "").trim();
-  const messageType = String(req.body?.message_type || "general").trim();
-  const subject = String(req.body?.subject || "").trim();
-  const body = String(req.body?.body || "").trim();
-  const parentId = req.body?.parent_id ? String(req.body.parent_id).trim() : null;
+router.post(
+  "/",
+  asyncRoute(async (req, res) => {
+    const receiverId = String(req.body?.receiver_id || "").trim();
+    const messageType = String(req.body?.message_type || "general").trim();
+    const subject = String(req.body?.subject || "").trim();
+    const body = String(req.body?.body || "").trim();
+    const parentId = req.body?.parent_id
+      ? String(req.body.parent_id).trim()
+      : null;
 
-  if (!receiverId) {
-    return res.status(400).json({ error: "receiver_id is required." });
-  }
-  if (!isUuid(receiverId)) {
-    return res.status(400).json({ error: "receiver_id must be a valid UUID." });
-  }
-  if (receiverId === req.user.id) {
-    return res.status(400).json({ error: "You cannot send a message to yourself." });
-  }
-  if (!VALID_MESSAGE_TYPES.has(messageType)) {
-    return res.status(400).json({ error: `message_type must be one of: ${[...VALID_MESSAGE_TYPES].join(", ")}.` });
-  }
-  if (!body) {
-    return res.status(400).json({ error: "Message body is required." });
-  }
-  if (body.length > MAX_BODY_LEN) {
-    return res.status(400).json({ error: `Message body must not exceed ${MAX_BODY_LEN} characters.` });
-  }
-  if (subject && subject.length > MAX_SUBJECT_LEN) {
-    return res.status(400).json({ error: `Subject must not exceed ${MAX_SUBJECT_LEN} characters.` });
-  }
-  if (parentId && !isUuid(parentId)) {
-    return res.status(400).json({ error: "parent_id must be a valid UUID when provided." });
-  }
+    if (!receiverId) {
+      throw new ApiError(400, "receiver_id is required.");
+    }
+    if (!isUuid(receiverId)) {
+      throw new ApiError(400, "receiver_id must be a valid UUID.");
+    }
+    if (receiverId === req.user.id) {
+      throw new ApiError(400, "You cannot send a message to yourself.");
+    }
+    if (!VALID_MESSAGE_TYPES.has(messageType)) {
+      throw new ApiError(
+        400,
+        `message_type must be one of: ${[...VALID_MESSAGE_TYPES].join(", ")}.`,
+      );
+    }
+    if (!body) {
+      throw new ApiError(400, "Message body is required.");
+    }
+    if (body.length > MAX_BODY_LEN) {
+      throw new ApiError(
+        400,
+        `Message body must not exceed ${MAX_BODY_LEN} characters.`,
+      );
+    }
+    if (subject && subject.length > MAX_SUBJECT_LEN) {
+      throw new ApiError(
+        400,
+        `Subject must not exceed ${MAX_SUBJECT_LEN} characters.`,
+      );
+    }
+    if (parentId && !isUuid(parentId)) {
+      throw new ApiError(400, "parent_id must be a valid UUID when provided.");
+    }
 
-  try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     // Verify receiver exists
     const receiverCheck = await pool.query(
       "SELECT id, role FROM users WHERE id = $1 LIMIT 1",
-      [receiverId]
+      [receiverId],
     );
     if (!receiverCheck.rowCount) {
-      return res.status(404).json({ error: "Receiver not found." });
+      throw new ApiError(404, "Receiver not found.");
     }
 
     // Enforce contact allowlist: sender must be permitted to contact the receiver.
     // Mirrors the logic in GET /contacts.
     const receiver = receiverCheck.rows[0];
-    const isSupportStaff = receiver.role === "it_support" || receiver.role === "admin";
+    const isSupportStaff =
+      receiver.role === "it_support" || receiver.role === "admin";
     if (!isSupportStaff) {
       const contactCheck = await pool.query(
         `SELECT 1
@@ -1046,10 +1110,10 @@ router.post("/", async (req, res) => {
               )
             )
           LIMIT 1`,
-        [req.user.id, receiverId, businessId]
+        [req.user.id, receiverId, businessId],
       );
       if (!contactCheck.rowCount) {
-        return res.status(403).json({ error: "You are not permitted to message this user." });
+        throw new ApiError(403, "You are not permitted to message this user.");
       }
     }
 
@@ -1064,12 +1128,13 @@ router.post("/", async (req, res) => {
               OR (sender_id = $3 AND receiver_id = $2)
             )
           LIMIT 1`,
-        [parentId, req.user.id, receiverId, businessId]
+        [parentId, req.user.id, receiverId, businessId],
       );
       if (!parentCheck.rowCount) {
-        return res.status(400).json({ error: "Invalid parent message." });
+        throw new ApiError(400, "Invalid parent message.");
       }
-      req.threadRootId = parentCheck.rows[0].thread_root_id || parentCheck.rows[0].id;
+      req.threadRootId =
+        parentCheck.rows[0].thread_root_id || parentCheck.rows[0].id;
     }
 
     const result = await pool.query(
@@ -1085,8 +1150,8 @@ router.post("/", async (req, res) => {
         subject || null,
         body,
         req.threadRootId || parentId || null,
-        businessId
-      ]
+        businessId,
+      ],
     );
 
     // Fetch display names for the response
@@ -1102,7 +1167,7 @@ router.post("/", async (req, res) => {
          LEFT JOIN users r ON r.id = m.receiver_id
          LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
         WHERE m.id = $1`,
-      [result.rows[0].id]
+      [result.rows[0].id],
     );
 
     if (messageType === "support_request" || messageType === "it_support") {
@@ -1112,24 +1177,22 @@ router.post("/", async (req, res) => {
           messageId: result.rows[0].id,
           messageType,
           receiverId,
-          parentId: parentId || null
-        }
+          parentId: parentId || null,
+        },
       });
     }
 
     res.status(201).json({ message: mapMessageRow(rows[0], req.user.id) });
-  } catch (err) {
-    logError("POST /messages error:", err.message);
-    res.status(500).json({ error: "Failed to send message." });
-  }
-});
+  }),
+);
 
 // PATCH /api/messages/:id/read
-router.patch("/:id/read", async (req, res) => {
-  try {
+router.patch(
+  "/:id/read",
+  asyncRoute(async (req, res) => {
     const messageId = String(req.params.id || "").trim();
     if (!isUuid(messageId)) {
-      return res.status(400).json({ error: "Invalid message ID." });
+      throw new ApiError(400, "Invalid message ID.");
     }
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
@@ -1140,27 +1203,25 @@ router.patch("/:id/read", async (req, res) => {
           AND business_id = $3
           AND is_deleted_by_receiver = FALSE
         RETURNING id, is_read`,
-      [messageId, req.user.id, businessId]
+      [messageId, req.user.id, businessId],
     );
 
     if (!result.rowCount) {
-      return res.status(404).json({ error: "Message not found." });
+      throw new ApiError(404, "Message not found.");
     }
 
     res.json({ success: true, id: result.rows[0].id, is_read: true });
-  } catch (err) {
-    logError("PATCH /messages/:id/read error:", err.message);
-    res.status(500).json({ error: "Failed to mark message as read." });
-  }
-});
+  }),
+);
 
 // PATCH /api/messages/:id/archive
 // Toggles archive status for the current user.
-router.patch("/:id/archive", async (req, res) => {
-  try {
+router.patch(
+  "/:id/archive",
+  asyncRoute(async (req, res) => {
     const messageId = String(req.params.id || "").trim();
     if (!isUuid(messageId)) {
-      return res.status(400).json({ error: "Invalid message ID." });
+      throw new ApiError(400, "Invalid message ID.");
     }
     const businessId = await resolveBusinessIdForUser(req.user);
     // Determine which column to toggle
@@ -1172,11 +1233,11 @@ router.patch("/:id/archive", async (req, res) => {
           AND business_id = $3
           AND (sender_id = $2 OR receiver_id = $2)
         LIMIT 1`,
-      [messageId, req.user.id, businessId]
+      [messageId, req.user.id, businessId],
     );
 
     if (!msgCheck.rowCount) {
-      return res.status(404).json({ error: "Message not found." });
+      throw new ApiError(404, "Message not found.");
     }
 
     const msg = msgCheck.rows[0];
@@ -1191,38 +1252,36 @@ router.patch("/:id/archive", async (req, res) => {
       const next = !msg.is_archived_by_receiver;
       await pool.query(
         "UPDATE messages SET is_archived_by_receiver = $1, is_archived_by_sender = $1, updated_at = NOW() WHERE id = $2",
-        [next, msg.id]
+        [next, msg.id],
       );
       res.json({ success: true, archived: next });
     } else if (isReceiver) {
       const next = !msg.is_archived_by_receiver;
       await pool.query(
         "UPDATE messages SET is_archived_by_receiver = $1, updated_at = NOW() WHERE id = $2",
-        [next, msg.id]
+        [next, msg.id],
       );
       res.json({ success: true, archived: next });
     } else {
       const next = !msg.is_archived_by_sender;
       await pool.query(
         "UPDATE messages SET is_archived_by_sender = $1, updated_at = NOW() WHERE id = $2",
-        [next, msg.id]
+        [next, msg.id],
       );
       res.json({ success: true, archived: next });
     }
-  } catch (err) {
-    logError("PATCH /messages/:id/archive error:", err.message);
-    res.status(500).json({ error: "Failed to archive message." });
-  }
-});
+  }),
+);
 
 // PATCH /api/messages/:id/resolve
 // Marks a support/CPA message as resolved (sets message_type to 'resolved' placeholder).
 // Implemented as setting review_resolved flag via archived_by_sender (sender side).
-router.patch("/:id/resolve", async (req, res) => {
-  try {
+router.patch(
+  "/:id/resolve",
+  asyncRoute(async (req, res) => {
     const messageId = String(req.params.id || "").trim();
     if (!isUuid(messageId)) {
-      return res.status(400).json({ error: "Invalid message ID." });
+      throw new ApiError(400, "Invalid message ID.");
     }
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
@@ -1233,27 +1292,25 @@ router.patch("/:id/resolve", async (req, res) => {
           AND business_id = $3
           AND is_deleted_by_sender = FALSE
         RETURNING id`,
-      [messageId, req.user.id, businessId]
+      [messageId, req.user.id, businessId],
     );
 
     if (!result.rowCount) {
-      return res.status(404).json({ error: "Message not found." });
+      throw new ApiError(404, "Message not found.");
     }
 
     res.json({ success: true });
-  } catch (err) {
-    logError("PATCH /messages/:id/resolve error:", err.message);
-    res.status(500).json({ error: "Failed to resolve message." });
-  }
-});
+  }),
+);
 
 // DELETE /api/messages/:id
 // Soft-deletes the message for the current user.
-router.delete("/:id", async (req, res) => {
-  try {
+router.delete(
+  "/:id",
+  asyncRoute(async (req, res) => {
     const messageId = String(req.params.id || "").trim();
     if (!isUuid(messageId)) {
-      return res.status(400).json({ error: "Invalid message ID." });
+      throw new ApiError(400, "Invalid message ID.");
     }
     const businessId = await resolveBusinessIdForUser(req.user);
     const msgCheck = await pool.query(
@@ -1263,11 +1320,11 @@ router.delete("/:id", async (req, res) => {
           AND business_id = $3
           AND (sender_id = $2 OR receiver_id = $2)
         LIMIT 1`,
-      [messageId, req.user.id, businessId]
+      [messageId, req.user.id, businessId],
     );
 
     if (!msgCheck.rowCount) {
-      return res.status(404).json({ error: "Message not found." });
+      throw new ApiError(404, "Message not found.");
     }
 
     const msg = msgCheck.rows[0];
@@ -1282,25 +1339,22 @@ router.delete("/:id", async (req, res) => {
     if (isReceiver && isSender) {
       await pool.query(
         "UPDATE messages SET is_deleted_by_receiver = TRUE, is_deleted_by_sender = TRUE, updated_at = NOW() WHERE id = $1",
-        [msg.id]
+        [msg.id],
       );
     } else if (isReceiver) {
       await pool.query(
         "UPDATE messages SET is_deleted_by_receiver = TRUE, updated_at = NOW() WHERE id = $1",
-        [msg.id]
+        [msg.id],
       );
     } else {
       await pool.query(
         "UPDATE messages SET is_deleted_by_sender = TRUE, updated_at = NOW() WHERE id = $1",
-        [msg.id]
+        [msg.id],
       );
     }
 
     res.json({ success: true });
-  } catch (err) {
-    logError("DELETE /messages/:id error:", err.message);
-    res.status(500).json({ error: "Failed to delete message." });
-  }
-});
+  }),
+);
 
 module.exports = router;

@@ -6,6 +6,8 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const ROUTE_PATH = require.resolve("../routes/index.js");
 
 function emptyRouter() {
@@ -15,35 +17,44 @@ function emptyRouter() {
 function loadIndexRouterFixture(options = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
-    arApBusinessId: null
+    arApBusinessId: null,
   };
 
-  Module._load = function(requestName, parent, isMain) {
+  Module._load = function (requestName, parent, isMain) {
     if (requestName === "../services/arApService") {
       return {
         getArApSummary: async (businessId) => {
           state.arApBusinessId = businessId;
           return { businessId, ok: true };
-        }
+        },
       };
     }
 
-    if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
+    if (
+      requestName === "../middleware/auth.middleware.js" ||
+      /auth\.middleware\.js$/.test(requestName)
+    ) {
       return {
         requireAuth(req, _res, next) {
           req.user = { id: "user_index_001" };
           next();
-        }
+        },
       };
     }
 
-    if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
+    if (
+      requestName === "../api/utils/resolveBusinessIdForUser.js" ||
+      /resolveBusinessIdForUser\.js$/.test(requestName)
+    ) {
       return {
-        resolveBusinessIdForUser: async () => "biz_index_001"
+        resolveBusinessIdForUser: async () => "biz_index_001",
       };
     }
 
-    if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
+    if (
+      requestName === "../services/subscriptionService.js" ||
+      /subscriptionService\.js$/.test(requestName)
+    ) {
       return {
         PLAN_PRO: "pro",
         PLAN_BUSINESS: "business",
@@ -52,31 +63,42 @@ function loadIndexRouterFixture(options = {}) {
             throw new Error("subscription lookup failed");
           }
           return { effectiveTier: options.tier || "free" };
-        }
+        },
       };
     }
 
-    if (requestName === "../api/utils/requireV2BusinessEnabled.js" || /requireV2BusinessEnabled\.js$/.test(requestName)) {
+    if (
+      requestName === "../api/utils/requireV2BusinessEnabled.js" ||
+      /requireV2BusinessEnabled\.js$/.test(requestName)
+    ) {
       return {
         requireV2BusinessEnabled(_req, _res, next) {
           next();
         },
         requireV2Entitlement(_req, _res, next) {
           next();
-        }
+        },
       };
     }
 
-    if (requestName === "./exports.routes.js" || /exports\.routes\.js$/.test(requestName)) {
+    if (
+      requestName === "./exports.routes.js" ||
+      /exports\.routes\.js$/.test(requestName)
+    ) {
       const router = express.Router();
       router.get("/history", (_req, res) => res.json([{ id: "export_001" }]));
       return router;
     }
 
-    if (requestName === "./recurring.routes.js" || /recurring\.routes\.js$/.test(requestName)) {
+    if (
+      requestName === "./recurring.routes.js" ||
+      /recurring\.routes\.js$/.test(requestName)
+    ) {
       const router = express.Router();
       router.get("/", (_req, res) => res.json([{ id: "recurring_001" }]));
-      router.get("/upcoming", (_req, res) => res.json([{ id: "upcoming_001" }]));
+      router.get("/upcoming", (_req, res) =>
+        res.json([{ id: "upcoming_001" }]),
+      );
       return router;
     }
 
@@ -99,13 +121,14 @@ function loadIndexRouterFixture(options = {}) {
     const app = express();
     app.use(express.json());
     app.use("/api", router);
+    attachCentralErrorHandler(app);
     return {
       app,
       state,
       cleanup() {
         delete require.cache[ROUTE_PATH];
         Module._load = originalLoad;
-      }
+      },
     };
   } catch (error) {
     Module._load = originalLoad;

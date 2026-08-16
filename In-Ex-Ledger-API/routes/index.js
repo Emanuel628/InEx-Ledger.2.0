@@ -1,10 +1,20 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const arApService = require('../services/arApService');
-const { requireAuth } = require('../middleware/auth.middleware.js');
-const { resolveBusinessIdForUser } = require('../api/utils/resolveBusinessIdForUser.js');
-const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require('../services/subscriptionService.js');
-const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
+const arApService = require("../services/arApService");
+const { requireAuth } = require("../middleware/auth.middleware.js");
+const {
+  resolveBusinessIdForUser,
+} = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  getSubscriptionSnapshotForBusiness,
+  PLAN_PRO,
+  PLAN_BUSINESS,
+} = require("../services/subscriptionService.js");
+const {
+  requireV2BusinessEnabled,
+  requireV2Entitlement,
+} = require("../api/utils/requireV2BusinessEnabled.js");
+const { asyncRoute } = require("../utils/apiError.js");
 
 const businessTierOnly = [requireV2BusinessEnabled, requireV2Entitlement];
 
@@ -14,14 +24,14 @@ async function getEffectiveTierForRequest(req) {
   return subscription?.effectiveTier || null;
 }
 
-router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
-  try {
+router.get(
+  "/arap-summary",
+  ...businessTierOnly,
+  asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     res.json(await arApService.getArApSummary(businessId));
-  } catch (_) {
-    res.status(500).json({ error: 'Failed to load AR/AP summary.' });
-  }
-});
+  }),
+);
 
 // Optional paid-feature preload endpoints should not create noisy 402 console errors
 // when a page checks for data the current plan does not include.
@@ -29,60 +39,73 @@ router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
 // is fully gated inside recurring.routes.js, which returns a 402
 // `recurring_requires_pro`. The Basic UI hides the recurring panel and never
 // calls these endpoints.
-router.get('/exports/history', requireAuth, async (req, res, next) => {
-  try {
-    const tier = await getEffectiveTierForRequest(req);
-    if (tier !== PLAN_PRO && tier !== PLAN_BUSINESS) {
-      return res.json([]);
+router.get(
+  "/exports/history",
+  requireAuth,
+  asyncRoute(async (req, res, next) => {
+    try {
+      const tier = await getEffectiveTierForRequest(req);
+      if (tier !== PLAN_PRO && tier !== PLAN_BUSINESS) {
+        return res.json([]);
+      }
+      return next();
+    } catch (_) {
+      return res
+        .status(503)
+        .json({ error: "Failed to load export history preview." });
     }
-    return next();
-  } catch (_) {
-    return res.status(503).json({ error: 'Failed to load export history preview.' });
-  }
-});
+  }),
+);
 
-const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
+const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === "true";
 if (ENABLE_V2_BUSINESS) {
-  router.use('/vendors', ...businessTierOnly, require('./vendors.routes'));
-  router.use('/customers', ...businessTierOnly, require('./customers.routes'));
-  router.use('/invoices', ...businessTierOnly, require('./invoices.routes'));
-  router.use('/bills', ...businessTierOnly, require('./bills.routes'));
-  router.use('/projects', ...businessTierOnly, require('./projects.routes'));
-  router.use('/billable-expenses', ...businessTierOnly, require('./billable-expenses.routes'));
+  router.use("/vendors", ...businessTierOnly, require("./vendors.routes"));
+  router.use("/customers", ...businessTierOnly, require("./customers.routes"));
+  router.use("/invoices", ...businessTierOnly, require("./invoices.routes"));
+  router.use("/bills", ...businessTierOnly, require("./bills.routes"));
+  router.use("/projects", ...businessTierOnly, require("./projects.routes"));
+  router.use(
+    "/billable-expenses",
+    ...businessTierOnly,
+    require("./billable-expenses.routes"),
+  );
 }
 
-router.use('/auth', require('./auth.routes.js'));
-router.use('/internal/support', require('./internalSupport.routes.js'));
-router.use('/accounts', require('./accounts.routes.js'));
-router.use('/bank-connections', require('./bank-connections.routes.js'));
-router.use('/email', require('./email.routes.js'));
-router.use('/unsubscribe', require('./unsubscribe.routes.js'));
-router.use('/support-email', require('./supportEmail.routes.js'));
-router.use('/plaid', require('./plaid.routes.js'));
-router.use('/receipts', require('./receipts.routes.js'));
-router.use('/support-artifacts', require('./supportArtifacts.routes.js'));
-router.use('/categories', require('./categories.routes.js'));
-router.use('/exports', require('./exports.routes.js'));
-router.use('/business', require('./business.routes.js'));
-router.use('/system', require('./system.routes.js'));
-router.use('/me', require('./me.routes.js'));
-router.use('/crypto', require('./crypto.routes.js'));
-router.use('/privacy', require('./privacy.routes.js'));
-router.use('/region', require('./region.routes.js'));
-router.use('/entitlements', require('./entitlements.routes.js'));
-router.use('/mileage', require('./mileage.routes.js'));
-router.use('/review', require('./review.routes.js'));
-router.use('/sessions', require('./sessions.routes.js'));
-router.use('/billing', require('./billing.routes.js'));
-router.use('/recurring', require('./recurring.routes.js'));
-router.use('/businesses', require('./businesses.routes.js'));
-router.use('/analytics', require('./analytics.routes.js'));
-router.use('/invoices-v1', require('./invoices-v1.routes.js'));
-router.use('/messages', require('./messages.routes.js'));
-router.use('/consent', require('./consent.routes.js'));
-router.use('/check-email-verified', require('./check-email-verified.routes.js'));
-router.use('/vehicle-claims', require('./vehicleClaims.routes.js'));
-router.use('/capital-assets', require('./capitalAssets.routes.js'));
-router.use('/home-office-worksheet', require('./homeOffice.routes.js'));
+router.use("/auth", require("./auth.routes.js"));
+router.use("/internal/support", require("./internalSupport.routes.js"));
+router.use("/accounts", require("./accounts.routes.js"));
+router.use("/bank-connections", require("./bank-connections.routes.js"));
+router.use("/email", require("./email.routes.js"));
+router.use("/unsubscribe", require("./unsubscribe.routes.js"));
+router.use("/support-email", require("./supportEmail.routes.js"));
+router.use("/plaid", require("./plaid.routes.js"));
+router.use("/receipts", require("./receipts.routes.js"));
+router.use("/support-artifacts", require("./supportArtifacts.routes.js"));
+router.use("/categories", require("./categories.routes.js"));
+router.use("/exports", require("./exports.routes.js"));
+router.use("/business", require("./business.routes.js"));
+router.use("/system", require("./system.routes.js"));
+router.use("/me", require("./me.routes.js"));
+router.use("/crypto", require("./crypto.routes.js"));
+router.use("/privacy", require("./privacy.routes.js"));
+router.use("/region", require("./region.routes.js"));
+router.use("/entitlements", require("./entitlements.routes.js"));
+router.use("/mileage", require("./mileage.routes.js"));
+router.use("/review", require("./review.routes.js"));
+router.use("/sessions", require("./sessions.routes.js"));
+router.use("/billing", require("./billing.routes.js"));
+router.use("/recurring", require("./recurring.routes.js"));
+router.use("/businesses", require("./businesses.routes.js"));
+router.use("/analytics", require("./analytics.routes.js"));
+router.use("/invoices-v1", require("./invoices-v1.routes.js"));
+router.use("/messages", require("./messages.routes.js"));
+router.use("/consent", require("./consent.routes.js"));
+router.use(
+  "/check-email-verified",
+  require("./check-email-verified.routes.js"),
+);
+router.use("/vehicle-claims", require("./vehicleClaims.routes.js"));
+router.use("/capital-assets", require("./capitalAssets.routes.js"));
+router.use("/home-office-worksheet", require("./homeOffice.routes.js"));
 
 module.exports = router;

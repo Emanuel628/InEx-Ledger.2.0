@@ -6,10 +6,16 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+
 const MESSAGES_ROUTE_PATH = require.resolve("../routes/messages.routes.js");
 const TEST_BUSINESS_ID = "33333333-3333-4333-8333-333333333333";
 
-function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows = null } = {}) {
+function loadMessagesRouter({
+  contactRows = [],
+  archivedRows = [],
+  receiverRows = null,
+} = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = { auditCalls: [], sentEmails: [], insertedMessages: [] };
 
@@ -22,49 +28,65 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
               return { rows: contactRows, rowCount: contactRows.length };
             }
 
-            if (/FROM messages\s+WHERE receiver_id = \$1\s+AND business_id = \$2\s+AND is_read = FALSE\s+AND is_deleted_by_receiver = FALSE/i.test(sql.replace(/\s+/g, " "))) {
+            if (
+              /FROM messages\s+WHERE receiver_id = \$1\s+AND business_id = \$2\s+AND is_read = FALSE\s+AND is_deleted_by_receiver = FALSE/i.test(
+                sql.replace(/\s+/g, " "),
+              )
+            ) {
               return {
-                rows: [{
-                  total_count: 4,
-                  support_count: 1,
-                  notification_count: 2,
-                  message_count: 1
-                }],
-                rowCount: 1
+                rows: [
+                  {
+                    total_count: 4,
+                    support_count: 1,
+                    notification_count: 2,
+                    message_count: 1,
+                  },
+                ],
+                rowCount: 1,
               };
             }
 
-            if (/SELECT id, role FROM users WHERE id = \$1 LIMIT 1/i.test(sql)) {
-              const rows = receiverRows || [{ id: params[0], role: "it_support" }];
+            if (
+              /SELECT id, role FROM users WHERE id = \$1 LIMIT 1/i.test(sql)
+            ) {
+              const rows = receiverRows || [
+                { id: params[0], role: "it_support" },
+              ];
               return { rows, rowCount: rows.length };
             }
 
             if (/INSERT INTO messages/i.test(sql)) {
               state.insertedMessages.push({ sql, params });
               return {
-                rows: [{
-                  id: "55555555-5555-4555-8555-555555555555"
-                }],
-                rowCount: 1
+                rows: [
+                  {
+                    id: "55555555-5555-4555-8555-555555555555",
+                  },
+                ],
+                rowCount: 1,
               };
             }
 
             if (/WHERE m.id = \$1$/i.test(sql.trim())) {
               return {
-                rows: [{
-                  id: "55555555-5555-4555-8555-555555555555",
-                  sender_id: "11111111-1111-4111-8111-111111111111",
-                  receiver_id: params[0] ? "22222222-2222-4222-8222-222222222222" : null,
-                  sender_name: "Owner Example",
-                  sender_email: "owner@example.com",
-                  receiver_name: "Support Example",
-                  receiver_email: "support@example.com",
-                  message_type: "support_request",
-                  subject: "Need help",
-                  body: "Please help with export cleanup",
-                  invoice_number: null
-                }],
-                rowCount: 1
+                rows: [
+                  {
+                    id: "55555555-5555-4555-8555-555555555555",
+                    sender_id: "11111111-1111-4111-8111-111111111111",
+                    receiver_id: params[0]
+                      ? "22222222-2222-4222-8222-222222222222"
+                      : null,
+                    sender_name: "Owner Example",
+                    sender_email: "owner@example.com",
+                    receiver_name: "Support Example",
+                    receiver_email: "support@example.com",
+                    message_type: "support_request",
+                    subject: "Need help",
+                    body: "Please help with export cleanup",
+                    invoice_number: null,
+                  },
+                ],
+                rowCount: 1,
               };
             }
 
@@ -72,13 +94,16 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
               return { rows: archivedRows, rowCount: archivedRows.length };
             }
 
-            if (/is_archived_by_receiver = TRUE/i.test(sql) && /is_archived_by_sender = TRUE/i.test(sql)) {
+            if (
+              /is_archived_by_receiver = TRUE/i.test(sql) &&
+              /is_archived_by_sender = TRUE/i.test(sql)
+            ) {
               return { rows: archivedRows, rowCount: archivedRows.length };
             }
 
             return { rows: [], rowCount: 0 };
-          }
-        }
+          },
+        },
       };
     }
 
@@ -90,10 +115,10 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
         requireAuth: (req, _res, next) => {
           req.user = {
             id: "11111111-1111-4111-8111-111111111111",
-            email: "owner@example.com"
+            email: "owner@example.com",
           };
           next();
-        }
+        },
       };
     }
 
@@ -118,19 +143,25 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
       return { createDataApiLimiter: () => (_req, _res, next) => next() };
     }
 
-    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
+    if (
+      requestName === "../utils/logger.js" ||
+      /logger\.js$/.test(requestName)
+    ) {
       return { logError() {}, logWarn() {}, logInfo() {} };
     }
 
-    if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
+    if (
+      requestName === "../services/auditEventService.js" ||
+      /auditEventService\.js$/.test(requestName)
+    ) {
       return {
         AUDIT_ACTIONS: {
-          SUPPORT_REQUEST_CREATED: "support.request.created"
+          SUPPORT_REQUEST_CREATED: "support.request.created",
         },
         async recordAuditEventForRequest(_pool, _req, payload) {
           state.auditCalls.push(payload);
           return "audit-1";
-        }
+        },
       };
     }
 
@@ -142,10 +173,10 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
               send: async (payload) => {
                 state.sentEmails.push(payload);
                 return { data: { id: "resend-msg-1" } };
-              }
+              },
             };
           }
-        }
+        },
       };
     }
 
@@ -159,6 +190,7 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
     const app = express();
     app.use(express.json());
     app.use("/api/messages", router);
+    attachCentralErrorHandler(app);
 
     return {
       app,
@@ -166,7 +198,7 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
       cleanup() {
         delete require.cache[MESSAGES_ROUTE_PATH];
         Module._load = originalLoad;
-      }
+      },
     };
   } catch (err) {
     Module._load = originalLoad;
@@ -190,19 +222,20 @@ test("messages POST records an audit event for support requests", async () => {
   const fixture = loadMessagesRouter();
 
   try {
-    const res = await request(fixture.app)
-      .post("/api/messages")
-      .send({
-        receiver_id: "22222222-2222-4222-8222-222222222222",
-        message_type: "support_request",
-        subject: "Need help",
-        body: "Please help with export cleanup"
-      });
+    const res = await request(fixture.app).post("/api/messages").send({
+      receiver_id: "22222222-2222-4222-8222-222222222222",
+      message_type: "support_request",
+      subject: "Need help",
+      body: "Please help with export cleanup",
+    });
 
     assert.equal(res.status, 201);
     assert.equal(fixture.state.auditCalls.length, 1);
     assert.equal(fixture.state.auditCalls[0].action, "support.request.created");
-    assert.equal(fixture.state.auditCalls[0].metadata.messageType, "support_request");
+    assert.equal(
+      fixture.state.auditCalls[0].metadata.messageType,
+      "support_request",
+    );
   } finally {
     fixture.cleanup();
   }
@@ -223,12 +256,15 @@ test("messages support-email stores an outbound support thread and reply-to rout
       .post("/api/messages/support-email")
       .send({
         subject: "Need help",
-        body: "Please help with export cleanup"
+        body: "Please help with export cleanup",
       });
 
     assert.equal(res.status, 201);
     assert.equal(fixture.state.sentEmails.length, 1);
-    assert.match(String(fixture.state.sentEmails[0].replyTo || ""), /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i);
+    assert.match(
+      String(fixture.state.sentEmails[0].replyTo || ""),
+      /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i,
+    );
     assert.equal(fixture.state.insertedMessages.length, 1);
     assert.equal(fixture.state.auditCalls.length, 1);
     assert.equal(fixture.state.auditCalls[0].metadata.delivery, "email");
@@ -236,9 +272,11 @@ test("messages support-email stores an outbound support thread and reply-to rout
     fixture.cleanup();
     if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
     else process.env.RESEND_API_KEY = beforeApiKey;
-    if (beforeReplyBase === undefined) delete process.env.SUPPORT_REPLY_BASE_EMAIL;
+    if (beforeReplyBase === undefined)
+      delete process.env.SUPPORT_REPLY_BASE_EMAIL;
     else process.env.SUPPORT_REPLY_BASE_EMAIL = beforeReplyBase;
-    if (beforeReplySecret === undefined) delete process.env.SUPPORT_REPLY_HMAC_SECRET;
+    if (beforeReplySecret === undefined)
+      delete process.env.SUPPORT_REPLY_HMAC_SECRET;
     else process.env.SUPPORT_REPLY_HMAC_SECRET = beforeReplySecret;
   }
 });
@@ -260,24 +298,38 @@ test("messages send-email delivers to typed external recipients and stores the o
         to_email: "client@example.com; second@example.com",
         message_type: "general",
         subject: "Brief Subject",
-        body: "Thanks for reaching out."
+        body: "Thanks for reaching out.",
       });
 
     assert.equal(res.status, 201);
     assert.equal(fixture.state.sentEmails.length, 1);
-    assert.deepEqual(fixture.state.sentEmails[0].to, ["client@example.com", "second@example.com"]);
-    assert.match(String(fixture.state.sentEmails[0].replyTo || ""), /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i);
+    assert.deepEqual(fixture.state.sentEmails[0].to, [
+      "client@example.com",
+      "second@example.com",
+    ]);
+    assert.match(
+      String(fixture.state.sentEmails[0].replyTo || ""),
+      /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i,
+    );
     assert.equal(fixture.state.insertedMessages.length, 1);
     assert.equal(fixture.state.auditCalls.length, 0);
-    assert.match(fixture.state.insertedMessages[0].params[6], /client@example\.com/i);
-    assert.match(fixture.state.insertedMessages[0].params[6], /second@example\.com/i);
+    assert.match(
+      fixture.state.insertedMessages[0].params[6],
+      /client@example\.com/i,
+    );
+    assert.match(
+      fixture.state.insertedMessages[0].params[6],
+      /second@example\.com/i,
+    );
   } finally {
     fixture.cleanup();
     if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
     else process.env.RESEND_API_KEY = beforeApiKey;
-    if (beforeReplyBase === undefined) delete process.env.SUPPORT_REPLY_BASE_EMAIL;
+    if (beforeReplyBase === undefined)
+      delete process.env.SUPPORT_REPLY_BASE_EMAIL;
     else process.env.SUPPORT_REPLY_BASE_EMAIL = beforeReplyBase;
-    if (beforeReplySecret === undefined) delete process.env.SUPPORT_REPLY_HMAC_SECRET;
+    if (beforeReplySecret === undefined)
+      delete process.env.SUPPORT_REPLY_HMAC_SECRET;
     else process.env.SUPPORT_REPLY_HMAC_SECRET = beforeReplySecret;
   }
 });
@@ -292,7 +344,7 @@ test("messages send-email rejects malformed email inside a recipient list", asyn
         to_email: "client@example.com, bad-address",
         message_type: "general",
         subject: "Brief Subject",
-        body: "Thanks for reaching out."
+        body: "Thanks for reaching out.",
       });
 
     assert.equal(res.status, 400);
@@ -313,7 +365,7 @@ test("messages send-email rejects invalid recipient email", async () => {
         to_email: "not-an-email",
         message_type: "general",
         subject: "Brief Subject",
-        body: "Thanks for reaching out."
+        body: "Thanks for reaching out.",
       });
 
     assert.equal(res.status, 400);
@@ -334,7 +386,7 @@ test("messages unread-count returns split unread buckets", async () => {
       total: 4,
       messages: 1,
       support: 1,
-      notifications: 2
+      notifications: 2,
     });
   } finally {
     fixture.cleanup();
@@ -359,8 +411,8 @@ test("messages archived route returns archived inbox and sent messages", async (
       is_archived_by_receiver: false,
       parent_id: null,
       created_at: "2026-04-19T12:00:00.000Z",
-      updated_at: "2026-04-19T12:00:00.000Z"
-    }
+      updated_at: "2026-04-19T12:00:00.000Z",
+    },
   ];
 
   const fixture = loadMessagesRouter({ archivedRows });
@@ -387,63 +439,100 @@ function loadMessagesRouterForReply() {
       return {
         pool: {
           async query(sql, params = []) {
-            if (/FROM messages m\s+LEFT JOIN invoices_v1/i.test(sql.replace(/\s+/g, " "))) {
+            if (
+              /FROM messages m\s+LEFT JOIN invoices_v1/i.test(
+                sql.replace(/\s+/g, " "),
+              )
+            ) {
               return {
-                rows: [{
-                  id: MESSAGE_ID,
-                  sender_id: OWNER_ID,
-                  receiver_id: OWNER_ID,
-                  is_deleted_by_receiver: false,
-                  is_deleted_by_sender: false,
-                  invoice_id: null,
-                  invoice_number: null,
-                  business_id: null,
-                  business_name: "Test Business",
-                  owner_id: OWNER_ID,
-                  thread_root_id: MESSAGE_ID,
-                  external_sender_email: "client@example.com",
-                  external_sender_name: "Client Example",
-                  external_message_id: null,
-                  external_references: null,
-                  subject: "Need help"
-                }],
-                rowCount: 1
+                rows: [
+                  {
+                    id: MESSAGE_ID,
+                    sender_id: OWNER_ID,
+                    receiver_id: OWNER_ID,
+                    is_deleted_by_receiver: false,
+                    is_deleted_by_sender: false,
+                    invoice_id: null,
+                    invoice_number: null,
+                    business_id: null,
+                    business_name: "Test Business",
+                    owner_id: OWNER_ID,
+                    thread_root_id: MESSAGE_ID,
+                    external_sender_email: "client@example.com",
+                    external_sender_name: "Client Example",
+                    external_message_id: null,
+                    external_references: null,
+                    subject: "Need help",
+                  },
+                ],
+                rowCount: 1,
               };
             }
 
             if (/INSERT INTO messages/i.test(sql)) {
               state.insertedMessages.push({ sql, params });
-              return { rows: [{ id: "66666666-6666-4666-8666-666666666666" }], rowCount: 1 };
+              return {
+                rows: [{ id: "66666666-6666-4666-8666-666666666666" }],
+                rowCount: 1,
+              };
             }
 
             return { rows: [], rowCount: 0 };
-          }
-        }
+          },
+        },
       };
     }
 
-    if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
-      return { requireAuth: (req, _res, next) => { req.user = { id: OWNER_ID, email: "owner@example.com" }; next(); } };
+    if (
+      requestName === "../middleware/auth.middleware.js" ||
+      /auth\.middleware\.js$/.test(requestName)
+    ) {
+      return {
+        requireAuth: (req, _res, next) => {
+          req.user = { id: OWNER_ID, email: "owner@example.com" };
+          next();
+        },
+      };
     }
 
-    if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
+    if (
+      requestName === "../api/utils/resolveBusinessIdForUser.js" ||
+      /resolveBusinessIdForUser\.js$/.test(requestName)
+    ) {
       return { resolveBusinessIdForUser: async () => TEST_BUSINESS_ID };
     }
 
-    if (requestName === "../middleware/csrf.middleware.js" || /csrf\.middleware\.js$/.test(requestName)) {
+    if (
+      requestName === "../middleware/csrf.middleware.js" ||
+      /csrf\.middleware\.js$/.test(requestName)
+    ) {
       return { requireCsrfProtection: (_req, _res, next) => next() };
     }
 
-    if (requestName === "../middleware/rate-limit.middleware.js" || /rate-limit\.middleware\.js$/.test(requestName)) {
+    if (
+      requestName === "../middleware/rate-limit.middleware.js" ||
+      /rate-limit\.middleware\.js$/.test(requestName)
+    ) {
       return { createDataApiLimiter: () => (_req, _res, next) => next() };
     }
 
-    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
+    if (
+      requestName === "../utils/logger.js" ||
+      /logger\.js$/.test(requestName)
+    ) {
       return { logError() {}, logWarn() {}, logInfo() {} };
     }
 
-    if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
-      return { AUDIT_ACTIONS: {}, async recordAuditEventForRequest() { return "audit-1"; } };
+    if (
+      requestName === "../services/auditEventService.js" ||
+      /auditEventService\.js$/.test(requestName)
+    ) {
+      return {
+        AUDIT_ACTIONS: {},
+        async recordAuditEventForRequest() {
+          return "audit-1";
+        },
+      };
     }
 
     if (requestName === "resend") {
@@ -454,10 +543,10 @@ function loadMessagesRouterForReply() {
               send: async (payload) => {
                 state.sentEmails.push(payload);
                 return { data: { id: "resend-msg-1" } };
-              }
+              },
             };
           }
-        }
+        },
       };
     }
 
@@ -471,6 +560,7 @@ function loadMessagesRouterForReply() {
     const app = express();
     app.use(express.json());
     app.use("/api/messages", router);
+    attachCentralErrorHandler(app);
 
     return {
       app,
@@ -478,7 +568,7 @@ function loadMessagesRouterForReply() {
       cleanup() {
         delete require.cache[MESSAGES_ROUTE_PATH];
         Module._load = originalLoad;
-      }
+      },
     };
   } catch (err) {
     Module._load = originalLoad;
@@ -496,7 +586,10 @@ test("messages reply-email attaches an uploaded file to the outbound email", asy
     const res = await request(fixture.app)
       .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
       .field("body", "Please see the attached file.")
-      .attach("attachments", Buffer.from("id,amount\n1,2.50"), { filename: "export.csv", contentType: "text/csv" });
+      .attach("attachments", Buffer.from("id,amount\n1,2.50"), {
+        filename: "export.csv",
+        contentType: "text/csv",
+      });
 
     assert.equal(res.status, 200);
     assert.equal(fixture.state.sentEmails.length, 1);
@@ -522,14 +615,23 @@ test("messages reply-email attaches multiple uploaded files to the outbound emai
     const res = await request(fixture.app)
       .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
       .field("body", "Please see the attached files.")
-      .attach("attachments", Buffer.from("id,amount\n1,2.50"), { filename: "export.csv", contentType: "text/csv" })
-      .attach("attachments", Buffer.from("hello"), { filename: "note.txt", contentType: "text/plain" });
+      .attach("attachments", Buffer.from("id,amount\n1,2.50"), {
+        filename: "export.csv",
+        contentType: "text/csv",
+      })
+      .attach("attachments", Buffer.from("hello"), {
+        filename: "note.txt",
+        contentType: "text/plain",
+      });
 
     assert.equal(res.status, 200);
     assert.equal(fixture.state.sentEmails.length, 1);
     const sent = fixture.state.sentEmails[0];
     assert.equal(sent.attachments?.length, 2);
-    assert.deepEqual(sent.attachments.map((entry) => entry.filename).sort(), ["export.csv", "note.txt"]);
+    assert.deepEqual(sent.attachments.map((entry) => entry.filename).sort(), [
+      "export.csv",
+      "note.txt",
+    ]);
   } finally {
     fixture.cleanup();
     if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
@@ -547,7 +649,10 @@ test("messages reply-email rejects an unsupported attachment type", async () => 
     const res = await request(fixture.app)
       .post("/api/messages/55555555-5555-4555-8555-555555555555/reply-email")
       .field("body", "Please see the attached file.")
-      .attach("attachments", Buffer.from("#!/bin/sh\necho hi"), { filename: "script.sh", contentType: "application/x-sh" });
+      .attach("attachments", Buffer.from("#!/bin/sh\necho hi"), {
+        filename: "script.sh",
+        contentType: "application/x-sh",
+      });
 
     assert.equal(res.status, 400);
     assert.equal(fixture.state.sentEmails.length, 0);
@@ -594,37 +699,67 @@ function loadMessagesRouterForIsolation({ activeBusinessId, rows }) {
           async query(sql, params = []) {
             if (/WITH visible_messages AS/i.test(sql)) {
               const requestedBusinessId = params[params.length - 1];
-              const matches = rows.filter((row) => row.business_id === requestedBusinessId);
+              const matches = rows.filter(
+                (row) => row.business_id === requestedBusinessId,
+              );
               return { rows: matches, rowCount: matches.length };
             }
             return { rows: [], rowCount: 0 };
-          }
-        }
+          },
+        },
       };
     }
 
-    if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
-      return { requireAuth: (req, _res, next) => { req.user = { id: "owner-1", email: "owner@example.com" }; next(); } };
+    if (
+      requestName === "../middleware/auth.middleware.js" ||
+      /auth\.middleware\.js$/.test(requestName)
+    ) {
+      return {
+        requireAuth: (req, _res, next) => {
+          req.user = { id: "owner-1", email: "owner@example.com" };
+          next();
+        },
+      };
     }
 
-    if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
+    if (
+      requestName === "../api/utils/resolveBusinessIdForUser.js" ||
+      /resolveBusinessIdForUser\.js$/.test(requestName)
+    ) {
       return { resolveBusinessIdForUser: async () => activeBusinessId };
     }
 
-    if (requestName === "../middleware/csrf.middleware.js" || /csrf\.middleware\.js$/.test(requestName)) {
+    if (
+      requestName === "../middleware/csrf.middleware.js" ||
+      /csrf\.middleware\.js$/.test(requestName)
+    ) {
       return { requireCsrfProtection: (_req, _res, next) => next() };
     }
 
-    if (requestName === "../middleware/rate-limit.middleware.js" || /rate-limit\.middleware\.js$/.test(requestName)) {
+    if (
+      requestName === "../middleware/rate-limit.middleware.js" ||
+      /rate-limit\.middleware\.js$/.test(requestName)
+    ) {
       return { createDataApiLimiter: () => (_req, _res, next) => next() };
     }
 
-    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
+    if (
+      requestName === "../utils/logger.js" ||
+      /logger\.js$/.test(requestName)
+    ) {
       return { logError() {}, logWarn() {}, logInfo() {} };
     }
 
-    if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
-      return { AUDIT_ACTIONS: {}, async recordAuditEventForRequest() { return "audit-1"; } };
+    if (
+      requestName === "../services/auditEventService.js" ||
+      /auditEventService\.js$/.test(requestName)
+    ) {
+      return {
+        AUDIT_ACTIONS: {},
+        async recordAuditEventForRequest() {
+          return "audit-1";
+        },
+      };
     }
 
     if (requestName === "resend") {
@@ -641,13 +776,14 @@ function loadMessagesRouterForIsolation({ activeBusinessId, rows }) {
     const app = express();
     app.use(express.json());
     app.use("/api/messages", router);
+    attachCentralErrorHandler(app);
 
     return {
       app,
       cleanup() {
         delete require.cache[MESSAGES_ROUTE_PATH];
         Module._load = originalLoad;
-      }
+      },
     };
   } catch (err) {
     Module._load = originalLoad;
@@ -659,24 +795,50 @@ test("messages inbox only returns rows tagged with the currently active business
   const businessA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   const businessB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   const rows = [
-    { id: "m-a", business_id: businessA, created_at: "2026-01-01", receiver_id: "owner-1", sender_id: "other", is_read: false },
-    { id: "m-b", business_id: businessB, created_at: "2026-01-02", receiver_id: "owner-1", sender_id: "other", is_read: false }
+    {
+      id: "m-a",
+      business_id: businessA,
+      created_at: "2026-01-01",
+      receiver_id: "owner-1",
+      sender_id: "other",
+      is_read: false,
+    },
+    {
+      id: "m-b",
+      business_id: businessB,
+      created_at: "2026-01-02",
+      receiver_id: "owner-1",
+      sender_id: "other",
+      is_read: false,
+    },
   ];
 
-  const fixtureA = loadMessagesRouterForIsolation({ activeBusinessId: businessA, rows });
+  const fixtureA = loadMessagesRouterForIsolation({
+    activeBusinessId: businessA,
+    rows,
+  });
   try {
     const res = await request(fixtureA.app).get("/api/messages/inbox");
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body.messages.map((m) => m.id), ["m-a"]);
+    assert.deepEqual(
+      res.body.messages.map((m) => m.id),
+      ["m-a"],
+    );
   } finally {
     fixtureA.cleanup();
   }
 
-  const fixtureB = loadMessagesRouterForIsolation({ activeBusinessId: businessB, rows });
+  const fixtureB = loadMessagesRouterForIsolation({
+    activeBusinessId: businessB,
+    rows,
+  });
   try {
     const res = await request(fixtureB.app).get("/api/messages/inbox");
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body.messages.map((m) => m.id), ["m-b"]);
+    assert.deepEqual(
+      res.body.messages.map((m) => m.id),
+      ["m-b"],
+    );
   } finally {
     fixtureB.cleanup();
   }
