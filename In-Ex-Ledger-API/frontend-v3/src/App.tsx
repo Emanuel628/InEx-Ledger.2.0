@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import Transactions from './pages/Transactions'
 import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
@@ -30,7 +30,8 @@ import Onboarding from './pages/Onboarding'
 import Help from './pages/Help'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
 import { startInactivityMonitor } from './lib/inactivityMonitor'
-import { applyV3PhraseTranslations, getStoredLanguage, getUserLanguage, observeV3PhraseTranslations, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
+import useV3PhraseTranslations from './hooks/useV3PhraseTranslations'
+import { getStoredLanguage, getUserLanguage, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
 import { normalizeInternalPath, resolvePageFromInternalPath } from './lib/navigation'
 import { PlanProvider } from './context/PlanContext'
 
@@ -242,29 +243,15 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const theme: ThemeMode = 'light'
   const [language, setLanguage] = useState(getStoredLanguage)
-  const languageRef = useRef(language)
+  useV3PhraseTranslations(language, currentPage)
 
   useEffect(() => {
     window.localStorage.setItem('inex-theme', 'light')
   }, [])
 
   useEffect(() => {
-    languageRef.current = language
     document.documentElement.lang = language
   }, [language])
-
-  useEffect(() => {
-    const root = document.getElementById('root')
-    if (!root) return undefined
-    const observer = observeV3PhraseTranslations(root, () => languageRef.current)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const root = document.getElementById('root')
-    if (!root) return
-    window.requestAnimationFrame(() => applyV3PhraseTranslations(root, language))
-  }, [currentPage, language])
 
   useEffect(() => {
     const nextLanguage = getUserLanguage(authUser)

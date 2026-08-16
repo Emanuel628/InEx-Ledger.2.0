@@ -227,6 +227,7 @@ test("v3 header notifications use real unread message counts without noisy local
 
 test("v3 shell has an SPA-owned i18n runtime wired to business language", () => {
   const appSource = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
+  const translationHookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useV3PhraseTranslations.ts"), "utf8");
   const shellSource = normalizeNewlines(
     fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8")
   );
@@ -244,6 +245,13 @@ test("v3 shell has an SPA-owned i18n runtime wired to business language", () => 
   assert.match(appSource, /getUserLanguage\(authUser\)/);
   assert.match(appSource, /setStoredLanguage\(nextLanguage\)/);
   assert.match(appSource, /translate\('app\.loading\.title', language\)/);
+  assert.match(appSource, /useV3PhraseTranslations\(language, currentPage\)/);
+  assert.doesNotMatch(appSource, /observeV3PhraseTranslations/);
+  assert.doesNotMatch(appSource, /applyV3PhraseTranslations/);
+  assert.doesNotMatch(appSource, /document\.getElementById\('root'\)/);
+  assert.match(translationHookSource, /observeV3PhraseTranslations\(root, \(\) => languageRef\.current\)/);
+  assert.match(translationHookSource, /applyV3PhraseTranslations\(root, language\)/);
+  assert.match(translationHookSource, /window\.requestAnimationFrame/);
   assert.match(appSource, /language: AppLanguage/);
   assert.match(appSource, /onLanguageChange: \(language: AppLanguage\) => void/);
   // AppShell consumes the same shared `language` from PageProps rather than

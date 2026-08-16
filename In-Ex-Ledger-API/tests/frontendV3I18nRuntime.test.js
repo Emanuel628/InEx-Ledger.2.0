@@ -52,6 +52,7 @@ test("v3 i18n catalog ships identical key coverage for every supported language"
 test("v3 i18n runtime is independent from the legacy data-i18n HTML pipeline", async () => {
   const source = fs.readFileSync(i18nPath, "utf8");
   const appSource = read("App.tsx");
+  const translationHookSource = read(path.join("hooks", "useV3PhraseTranslations.ts"));
   const shellSource = read(path.join("components", "AppShell.tsx"));
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
   const runner = await import("../scripts/run-all-node-tests.mjs");
@@ -65,13 +66,16 @@ test("v3 i18n runtime is independent from the legacy data-i18n HTML pipeline", a
   assert.match(source, /export function normalizeLanguage/);
   assert.match(source, /export function setStoredLanguage/);
   assert.match(appSource, /setStoredLanguage\(nextLanguage\)/);
-  assert.match(appSource, /observeV3PhraseTranslations\(root, \(\) => languageRef\.current\)/);
-  assert.match(appSource, /applyV3PhraseTranslations\(root, language\)/);
+  assert.match(appSource, /useV3PhraseTranslations\(language, currentPage\)/);
+  assert.doesNotMatch(appSource, /observeV3PhraseTranslations\(root/);
+  assert.doesNotMatch(appSource, /applyV3PhraseTranslations\(root/);
+  assert.match(translationHookSource, /observeV3PhraseTranslations\(root, \(\) => languageRef\.current\)/);
+  assert.match(translationHookSource, /applyV3PhraseTranslations\(root, language\)/);
   assert.match(shellSource, /const t = \(key: TranslationKey\) => translate\(key, language\)/);
   assert.match(pkg.scripts["build:frontend-v3"], /build-v3-phrase-catalog\.mjs/);
   assert.ok(runner.listNodeTestFiles(repoRoot).includes("tests/frontendV3I18nRuntime.test.js"));
-  assert.doesNotMatch(`${source}\n${appSource}\n${shellSource}`, /data-i18n/);
-  assert.doesNotMatch(`${source}\n${appSource}\n${shellSource}`, /public\/js\/i18n/);
+  assert.doesNotMatch(`${source}\n${appSource}\n${translationHookSource}\n${shellSource}`, /data-i18n/);
+  assert.doesNotMatch(`${source}\n${appSource}\n${translationHookSource}\n${shellSource}`, /public\/js\/i18n/);
 });
 
 test("v3 phrase catalog is generated from current TSX visible copy", () => {
