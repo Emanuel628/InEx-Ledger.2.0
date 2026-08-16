@@ -350,6 +350,7 @@ authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
   }
 
   const client = getPlaidClient();
+  const previousCursor = connection.cursor || null;
   let cursor = connection.cursor || null;
   let added = [];
   let modified = [];
@@ -445,18 +446,23 @@ authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
 
   let inserted = 0;
   let skippedUnknownAccount = 0;
+  let failed = 0;
   let duplicates = 0;
   for (const raw of added) {
     const internalAccount = accountMap.get(raw.account_id);
     if (!internalAccount) {
       skippedUnknownAccount += 1;
+      failed += 1;
       continue;
     }
     const canonical = plaidTransactionToCanonical(raw, {
       accountId: internalAccount.id,
       defaultCurrency: internalAccount.currency || "USD"
     });
-    if (!canonical || !canonical.date) continue;
+    if (!canonical || !canonical.date) {
+      failed += 1;
+      continue;
+    }
     const mappedCategory = categorizeImportedTransaction({
       type: canonical.type,
       description: canonical.description,
@@ -505,6 +511,7 @@ authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
       if (insertResult.rowCount) inserted += 1;
       else duplicates += 1;
     } catch (err) {
+      failed += 1;
       logWarn("plaid insert transaction failed:", err.message);
     }
   }
@@ -524,20 +531,26 @@ authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
         [businessId, raw.transaction_id]
       );
       const existingTxn = existingTxnResult.rows[0] || null;
+      if (!existingTxn) {
+        failed += 1;
+        continue;
+      }
       const canonical = plaidTransactionToCanonical(raw, {
-        accountId: existingTxn?.account_id || null,
-        defaultCurrency: existingTxn?.currency || "USD"
+        accountId: existingTxn.account_id,
+        defaultCurrency: existingTxn.currency || "USD"
       });
-      const mappedCategory = canonical
-        ? categorizeImportedTransaction({
-          type: canonical.type,
-          description: canonical.description,
-          merchantName: canonical.merchant_name,
-          categoryGuess: canonical.category_guess
-        })
-        : null;
+      if (!canonical) {
+        failed += 1;
+        continue;
+      }
+      const mappedCategory = categorizeImportedTransaction({
+        type: canonical.type,
+        description: canonical.description,
+        merchantName: canonical.merchant_name,
+        categoryGuess: canonical.category_guess
+      });
       const mappingMeta = getMappingMetadata(mappedCategory);
-      const categoryId = mappedCategory?.categoryName && canonical
+      const categoryId = mappedCategory?.categoryName
         ? await getOrCreateImportedCategoryId(mappedCategory.categoryName, canonical.type)
         : null;
       const upd = await pool.query(
@@ -575,6 +588,7 @@ authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
       );
       modifiedApplied += upd.rowCount;
     } catch (err) {
+      failed += 1;
       logWarn("plaid modify transaction failed:", err.message);
     }
   }
@@ -597,6 +611,7 @@ authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
       );
       removedApplied += del.rowCount;
     } catch (err) {
+      failed += 1;
       logWarn("plaid remove transaction failed:", err.message);
     }
   }
@@ -604,14 +619,17 @@ authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
   await finalizeImportBatch(pool, batch.id, {
     imported: inserted,
     duplicate: duplicates,
-    failed: 0,
+    failed,
     totalRows: added.length + modified.length + removed.length
   });
 
+  const cursorAdvanced = failed === 0;
   await updateBankConnectionStatus(pool, businessId, connectionId, {
-    status: "active",
-    lastError: null,
-    cursor
+    status: cursorAdvanced ? "active" : "error",
+    lastError: cursorAdvanced
+      ? null
+      : `Plaid sync had ${failed} row-level failure${failed === 1 ? "" : "s"}; cursor was not advanced.`,
+    cursor: cursorAdvanced ? cursor : previousCursor
   });
 
   res.json({
@@ -622,6 +640,8 @@ authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
     modified: modifiedApplied,
     removed: removedApplied,
     skipped_unknown_account: skippedUnknownAccount,
+    failed,
+    cursor_advanced: cursorAdvanced,
     has_more: false
   });
 }));

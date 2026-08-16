@@ -26,7 +26,12 @@ function makeCategory(id, name, kind, taxMapUs) {
   };
 }
 
-function loadPlaidRouterWithState({ failGetConnection = false } = {}) {
+function loadPlaidRouterWithState({
+  failGetConnection = false,
+  failInsert = false,
+  missingPlaidAccount = false,
+  connectionCursor = null
+} = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
     queries: [],
@@ -52,8 +57,8 @@ function loadPlaidRouterWithState({ failGetConnection = false } = {}) {
 
       if (/SELECT id, external_account_id, currency\s+FROM accounts/i.test(sql)) {
         return {
-          rows: [{ id: accountId, external_account_id: "plaid-account-1", currency: "USD" }],
-          rowCount: 1
+          rows: missingPlaidAccount ? [] : [{ id: accountId, external_account_id: "plaid-account-1", currency: "USD" }],
+          rowCount: missingPlaidAccount ? 0 : 1
         };
       }
 
@@ -83,6 +88,9 @@ function loadPlaidRouterWithState({ failGetConnection = false } = {}) {
       }
 
       if (/INSERT INTO transactions/i.test(sql)) {
+        if (failInsert) {
+          throw new Error("insert failed");
+        }
         state.inserted.push({
           category_id: params[3],
           merchant_name: params[10],
@@ -220,7 +228,7 @@ function loadPlaidRouterWithState({ failGetConnection = false } = {}) {
           return {
             id: connectionId,
             provider: "plaid",
-            cursor: null
+            cursor: connectionCursor
           };
         },
         decryptAccessToken() {
@@ -306,6 +314,58 @@ test("POST /api/plaid/connections/:id/sync applies categorization and mapping me
     lastError: null,
     cursor: "cursor-next-1"
   });
+  assert.equal(response.body.failed, 0);
+  assert.equal(response.body.cursor_advanced, true);
+});
+
+test("POST /api/plaid/connections/:id/sync does not advance cursor after row-level failures", async () => {
+  const { app, state, connectionId } = loadPlaidRouterWithState({
+    connectionCursor: "cursor-prev-1",
+    failInsert: true
+  });
+
+  const response = await request(app)
+    .post(`/api/plaid/connections/${connectionId}/sync`)
+    .send({});
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.inserted, 0);
+  assert.equal(response.body.modified, 1);
+  assert.equal(response.body.failed, 1);
+  assert.equal(response.body.cursor_advanced, false);
+
+  assert.deepEqual(state.finalizedBatch, {
+    batchId: "batch-plaid-1",
+    summary: {
+      imported: 0,
+      duplicate: 0,
+      failed: 1,
+      totalRows: 2
+    }
+  });
+
+  assert.equal(state.updatedConnectionStatus.status, "error");
+  assert.match(state.updatedConnectionStatus.lastError, /1 row-level failure/);
+  assert.equal(state.updatedConnectionStatus.cursor, "cursor-prev-1");
+});
+
+test("POST /api/plaid/connections/:id/sync treats unknown Plaid accounts as retry-blocking failures", async () => {
+  const { app, state, connectionId } = loadPlaidRouterWithState({
+    connectionCursor: "cursor-prev-2",
+    missingPlaidAccount: true
+  });
+
+  const response = await request(app)
+    .post(`/api/plaid/connections/${connectionId}/sync`)
+    .send({});
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.inserted, 0);
+  assert.equal(response.body.skipped_unknown_account, 1);
+  assert.equal(response.body.failed, 1);
+  assert.equal(response.body.cursor_advanced, false);
+  assert.equal(state.updatedConnectionStatus.status, "error");
+  assert.equal(state.updatedConnectionStatus.cursor, "cursor-prev-2");
 });
 
 test("POST /api/plaid/connections/:id/sync rejects invalid connection ids", async () => {
