@@ -8,6 +8,7 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError, logInfo } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const { sendInvoiceEmail } = require("../services/invoiceEmailService.js");
 const { sendInvoiceOwnerActivityEmail } = require("../services/invoiceOwnerEmailService.js");
 const {
@@ -200,426 +201,393 @@ async function generateInvoiceNumber(businessId) {
 }
 
 /* ── GET /api/invoices-v1 ── list invoices */
-/* ── GET /api/invoices-v1 ── list invoices */
-router.get("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+router.get("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const status = req.query.status ? String(req.query.status).toLowerCase() : null;
-    const params = [businessId];
+  const status = req.query.status ? String(req.query.status).toLowerCase() : null;
+  const params = [businessId];
 
-    let where = "WHERE business_id = $1 AND deleted_at IS NULL";
+  let where = "WHERE business_id = $1 AND deleted_at IS NULL";
 
-if (status === "deleted") {
-  where = "WHERE business_id = $1 AND deleted_at IS NOT NULL";
-} else if (status && VALID_STATUSES.has(status)) {
-  where += " AND status = $2";
-  params.push(status);
-}
+  if (status === "deleted") {
+    where = "WHERE business_id = $1 AND deleted_at IS NOT NULL";
+  } else if (status && VALID_STATUSES.has(status)) {
+    where += " AND status = $2";
+    params.push(status);
+  }
 
-    const result = await pool.query(
-      `SELECT id, title, invoice_number, customer_name, customer_email, issue_date, due_date,
+  const result = await pool.query(
+    `SELECT id, title, invoice_number, customer_name, customer_email, issue_date, due_date,
               status, currency, subtotal, tax_rate, tax_amount, total_amount, notes,
               line_items, created_at, updated_at
        FROM invoices_v1
        ${where}
        ORDER BY issue_date DESC, created_at DESC
        LIMIT 200`,
-      params
-    );
+    params
+  );
 
-    res.json(result.rows);
-  } catch (err) {
-    logError("GET /invoices-v1 error:", err);
-    res.status(500).json({ error: "Failed to load invoices." });
-  }
-});
+  res.json(result.rows);
+}));
 
 /* ── POST /api/invoices-v1 ── create invoice */
-router.post("/", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+router.post("/", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const validation = validateInvoicePayload(req.body);
-    if (!validation.valid) {
-      return res.status(400).json({ error: validation.message });
-    }
+  const validation = validateInvoicePayload(req.body);
+  if (!validation.valid) {
+    throw new ApiError(400, validation.message);
+  }
 
-    const { title, customer_name, customer_email, issue_date, due_date, currency,
-            line_items, subtotal, tax_rate, tax_amount, total_amount, notes } = validation.normalized;
+  const { title, customer_name, customer_email, issue_date, due_date, currency,
+          line_items, subtotal, tax_rate, tax_amount, total_amount, notes } = validation.normalized;
 
-    const status = String(req.body.status || "draft").toLowerCase();
-    const finalStatus = VALID_STATUSES.has(status) ? status : "draft";
-    let createdInvoice = null;
+  const status = String(req.body.status || "draft").toLowerCase();
+  const finalStatus = VALID_STATUSES.has(status) ? status : "draft";
+  let createdInvoice = null;
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const invoiceNumber = await generateInvoiceNumber(businessId);
-      try {
-        const result = await pool.query(
-          `INSERT INTO invoices_v1
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const invoiceNumber = await generateInvoiceNumber(businessId);
+    try {
+      const result = await pool.query(
+        `INSERT INTO invoices_v1
             (id, business_id, title, invoice_number, customer_name, customer_email,
              issue_date, due_date, status, currency, line_items,
              subtotal, tax_rate, tax_amount, total_amount, notes, created_at, updated_at)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now(),now())
            RETURNING *`,
-          [
-            crypto.randomUUID(), businessId, title, invoiceNumber, customer_name, customer_email,
-            issue_date, due_date, finalStatus, currency, JSON.stringify(line_items),
-            subtotal, tax_rate, tax_amount, total_amount, notes
-          ]
-        );
-        createdInvoice = result.rows[0];
-        break;
-      } catch (err) {
-        if (err?.code === "23505") {
-          continue;
-        }
-        throw err;
+        [
+          crypto.randomUUID(), businessId, title, invoiceNumber, customer_name, customer_email,
+          issue_date, due_date, finalStatus, currency, JSON.stringify(line_items),
+          subtotal, tax_rate, tax_amount, total_amount, notes
+        ]
+      );
+      createdInvoice = result.rows[0];
+      break;
+    } catch (err) {
+      if (err?.code === "23505") {
+        continue;
       }
+      throw err;
     }
-
-    if (!createdInvoice) {
-      return res.status(409).json({ error: "Could not generate a unique invoice number. Please try again." });
-    }
-
-    res.status(201).json(createdInvoice);
-  } catch (err) {
-    logError("POST /invoices-v1 error:", err);
-    res.status(500).json({ error: "Failed to create invoice." });
   }
-});
+
+  if (!createdInvoice) {
+    throw new ApiError(409, "Could not generate a unique invoice number. Please try again.");
+  }
+
+  res.status(201).json(createdInvoice);
+}));
 
 /* ── GET /api/invoices-v1/:id ── get single invoice */
-router.get("/:id", async (req, res) => {
+router.get("/:id", asyncRoute(async (req, res) => {
   if (!UUID_RE.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid invoice ID." });
+    throw new ApiError(400, "Invalid invoice ID.");
   }
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const result = await pool.query(
-      "SELECT * FROM invoices_v1 WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
-      [req.params.id, businessId]
-    );
-    if (!result.rowCount) return res.status(404).json({ error: "Invoice not found." });
+  const result = await pool.query(
+    "SELECT * FROM invoices_v1 WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
+    [req.params.id, businessId]
+  );
+  if (!result.rowCount) throw new ApiError(404, "Invoice not found.");
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    logError("GET /invoices-v1/:id error:", err);
-    res.status(500).json({ error: "Failed to load invoice." });
-  }
-});
+  res.json(result.rows[0]);
+}));
 
 /* ── PUT /api/invoices-v1/:id ── update invoice */
-router.put("/:id", async (req, res) => {
+router.put("/:id", asyncRoute(async (req, res) => {
   if (!UUID_RE.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid invoice ID." });
+    throw new ApiError(400, "Invalid invoice ID.");
   }
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const existing = await pool.query(
-      "SELECT id, status FROM invoices_v1 WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
-      [req.params.id, businessId]
-    );
-    if (!existing.rowCount) return res.status(404).json({ error: "Invoice not found." });
-    if (existing.rows[0].status === "paid" || existing.rows[0].status === "void") {
-      return res.status(409).json({ error: "Paid or voided invoices cannot be edited." });
-    }
+  const existing = await pool.query(
+    "SELECT id, status FROM invoices_v1 WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
+    [req.params.id, businessId]
+  );
+  if (!existing.rowCount) throw new ApiError(404, "Invoice not found.");
+  if (existing.rows[0].status === "paid" || existing.rows[0].status === "void") {
+    throw new ApiError(409, "Paid or voided invoices cannot be edited.");
+  }
 
-    const validation = validateInvoicePayload(req.body);
-    if (!validation.valid) return res.status(400).json({ error: validation.message });
+  const validation = validateInvoicePayload(req.body);
+  if (!validation.valid) throw new ApiError(400, validation.message);
 
-    const { title, customer_name, customer_email, issue_date, due_date, currency,
-            line_items, subtotal, tax_rate, tax_amount, total_amount, notes } = validation.normalized;
+  const { title, customer_name, customer_email, issue_date, due_date, currency,
+          line_items, subtotal, tax_rate, tax_amount, total_amount, notes } = validation.normalized;
 
-    const statusRaw = String(req.body.status || existing.rows[0].status).toLowerCase();
-    const status = VALID_STATUSES.has(statusRaw) ? statusRaw : existing.rows[0].status;
+  const statusRaw = String(req.body.status || existing.rows[0].status).toLowerCase();
+  const status = VALID_STATUSES.has(statusRaw) ? statusRaw : existing.rows[0].status;
 
-    const result = await pool.query(
-      `UPDATE invoices_v1
+  const result = await pool.query(
+    `UPDATE invoices_v1
        SET title=$1, customer_name=$2, customer_email=$3, issue_date=$4, due_date=$5, status=$6,
            currency=$7, line_items=$8, subtotal=$9, tax_rate=$10, tax_amount=$11,
            total_amount=$12, notes=$13, updated_at=now()
        WHERE id=$14 AND business_id=$15 AND deleted_at IS NULL
        RETURNING *`,
-      [title, customer_name, customer_email, issue_date, due_date, status, currency,
-       JSON.stringify(line_items), subtotal, tax_rate, tax_amount, total_amount, notes,
-       req.params.id, businessId]
-    );
+    [title, customer_name, customer_email, issue_date, due_date, status, currency,
+     JSON.stringify(line_items), subtotal, tax_rate, tax_amount, total_amount, notes,
+     req.params.id, businessId]
+  );
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    logError("PUT /invoices-v1/:id error:", err);
-    res.status(500).json({ error: "Failed to update invoice." });
-  }
-});
+  res.json(result.rows[0]);
+}));
 
 /* ── PATCH /api/invoices-v1/:id/status ── mark sent/paid/void */
-router.patch("/:id/status", async (req, res) => {
+router.patch("/:id/status", asyncRoute(async (req, res) => {
   if (!UUID_RE.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid invoice ID." });
+    throw new ApiError(400, "Invalid invoice ID.");
   }
   const newStatus = String(req.body?.status || "").toLowerCase();
   if (!VALID_STATUSES.has(newStatus)) {
-    return res.status(400).json({ error: "status must be one of: draft, sent, paid, void." });
+    throw new ApiError(400, "status must be one of: draft, sent, paid, void.");
   }
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const result = await pool.query(
-      "UPDATE invoices_v1 SET status=$1, updated_at=now() WHERE id=$2 AND business_id=$3 AND deleted_at IS NULL RETURNING *",
-      [newStatus, req.params.id, businessId]
-    );
-    if (!result.rowCount) return res.status(404).json({ error: "Invoice not found." });
+  const result = await pool.query(
+    "UPDATE invoices_v1 SET status=$1, updated_at=now() WHERE id=$2 AND business_id=$3 AND deleted_at IS NULL RETURNING *",
+    [newStatus, req.params.id, businessId]
+  );
+  if (!result.rowCount) throw new ApiError(404, "Invoice not found.");
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    logError("PATCH /invoices-v1/:id/status error:", err);
-    res.status(500).json({ error: "Failed to update invoice status." });
-  }
-});
+  res.json(result.rows[0]);
+}));
 
 /* ── POST /api/invoices-v1/:id/send ── email the invoice to the customer */
-router.post("/:id/send", invoiceAttachmentsUpload.array("attachments", MAX_INVOICE_ATTACHMENTS), async (req, res) => {
+router.post("/:id/send", invoiceAttachmentsUpload.array("attachments", MAX_INVOICE_ATTACHMENTS), asyncRoute(async (req, res) => {
   if (!UUID_RE.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid invoice ID." });
+    throw new ApiError(400, "Invalid invoice ID.");
   }
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const existing = await pool.query(
-      `SELECT i.*, b.name AS business_name
+  const existing = await pool.query(
+    `SELECT i.*, b.name AS business_name
          FROM invoices_v1 i
          JOIN businesses b ON b.id = i.business_id
         WHERE i.id = $1 AND i.business_id = $2
         AND i.deleted_at IS NULL
         LIMIT 1`,
-      [req.params.id, businessId]
-    );
-    if (!existing.rowCount) return res.status(404).json({ error: "Invoice not found." });
-    const invoice = existing.rows[0];
+    [req.params.id, businessId]
+  );
+  if (!existing.rowCount) throw new ApiError(404, "Invoice not found.");
+  const invoice = existing.rows[0];
 
-    const parsedTo = parseEmailList(req.body?.recipient_email || invoice.customer_email || "");
-    if (!parsedTo.ok) {
-      return res.status(400).json({ error: `Invalid recipient email: ${parsedTo.invalid}` });
-    }
-    if (!parsedTo.emails.length) {
-      return res.status(400).json({ error: "Invoice has no customer email. Add one before sending." });
-    }
-    const parsedCc = parseEmailList(req.body?.cc_emails || "");
-    if (!parsedCc.ok) {
-      return res.status(400).json({ error: `Invalid CC email: ${parsedCc.invalid}` });
-    }
-    const ccEmails = parsedCc.emails.filter((email) => !parsedTo.emails.includes(email));
-    const recipientEmail = parsedTo.emails.join(", ");
-    const ccEmailText = ccEmails.join(", ");
+  const parsedTo = parseEmailList(req.body?.recipient_email || invoice.customer_email || "");
+  if (!parsedTo.ok) {
+    throw new ApiError(400, `Invalid recipient email: ${parsedTo.invalid}`);
+  }
+  if (!parsedTo.emails.length) {
+    throw new ApiError(400, "Invoice has no customer email. Add one before sending.");
+  }
+  const parsedCc = parseEmailList(req.body?.cc_emails || "");
+  if (!parsedCc.ok) {
+    throw new ApiError(400, `Invalid CC email: ${parsedCc.invalid}`);
+  }
+  const ccEmails = parsedCc.emails.filter((email) => !parsedTo.emails.includes(email));
+  const recipientEmail = parsedTo.emails.join(", ");
+  const ccEmailText = ccEmails.join(", ");
 
-    const customMessage = String(req.body?.message || "").trim().slice(0, 2000) || null;
+  const customMessage = String(req.body?.message || "").trim().slice(0, 2000) || null;
 
-    const resendClient = getResendClient();
-    let sendResult;
-    try {
-      sendResult = await sendInvoiceEmail(resendClient, {
-        invoice,
-        recipientEmail: parsedTo.emails,
-        ccEmails,
-        businessName: invoice.business_name,
-        senderName: req.user?.email || null,
-        customMessage,
-        attachments: req.files?.length ? buildResendAttachments(req.files) : undefined
-      });
-    } catch (err) {
-      const status = err.status || 502;
-      logError("POST /invoices-v1/:id/send error:", {
-        message: err.message,
-        code: err.code || "email_failed", 
-        details: err.details || null
-      });
-      await sendInvoiceOwnerActivityEmail({
-        businessId,
-        kind: "failed",
-        userId: req.user.id,
-        actionUrl: "/invoices",
-        details: [
-          { label: "Invoice", value: invoice.invoice_number || "Invoice" },
-          { label: "Recipient", value: recipientEmail },
-          ...(ccEmailText ? [{ label: "CC", value: ccEmailText }] : []),
-          ...(err.message ? [{ label: "Issue", value: String(err.message).slice(0, 300) }] : [])
-        ]
-      });
-      return res.status(status).json({
-        error: err.message,
-        code: err.code || "email_failed",
-        details: err.details || null
-      });
-    }
-
-    // Bump invoice status to "sent" when it was still a draft.
-    if (invoice.status === "draft") {
-      await pool.query(
-        "UPDATE invoices_v1 SET status = 'sent', updated_at = now() WHERE id = $1 AND business_id = $2",
-        [invoice.id, businessId]
-      );
-    }
-
-    // Record an outbound message so the activity shows up in Messages.
-    const messageId = crypto.randomUUID();
-    await pool.query(
-      `INSERT INTO messages
-         (id, sender_id, receiver_id, message_type, subject, body,
-          external_sender_email, external_sender_name, invoice_id, business_id)
-       VALUES ($1, $2, $2, 'invoice_sent', $3, $4, $5, $6, $7, $8)`,
-      [
-        messageId,
-        req.user.id,
-        `Invoice: ${invoice.title || invoice.invoice_number}`,
-        customMessage || `Invoice ${invoice.invoice_number} was emailed to ${recipientEmail}${ccEmailText ? ` (cc ${ccEmailText})` : ""}.`,
-        recipientEmail,
-        invoice.customer_name || null,
-        invoice.id,
-        businessId
-      ]
-    );
-
-    await recordAuditEventForRequest(pool, req, {
-      userId: req.user.id,
-      businessId,
-      action: "invoice.sent",
-      metadata: {
-        invoice_id: invoice.id,
-        recipient: recipientEmail,
-        cc: ccEmails,
-        resend_id: sendResult?.data?.id || null
-      }
+  const resendClient = getResendClient();
+  let sendResult;
+  try {
+    sendResult = await sendInvoiceEmail(resendClient, {
+      invoice,
+      recipientEmail: parsedTo.emails,
+      ccEmails,
+      businessName: invoice.business_name,
+      senderName: req.user?.email || null,
+      customMessage,
+      attachments: req.files?.length ? buildResendAttachments(req.files) : undefined
     });
-
-    logInfo("Invoice email sent", {
-      invoiceId: invoice.id,
-      recipient: recipientEmail,
-      cc: ccEmails
+  } catch (err) {
+    const status = err.status || 502;
+    logError("POST /invoices-v1/:id/send error:", {
+      message: err.message,
+      code: err.code || "email_failed",
+      details: err.details || null
     });
     await sendInvoiceOwnerActivityEmail({
       businessId,
-      kind: "sent",
+      kind: "failed",
       userId: req.user.id,
       actionUrl: "/invoices",
       details: [
         { label: "Invoice", value: invoice.invoice_number || "Invoice" },
         { label: "Recipient", value: recipientEmail },
         ...(ccEmailText ? [{ label: "CC", value: ccEmailText }] : []),
-        { label: "Total", value: `${invoice.currency} ${Number(invoice.total_amount || 0).toFixed(2)}` }
+        ...(err.message ? [{ label: "Issue", value: String(err.message).slice(0, 300) }] : [])
       ]
     });
-
-    res.json({
-      ok: true,
-      message_id: messageId,
-      recipient_email: recipientEmail,
-      cc_emails: ccEmails,
-      resend_id: sendResult?.data?.id || null
+    return res.status(status).json({
+      error: err.message,
+      code: err.code || "email_failed",
+      details: err.details || null
     });
-  } catch (err) {
-    logError("POST /invoices-v1/:id/send error:", err);
-    res.status(500).json({ error: "Failed to send invoice." });
-  }
-});
-
-/* ── DELETE /api/invoices-v1/:id ── delete draft invoice */
-/* ── DELETE /api/invoices-v1/:id ── soft-delete invoice */
-router.delete("/:id", async (req, res) => {
-  if (!UUID_RE.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid invoice ID." });
   }
 
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-
-    const existing = await pool.query(
-      "SELECT id, status, deleted_at FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
-      [req.params.id, businessId]
-    );
-
-    if (!existing.rowCount || existing.rows[0].deleted_at) {
-      return res.status(404).json({ error: "Invoice not found." });
-    }
-
+  // Bump invoice status to "sent" when it was still a draft.
+  if (invoice.status === "draft") {
     await pool.query(
-      `UPDATE invoices_v1
+      "UPDATE invoices_v1 SET status = 'sent', updated_at = now() WHERE id = $1 AND business_id = $2",
+      [invoice.id, businessId]
+    );
+  }
+
+  // Record an outbound message so the activity shows up in Messages.
+  const messageId = crypto.randomUUID();
+  await pool.query(
+    `INSERT INTO messages
+         (id, sender_id, receiver_id, message_type, subject, body,
+          external_sender_email, external_sender_name, invoice_id, business_id)
+       VALUES ($1, $2, $2, 'invoice_sent', $3, $4, $5, $6, $7, $8)`,
+    [
+      messageId,
+      req.user.id,
+      `Invoice: ${invoice.title || invoice.invoice_number}`,
+      customMessage || `Invoice ${invoice.invoice_number} was emailed to ${recipientEmail}${ccEmailText ? ` (cc ${ccEmailText})` : ""}.`,
+      recipientEmail,
+      invoice.customer_name || null,
+      invoice.id,
+      businessId
+    ]
+  );
+
+  await recordAuditEventForRequest(pool, req, {
+    userId: req.user.id,
+    businessId,
+    action: "invoice.sent",
+    metadata: {
+      invoice_id: invoice.id,
+      recipient: recipientEmail,
+      cc: ccEmails,
+      resend_id: sendResult?.data?.id || null
+    }
+  });
+
+  logInfo("Invoice email sent", {
+    invoiceId: invoice.id,
+    recipient: recipientEmail,
+    cc: ccEmails
+  });
+  await sendInvoiceOwnerActivityEmail({
+    businessId,
+    kind: "sent",
+    userId: req.user.id,
+    actionUrl: "/invoices",
+    details: [
+      { label: "Invoice", value: invoice.invoice_number || "Invoice" },
+      { label: "Recipient", value: recipientEmail },
+      ...(ccEmailText ? [{ label: "CC", value: ccEmailText }] : []),
+      { label: "Total", value: `${invoice.currency} ${Number(invoice.total_amount || 0).toFixed(2)}` }
+    ]
+  });
+
+  res.json({
+    ok: true,
+    message_id: messageId,
+    recipient_email: recipientEmail,
+    cc_emails: ccEmails,
+    resend_id: sendResult?.data?.id || null
+  });
+}));
+
+/* ── DELETE /api/invoices-v1/:id ── soft-delete invoice */
+router.delete("/:id", asyncRoute(async (req, res) => {
+  if (!UUID_RE.test(req.params.id)) {
+    throw new ApiError(400, "Invalid invoice ID.");
+  }
+
+  const businessId = await resolveBusinessIdForUser(req.user);
+
+  const existing = await pool.query(
+    "SELECT id, status, deleted_at FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
+    [req.params.id, businessId]
+  );
+
+  if (!existing.rowCount || existing.rows[0].deleted_at) {
+    throw new ApiError(404, "Invoice not found.");
+  }
+
+  await pool.query(
+    `UPDATE invoices_v1
           SET deleted_at = NOW(),
               deleted_by = $1,
               updated_at = NOW()
         WHERE id = $2
           AND business_id = $3
           AND deleted_at IS NULL`,
-      [req.user.id, req.params.id, businessId]
-    );
+    [req.user.id, req.params.id, businessId]
+  );
 
-    await recordAuditEventForRequest(pool, req, {
-      userId: req.user.id,
-      businessId,
-      action: "invoice.deleted",
-      metadata: {
-        invoice_id: req.params.id,
-        previous_status: existing.rows[0].status
-      }
-    });
+  await recordAuditEventForRequest(pool, req, {
+    userId: req.user.id,
+    businessId,
+    action: "invoice.deleted",
+    metadata: {
+      invoice_id: req.params.id,
+      previous_status: existing.rows[0].status
+    }
+  });
 
-    res.json({ ok: true });
-  } catch (err) {
-    logError("DELETE /invoices-v1/:id error:", err);
-    res.status(500).json({ error: "Failed to delete invoice." });
-  }
-});
+  res.json({ ok: true });
+}));
 
 /* ── PATCH /api/invoices-v1/:id/restore ── restore soft-deleted invoice */
-router.patch("/:id/restore", async (req, res) => {
+router.patch("/:id/restore", asyncRoute(async (req, res) => {
   if (!UUID_RE.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid invoice ID." });
+    throw new ApiError(400, "Invalid invoice ID.");
   }
 
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const existing = await pool.query(
-      "SELECT id, status, deleted_at FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
-      [req.params.id, businessId]
-    );
+  const existing = await pool.query(
+    "SELECT id, status, deleted_at FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
+    [req.params.id, businessId]
+  );
 
-    if (!existing.rowCount) {
-      return res.status(404).json({ error: "Invoice not found." });
-    }
+  if (!existing.rowCount) {
+    throw new ApiError(404, "Invoice not found.");
+  }
 
-    if (!existing.rows[0].deleted_at) {
-      return res.status(409).json({ error: "Invoice is not deleted." });
-    }
+  if (!existing.rows[0].deleted_at) {
+    throw new ApiError(409, "Invoice is not deleted.");
+  }
 
-    const result = await pool.query(
-      `UPDATE invoices_v1
+  const result = await pool.query(
+    `UPDATE invoices_v1
           SET deleted_at = NULL,
               deleted_by = NULL,
               updated_at = NOW()
         WHERE id = $1
           AND business_id = $2
         RETURNING *`,
-      [req.params.id, businessId]
-    );
+    [req.params.id, businessId]
+  );
 
-    await recordAuditEventForRequest(pool, req, {
-      userId: req.user.id,
-      businessId,
-      action: "invoice.restored",
-      metadata: {
-        invoice_id: req.params.id,
-        status: existing.rows[0].status
-      }
-    });
+  await recordAuditEventForRequest(pool, req, {
+    userId: req.user.id,
+    businessId,
+    action: "invoice.restored",
+    metadata: {
+      invoice_id: req.params.id,
+      status: existing.rows[0].status
+    }
+  });
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    logError("PATCH /invoices-v1/:id/restore error:", err);
-    res.status(500).json({ error: "Failed to restore invoice." });
+  res.json(result.rows[0]);
+}));
+
+router.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) {
+    logError("invoices-v1 route error:", err);
   }
+  const error = status < 500 ? err.message : "Internal server error";
+  res.status(status).json({ error });
 });
 
 module.exports = router;

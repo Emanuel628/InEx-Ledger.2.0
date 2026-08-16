@@ -363,6 +363,15 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   `tests/supportEmailThreading.test.js` so database insert failures no longer
   leak operational details. Focused inbound email suites: **5/5 passing**. Now
   **27 of 40** route files use the pattern. Phase score unchanged at **3.75/5**.
+  **Follow-up, same PR sequence**: converted `invoices-v1.routes.js`.
+  Preserved the route's real special case for outbound email-provider failures,
+  which still logs structured details, notifies the invoice owner, and returns
+  the provider-facing error payload. Moved the route's list/create/read/update/
+  status/delete/restore boilerplate to `asyncRoute` plus `ApiError` and a
+  router-level `{ error }` mapper. Added tests for preserved validation errors
+  and generic unexpected database failures. Focused invoice suites:
+  **23/23 passing**. Now **28 of 40** route files use the pattern. Phase score
+  unchanged at **3.75/5**.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1554,3 +1563,17 @@ test that had been failing identically since PR 13).
   server error" }`. Focused inbound email suites: **5/5 passing**. Now **27 of
   40** route files use the pattern; Phase 4 remains **3.75/5** pending the
   larger route families.
+
+- **PR 32** (`chore/align-invoices-v1-api-errors`): same phase, same item,
+  no new checklist points. Converted `invoices-v1.routes.js` to the shared
+  `asyncRoute`/`ApiError` pattern while preserving the route's meaningful local
+  email-provider failure translation.
+
+  Expected validation, missing invoice, conflict, and invalid-id cases now throw
+  `ApiError`s. Unexpected list/create/read/update/status/delete/restore failures
+  route through one `{ error }` mapper with a generic 500 body. The outbound
+  email send catch remains local because it logs provider details, sends the
+  owner failure notification, and returns the existing `email_failed` payload.
+  Added focused tests for a preserved validation 400 and a generic unexpected
+  list failure. Focused invoice suites: **23/23 passing**. Now **28 of 40**
+  route files use the pattern; Phase 4 remains **3.75/5**.

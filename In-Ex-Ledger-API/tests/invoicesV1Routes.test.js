@@ -8,7 +8,7 @@ const request = require("supertest");
 
 const ROUTE_PATH = require.resolve("../routes/invoices-v1.routes.js");
 
-function loadInvoicesRouter({ effectiveTier = "v1" } = {}) {
+function loadInvoicesRouter({ effectiveTier = "v1", failList = false } = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
     insertAttempts: 0,
@@ -57,6 +57,9 @@ function loadInvoicesRouter({ effectiveTier = "v1" } = {}) {
         pool: {
           async query(sql, params = []) {
             if (/SELECT id, title, invoice_number/i.test(sql) && /FROM invoices_v1/i.test(sql)) {
+              if (failList) {
+                throw new Error("connection reset");
+              }
               state.listQueried = true;
               return { rows: [], rowCount: 0 };
             }
@@ -195,6 +198,43 @@ test("Basic (free tier) can create an invoice -- invoicing is not plan-gated", a
 
     assert.equal(response.status, 201);
     assert.ok(fixture.state.insertAttempts >= 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("invoice creation preserves validation errors through the shared handler", async () => {
+  const fixture = loadInvoicesRouter();
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/invoices-v1")
+      .send({
+        customer_name: "Client B",
+        issue_date: "2026-04-25",
+        currency: "USD",
+        line_items: [
+          { description: "Consulting", quantity: 1, unit_price: 50 }
+        ]
+      });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: "title is required." });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("invoice list hides unexpected database failures", async () => {
+  const fixture = loadInvoicesRouter({ failList: true });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app).get("/api/invoices-v1");
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { error: "Internal server error" });
   } finally {
     fixture.cleanup();
   }
