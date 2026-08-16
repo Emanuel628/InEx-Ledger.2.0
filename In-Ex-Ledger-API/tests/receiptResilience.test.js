@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const RECEIPTS_ROUTE_PATH = require.resolve("../routes/receipts.routes.js");
 
@@ -125,6 +126,7 @@ function buildReceiptsApp({ poolQuery, logEvents }) {
     const app = express();
     app.use(express.json());
     app.use("/api/receipts", receiptsRouter);
+    attachCentralErrorHandler(app);
     return { app, restore: () => { Module._load = originalLoad; delete require.cache[RECEIPTS_ROUTE_PATH]; } };
   } catch (err) {
     Module._load = originalLoad;

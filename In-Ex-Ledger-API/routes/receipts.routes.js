@@ -14,6 +14,7 @@ const {
 } = require("../api/utils/resolveBusinessIdForUser.js");
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   getSubscriptionSnapshotForBusiness
 } = require("../services/subscriptionService.js");
@@ -291,43 +292,35 @@ function setNoStoreHeaders(res) {
    GET /receipts — List Receipts (Newest First)
    ========================================================= */
 
-router.get("/", async (req, res) => {
-  try {
-    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
+router.get("/", asyncRoute(async (req, res) => {
+  const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
 
-    if (!scope.businessIds.length) {
-      return res.status(400).json({
-        error: "Missing business context"
-      });
-    }
-
-    const sql = buildReceiptListSql();
-    let result;
-
-    try {
-      result = await pool.query(sql, [scope.businessIds]);
-    } catch (err) {
-      if (!isRecoverableReceiptSchemaError(err)) {
-        throw err;
-      }
-
-      logWarn("Receipts schema drift detected; applying safe receipt metadata guards before retry", getErrorDiagnostic(err));
-      await ensureReceiptListSchema();
-      result = await pool.query(sql, [scope.businessIds]);
-    }
-
-    const rows = mapReceiptListRows(result.rows || []);
-
-    setNoStoreHeaders(res);
-
-    return res.status(200).json(rows);
-  } catch (err) {
-    logError("Receipts load error:", getErrorDiagnostic(err));
-    return res.status(500).json({
-      error: "Failed to load receipts"
-    });
+  if (!scope.businessIds.length) {
+    throw new ApiError(400, "Missing business context");
   }
-});
+
+  const sql = buildReceiptListSql();
+  let result;
+
+  try {
+    result = await pool.query(sql, [scope.businessIds]);
+  } catch (err) {
+    if (!isRecoverableReceiptSchemaError(err)) {
+      logError("Receipts load error:", getErrorDiagnostic(err));
+      throw err;
+    }
+
+    logWarn("Receipts schema drift detected; applying safe receipt metadata guards before retry", getErrorDiagnostic(err));
+    await ensureReceiptListSchema();
+    result = await pool.query(sql, [scope.businessIds]);
+  }
+
+  const rows = mapReceiptListRows(result.rows || []);
+
+  setNoStoreHeaders(res);
+
+  return res.status(200).json(rows);
+}));
 
 /* =========================================================
    POST /receipts — Upload Receipt
@@ -336,21 +329,16 @@ router.get("/", async (req, res) => {
 // Resolves the business and subscription for a receipt upload. Receipt uploads
 // are available on every tier; Basic businesses are metered by the monthly
 // receipt cap, enforced inside the POST handler before any insert.
-async function checkReceiptPlanAccess(req, res, next) {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    req._receiptsBusinessId = businessId;
-    req._receiptsSubscription = await getSubscriptionSnapshotForBusiness(businessId);
-    next();
-  } catch (err) {
-    logError("Receipt plan gate error:", err);
-    res.status(500).json({ error: "Failed to verify plan access." });
-  }
-}
+const checkReceiptPlanAccess = asyncRoute(async (req, _res, next) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  req._receiptsBusinessId = businessId;
+  req._receiptsSubscription = await getSubscriptionSnapshotForBusiness(businessId);
+  next();
+});
 
-router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, res) => {
+router.post("/", checkReceiptPlanAccess, upload.single("receipt"), asyncRoute(async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: "Receipt file is required." });
+    throw new ApiError(400, "Receipt file is required.");
   }
 
   const client = await pool.connect();
@@ -371,9 +359,7 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
 
     if (transactionId !== null) {
       if (!isUuid(transactionId)) {
-        return res.status(400).json({
-          error: "transaction_id must be a valid UUID when provided."
-        });
+        throw new ApiError(400, "transaction_id must be a valid UUID when provided.");
       }
 
       const txCheck = await pool.query(
@@ -385,9 +371,7 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
       );
 
       if (!txCheck.rowCount) {
-        return res.status(404).json({
-          error: "Transaction not found or does not belong to this business."
-        });
+        throw new ApiError(404, "Transaction not found or does not belong to this business.");
       }
 
       const lockState = await loadAccountingLockState(pool, businessId);
@@ -400,9 +384,7 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
     const normalizedMimeType = normalizeUploadedReceiptMimeType(req.file);
 
     if (!normalizedMimeType) {
-      return res.status(400).json({
-        error: "Unsupported file type. Only receipt images or PDFs are allowed."
-      });
+      throw new ApiError(400, "Unsupported file type. Only receipt images or PDFs are allowed.");
     }
 
     // Acquire a per-business advisory lock so the monthly-cap check, the insert,
@@ -537,18 +519,21 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
         locked_through_date: err.lockedThroughDate
       });
     }
+    if (err.status && err.status < 500) {
+      throw err;
+    }
     logError("POST /receipts error:", err);
-    return res.status(500).json({ error: "Failed to save receipt." });
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
 /* =========================================================
    PATCH /receipts/:id/attach — Attach/Detach to Transaction
    ========================================================= */
 
-router.patch("/:id/attach", async (req, res) => {
+router.patch("/:id/attach", asyncRoute(async (req, res) => {
   const client = await pool.connect();
   let inTransaction = false;
 
@@ -557,22 +542,18 @@ router.patch("/:id/attach", async (req, res) => {
     const receiptId = req.params.id;
 
     if (!UUID_RE.test(receiptId)) {
-      return res.status(400).json({ error: "Invalid receipt ID." });
+      throw new ApiError(400, "Invalid receipt ID.");
     }
 
     if (!("transaction_id" in (req.body || {}))) {
-      return res.status(400).json({
-        error: "transaction_id must be provided (uuid or null)."
-      });
+      throw new ApiError(400, "transaction_id must be provided (uuid or null).");
     }
 
     const transactionId = req.body.transaction_id;
 
     if (transactionId !== null && transactionId !== undefined) {
       if (typeof transactionId !== "string" || !UUID_RE.test(transactionId)) {
-        return res.status(400).json({
-          error: "transaction_id must be a valid UUID when provided."
-        });
+        throw new ApiError(400, "transaction_id must be a valid UUID when provided.");
       }
     }
 
@@ -592,7 +573,7 @@ router.patch("/:id/attach", async (req, res) => {
     if (!receiptLookup.rowCount) {
       await client.query("ROLLBACK");
       inTransaction = false;
-      return res.status(404).json({ error: "Receipt not found." });
+      throw new ApiError(404, "Receipt not found.");
     }
 
     const receiptBusinessId = receiptLookup.rows[0].business_id;
@@ -613,9 +594,7 @@ router.patch("/:id/attach", async (req, res) => {
       if (!txCheck.rowCount) {
         await client.query("ROLLBACK");
         inTransaction = false;
-        return res.status(404).json({
-          error: "Transaction not found or does not belong to this business."
-        });
+        throw new ApiError(404, "Transaction not found or does not belong to this business.");
       }
 
       assertDateUnlocked(lockState, txCheck.rows[0].date);
@@ -631,11 +610,13 @@ router.patch("/:id/attach", async (req, res) => {
       if (Number(attachedCount.rows[0]?.count || 0) >= MAX_RECEIPTS_PER_TRANSACTION) {
         await client.query("ROLLBACK");
         inTransaction = false;
-        return res.status(409).json({
-          error: `This transaction already has ${MAX_RECEIPTS_PER_TRANSACTION} receipt files. Remove one before attaching another.`,
-          code: "transaction_receipt_limit_reached",
-          limit: MAX_RECEIPTS_PER_TRANSACTION
-        });
+        const limitError = new ApiError(
+          409,
+          `This transaction already has ${MAX_RECEIPTS_PER_TRANSACTION} receipt files. Remove one before attaching another.`,
+          { code: "transaction_receipt_limit_reached" }
+        );
+        limitError.limit = MAX_RECEIPTS_PER_TRANSACTION;
+        throw limitError;
       }
     } else {
       // Detaching (null) -> check if the receipt is currently linked to a
@@ -667,7 +648,7 @@ router.patch("/:id/attach", async (req, res) => {
     if (!result.rowCount) {
       await client.query("ROLLBACK");
       inTransaction = false;
-      return res.status(404).json({ error: "Receipt not found." });
+      throw new ApiError(404, "Receipt not found.");
     }
 
     // Re-derive receipt_status for both the transaction this receipt is
@@ -709,91 +690,91 @@ router.patch("/:id/attach", async (req, res) => {
         locked_through_date: err.lockedThroughDate
       });
     }
+    if (err.status === 409 && err.code === "transaction_receipt_limit_reached") {
+      return res.status(409).json({
+        error: err.message,
+        code: err.code,
+        limit: err.limit || MAX_RECEIPTS_PER_TRANSACTION
+      });
+    }
+    if (err.status && err.status < 500) {
+      throw err;
+    }
     logError("PATCH /receipts/:id/attach error:", err);
-    return res.status(500).json({
-      error: "Failed to update receipt attachment."
-    });
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
 /* =========================================================
    GET /receipts/:id — Secure Download
    ========================================================= */
 
-router.get("/:id", async (req, res) => {
-  try {
-    const scope = await getBusinessScopeForUser(req.user, "all");
-    const receiptId = String(req.params.id || "").trim();
-    if (!isUuid(receiptId)) {
-      return res.status(400).json({ error: "Invalid receipt ID." });
-    }
-
-    const result = await pool.query(
-      `SELECT id, filename, mime_type, storage_path, file_bytes
-       FROM receipts
-       WHERE id = $1 AND business_id = ANY($2::uuid[])
-       LIMIT 1`,
-      [receiptId, scope.businessIds]
-    );
-
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "Receipt not found." });
-    }
-
-    const { id, filename, mime_type, storage_path, file_bytes } = result.rows[0];
-    const resolvedStoragePath = resolveReceiptFilePath(storage_path);
-
-    if (resolvedStoragePath && !isManagedReceiptPath(resolvedStoragePath) && path.isAbsolute(String(storage_path || "").trim())) {
-      logWarn("Blocked receipt download for unmanaged storage path", {
-        receiptId,
-        businessIds: scope.businessIds
-      });
-      return res.status(404).json({ error: "Receipt file missing." });
-    }
-
-    if (!resolvedStoragePath && !file_bytes) {
-      logWarn("Receipt file missing for preview", {
-        receiptId,
-        businessIds: scope.businessIds,
-        storagePath: storage_path
-      });
-      return res.status(404).json({ error: "Receipt file missing." });
-    }
-
-    // Zero trust cache protection
-    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-
-    const responseMimeType = getSafeReceiptResponseMimeType(mime_type);
-    const dispositionType = shouldInlineReceiptMimeType(mime_type) ? "inline" : "attachment";
-
-    res.setHeader("Content-Type", responseMimeType);
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Content-Disposition", `${dispositionType}; filename*=UTF-8''${encodeURIComponent(filename)}`);
-
-    if (file_bytes) {
-      return res.send(Buffer.isBuffer(file_bytes) ? file_bytes : Buffer.from(file_bytes));
-    }
-
-    if (resolvedStoragePath) {
-      return res.sendFile(resolvedStoragePath);
-    }
-
-    return res.status(404).json({ error: "Receipt file missing." });
-  } catch (err) {
-    logError("GET /receipts/:id error:", err);
-    return res.status(500).json({ error: "Failed to load receipt." });
+router.get("/:id", asyncRoute(async (req, res) => {
+  const scope = await getBusinessScopeForUser(req.user, "all");
+  const receiptId = String(req.params.id || "").trim();
+  if (!isUuid(receiptId)) {
+    throw new ApiError(400, "Invalid receipt ID.");
   }
-});
+
+  const result = await pool.query(
+    `SELECT id, filename, mime_type, storage_path, file_bytes
+     FROM receipts
+     WHERE id = $1 AND business_id = ANY($2::uuid[])
+     LIMIT 1`,
+    [receiptId, scope.businessIds]
+  );
+
+  if (!result.rowCount) {
+    throw new ApiError(404, "Receipt not found.");
+  }
+
+  const { filename, mime_type, storage_path, file_bytes } = result.rows[0];
+  const resolvedStoragePath = resolveReceiptFilePath(storage_path);
+
+  if (resolvedStoragePath && !isManagedReceiptPath(resolvedStoragePath) && path.isAbsolute(String(storage_path || "").trim())) {
+    logWarn("Blocked receipt download for unmanaged storage path", {
+      receiptId,
+      businessIds: scope.businessIds
+    });
+    throw new ApiError(404, "Receipt file missing.");
+  }
+
+  if (!resolvedStoragePath && !file_bytes) {
+    logWarn("Receipt file missing for preview", {
+      receiptId,
+      businessIds: scope.businessIds,
+      storagePath: storage_path
+    });
+    throw new ApiError(404, "Receipt file missing.");
+  }
+
+  setNoStoreHeaders(res);
+
+  const responseMimeType = getSafeReceiptResponseMimeType(mime_type);
+  const dispositionType = shouldInlineReceiptMimeType(mime_type) ? "inline" : "attachment";
+
+  res.setHeader("Content-Type", responseMimeType);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Disposition", `${dispositionType}; filename*=UTF-8''${encodeURIComponent(filename)}`);
+
+  if (file_bytes) {
+    return res.send(Buffer.isBuffer(file_bytes) ? file_bytes : Buffer.from(file_bytes));
+  }
+
+  if (resolvedStoragePath) {
+    return res.sendFile(resolvedStoragePath);
+  }
+
+  throw new ApiError(404, "Receipt file missing.");
+}));
 
 /* =========================================================
    DELETE /receipts/:id — Delete Receipt (DB + Disk)
    ========================================================= */
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", asyncRoute(async (req, res) => {
   const client = await pool.connect();
   let storagePath = null;
   let pendingDeletePath = null;
@@ -803,7 +784,7 @@ router.delete("/:id", async (req, res) => {
     const scope = await getBusinessScopeForUser(req.user, "all");
     const receiptId = req.params.id;
     if (!isUuid(receiptId)) {
-      return res.status(400).json({ error: "Invalid receipt ID." });
+      throw new ApiError(400, "Invalid receipt ID.");
     }
 
     await client.query("BEGIN");
@@ -828,7 +809,7 @@ router.delete("/:id", async (req, res) => {
 
     if (!found.rowCount) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Receipt not found." });
+      throw new ApiError(404, "Receipt not found.");
     }
 
     // Block deleting a receipt that is evidence for a locked-period transaction
@@ -840,11 +821,7 @@ router.delete("/:id", async (req, res) => {
         assertDateUnlocked(lockState, txDate);
       } catch (lockErr) {
         await client.query("ROLLBACK");
-        return res.status(lockErr.status).json({
-          error: lockErr.message,
-          code: lockErr.code,
-          locked_through_date: lockErr.lockedThroughDate
-        });
+        throw lockErr;
       }
     }
 
@@ -905,17 +882,24 @@ router.delete("/:id", async (req, res) => {
       try {
         await fsp.rename(pendingDeletePath, storagePath);
       } catch (restoreErr) {
-        if (restoreErr?.code === "ENOENT") {
-          return res.status(500).json({ error: "Failed to delete receipt." });
-        }
         logError("Failed to restore receipt after delete error:", restoreErr);
       }
     }
+    if (err.name === "AccountingPeriodLockedError") {
+      return res.status(409).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate
+      });
+    }
+    if (err.status && err.status < 500) {
+      throw err;
+    }
     logError("DELETE /receipts/:id error:", err);
-    return res.status(500).json({ error: "Failed to delete receipt." });
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
 module.exports = router;

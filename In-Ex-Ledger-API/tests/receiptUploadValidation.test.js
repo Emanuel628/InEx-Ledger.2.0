@@ -8,6 +8,7 @@ const path = require("path");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const RECEIPTS_ROUTE_PATH = require.resolve("../routes/receipts.routes.js");
 
@@ -190,9 +191,7 @@ function buildApp(router) {
   const app = express();
   app.use(express.json());
   app.use("/api/receipts", router);
-  app.use((err, _req, res, _next) => {
-    res.status(err.status || 500).json({ error: err.message });
-  });
+  attachCentralErrorHandler(app);
   return app;
 }
 
