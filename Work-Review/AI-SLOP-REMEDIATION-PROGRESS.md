@@ -344,6 +344,17 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   helper and assert that the rollback-on-materialization-failure path no longer
   leaks the raw internal error message. Focused suite: **12/12 passing**. Now
   **24 of 40** route files use the pattern. Phase score unchanged at **3.75/5**.
+  **Follow-up, same PR sequence**: converted `categories.routes.js`. Preserved
+  the non-boilerplate special cases: unique-name violations still map to 409,
+  locked accounting-period errors still return their `code` and
+  `locked_through_date`, and merge keeps its transaction rollback path. Removed
+  route-local custom 500 responses from list/create/unmapped/defaults/update/
+  delete/merge flows and moved unexpected failures to the central generic
+  handler. Added `tests/categoriesRouteErrors.test.js` and updated
+  `categoryRegionGating.test.js` to mount the shared central error helper.
+  Focused category suites plus direct-mount integration/critical coverage:
+  **153/153 passing**. Now **25 of 40** route files use the pattern. Phase score
+  unchanged at **3.75/5** pending the larger route families.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1507,3 +1518,18 @@ test that had been failing identically since PR 13).
   and assert that the rollback-on-materialization-failure path no longer leaks
   the raw internal error message. Focused suite: **12/12 passing**. Now
   **24 of 40** route files use the pattern; Phase 4 remains **3.75/5**.
+
+- **PR 30** (`chore/expand-api-error-rollout-9`): same phase, same item,
+  no new checklist points. Converted `categories.routes.js` to the shared
+  `asyncRoute`/`ApiError` pattern while preserving the route's real special
+  cases: unique-name conflict translation, accounting-period lock response
+  fields, and merge rollback.
+
+  Removed route-local custom 500 responses from the list/create/unmapped/
+  defaults/update/delete/merge flows and moved unexpected failures to the
+  central generic handler. Added `tests/categoriesRouteErrors.test.js` for
+  generic 500, preserved 409 conflict, and preserved 404 delete behavior.
+  Updated `categoryRegionGating.test.js` to use the central error helper.
+  Focused category suites plus direct-mount integration/critical coverage:
+  **153/153 passing**. Now **25 of 40** route files use the pattern; Phase 4
+  remains **3.75/5** pending the larger route families.

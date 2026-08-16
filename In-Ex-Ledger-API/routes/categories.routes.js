@@ -4,7 +4,8 @@ const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { logWarn } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   resolveBusinessIdForUser,
   getBusinessScopeForUser
@@ -141,77 +142,72 @@ async function deactivateRegionIncompatibleDefaultCategories(db, businessId, bus
 /**
  * GET /api/categories
  */
-router.get("/", async (req, res) => {
-  try {
-    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
-    const includeInactive = String(req.query.include_inactive || "").toLowerCase() === "true";
-    const activeFilter = includeInactive ? "" : " AND c.is_active = true";
-    const requestedLimit = parseInt(req.query.limit, 10);
-    const limit = Math.min(Math.max(requestedLimit || CATEGORIES_DEFAULT_LIMIT, 1), CATEGORIES_MAX_LIMIT);
-    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
-    const result = await pool.query(
-      `SELECT c.id, c.business_id, b.name AS business_name, c.name, c.kind, c.color,
-              b.region AS business_region, c.tax_map_us, c.tax_map_ca, c.is_default, c.is_active, c.created_at,
-              COALESCE(tx.transaction_count, 0)::int AS transaction_count
+router.get("/", asyncRoute(async (req, res) => {
+  const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
+  const includeInactive = String(req.query.include_inactive || "").toLowerCase() === "true";
+  const activeFilter = includeInactive ? "" : " AND c.is_active = true";
+  const requestedLimit = parseInt(req.query.limit, 10);
+  const limit = Math.min(Math.max(requestedLimit || CATEGORIES_DEFAULT_LIMIT, 1), CATEGORIES_MAX_LIMIT);
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+  const result = await pool.query(
+    `SELECT c.id, c.business_id, b.name AS business_name, c.name, c.kind, c.color,
+            b.region AS business_region, c.tax_map_us, c.tax_map_ca, c.is_default, c.is_active, c.created_at,
+            COALESCE(tx.transaction_count, 0)::int AS transaction_count
+     FROM categories c
+     JOIN businesses b ON b.id = c.business_id
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS transaction_count
+       FROM transactions t
+       WHERE t.business_id = c.business_id
+         AND t.category_id = c.id
+         AND t.deleted_at IS NULL
+     ) tx ON true
+     WHERE c.business_id = ANY($1::uuid[])${activeFilter}
+       AND ${CATEGORY_REGION_FILTER_SQL}
+     ORDER BY b.name ASC, c.kind, c.name
+     LIMIT $2 OFFSET $3`,
+    [scope.businessIds, limit, offset]
+  );
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS count
        FROM categories c
        JOIN businesses b ON b.id = c.business_id
-       LEFT JOIN LATERAL (
-         SELECT COUNT(*)::int AS transaction_count
-         FROM transactions t
-         WHERE t.business_id = c.business_id
-           AND t.category_id = c.id
-           AND t.deleted_at IS NULL
-       ) tx ON true
-       WHERE c.business_id = ANY($1::uuid[])${activeFilter}
-         AND ${CATEGORY_REGION_FILTER_SQL}
-       ORDER BY b.name ASC, c.kind, c.name
-       LIMIT $2 OFFSET $3`,
-      [scope.businessIds, limit, offset]
-    );
-    const countResult = await pool.query(
-      `SELECT COUNT(*)::int AS count
-         FROM categories c
-         JOIN businesses b ON b.id = c.business_id
-        WHERE c.business_id = ANY($1::uuid[])${activeFilter}
-          AND ${CATEGORY_REGION_FILTER_SQL}`,
-      [scope.businessIds]
-    );
-    const total = Number(countResult.rows[0]?.count || 0);
-    res.json({
-      data: result.rows,
-      total,
-      limit,
-      offset,
-      has_more: offset + result.rows.length < total
-    });
-  } catch (err) {
-    logError("GET /categories error:", err.message);
-    res.status(500).json({ error: "Failed to load categories." });
-  }
-});
+      WHERE c.business_id = ANY($1::uuid[])${activeFilter}
+        AND ${CATEGORY_REGION_FILTER_SQL}`,
+    [scope.businessIds]
+  );
+  const total = Number(countResult.rows[0]?.count || 0);
+  res.json({
+    data: result.rows,
+    total,
+    limit,
+    offset,
+    has_more: offset + result.rows.length < total
+  });
+}));
 
 /**
  * POST /api/categories
  */
-router.post("/", async (req, res) => {
+router.post("/", asyncRoute(async (req, res) => {
   const { name, kind, color, tax_map_us, tax_map_ca } = req.body ?? {};
 
   if (!name || typeof name !== "string" || !name.trim()) {
-    return res.status(400).json({ error: "name is required" });
+    throw new ApiError(400, "name is required");
   }
   if (!kind || !VALID_KINDS.has(kind)) {
-    return res.status(400).json({ error: "kind must be 'income' or 'expense'" });
+    throw new ApiError(400, "kind must be 'income' or 'expense'");
   }
   if (color && !VALID_COLORS.has(color)) {
-    return res.status(400).json({ error: "color is invalid" });
+    throw new ApiError(400, "color is invalid");
   }
   const explicitUsTaxMap = normalizeCategoryTaxMap(tax_map_us, "US");
   if (!explicitUsTaxMap.valid) {
-    return res.status(400).json({ error: explicitUsTaxMap.error });
+    throw new ApiError(400, explicitUsTaxMap.error);
   }
   const explicitCaTaxMap = normalizeCategoryTaxMap(tax_map_ca, "CA");
   if (!explicitCaTaxMap.valid) {
-    return res.status(400).json({ error: explicitCaTaxMap.error });
+    throw new ApiError(400, explicitCaTaxMap.error);
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -222,7 +218,7 @@ router.post("/", async (req, res) => {
       tax_map_ca
     });
     if (!scopedTaxMaps.valid) {
-      return res.status(400).json({ error: scopedTaxMaps.error });
+      throw new ApiError(400, scopedTaxMaps.error);
     }
     const result = await pool.query(
       `INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca)
@@ -242,71 +238,60 @@ router.post("/", async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (isCategoryNameConflict(err)) {
-      return res.status(409).json({ error: "A category with this name already exists." });
+      throw new ApiError(409, "A category with this name already exists.");
     }
-    logError("POST /categories error:", err.message);
-    res.status(500).json({ error: "Failed to create category." });
+    throw err;
   }
-});
+}));
 
 /**
  * GET /api/categories/unmapped?region=US|CA
  * Returns categories with no tax line mapping for the given region (defaults to business region).
  */
-router.get("/unmapped", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const requestedRegion = String(req.query.region || "").toUpperCase();
-    let region = requestedRegion === "CA" || requestedRegion === "US" ? requestedRegion : null;
-    if (!region) {
-      const bizRegion = await pool.query("SELECT region FROM businesses WHERE id = $1 LIMIT 1", [businessId]);
-      region = String(bizRegion.rows[0]?.region || "US").toUpperCase() === "CA" ? "CA" : "US";
-    }
-    const rows = await getUnmappedCategories(pool, { businessId, region });
-    res.json({ region, count: rows.length, categories: rows });
-  } catch (err) {
-    logError("GET /categories/unmapped error:", err.message);
-    res.status(500).json({ error: "Failed to load unmapped categories." });
+router.get("/unmapped", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const requestedRegion = String(req.query.region || "").toUpperCase();
+  let region = requestedRegion === "CA" || requestedRegion === "US" ? requestedRegion : null;
+  if (!region) {
+    const bizRegion = await pool.query("SELECT region FROM businesses WHERE id = $1 LIMIT 1", [businessId]);
+    region = String(bizRegion.rows[0]?.region || "US").toUpperCase() === "CA" ? "CA" : "US";
   }
-});
+  const rows = await getUnmappedCategories(pool, { businessId, region });
+  res.json({ region, count: rows.length, categories: rows });
+}));
 
-router.post("/defaults", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const businessRegion = await loadBusinessRegion(businessId);
-    await deactivateRegionIncompatibleDefaultCategories(pool, businessId, businessRegion);
-    const inserted = await seedDefaultCategoriesForBusiness(pool, businessId);
-    invalidateCategorySnapshots(businessId);
-    return res.status(200).json({
-      inserted_count: inserted.length,
-      categories: inserted
-    });
-  } catch (err) {
-    logError("POST /categories/defaults error:", err.message);
-    return res.status(500).json({ error: "Failed to add default categories." });
-  }
-});
+router.post("/defaults", asyncRoute(async (req, res) => {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const businessRegion = await loadBusinessRegion(businessId);
+  await deactivateRegionIncompatibleDefaultCategories(pool, businessId, businessRegion);
+  const inserted = await seedDefaultCategoriesForBusiness(pool, businessId);
+  invalidateCategorySnapshots(businessId);
+  res.status(200).json({
+    inserted_count: inserted.length,
+    categories: inserted
+  });
+}));
 
 /**
  * PUT /api/categories/:id
  */
-router.put("/:id", async (req, res) => {
+router.put("/:id", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid category ID." });
+    throw new ApiError(400, "Invalid category ID.");
   }
   const { name, kind, color, tax_map_us, tax_map_ca, is_active } = req.body ?? {};
 
   if (kind && !VALID_KINDS.has(kind)) {
-    return res.status(400).json({ error: "kind must be 'income' or 'expense'" });
+    throw new ApiError(400, "kind must be 'income' or 'expense'");
   }
   if (name !== undefined && (!name || typeof name !== "string" || !name.trim())) {
-    return res.status(400).json({ error: "name cannot be empty" });
+    throw new ApiError(400, "name cannot be empty");
   }
   if (color !== undefined && color !== null && !VALID_COLORS.has(color)) {
-    return res.status(400).json({ error: "color is invalid" });
+    throw new ApiError(400, "color is invalid");
   }
   if (is_active !== undefined && typeof is_active !== "boolean") {
-    return res.status(400).json({ error: "is_active must be a boolean" });
+    throw new ApiError(400, "is_active must be a boolean");
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -317,7 +302,7 @@ router.put("/:id", async (req, res) => {
       [req.params.id, businessId]
     );
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Category not found." });
+      throw new ApiError(404, "Category not found.");
     }
 
     const current = existing.rows[0];
@@ -332,7 +317,7 @@ router.put("/:id", async (req, res) => {
       currentCa: current.tax_map_ca
     });
     if (!scopedTaxMaps.valid) {
-      return res.status(400).json({ error: scopedTaxMaps.error });
+      throw new ApiError(400, scopedTaxMaps.error);
     }
     const newTaxMapUs = scopedTaxMaps.taxMapUs;
     const newTaxMapCa = scopedTaxMaps.taxMapCa;
@@ -366,7 +351,7 @@ router.put("/:id", async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     if (isCategoryNameConflict(err)) {
-      return res.status(409).json({ error: "A category with this name already exists." });
+      throw new ApiError(409, "A category with this name already exists.");
     }
     if (err instanceof AccountingPeriodLockedError) {
       return res.status(err.status).json({
@@ -375,62 +360,54 @@ router.put("/:id", async (req, res) => {
         locked_through_date: err.lockedThroughDate
       });
     }
-    logError("PUT /categories/:id error:", err.message);
-    res.status(500).json({ error: "Failed to update category." });
+    throw err;
   }
-});
+}));
 
 /**
  * DELETE /api/categories/:id
  */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid category ID." });
+    throw new ApiError(400, "Invalid category ID.");
   }
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+  const businessId = await resolveBusinessIdForUser(req.user);
 
-    const existing = await pool.query(
-      "SELECT id FROM categories WHERE id = $1 AND business_id = $2",
-      [req.params.id, businessId]
-    );
-    if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Category not found." });
-    }
-
-    const usage = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE category_id = $1 AND business_id = $2 AND deleted_at IS NULL",
-      [req.params.id, businessId]
-    );
-    if (parseInt(usage.rows[0]?.count || "0", 10) > 0) {
-      return res.status(409).json({ error: "This category cannot be deleted because it is in use." });
-    }
-
-    const recurringUsage = await pool.query(
-      "SELECT COUNT(*) FROM recurring_transactions WHERE category_id = $1 AND business_id = $2",
-      [req.params.id, businessId]
-    );
-    if (parseInt(recurringUsage.rows[0]?.count || "0", 10) > 0) {
-      return res.status(409).json({
-        error: "This category cannot be deleted because it is used by a recurring transaction."
-      });
-    }
-
-    const del = await pool.query(
-      "DELETE FROM categories WHERE id = $1 AND business_id = $2",
-      [req.params.id, businessId]
-    );
-    if (del.rowCount === 0) {
-      return res.status(404).json({ error: "Category not found." });
-    }
-
-    invalidateCategorySnapshots(businessId);
-    res.json({ message: "Category deleted." });
-  } catch (err) {
-    logError("DELETE /categories/:id error:", err.stack || err);
-    res.status(500).json({ error: "Failed to delete category." });
+  const existing = await pool.query(
+    "SELECT id FROM categories WHERE id = $1 AND business_id = $2",
+    [req.params.id, businessId]
+  );
+  if (existing.rowCount === 0) {
+    throw new ApiError(404, "Category not found.");
   }
-});
+
+  const usage = await pool.query(
+    "SELECT COUNT(*) FROM transactions WHERE category_id = $1 AND business_id = $2 AND deleted_at IS NULL",
+    [req.params.id, businessId]
+  );
+  if (parseInt(usage.rows[0]?.count || "0", 10) > 0) {
+    throw new ApiError(409, "This category cannot be deleted because it is in use.");
+  }
+
+  const recurringUsage = await pool.query(
+    "SELECT COUNT(*) FROM recurring_transactions WHERE category_id = $1 AND business_id = $2",
+    [req.params.id, businessId]
+  );
+  if (parseInt(recurringUsage.rows[0]?.count || "0", 10) > 0) {
+    throw new ApiError(409, "This category cannot be deleted because it is used by a recurring transaction.");
+  }
+
+  const del = await pool.query(
+    "DELETE FROM categories WHERE id = $1 AND business_id = $2",
+    [req.params.id, businessId]
+  );
+  if (del.rowCount === 0) {
+    throw new ApiError(404, "Category not found.");
+  }
+
+  invalidateCategorySnapshots(businessId);
+  res.json({ message: "Category deleted." });
+}));
 
 /**
  * POST /api/categories/:id/merge
@@ -444,14 +421,14 @@ router.delete("/:id", async (req, res) => {
  * Both categories must belong to the caller's business and share the same
  * kind (income/expense) — merging across kinds would corrupt totals.
  */
-router.post("/:id/merge", async (req, res) => {
+router.post("/:id/merge", asyncRoute(async (req, res) => {
   const sourceId = req.params.id;
   const targetId = String(req.body?.target_id || "").trim();
   if (!UUID_REGEX.test(sourceId) || !UUID_REGEX.test(targetId)) {
-    return res.status(400).json({ error: "Invalid category id." });
+    throw new ApiError(400, "Invalid category id.");
   }
   if (sourceId === targetId) {
-    return res.status(400).json({ error: "Source and target must be different categories." });
+    throw new ApiError(400, "Source and target must be different categories.");
   }
 
   const client = await pool.connect();
@@ -465,13 +442,13 @@ router.post("/:id/merge", async (req, res) => {
     );
     if (rows.rowCount !== 2) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Source or target category not found." });
+      throw new ApiError(404, "Source or target category not found.");
     }
     const source = rows.rows.find((r) => r.id === sourceId);
     const target = rows.rows.find((r) => r.id === targetId);
     if (source.kind !== target.kind) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Cannot merge across category kinds (income vs expense)." });
+      throw new ApiError(400, "Cannot merge across category kinds (income vs expense).");
     }
 
     // Refuse if either category touches a locked period. The merge would
@@ -512,11 +489,10 @@ router.post("/:id/merge", async (req, res) => {
         locked_through_date: err.lockedThroughDate
       });
     }
-    logError("POST /categories/:id/merge error:", err.message);
-    res.status(500).json({ error: "Failed to merge categories." });
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
 module.exports = router;
