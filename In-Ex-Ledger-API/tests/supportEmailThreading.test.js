@@ -33,7 +33,7 @@ function signInboundPayload(secret, bodyObject, timestampSeconds = Math.floor(Da
   return { rawBody, signature, timestampSeconds };
 }
 
-function loadInboundEmailApp() {
+function loadInboundEmailApp({ failInsert = false } = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = { insertedMessages: [] };
 
@@ -54,6 +54,9 @@ function loadInboundEmailApp() {
             }
 
             if (/INSERT INTO messages/i.test(sql)) {
+              if (failInsert) {
+                throw new Error("connection reset");
+              }
               state.insertedMessages.push({ sql, params });
               return { rows: [], rowCount: 1 };
             }
@@ -142,6 +145,39 @@ test("POST /api/email/inbound routes support reply tokens into the user's messag
       assert.equal(fixture.state.insertedMessages[0].params[2], "it_support");
       assert.equal(fixture.state.insertedMessages[0].params[8], "77777777-7777-4777-8777-777777777777");
       assert.match(fixture.state.insertedMessages[1].sql, /'notification'/i);
+    } finally {
+      fixture.cleanup();
+    }
+  });
+});
+
+test("POST /api/email/inbound hides unexpected processing failures", async () => {
+  await withEnv({
+    INBOUND_EMAIL_WEBHOOK_SECRET: "test-inbound-secret",
+    SUPPORT_REPLY_BASE_EMAIL: "support@inex.app",
+    SUPPORT_REPLY_HMAC_SECRET: "support-reply-secret-32-bytes-aaaa"
+  }, async () => {
+    const fixture = loadInboundEmailApp({ failInsert: true });
+
+    try {
+      const { buildSupportReplyToAddress } = require("../services/supportEmailService.js");
+      const replyTo = buildSupportReplyToAddress("77777777-7777-4777-8777-777777777777");
+      const { rawBody, signature, timestampSeconds } = signInboundPayload("test-inbound-secret", {
+        from: { email: "support.inex@gmail.com", name: "InEx Support" },
+        to: [{ email: replyTo }],
+        subject: "Re: Need help",
+        text: "Here is the next step."
+      });
+
+      const res = await request(fixture.app)
+        .post("/api/email/inbound")
+        .set("Content-Type", "application/json")
+        .set("x-inbound-timestamp", String(timestampSeconds))
+        .set("x-inbound-signature", signature)
+        .send(rawBody);
+
+      assert.equal(res.status, 500);
+      assert.deepEqual(res.body, { ok: false, error: "Internal server error" });
     } finally {
       fixture.cleanup();
     }

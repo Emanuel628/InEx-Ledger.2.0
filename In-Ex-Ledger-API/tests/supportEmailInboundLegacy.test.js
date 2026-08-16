@@ -42,7 +42,7 @@ function signLegacy(secret, rawBody, timestamp = String(Math.floor(Date.now() / 
   return { timestamp, signature };
 }
 
-function loadLegacySupportInboundApp() {
+function loadLegacySupportInboundApp({ failInsert = false } = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = { insertedMessages: [] };
 
@@ -63,6 +63,9 @@ function loadLegacySupportInboundApp() {
               };
             }
             if (/INSERT INTO messages/i.test(sql)) {
+              if (failInsert) {
+                throw new Error("connection reset");
+              }
               state.insertedMessages.push({ sql, params });
               return { rows: [], rowCount: 1 };
             }
@@ -180,6 +183,41 @@ test("legacy support inbound route also accepts x-inbound signature headers", as
 
       assert.equal(res.status, 200);
       assert.equal(fixture.state.insertedMessages.length, 1);
+    } finally {
+      fixture.cleanup();
+    }
+  });
+});
+
+test("legacy support inbound route hides unexpected processing failures", async () => {
+  await withEnv({
+    SUPPORT_INBOUND_WEBHOOK_SECRET: `whsec_${Buffer.from("legacy-support-secret-123").toString("base64")}`,
+    SUPPORT_REPLY_BASE_EMAIL: "support@inex.app",
+    SUPPORT_REPLY_HMAC_SECRET: "support-reply-secret-32-bytes-aaaa"
+  }, async () => {
+    const fixture = loadLegacySupportInboundApp({ failInsert: true });
+
+    try {
+      const { buildSupportReplyToAddress } = require("../services/supportEmailService.js");
+      const replyTo = buildSupportReplyToAddress("77777777-7777-4777-8777-777777777777");
+      const rawBody = JSON.stringify({
+        from: { email: "support.inex@gmail.com", name: "InEx Support" },
+        to: [{ email: replyTo }],
+        subject: "Re: Need help",
+        text: "Here is the next step."
+      });
+      const signed = signSvix(process.env.SUPPORT_INBOUND_WEBHOOK_SECRET, rawBody);
+
+      const res = await request(fixture.app)
+        .post("/api/support-email/inbound")
+        .set("Content-Type", "application/json")
+        .set("svix-id", signed.id)
+        .set("svix-timestamp", signed.timestamp)
+        .set("svix-signature", signed.signature)
+        .send(rawBody);
+
+      assert.equal(res.status, 500);
+      assert.deepEqual(res.body, { ok: false, error: "Internal server error" });
     } finally {
       fixture.cleanup();
     }

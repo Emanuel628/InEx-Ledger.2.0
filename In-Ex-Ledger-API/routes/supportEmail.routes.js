@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { asyncRoute } = require("../utils/apiError.js");
 const {
   parseSupportReplyToken
 } = require("../services/supportEmailService.js");
@@ -346,7 +347,7 @@ async function fetchReceivedEmailContent(payload) {
   return result?.data || null;
 }
 
-router.post("/inbound", async (req, res) => {
+router.post("/inbound", asyncRoute(async (req, res) => {
   const verification = verifySupportInboundRequest(req);
 
   if (!verification.ok) {
@@ -481,9 +482,17 @@ router.post("/inbound", async (req, res) => {
       message_id: messageId
     });
   } catch (err) {
-    logError("support inbound email webhook error:", err.message);
-    return res.status(500).json({ ok: false, error: "Failed to process inbound support email." });
+    throw err;
   }
+}));
+
+router.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) {
+    logError("support inbound email webhook error:", err.message);
+  }
+  const error = status < 500 ? err.message : "Internal server error";
+  res.status(status).json({ ok: false, error });
 });
 
 module.exports = router;

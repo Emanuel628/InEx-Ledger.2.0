@@ -355,6 +355,14 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   Focused category suites plus direct-mount integration/critical coverage:
   **153/153 passing**. Now **25 of 40** route files use the pattern. Phase score
   unchanged at **3.75/5** pending the larger route families.
+  **Follow-up, same PR sequence**: converted `supportEmail.routes.js` and
+  `email.routes.js`. Kept the webhook response envelope as `{ ok, error }`, but
+  removed route-local custom 500 bodies from unexpected processing failures and
+  sent those failures through router-level generic 500 handlers. Added failure
+  coverage in `tests/supportEmailInboundLegacy.test.js` and
+  `tests/supportEmailThreading.test.js` so database insert failures no longer
+  leak operational details. Focused inbound email suites: **5/5 passing**. Now
+  **27 of 40** route files use the pattern. Phase score unchanged at **3.75/5**.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1533,3 +1541,16 @@ test that had been failing identically since PR 13).
   Focused category suites plus direct-mount integration/critical coverage:
   **153/153 passing**. Now **25 of 40** route files use the pattern; Phase 4
   remains **3.75/5** pending the larger route families.
+
+- **PR 31** (`chore/align-inbound-email-api-errors`): same phase, same item,
+  no new checklist points. Converted `supportEmail.routes.js` and
+  `email.routes.js` to the shared `asyncRoute` pattern while preserving their
+  webhook-specific `{ ok, error }` response envelope.
+
+  Removed bespoke route-local 500 bodies for unexpected processing failures and
+  moved those failures to router-level generic 500 handlers. Added insert-failure
+  tests to both inbound email fixtures so support reply threading still works,
+  while unexpected persistence failures return `{ ok: false, error: "Internal
+  server error" }`. Focused inbound email suites: **5/5 passing**. Now **27 of
+  40** route files use the pattern; Phase 4 remains **3.75/5** pending the
+  larger route families.

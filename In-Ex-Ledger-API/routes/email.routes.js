@@ -37,6 +37,7 @@ const crypto = require("crypto");
 const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { asyncRoute } = require("../utils/apiError.js");
 const {
   extractTokenFromRecipient,
   parseReplyToken
@@ -496,7 +497,7 @@ function describeInboundCaller(req) {
  * The standalone email-route tests build their own app and must
  * register the same raw parser before any global JSON parser.
  */
-router.post("/inbound", async (req, res) => {
+router.post("/inbound", asyncRoute(async (req, res) => {
   const verification = verifyInboundEmailRequest(req);
   if (!verification.ok) {
     logWarn("inbound email webhook rejected", {
@@ -691,9 +692,17 @@ const body =
       message_id: messageId
     });
   } catch (err) {
-    logError("inbound email webhook error:", err.message);
-    res.status(500).json({ ok: false, error: "Failed to process inbound email." });
+    throw err;
   }
+}));
+
+router.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) {
+    logError("inbound email webhook error:", err.message);
+  }
+  const error = status < 500 ? err.message : "Internal server error";
+  res.status(status).json({ ok: false, error });
 });
 
 module.exports = router;
