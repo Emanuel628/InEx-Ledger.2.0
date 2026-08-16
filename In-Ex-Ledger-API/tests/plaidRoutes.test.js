@@ -7,6 +7,7 @@ const Module = require("node:module");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-plaid-routes";
 process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret-plaid-routes";
@@ -42,6 +43,7 @@ function buildApp(router) {
   app.use(express.json());
   app.use(ensureCsrfCookie);
   app.use("/api/plaid", router);
+  attachCentralErrorHandler(app);
   return app;
 }
 
@@ -201,11 +203,7 @@ test("POST /api/plaid/exchange-public-token returns 503 when env is missing", as
   });
 });
 
-test("POST /api/plaid/connections/:id/sync rejects invalid UUID (400) after config gate", async () => {
-  // When env is missing, the env gate fires first (503). With env present
-  // we still need to validate the UUID; we can't fake env without exercising
-  // the SDK, so this test just confirms unauthenticated returns 401 — the
-  // UUID branch is unit-tested via the route handler structure.
+test("POST /api/plaid/connections/:id/sync rejects unauthenticated requests before UUID validation", async () => {
   const router = require("../routes/plaid.routes.js");
   const app = buildApp(router);
   const res = await request(app).post("/api/plaid/connections/not-a-uuid/sync");

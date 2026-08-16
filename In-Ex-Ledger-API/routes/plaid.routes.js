@@ -8,6 +8,7 @@ const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError, logInfo, logWarn } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   isPlaidConfigured,
   getPlaidClient,
@@ -177,7 +178,7 @@ authedRouter.use((req, res, next) => {
  * POST /api/plaid/link-token
  * Creates a Plaid Link token the frontend can use to launch the Link flow.
  */
-authedRouter.post("/link-token", async (req, res) => {
+authedRouter.post("/link-token", asyncRoute(async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const { Products } = require("plaid");
@@ -199,17 +200,17 @@ authedRouter.post("/link-token", async (req, res) => {
     logError("POST /plaid/link-token error:", detail);
     res.status(502).json({ error: detail.message, code: detail.code });
   }
-});
+}));
 
 /**
  * POST /api/plaid/exchange-public-token
  * Exchanges the public_token returned by Plaid Link for an access_token
  * and creates a bank_connections row + seeds the accounts table.
  */
-authedRouter.post("/exchange-public-token", async (req, res) => {
+authedRouter.post("/exchange-public-token", asyncRoute(async (req, res) => {
   const publicToken = String(req.body?.public_token || "").trim();
   if (!publicToken) {
-    return res.status(400).json({ error: "public_token is required." });
+    throw new ApiError(400, "public_token is required.");
   }
 
   const client = getPlaidClient();
@@ -270,7 +271,7 @@ authedRouter.post("/exchange-public-token", async (req, res) => {
     });
   } catch (err) {
     logError("plaid createBankConnection failed:", err.message);
-    return res.status(500).json({ error: "Failed to store bank connection." });
+    throw err;
   }
 
   // Seed accounts table from Plaid's account list.
@@ -322,7 +323,7 @@ authedRouter.post("/exchange-public-token", async (req, res) => {
     institution_name: institutionName,
     accounts: inserted
   });
-});
+}));
 
 /**
  * POST /api/plaid/connections/:id/sync
@@ -330,20 +331,20 @@ authedRouter.post("/exchange-public-token", async (req, res) => {
  * row through the canonical import shape, and inserts new ones. Idempotent
  * via the (account_id, external_id) unique index from PR #205.
  */
-authedRouter.post("/connections/:id/sync", async (req, res) => {
+authedRouter.post("/connections/:id/sync", asyncRoute(async (req, res) => {
   const connectionId = String(req.params.id || "").trim();
   if (!UUID_RE.test(connectionId)) {
-    return res.status(400).json({ error: "Invalid connection id." });
+    throw new ApiError(400, "Invalid connection id.");
   }
 
   const businessId = await resolveBusinessIdForUser(req.user);
   const connection = await getBankConnection(pool, businessId, connectionId);
   if (!connection || connection.provider !== "plaid") {
-    return res.status(404).json({ error: "Connection not found." });
+    throw new ApiError(404, "Connection not found.");
   }
   const accessToken = decryptAccessToken(connection);
   if (!accessToken) {
-    return res.status(409).json({ error: "Connection has no usable access token." });
+    throw new ApiError(409, "Connection has no usable access token.");
   }
 
   const client = getPlaidClient();
@@ -621,7 +622,7 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
     skipped_unknown_account: skippedUnknownAccount,
     has_more: false
   });
-});
+}));
 
 /**
  * Public webhook endpoint. Plaid posts JSON with no auth header; verification

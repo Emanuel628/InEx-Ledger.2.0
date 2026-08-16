@@ -1586,3 +1586,16 @@ test that had been failing identically since PR 13).
   `attachCentralErrorHandler` helper instead of relying on route-local
   duplication or Express's default error handler. Focused invoice suites:
   **23/23 passing**.
+
+- **PR 34** (`chore/align-plaid-api-errors`): same phase, same item, no new
+  checklist points. Converted the authenticated Plaid routes to `asyncRoute`
+  and `ApiError` only where it removed generic route boilerplate: missing
+  `public_token`, invalid sync ids, missing/invalid bank connections, unusable
+  access tokens, and unexpected connection lookup/storage failures. Preserved
+  direct Plaid provider translations (`502` with Plaid error codes), the
+  deployment config gate's `plaid_not_configured` code, non-fatal account/
+  transaction item warnings, and the public webhook's `{ ok }` envelope.
+  Updated standalone Plaid tests to mount the shared central error helper and
+  added focused sync fixture coverage for specific 400s and generic 500s.
+  Focused Plaid suites: **38/38 passing**. Now **29 of 40** route files use the
+  pattern; Phase 4 remains **3.75/5**.

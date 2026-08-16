@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-plaid-sync-route";
 process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret-plaid-sync-route";
@@ -25,7 +26,7 @@ function makeCategory(id, name, kind, taxMapUs) {
   };
 }
 
-function loadPlaidRouterWithState() {
+function loadPlaidRouterWithState({ failGetConnection = false } = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
     queries: [],
@@ -212,11 +213,16 @@ function loadPlaidRouterWithState() {
     if (requestName === "../services/bankConnectionService.js" || /bankConnectionService\.js$/.test(requestName)) {
       return {
         createBankConnection: async () => null,
-        getBankConnection: async () => ({
-          id: connectionId,
-          provider: "plaid",
-          cursor: null
-        }),
+        getBankConnection: async () => {
+          if (failGetConnection) {
+            throw new Error("connection reset");
+          }
+          return {
+            id: connectionId,
+            provider: "plaid",
+            cursor: null
+          };
+        },
         decryptAccessToken() {
           return "access-token";
         },
@@ -249,6 +255,7 @@ function loadPlaidRouterWithState() {
     const app = express();
     app.use(express.json());
     app.use("/api/plaid", router);
+    attachCentralErrorHandler(app);
     return { app, state, connectionId, categoryIdByName };
   } finally {
     Module._load = originalLoad;
@@ -299,4 +306,37 @@ test("POST /api/plaid/connections/:id/sync applies categorization and mapping me
     lastError: null,
     cursor: "cursor-next-1"
   });
+});
+
+test("POST /api/plaid/connections/:id/sync rejects invalid connection ids", async () => {
+  const { app } = loadPlaidRouterWithState();
+
+  const response = await request(app)
+    .post("/api/plaid/connections/not-a-uuid/sync")
+    .send({});
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(response.body, { error: "Invalid connection id." });
+});
+
+test("POST /api/plaid/exchange-public-token rejects a missing public token", async () => {
+  const { app } = loadPlaidRouterWithState();
+
+  const response = await request(app)
+    .post("/api/plaid/exchange-public-token")
+    .send({});
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(response.body, { error: "public_token is required." });
+});
+
+test("POST /api/plaid/connections/:id/sync hides unexpected connection lookup failures", async () => {
+  const { app, connectionId } = loadPlaidRouterWithState({ failGetConnection: true });
+
+  const response = await request(app)
+    .post(`/api/plaid/connections/${connectionId}/sync`)
+    .send({});
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(response.body, { error: "Internal server error" });
 });
