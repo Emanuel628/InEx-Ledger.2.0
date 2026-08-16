@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ME_ROUTE_PATH = require.resolve("../routes/me.routes.js");
 
@@ -253,9 +254,7 @@ function buildApp(router) {
   const app = express();
   app.use(express.json());
   app.use("/api/me", router);
-  app.use((err, _req, res, _next) => {
-    res.status(500).json({ error: err?.message || "error" });
-  });
+  attachCentralErrorHandler(app);
   return app;
 }
 

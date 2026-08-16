@@ -12,6 +12,7 @@ const { getSubscriptionSnapshotForUser } = require("../services/subscriptionServ
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logInfo } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 const {
   AUDIT_ACTIONS,
@@ -241,87 +242,72 @@ router.use(requireCsrfProtection);
 
 router.use(createDataApiLimiter());
 
-router.get("/", async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
-              ui_preferences,
-              country, province, data_residency, created_at,
-              onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
-         FROM users
-        WHERE id = $1
-        LIMIT 1`,
-      [req.user.id]
-    );
+router.get("/", asyncRoute(async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
+            ui_preferences,
+            country, province, data_residency, created_at,
+            onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
+       FROM users
+      WHERE id = $1
+      LIMIT 1`,
+    [req.user.id]
+  );
 
-    const user = result.rows[0];
-    if (!user) {
-      return res.status(401).json({ error: "User not found." });
-    }
-    const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
-    const businesses = await listBusinessesForUser(req.user.id);
-    const activeBusiness = businesses.find((business) => business.id === businessId) || null;
-    const subscription = await getSubscriptionSnapshotForUser({
-      id: req.user.id,
-      business_id: businessId
-    });
-    res.status(200).json({
-      ...user,
-      business_id: businessId,
-      active_business_id: businessId,
-      active_business: activeBusiness,
-      businesses,
-      onboarding: normalizeOnboardingPayload(user),
-      subscription
-    });
-  } catch (err) {
-    logError("GET /me error:", err.message);
-    res.status(500).json({ error: "Failed to load profile." });
+  const user = result.rows[0];
+  if (!user) {
+    throw new ApiError(401, "User not found.");
   }
-});
+  const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
+  const businesses = await listBusinessesForUser(req.user.id);
+  const activeBusiness = businesses.find((business) => business.id === businessId) || null;
+  const subscription = await getSubscriptionSnapshotForUser({
+    id: req.user.id,
+    business_id: businessId
+  });
+  res.status(200).json({
+    ...user,
+    business_id: businessId,
+    active_business_id: businessId,
+    active_business: activeBusiness,
+    businesses,
+    onboarding: normalizeOnboardingPayload(user),
+    subscription
+  });
+}));
 
 /**
  * GET /api/me/audit-events
  * Recent sensitive actions for the authenticated user.
  */
-router.get("/audit-events", async (req, res) => {
-  try {
-    const parsedLimit = parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(parsedLimit)
-      ? Math.min(Math.max(parsedLimit, 1), 200)
-      : 50;
-    const events = await listAuditEventsForUser(pool, req.user.id, {
-      limit
-    });
-    res.json({ events });
-  } catch (err) {
-    logError("GET /me/audit-events error:", err.message);
-    res.status(500).json({ error: "Failed to load audit events." });
+router.get("/audit-events", asyncRoute(async (req, res) => {
+  const parsedLimit = parseInt(req.query.limit, 10);
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.min(Math.max(parsedLimit, 1), 200)
+    : 50;
+  const events = await listAuditEventsForUser(pool, req.user.id, {
+    limit
+  });
+  res.json({ events });
+}));
+
+router.get("/onboarding", asyncRoute(async (req, res) => {
+  const result = await pool.query(
+    `SELECT onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
+       FROM users
+      WHERE id = $1
+      LIMIT 1`,
+    [req.user.id]
+  );
+
+  if (!result.rowCount) {
+    throw new ApiError(404, "User not found.");
   }
-});
 
-router.get("/onboarding", async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
-         FROM users
-        WHERE id = $1
-        LIMIT 1`,
-      [req.user.id]
-    );
+  return res.status(200).json(normalizeOnboardingPayload(result.rows[0]));
+}));
 
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
-    return res.status(200).json(normalizeOnboardingPayload(result.rows[0]));
-  } catch (err) {
-    logError("GET /me/onboarding error:", err.message);
-    return res.status(500).json({ error: "Failed to load onboarding state." });
-  }
-});
-
-router.put("/onboarding", async (req, res) => {
+router.put("/onboarding", asyncRoute(async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
   const starterAccountType = String(req.body?.starter_account_type || "").trim().toLowerCase();
   const starterAccountName = normalizeOptionalTrimmedStringWithLimit(
@@ -340,285 +326,275 @@ router.put("/onboarding", async (req, res) => {
   const language = String(req.body?.language || "").trim();
 
   if (!businessName) {
-    return res.status(400).json({ error: "Business name is required." });
+    throw new ApiError(400, "Business name is required.");
   }
   if (businessName.length > MAX_BUSINESS_NAME_LENGTH) {
-    return res.status(400).json({ error: `Business name must be ${MAX_BUSINESS_NAME_LENGTH} characters or fewer.` });
+    throw new ApiError(400, `Business name must be ${MAX_BUSINESS_NAME_LENGTH} characters or fewer.`);
   }
   if (!VALID_REGIONS.has(region)) {
-    return res.status(400).json({ error: "Choose a valid region." });
+    throw new ApiError(400, "Choose a valid region.");
   }
   if (!VALID_LANGUAGES.has(language)) {
-    return res.status(400).json({ error: "Choose a valid language." });
+    throw new ApiError(400, "Choose a valid language.");
   }
   if (starterAccountType && !VALID_STARTER_ACCOUNT_TYPES.has(starterAccountType)) {
-    return res.status(400).json({ error: "Choose a valid starter account type." });
+    throw new ApiError(400, "Choose a valid starter account type.");
   }
   if (!starterAccountType) {
-    return res.status(400).json({ error: "Choose your first account type." });
+    throw new ApiError(400, "Choose your first account type.");
   }
   if (!starterAccountName) {
-    return res.status(400).json({ error: "Enter a name for your first account." });
+    throw new ApiError(400, "Enter a name for your first account.");
   }
   if (startFocus && !VALID_START_FOCUS.has(startFocus)) {
-    return res.status(400).json({ error: "Choose a valid starting workflow." });
+    throw new ApiError(400, "Choose a valid starting workflow.");
   }
-    if (region === "CA" && !CA_PROVINCES.has(province)) {
-    return res.status(400).json({ error: "Choose a valid province." });
+  if (region === "CA" && !CA_PROVINCES.has(province)) {
+    throw new ApiError(400, "Choose a valid province.");
   }
   if (businessActivityCode && !BUSINESS_ACTIVITY_CODE_PATTERN.test(businessActivityCode)) {
-    return res.status(400).json({ error: "Business activity code must be exactly 6 digits." });
+    throw new ApiError(400, "Business activity code must be exactly 6 digits.");
   }
   if (rawAccountingMethod && !VALID_ACCOUNTING_METHODS.has(rawAccountingMethod)) {
-    return res.status(400).json({ error: "Accounting method must be 'cash' or 'accrual'." });
+    throw new ApiError(400, "Accounting method must be 'cash' or 'accrual'.");
   }
   if (starterAccountName?.error) {
-    return res.status(400).json({ error: `Starter account name ${starterAccountName.error}` });
+    throw new ApiError(400, `Starter account name ${starterAccountName.error}`);
   }
   const accountingMethod = rawAccountingMethod || null;
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
-    const client = await pool.connect();
-
-    try {
-      await client.query("BEGIN");
-
-      const currentUser = await client.query(
-        "SELECT onboarding_completed, trial_eligible FROM users WHERE id = $1 FOR UPDATE",
-        [req.user.id]
-      );
-      const alreadyCompleted = !!currentUser.rows[0]?.onboarding_completed;
-      const trialEligible = currentUser.rows[0]?.trial_eligible !== false;
-      const normalizedStarterAccountType = starterAccountType;
-      const normalizedStartFocus = VALID_START_FOCUS.has(startFocus)
-        ? startFocus
-        : resolveDefaultStartFocus();
-      const onboardingRecommendations = buildOnboardingRecommendations(region, normalizedStartFocus);
-      const starterName = starterAccountName;
-      const guidedSetupActive = GUIDED_SETUP_STEPS.includes(normalizedStartFocus);
-
-      await client.query(
-        `UPDATE businesses
-            SET name = $1,
-                region = $2,
-                language = $3,
-                province = CASE
-                  WHEN $2 = 'CA' THEN $4
-                  ELSE NULL
-                END,
-                business_activity_code = $5,
-                accounting_method = $6,
-                material_participation = $7
-          WHERE id = $8`,
-        [
-          businessName,
-          region,
-          language,
-          province || null,
-          businessActivityCode || null,
-          accountingMethod,
-          materialParticipation === "yes",
-          businessId
-        ]
-      );
-
-      await seedDefaultCategoriesForBusiness(client, businessId);
-
-      // Gate on whether THIS business already has an account, not on whether
-      // the user has ever completed onboarding before (e.g. for another,
-      // possibly now-deleted, business) -- otherwise a business with zero
-      // accounts never gets its starter account created.
-      const existingAccounts = await client.query(
-        "SELECT id FROM accounts WHERE business_id = $1 LIMIT 1",
-        [businessId]
-      );
-
-      if (existingAccounts.rowCount === 0) {
-        await client.query(
-          `INSERT INTO accounts (id, business_id, name, type)
-          VALUES ($1, $2, $3, $4)`,
-          [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
-        );
-      }
-
-      const guidedSetupAnchor = guidedSetupActive
-        ? resolveGuidedSetupAnchor(normalizedStartFocus)
-        : null;
-
-      const onboardingData = {
-        business_name: businessName,
-        starter_account_type: normalizedStarterAccountType,
-        starter_account_name: starterName,
-        start_focus: normalizedStartFocus,
-        region,
-        province: region === "CA" ? province : "",
-        business_activity_code: businessActivityCode,
-        accounting_method: accountingMethod || "",
-        material_participation: materialParticipation,
-        language,
-        recommended_categories: onboardingRecommendations.recommended_categories,
-        setup_notes: onboardingRecommendations.setup_notes,
-        guided_setup_active: guidedSetupActive,
-        guided_setup_step: guidedSetupActive ? guidedSetupAnchor : "complete",
-        guided_setup_anchor: guidedSetupAnchor
-      };
-
-      const updated = await client.query(
-        `UPDATE users
-            SET onboarding_completed = true,
-                onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
-                onboarding_data = $1::jsonb
-          WHERE id = $2
-          RETURNING onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen`,
-        [JSON.stringify(onboardingData), req.user.id]
-      );
-
-      await client.query("COMMIT");
-
-      const subscription = await getSubscriptionSnapshotForUser({
-        id: req.user.id,
-        business_id: businessId
-      });
-      let redirectTo = `/${normalizedStartFocus}`;
-      if (!trialEligible && !subscription?.isPaid && !subscription?.isTrialing) {
-        redirectTo = buildReactivationRedirect(`/${normalizedStartFocus}`);
-      } else if (shouldRedirectToTrialSetup(subscription)) {
-        redirectTo = buildTrialSetupRedirect(`/${normalizedStartFocus}`);
-      }
-
-      await recordAuditEventForRequest(pool, req, {
-        action: AUDIT_ACTIONS.ONBOARDING_COMPLETED,
-        businessId,
-        metadata: {
-          region,
-          province: region === "CA" ? province : null,
-          language,
-          startFocus: normalizedStartFocus,
-          starterAccountType: normalizedStarterAccountType,
-          firstCompletion: !alreadyCompleted,
-          redirectedToTrialSetup: redirectTo.startsWith("/trial-setup"),
-          redirectedToReactivationBilling: redirectTo.startsWith("/subscription?reactivated=1")
-        }
-      });
-
-      return res.status(200).json({
-        onboarding: normalizeOnboardingPayload(updated.rows[0]),
-        redirect_to: redirectTo
-      });
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    logError("PUT /me/onboarding error:", err.message);
-    return res.status(500).json({ error: "Failed to save onboarding." });
-  }
-});
-
-router.post("/onboarding/guide", async (req, res) => {
-  const action = String(req.body?.action || "").trim().toLowerCase();
-  const page = String(req.body?.page || "").trim().toLowerCase();
-
-  if (!VALID_GUIDED_SETUP_ACTIONS.has(action)) {
-    return res.status(400).json({ error: "Invalid onboarding guide action." });
-  }
-  if (page && !GUIDED_SETUP_STEPS.includes(page)) {
-    return res.status(400).json({ error: "Invalid onboarding guide page." });
-  }
+  const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
+  const client = await pool.connect();
 
   try {
-    const current = await pool.query(
-      `SELECT onboarding_completed, onboarding_data, onboarding_tour_seen
-         FROM users
-        WHERE id = $1
-        LIMIT 1`,
+    await client.query("BEGIN");
+
+    const currentUser = await client.query(
+      "SELECT onboarding_completed, trial_eligible FROM users WHERE id = $1 FOR UPDATE",
       [req.user.id]
     );
-    if (!current.rowCount) {
-      return res.status(404).json({ error: "User not found." });
-    }
+    const alreadyCompleted = !!currentUser.rows[0]?.onboarding_completed;
+    const trialEligible = currentUser.rows[0]?.trial_eligible !== false;
+    const normalizedStarterAccountType = starterAccountType;
+    const normalizedStartFocus = VALID_START_FOCUS.has(startFocus)
+      ? startFocus
+      : resolveDefaultStartFocus();
+    const onboardingRecommendations = buildOnboardingRecommendations(region, normalizedStartFocus);
+    const starterName = starterAccountName;
+    const guidedSetupActive = GUIDED_SETUP_STEPS.includes(normalizedStartFocus);
 
-    if (!current.rows[0]?.onboarding_completed) {
-      return res.status(400).json({ error: "Finish onboarding before using the guided setup flow." });
-    }
-
-    const currentData =
-      current.rows[0]?.onboarding_data && typeof current.rows[0].onboarding_data === "object"
-        ? { ...current.rows[0].onboarding_data }
-        : {};
-    const currentTourSeen =
-      current.rows[0]?.onboarding_tour_seen && typeof current.rows[0].onboarding_tour_seen === "object"
-        ? { ...current.rows[0].onboarding_tour_seen }
-        : {};
-    const guidedSetupAnchor = resolveGuidedSetupAnchor(
-      currentData.guided_setup_anchor || currentData.start_focus || GUIDED_SETUP_STEPS[0]
+    await client.query(
+      `UPDATE businesses
+          SET name = $1,
+              region = $2,
+              language = $3,
+              province = CASE
+                WHEN $2 = 'CA' THEN $4
+                ELSE NULL
+              END,
+              business_activity_code = $5,
+              accounting_method = $6,
+              material_participation = $7
+        WHERE id = $8`,
+      [
+        businessName,
+        region,
+        language,
+        province || null,
+        businessActivityCode || null,
+        accountingMethod,
+        materialParticipation === "yes",
+        businessId
+      ]
     );
-    const guidedSequence = getGuidedSetupSequence(guidedSetupAnchor);
-    const effectivePage =
-      page || (GUIDED_SETUP_STEPS.includes(currentData.guided_setup_step) ? currentData.guided_setup_step : guidedSequence[0]);
-    const timestamp = new Date().toISOString();
 
-    const isReplay = currentData.guided_setup_replay === true;
-    let redirectTo = "/transactions";
-    if (action === "skip") {
-      guidedSequence.forEach((step) => {
-        currentTourSeen[step] = true;
-      });
-      currentData.guided_setup_active = false;
-      currentData.guided_setup_step = "skipped";
-      currentData.guided_setup_completed_at = timestamp;
-      currentData.guided_setup_skipped_at = timestamp;
-      delete currentData.guided_setup_replay;
-    } else if (action === "finish") {
-      currentTourSeen[effectivePage] = true;
-      currentData.guided_setup_active = false;
-      currentData.guided_setup_step = "complete";
-      currentData.guided_setup_completed_at = timestamp;
-      delete currentData.guided_setup_replay;
-    } else if (action === "back") {
-      const previousStep = resolvePreviousGuidedSetupStep(effectivePage, guidedSetupAnchor);
-      currentData.guided_setup_active = true;
-      currentData.guided_setup_step = previousStep || guidedSequence[0];
-      redirectTo = GUIDED_SETUP_ROUTES[currentData.guided_setup_step] || `/${currentData.guided_setup_step}`;
-    } else {
-      currentTourSeen[effectivePage] = true;
-      const nextStep = resolveNextGuidedSetupStep(effectivePage, guidedSetupAnchor);
-      if (nextStep) {
-        currentData.guided_setup_active = true;
-        currentData.guided_setup_step = nextStep;
-        redirectTo = GUIDED_SETUP_ROUTES[nextStep] || `/${nextStep}`;
-      } else {
-        currentData.guided_setup_active = false;
-        currentData.guided_setup_step = "complete";
-        currentData.guided_setup_completed_at = timestamp;
-      }
+    await seedDefaultCategoriesForBusiness(client, businessId);
+
+    // Gate on whether THIS business already has an account, not on whether
+    // the user has ever completed onboarding before (e.g. for another,
+    // possibly now-deleted, business) -- otherwise a business with zero
+    // accounts never gets its starter account created.
+    const existingAccounts = await client.query(
+      "SELECT id FROM accounts WHERE business_id = $1 LIMIT 1",
+      [businessId]
+    );
+
+    if (existingAccounts.rowCount === 0) {
+      await client.query(
+        `INSERT INTO accounts (id, business_id, name, type)
+        VALUES ($1, $2, $3, $4)`,
+        [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
+      );
     }
 
-    const updated = await pool.query(
+    const guidedSetupAnchor = guidedSetupActive
+      ? resolveGuidedSetupAnchor(normalizedStartFocus)
+      : null;
+
+    const onboardingData = {
+      business_name: businessName,
+      starter_account_type: normalizedStarterAccountType,
+      starter_account_name: starterName,
+      start_focus: normalizedStartFocus,
+      region,
+      province: region === "CA" ? province : "",
+      business_activity_code: businessActivityCode,
+      accounting_method: accountingMethod || "",
+      material_participation: materialParticipation,
+      language,
+      recommended_categories: onboardingRecommendations.recommended_categories,
+      setup_notes: onboardingRecommendations.setup_notes,
+      guided_setup_active: guidedSetupActive,
+      guided_setup_step: guidedSetupActive ? guidedSetupAnchor : "complete",
+      guided_setup_anchor: guidedSetupAnchor
+    };
+
+    const updated = await client.query(
       `UPDATE users
-          SET onboarding_data = $1::jsonb,
-              onboarding_tour_seen = $2::jsonb
-        WHERE id = $3
+          SET onboarding_completed = true,
+              onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
+              onboarding_data = $1::jsonb
+        WHERE id = $2
         RETURNING onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen`,
-      [JSON.stringify(currentData), JSON.stringify(currentTourSeen), req.user.id]
+      [JSON.stringify(onboardingData), req.user.id]
     );
+
+    await client.query("COMMIT");
+
+    const subscription = await getSubscriptionSnapshotForUser({
+      id: req.user.id,
+      business_id: businessId
+    });
+    let redirectTo = `/${normalizedStartFocus}`;
+    if (!trialEligible && !subscription?.isPaid && !subscription?.isTrialing) {
+      redirectTo = buildReactivationRedirect(`/${normalizedStartFocus}`);
+    } else if (shouldRedirectToTrialSetup(subscription)) {
+      redirectTo = buildTrialSetupRedirect(`/${normalizedStartFocus}`);
+    }
+
+    await recordAuditEventForRequest(pool, req, {
+      action: AUDIT_ACTIONS.ONBOARDING_COMPLETED,
+      businessId,
+      metadata: {
+        region,
+        province: region === "CA" ? province : null,
+        language,
+        startFocus: normalizedStartFocus,
+        starterAccountType: normalizedStarterAccountType,
+        firstCompletion: !alreadyCompleted,
+        redirectedToTrialSetup: redirectTo.startsWith("/trial-setup"),
+        redirectedToReactivationBilling: redirectTo.startsWith("/subscription?reactivated=1")
+      }
+    });
 
     return res.status(200).json({
       onboarding: normalizeOnboardingPayload(updated.rows[0]),
       redirect_to: redirectTo
     });
   } catch (err) {
-    logError("POST /me/onboarding/guide error:", err.message);
-    return res.status(500).json({ error: "Failed to update guided onboarding." });
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
-});
+}));
 
-router.post("/onboarding/tour", async (req, res) => {
+router.post("/onboarding/guide", asyncRoute(async (req, res) => {
+  const action = String(req.body?.action || "").trim().toLowerCase();
+  const page = String(req.body?.page || "").trim().toLowerCase();
+
+  if (!VALID_GUIDED_SETUP_ACTIONS.has(action)) {
+    throw new ApiError(400, "Invalid onboarding guide action.");
+  }
+  if (page && !GUIDED_SETUP_STEPS.includes(page)) {
+    throw new ApiError(400, "Invalid onboarding guide page.");
+  }
+
+  const current = await pool.query(
+    `SELECT onboarding_completed, onboarding_data, onboarding_tour_seen
+       FROM users
+      WHERE id = $1
+      LIMIT 1`,
+    [req.user.id]
+  );
+  if (!current.rowCount) {
+    throw new ApiError(404, "User not found.");
+  }
+
+  if (!current.rows[0]?.onboarding_completed) {
+    throw new ApiError(400, "Finish onboarding before using the guided setup flow.");
+  }
+
+  const currentData =
+    current.rows[0]?.onboarding_data && typeof current.rows[0].onboarding_data === "object"
+      ? { ...current.rows[0].onboarding_data }
+      : {};
+  const currentTourSeen =
+    current.rows[0]?.onboarding_tour_seen && typeof current.rows[0].onboarding_tour_seen === "object"
+      ? { ...current.rows[0].onboarding_tour_seen }
+      : {};
+  const guidedSetupAnchor = resolveGuidedSetupAnchor(
+    currentData.guided_setup_anchor || currentData.start_focus || GUIDED_SETUP_STEPS[0]
+  );
+  const guidedSequence = getGuidedSetupSequence(guidedSetupAnchor);
+  const effectivePage =
+    page || (GUIDED_SETUP_STEPS.includes(currentData.guided_setup_step) ? currentData.guided_setup_step : guidedSequence[0]);
+  const timestamp = new Date().toISOString();
+
+  const isReplay = currentData.guided_setup_replay === true;
+  let redirectTo = "/transactions";
+  if (action === "skip") {
+    guidedSequence.forEach((step) => {
+      currentTourSeen[step] = true;
+    });
+    currentData.guided_setup_active = false;
+    currentData.guided_setup_step = "skipped";
+    currentData.guided_setup_completed_at = timestamp;
+    currentData.guided_setup_skipped_at = timestamp;
+    delete currentData.guided_setup_replay;
+  } else if (action === "finish") {
+    currentTourSeen[effectivePage] = true;
+    currentData.guided_setup_active = false;
+    currentData.guided_setup_step = "complete";
+    currentData.guided_setup_completed_at = timestamp;
+    delete currentData.guided_setup_replay;
+  } else if (action === "back") {
+    const previousStep = resolvePreviousGuidedSetupStep(effectivePage, guidedSetupAnchor);
+    currentData.guided_setup_active = true;
+    currentData.guided_setup_step = previousStep || guidedSequence[0];
+    redirectTo = GUIDED_SETUP_ROUTES[currentData.guided_setup_step] || `/${currentData.guided_setup_step}`;
+  } else {
+    currentTourSeen[effectivePage] = true;
+    const nextStep = resolveNextGuidedSetupStep(effectivePage, guidedSetupAnchor);
+    if (nextStep) {
+      currentData.guided_setup_active = true;
+      currentData.guided_setup_step = nextStep;
+      redirectTo = GUIDED_SETUP_ROUTES[nextStep] || `/${nextStep}`;
+    } else {
+      currentData.guided_setup_active = false;
+      currentData.guided_setup_step = "complete";
+      currentData.guided_setup_completed_at = timestamp;
+    }
+  }
+
+  const updated = await pool.query(
+    `UPDATE users
+        SET onboarding_data = $1::jsonb,
+            onboarding_tour_seen = $2::jsonb
+      WHERE id = $3
+      RETURNING onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen`,
+    [JSON.stringify(currentData), JSON.stringify(currentTourSeen), req.user.id]
+  );
+
+  return res.status(200).json({
+    onboarding: normalizeOnboardingPayload(updated.rows[0]),
+    redirect_to: redirectTo
+  });
+}));
+
+router.post("/onboarding/tour", asyncRoute(async (req, res) => {
   const page = String(req.body?.page || "").trim();
   if (!page) {
-    return res.status(400).json({ error: "Page is required." });
+    throw new ApiError(400, "Page is required.");
   }
 
   const VALID_TOUR_PAGES = new Set([
@@ -626,75 +602,65 @@ router.post("/onboarding/tour", async (req, res) => {
     "analytics", "goals", "tax", "settings", "billing", "messages"
   ]);
   if (!VALID_TOUR_PAGES.has(page)) {
-    return res.status(400).json({ error: "Invalid page value." });
+    throw new ApiError(400, "Invalid page value.");
   }
 
-  try {
-    const current = await pool.query(
-      "SELECT onboarding_tour_seen FROM users WHERE id = $1 LIMIT 1",
-      [req.user.id]
-    );
-    if (!current.rowCount) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
-    const nextState =
-      current.rows[0]?.onboarding_tour_seen && typeof current.rows[0].onboarding_tour_seen === "object"
-        ? { ...current.rows[0].onboarding_tour_seen, [page]: true }
-        : { [page]: true };
-
-    await pool.query(
-      "UPDATE users SET onboarding_tour_seen = $1::jsonb WHERE id = $2",
-      [JSON.stringify(nextState), req.user.id]
-    );
-
-    return res.status(200).json({ success: true, tour_seen: nextState });
-  } catch (err) {
-    logError("POST /me/onboarding/tour error:", err.message);
-    return res.status(500).json({ error: "Failed to update onboarding tour state." });
+  const current = await pool.query(
+    "SELECT onboarding_tour_seen FROM users WHERE id = $1 LIMIT 1",
+    [req.user.id]
+  );
+  if (!current.rowCount) {
+    throw new ApiError(404, "User not found.");
   }
-});
 
-router.post("/onboarding/replay", async (req, res) => {
-  try {
-    const current = await pool.query(
-      "SELECT onboarding_data FROM users WHERE id = $1 LIMIT 1",
-      [req.user.id]
-    );
-    if (!current.rowCount) {
-      return res.status(404).json({ error: "User not found." });
-    }
+  const nextState =
+    current.rows[0]?.onboarding_tour_seen && typeof current.rows[0].onboarding_tour_seen === "object"
+      ? { ...current.rows[0].onboarding_tour_seen, [page]: true }
+      : { [page]: true };
 
-    const nextData =
-      current.rows[0]?.onboarding_data && typeof current.rows[0].onboarding_data === "object"
-        ? { ...current.rows[0].onboarding_data }
-        : {};
-    delete nextData.guided_setup_completed_at;
-    delete nextData.guided_setup_skipped_at;
-    const replayAnchor = resolveGuidedSetupAnchor(
-      nextData.guided_setup_anchor || nextData.start_focus || GUIDED_SETUP_STEPS[0]
-    );
-    nextData.guided_setup_active = true;
-    nextData.guided_setup_step = replayAnchor;
-    nextData.guided_setup_anchor = replayAnchor;
-    nextData.guided_setup_replay = true;
+  await pool.query(
+    "UPDATE users SET onboarding_tour_seen = $1::jsonb WHERE id = $2",
+    [JSON.stringify(nextState), req.user.id]
+  );
 
-    await pool.query(
-      "UPDATE users SET onboarding_tour_seen = '{}'::jsonb, onboarding_data = $1::jsonb WHERE id = $2",
-      [JSON.stringify(nextData), req.user.id]
-    );
-    return res.status(200).json({ success: true, redirect_to: GUIDED_SETUP_ROUTES[replayAnchor] || `/${replayAnchor}` });
-  } catch (err) {
-    logError("POST /me/onboarding/replay error:", err.message);
-    return res.status(500).json({ error: "Failed to reset onboarding tips." });
+  return res.status(200).json({ success: true, tour_seen: nextState });
+}));
+
+router.post("/onboarding/replay", asyncRoute(async (req, res) => {
+  const current = await pool.query(
+    "SELECT onboarding_data FROM users WHERE id = $1 LIMIT 1",
+    [req.user.id]
+  );
+  if (!current.rowCount) {
+    throw new ApiError(404, "User not found.");
   }
-});
+
+  const nextData =
+    current.rows[0]?.onboarding_data && typeof current.rows[0].onboarding_data === "object"
+      ? { ...current.rows[0].onboarding_data }
+      : {};
+  delete nextData.guided_setup_completed_at;
+  delete nextData.guided_setup_skipped_at;
+  const replayAnchor = resolveGuidedSetupAnchor(
+    nextData.guided_setup_anchor || nextData.start_focus || GUIDED_SETUP_STEPS[0]
+  );
+  nextData.guided_setup_active = true;
+  nextData.guided_setup_step = replayAnchor;
+  nextData.guided_setup_anchor = replayAnchor;
+  nextData.guided_setup_replay = true;
+
+  await pool.query(
+    "UPDATE users SET onboarding_tour_seen = '{}'::jsonb, onboarding_data = $1::jsonb WHERE id = $2",
+    [JSON.stringify(nextData), req.user.id]
+  );
+  return res.status(200).json({ success: true, redirect_to: GUIDED_SETUP_ROUTES[replayAnchor] || `/${replayAnchor}` });
+}));
 
 /**
  * PUT /api/me
  * Update user profile (full_name, display_name).
  */
-router.put("/", async (req, res) => {
+router.put("/", asyncRoute(async (req, res) => {
   const body = req.body ?? {};
   const fullName = "full_name" in body
     ? normalizeOptionalTrimmedStringWithLimit(body.full_name, MAX_PROFILE_NAME_LENGTH)
@@ -704,57 +670,47 @@ router.put("/", async (req, res) => {
     : null;
 
   if (fullName?.error) {
-    return res.status(400).json({ error: `Full name ${fullName.error}` });
+    throw new ApiError(400, `Full name ${fullName.error}`);
   }
   if (displayName?.error) {
-    return res.status(400).json({ error: `Display name ${displayName.error}` });
+    throw new ApiError(400, `Display name ${displayName.error}`);
   }
 
-  try {
-    const result = await pool.query(
-      `UPDATE users
-       SET full_name = CASE WHEN $4::boolean THEN $1 ELSE full_name END,
-           display_name = CASE WHEN $5::boolean THEN $2 ELSE display_name END
-       WHERE id = $3
-       RETURNING id, email, full_name, display_name, created_at`,
-      [
-        fullName,
-        displayName,
-        req.user.id,
-        'full_name' in body,
-        'display_name' in body
-      ]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    logError("PUT /me error:", err.message);
-    res.status(500).json({ error: "Failed to update profile." });
-  }
-});
+  const result = await pool.query(
+    `UPDATE users
+     SET full_name = CASE WHEN $4::boolean THEN $1 ELSE full_name END,
+         display_name = CASE WHEN $5::boolean THEN $2 ELSE display_name END
+     WHERE id = $3
+     RETURNING id, email, full_name, display_name, created_at`,
+    [
+      fullName,
+      displayName,
+      req.user.id,
+      "full_name" in body,
+      "display_name" in body
+    ]
+  );
+  res.json(result.rows[0]);
+}));
 
-router.put("/preferences", async (req, res) => {
+router.put("/preferences", asyncRoute(async (req, res) => {
   const updates = normalizeUiPreferences(req.body);
   if (!Object.keys(updates).length) {
-    return res.status(400).json({ error: "No valid preferences provided." });
+    throw new ApiError(400, "No valid preferences provided.");
   }
 
-  try {
-    const result = await pool.query(
-      `UPDATE users
-          SET ui_preferences = COALESCE(ui_preferences, '{}'::jsonb) || $1::jsonb
-        WHERE id = $2
-        RETURNING ui_preferences`,
-      [JSON.stringify(updates), req.user.id]
-    );
+  const result = await pool.query(
+    `UPDATE users
+        SET ui_preferences = COALESCE(ui_preferences, '{}'::jsonb) || $1::jsonb
+      WHERE id = $2
+      RETURNING ui_preferences`,
+    [JSON.stringify(updates), req.user.id]
+  );
 
-    return res.status(200).json({ ui_preferences: result.rows[0]?.ui_preferences || {} });
-  } catch (err) {
-    logError("PUT /me/preferences error:", err.message);
-    return res.status(500).json({ error: "Failed to update preferences." });
-  }
-});
+  return res.status(200).json({ ui_preferences: result.rows[0]?.ui_preferences || {} });
+}));
 
-router.delete("/", accountDeleteLimiter, async (req, res) => {
+router.delete("/", accountDeleteLimiter, asyncRoute(async (req, res) => {
   const { password } = req.body ?? {};
   const providedMfaReauthToken = String(req.body?.mfaReauthToken || "").trim();
   const client = await pool.connect();
@@ -1039,6 +995,6 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
   } finally {
     client.release();
   }
-});
+}));
 
 module.exports = router;
