@@ -10,6 +10,14 @@ function ensureStorageDir() {
   }
 }
 
+function resolveManagedExportPath(filePath) {
+  const resolvedPath = path.resolve(filePath);
+  if (!resolvedPath.startsWith(EXPORT_STORAGE_DIR + path.sep) && resolvedPath !== EXPORT_STORAGE_DIR) {
+    throw new Error("Invalid export path");
+  }
+  return resolvedPath;
+}
+
 async function saveRedactedPdf(jobId, buffer) {
   ensureStorageDir();
   const safeJobId = jobId.replace(/[^a-zA-Z0-9-_]/g, "") || crypto.randomUUID();
@@ -21,10 +29,7 @@ async function saveRedactedPdf(jobId, buffer) {
 }
 
 function buildRedactedStream(res, filePath) {
-  const resolvedPath = path.resolve(filePath);
-  if (!resolvedPath.startsWith(EXPORT_STORAGE_DIR + path.sep) && resolvedPath !== EXPORT_STORAGE_DIR) {
-    throw new Error("Invalid export path");
-  }
+  const resolvedPath = resolveManagedExportPath(filePath);
   if (!fs.existsSync(resolvedPath)) {
     throw new Error("Redacted export not found.");
   }
@@ -41,17 +46,42 @@ function buildRedactedStream(res, filePath) {
   stream.pipe(res);
 }
 
-async function deleteExportFile(filePath) {
-  if (!filePath) return;
-  const resolvedPath = path.resolve(filePath);
-  if (!resolvedPath.startsWith(EXPORT_STORAGE_DIR + path.sep) && resolvedPath !== EXPORT_STORAGE_DIR) {
-    throw new Error("Invalid export path");
+async function cleanupExportFile(filePath) {
+  if (!filePath) {
+    return { status: "not_applicable" };
   }
+
+  let resolvedPath;
+  try {
+    resolvedPath = resolveManagedExportPath(filePath);
+  } catch (err) {
+    return { status: "failed", reason: err.message };
+  }
+
   try {
     await fs.promises.unlink(resolvedPath);
+    return { status: "deleted" };
   } catch (err) {
-    if (err.code !== "ENOENT") throw err;
+    if (err.code === "ENOENT") {
+      return { status: "missing" };
+    }
+    return { status: "failed", reason: err.message };
   }
 }
 
-module.exports = { saveRedactedPdf, buildRedactedStream, deleteExportFile };
+async function deleteExportFile(filePath) {
+  const result = await cleanupExportFile(filePath);
+  if (result.status === "failed") {
+    throw new Error(result.reason || "Export file cleanup failed");
+  }
+}
+
+module.exports = {
+  saveRedactedPdf,
+  buildRedactedStream,
+  cleanupExportFile,
+  deleteExportFile,
+  __private: {
+    resolveManagedExportPath
+  }
+};

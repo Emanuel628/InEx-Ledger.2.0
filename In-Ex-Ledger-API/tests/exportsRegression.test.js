@@ -181,6 +181,9 @@ function loadExportsRouter(options = {}) {
     insertedSnapshotItems: null,
     released: false,
     savedRedacted: null,
+    exportCleanupCalls: [],
+    deletedExportMetadata: null,
+    deletedExport: null,
     vehicleCostQueryCount: 0,
   };
   const grantPayload = options.grantPayload || {
@@ -250,6 +253,10 @@ function loadExportsRouter(options = {}) {
         buildRedactedStream() {
           throw new Error("not used");
         },
+        cleanupExportFile: async (filePath) => {
+          state.exportCleanupCalls.push(filePath);
+          return options.exportCleanupResult || { status: "deleted" };
+        },
         deleteExportFile: async () => {},
       };
     }
@@ -286,6 +293,13 @@ function loadExportsRouter(options = {}) {
             if (/FROM support_artifacts/i.test(sql)) return { rows: [] };
             if (/FROM transaction_review_states/i.test(sql))
               return { rows: fixture.reviewStateRows || [] };
+            if (/SELECT m\.file_path[\s\S]*FROM exports e/i.test(sql)) {
+              return {
+                rows: options.exportHistoryExists === false
+                  ? []
+                  : [{ file_path: options.exportHistoryFilePath || "C:\\exports\\export_001.pdf" }],
+              };
+            }
             if (/FROM mileage/i.test(sql)) return { rows: fixture.mileage };
             if (/FROM vehicle_expense_details/i.test(sql)) {
               state.vehicleCostQueryCount += 1;
@@ -374,6 +388,10 @@ function loadExportsRouter(options = {}) {
                   state.insertedSnapshot = params;
                 if (/INSERT INTO export_snapshot_items/i.test(sql))
                   state.insertedSnapshotItems = params;
+                if (/DELETE FROM export_metadata/i.test(sql))
+                  state.deletedExportMetadata = params;
+                if (/DELETE FROM exports/i.test(sql))
+                  state.deletedExport = params;
                 return { rowCount: 1, rows: [] };
               },
               release() {
@@ -385,7 +403,7 @@ function loadExportsRouter(options = {}) {
       };
     }
     if (/logger\.js$/.test(requestName)) {
-      return { logError() {}, logInfo() {} };
+      return { logError() {}, logInfo() {}, logWarn() {} };
     }
     if (/logSanitizer\.js$/.test(requestName)) {
       return {
@@ -1013,6 +1031,59 @@ test("route exposes backend-authoritative tax mapping rules", async () => {
     assert.equal(response.body.source, "backend-authoritative");
     assert.ok(response.body.rules.jurisdiction_maps.US.sales_revenue);
     assert.ok(response.body.rules.jurisdiction_maps.CA.meals);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("export history delete removes DB rows and reports successful file cleanup", async () => {
+  const fixture = loadExportsRouter();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .delete("/api/exports/history/export_001");
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.message, "Export deleted.");
+    assert.equal(response.body.file_cleanup, "deleted");
+    assert.deepEqual(fixture.state.exportCleanupCalls, ["C:\\exports\\export_001.pdf"]);
+    assert.deepEqual(fixture.state.deletedExportMetadata, ["export_001"]);
+    assert.deepEqual(fixture.state.deletedExport, ["export_001", "biz_test"]);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("export history delete keeps DB deletion authoritative when file cleanup fails", async () => {
+  const fixture = loadExportsRouter({
+    exportCleanupResult: { status: "failed", reason: "permission denied" },
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .delete("/api/exports/history/export_001");
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.file_cleanup, "failed");
+    assert.deepEqual(fixture.state.exportCleanupCalls, ["C:\\exports\\export_001.pdf"]);
+    assert.deepEqual(fixture.state.deletedExportMetadata, ["export_001"]);
+    assert.deepEqual(fixture.state.deletedExport, ["export_001", "biz_test"]);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("export history delete returns 404 before cleanup when the export is absent", async () => {
+  const fixture = loadExportsRouter({ exportHistoryExists: false });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .delete("/api/exports/history/export_001");
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(fixture.state.exportCleanupCalls, []);
+    assert.equal(fixture.state.deletedExportMetadata, null);
+    assert.equal(fixture.state.deletedExport, null);
   } finally {
     fixture.cleanup();
   }

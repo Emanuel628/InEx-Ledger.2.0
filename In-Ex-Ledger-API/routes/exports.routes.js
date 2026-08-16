@@ -16,7 +16,7 @@ const {
 const {
   saveRedactedPdf,
   buildRedactedStream,
-  deleteExportFile,
+  cleanupExportFile,
 } = require("../services/exportStorage.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
 const { decryptGstHstNumber } = require("../services/gstHstNumberService.js");
@@ -51,7 +51,7 @@ const {
   sendExportFailedEmail,
 } = require("../services/exportEmailService.js");
 const { pool } = require("../db.js");
-const { logError, logInfo } = require("../utils/logger.js");
+const { logError, logInfo, logWarn } = require("../utils/logger.js");
 const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
 const {
@@ -1849,9 +1849,7 @@ router.delete("/history/:id", exportGrantLimiter, async (req, res) => {
       return res.status(404).json({ error: "Export not found." });
     }
 
-    if (rows[0].file_path) {
-      await deleteExportFile(rows[0].file_path).catch(() => {});
-    }
+    const filePath = rows[0].file_path || null;
 
     const client = await pool.connect();
     try {
@@ -1871,13 +1869,27 @@ router.delete("/history/:id", exportGrantLimiter, async (req, res) => {
       client.release();
     }
 
+    const fileCleanup = await cleanupExportFile(filePath);
+    if (fileCleanup.status === "failed") {
+      logWarn("Export file cleanup failed after history delete", {
+        userId: user.id,
+        businessId,
+        exportId: req.params.id,
+        reason: fileCleanup.reason || "unknown"
+      });
+    }
+
     logInfo("Export deleted", {
       userId: user.id,
       businessId,
       exportId: req.params.id,
+      fileCleanupStatus: fileCleanup.status,
     });
 
-    return res.json({ message: "Export deleted." });
+    return res.json({
+      message: "Export deleted.",
+      file_cleanup: fileCleanup.status,
+    });
   } catch (err) {
     logError("Export delete error", { err: err.message });
     return res.status(500).json({ error: "Failed to delete export." });
