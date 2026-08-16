@@ -546,7 +546,7 @@ Preferred final architecture:
 
 ## Status
 
-Phase 6 has started.
+Phase 6 is complete as of the final local verification pass.
 
 Do not delete remaining sidecar files unless both are true:
 
@@ -555,7 +555,7 @@ Do not delete remaining sidecar files unless both are true:
 
 ## Findings
 
-Remaining sidecar/patch files confirmed on `main`:
+Files confirmed gone/not found from current direct checks:
 
 - `In-Ex-Ledger-API/public/js/transaction-undo-button.js`
 - `In-Ex-Ledger-API/public/js/transaction-checkbox-actions.js`
@@ -564,20 +564,20 @@ Remaining sidecar/patch files confirmed on `main`:
 - `In-Ex-Ledger-API/services/subscriptionTrialCheckoutPatch.js`
 - `In-Ex-Ledger-API/public/js/theme-boot.js`
 - `In-Ex-Ledger-API/middleware/accountSwitchMfaTrust.js`
-
-Files confirmed gone/not found from current direct checks:
-
 - `In-Ex-Ledger-API/public/js/global-patches.js`
 - `In-Ex-Ledger-API/public/js/quick-add-entitlements.js`
 
-## Phase 6 Remaining Work
+Additional completion notes:
 
-- Recheck all suspicious filenames using a full local search because the GitHub connector search can miss exact filenames.
-- For every remaining sidecar, choose one of these outcomes:
-  - move useful behavior into owner file, then delete sidecar
-  - mark as intentionally permanent with a clear owner reason
-  - delete only if behavior is truly unwanted and unused
-- Do not create new sidecars.
+- Full local tracked-file search found no active `public/js`, `public/css`,
+  `routes`, `services`, or `middleware` filenames containing `-v2`, `patch`,
+  `override`, `bridge`, `temporary`, `temp`, `legacy`, `old`, or `sidecar`.
+- `In-Ex-Ledger-API/public/js/landing-faqs-v2.js` was not active product code;
+  its only tracked code reference was archived legacy HTML. It now lives under
+  `In-Ex-Ledger-API/legacy/public-html/js/landing-faqs-v2.js`.
+- `frontend-v3/src/pages/PlaceholderPage.tsx` was deleted. `App.tsx` now uses
+  an exhaustive page switch so missing V3 page wiring cannot fall through to
+  placeholder copy.
 
 ## Phase 6 Definition of Done
 
@@ -585,7 +585,7 @@ Files confirmed gone/not found from current direct checks:
 - No `-v2`, `patch`, `override`, `bridge`, or `temporary` file remains unless explicitly documented as permanent.
 - No hidden script injection remains.
 - All useful behavior lives in owner files.
-- `Docs/UNFINISHED-CLEANUP-WORK.md` remains the single cleanup source of truth.
+- `Work-To-Do/UNFINISHED-CLEANUP-WORK.md` remains the single cleanup source of truth.
 
 ---
 

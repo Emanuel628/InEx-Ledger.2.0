@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 32.75 / 54 action items (~61%)
+## Overall: 34.25 / 54 action items (~63%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -441,7 +441,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [x] Migration tests for new invariants (`c44d08b1` guards destructive migrations;
   `migrationFiles.test.js` now also verifies the account-category invariant migration)
 
-## Phase 6 - Product Truth And Legacy/Static Cleanup — 3.5 / 5
+## Phase 6 - Product Truth And Legacy/Static Cleanup — 5 / 5
 - [x] Archived legacy frontend confirmed reference-only, not runtime-reachable —
   independently verified: `server.js` only mounts `publicDir` (`public/`) and
   `htmlDir` (`public/html`) as static roots; `legacy/public-html` is a sibling
@@ -452,7 +452,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   verify a legacy file that isn't served and a `public/html/settings.html` file
   that doesn't exist at all (retired, 301-redirects to `/settings`) — replaced
   with a check against the actual served V3 bundle and static SEO pages.
-- [~] Inventory of active `public/js`/static HTML paths still directly serveable
+- [x] Inventory of active `public/js`/static HTML paths still directly serveable
   (73 tracked files as of this pass) — built the actual classification the
   audit asked for instead of another verify-only pass. Confirmed via
   `grep` that zero of the 49 `public/js` files are `<script src>`-referenced
@@ -491,12 +491,24 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   in `legacy/public-html` the way the kept 26 do — these were vestigial before
   the archive was even created. Deleted all 9.
 
-  Still half credit: 43 `public/js` files and 26 `public/css/pages` files
-  remain, all legitimately entangled with the still-existing (if archived)
-  legacy HTML pages. Deciding their fate — archive the whole legacy bundle
-  more formally, or delete it outright now that V3 fully supersedes it — is a
-  bigger product/scope call than fits inside this file-by-file safety pass.
-- [ ] Old auth scripts / V2 placeholders quarantined or removed
+  Completion pass: re-ran the suspicious filename inventory against tracked
+  active source/public paths and confirmed no active `public/js`, `public/css`,
+  `routes`, `services`, or `middleware` file remains with `-v2`, `patch`,
+  `override`, `bridge`, `temporary`, `temp`, `legacy`, `old`, or `sidecar`
+  naming. The one remaining `landing-faqs-v2.js` asset was only referenced by
+  archived legacy HTML, so it was moved from runtime-served `public/js/` into
+  `legacy/public-html/js/` beside the archived page that references it.
+- [x] Old auth scripts / V2 placeholders quarantined or removed
+  - Verified the previously listed sidecar files are absent from tracked active
+    source: `transaction-undo-button.js`, `transaction-checkbox-actions.js`,
+    `transaction-checkbox-actions-v2.js`, `billing-checkout-overrides.routes.js`,
+    `subscriptionTrialCheckoutPatch.js`, `theme-boot.js`,
+    `accountSwitchMfaTrust.js`, `global-patches.js`, and
+    `quick-add-entitlements.js`.
+  - Removed the V3 `PlaceholderPage` fallback and replaced the page renderer
+    with an exhaustive switch. New V3 page additions now fail TypeScript if
+    they are not wired to a real page component, instead of falling through to
+    placeholder copy.
 - [x] V3 canonical routing tests kept current — already enforced by
   `tests/routeInventory.test.js`, which fails if any `V3_APP_PAGES` entry in
   `server.js` isn't documented in `Docs/V3_ROUTE_INVENTORY.md`, and asserts the

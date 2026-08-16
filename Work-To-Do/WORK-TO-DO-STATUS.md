@@ -144,20 +144,21 @@ Status: ✅ complete. All 28 task rows checked off `[x]`. Moved to `Work-Complet
 - ✅ ~~Confirm `subscriptionTrialCheckoutPatch.js` was consolidated/removed~~ — not found.
 - ✅ ~~Confirm no billing/subscription patch/override sidecars remain~~ — full filename search found only `public/css/pages/subscription-premium-bridge.css` (a stylesheet, naming coincidence) — not a route/service sidecar.
 
-### Phase 5 — Theme / Dark Mode Drift Cleanup
 
-- ✅ ~~Dark mode is intended to stay disabled~~ — `public/js/theme-boot.js` exists and its header documents it as a permanent early light-mode lock.
-- ✅ ~~Confirm dark mode cannot activate from localStorage~~ — `theme-boot.js` forces `data-theme=light` and overwrites `lb_theme` to `light` on every boot.
-- ✅ ~~Confirm dark mode cannot activate from OS/browser preference~~ — `theme-boot.js` hard-sets light regardless of `prefers-color-scheme`.
-- ✅ ~~Confirm theme ownership~~ — `theme-boot.js` is documented as the permanent early light-mode lock.
-- ⏳ PARTIAL — Optional: a runtime UI spot-check that no visible toggle re-enables dark mode.
+### Phase 5 - Theme / Dark Mode Drift Cleanup
 
-### Phase 6 — Final Audit
+- DONE - `public/js/theme-boot.js` is not present in the repo.
+- DONE - No active `theme-boot.js` reference remains.
+- DONE - No active early theme boot sidecar remains.
+- DONE - Active theme behavior is owned by V3/app code, not a hidden public sidecar.
+- PARTIAL - Optional: a runtime UI spot-check that no visible toggle re-enables dark mode.
 
-- ✅ ~~`transaction-undo-button.js` spot-check not found~~
-- ✅ ~~`billing-checkout-overrides.routes.js` spot-check not found~~
-- ✅ ~~Full local filename search for `patch`, `override`, `bridge`, `-v2`, sidecar names~~ — only matches are `public/js/landing-faqs-v2.js` and `public/css/pages/subscription-premium-bridge.css`, both legitimate redesign assets.
-- ✅ ~~Owner/removal decision for remaining suspicious sidecars~~ — the two matches above are intentional UI files; no removal needed.
+### Phase 6 - Final Audit
+
+- DONE - `transaction-undo-button.js` spot-check not found.
+- DONE - `billing-checkout-overrides.routes.js` spot-check not found.
+- DONE - Full local filename search for `patch`, `override`, `bridge`, `-v2`, sidecar names found no active `public/js`, `public/css`, `routes`, `services`, or `middleware` matches.
+- DONE - `landing-faqs-v2.js` was moved into the legacy archive; the V3 placeholder fallback was removed.
 
 ### Additional Cleanup Candidates
 

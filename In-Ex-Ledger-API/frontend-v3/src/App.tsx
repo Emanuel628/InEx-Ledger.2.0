@@ -28,7 +28,6 @@ import VerifyEmail from './pages/VerifyEmail'
 import MfaChallenge from './pages/MfaChallenge'
 import Onboarding from './pages/Onboarding'
 import Help from './pages/Help'
-import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
 import { startInactivityMonitor } from './lib/inactivityMonitor'
 import { applyV3PhraseTranslations, getStoredLanguage, getUserLanguage, observeV3PhraseTranslations, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
@@ -441,134 +440,81 @@ function App() {
   }
 
   function renderPage() {
-  if (authLoading) {
-    return (
-      <div className="app-v3-loading" data-theme={theme} role="status" aria-live="polite">
-        <div>
-          <strong>{translate('app.loading.title', language)}</strong>
-          <span>{translate('app.loading.body', language)}</span>
+    if (authLoading) {
+      return (
+        <div className="app-v3-loading" data-theme={theme} role="status" aria-live="polite">
+          <div>
+            <strong>{translate('app.loading.title', language)}</strong>
+            <span>{translate('app.loading.body', language)}</span>
+          </div>
         </div>
-      </div>
-    )
-  }
+      )
+    }
 
-  if (currentPage === 'Accounts') {
-    return <Accounts {...pageProps} />
-  }
-
-  if (currentPage === 'Categories') {
-    return <Categories {...pageProps} />
-  }
-
-  if (currentPage === 'Receipts') {
-    return <Receipts {...pageProps} />
-  }
-
-  if (currentPage === 'Exports') {
-    return <Exports {...pageProps} />
-  }
-
-  if (currentPage === 'Mileage') {
-    return <Mileage {...pageProps} />
-  }
-
-  if (currentPage === 'Invoices') {
-    return <Invoices {...pageProps} />
-  }
-
-  if (currentPage === 'Messages') {
-    return <Messages {...pageProps} />
-  }
-
-  if (currentPage === 'Analytics') {
-    return <Analytics {...pageProps} />
-  }
-
-  if (currentPage === 'Settings') {
-    return <Settings {...pageProps} />
-  }
-
-  if (currentPage === 'Subscription') {
-    return <Subscription {...pageProps} />
-  }
-
-  if (currentPage === 'BusinessWorkspaces') {
-    return <BusinessWorkspaces {...pageProps} />
-  }
-
-  if (currentPage === 'Landing') {
-    return <Landing {...pageProps} />
-  }
-
-  if (currentPage === 'Pricing') {
-    return <Pricing {...pageProps} />
-  }
-
-  if (currentPage === 'Legal') {
-    return <Legal {...pageProps} />
-  }
-
-  if (currentPage === 'Privacy') {
-    return <Privacy {...pageProps} />
-  }
-
-  if (currentPage === 'Terms') {
-    return <Terms {...pageProps} />
-  }
-
-  if (currentPage === 'Sessions') {
-    return <Sessions {...pageProps} />
-  }
-
-  if (currentPage === 'ChangeEmail') {
-    return <ChangeEmail {...pageProps} />
-  }
-
-  if (currentPage === 'Upgrade') {
-    return <Upgrade {...pageProps} />
-  }
-
-  if (currentPage === 'TrialSetup') {
-    return <TrialSetup {...pageProps} />
-  }
-
-  if (currentPage === 'Login') {
-    return <Login {...pageProps} />
-  }
-
-  if (currentPage === 'Register') {
-    return <Register {...pageProps} />
-  }
-
-  if (currentPage === 'ForgotPassword') {
-    return <ForgotPassword {...pageProps} />
-  }
-
-  if (currentPage === 'ResetPassword') {
-    return <ResetPassword {...pageProps} />
-  }
-
-  if (currentPage === 'VerifyEmail') {
-    return <VerifyEmail {...pageProps} />
-  }
-
-  if (currentPage === 'MfaChallenge') {
-    return <MfaChallenge {...pageProps} />
-  }
-
-  if (currentPage === 'Onboarding') {
-    return <Onboarding {...pageProps} />
-  }
-
-  if (currentPage === 'Help') {
-    return <Help {...pageProps} />
-  }
-
-  if (currentPage === 'Transactions') {
-    return <Transactions {...pageProps} />
-  }
-
-  return <PlaceholderPage {...pageProps} />
+    switch (currentPage) {
+      case 'Accounts':
+        return <Accounts {...pageProps} />
+      case 'Categories':
+        return <Categories {...pageProps} />
+      case 'Receipts':
+        return <Receipts {...pageProps} />
+      case 'Exports':
+        return <Exports {...pageProps} />
+      case 'Mileage':
+        return <Mileage {...pageProps} />
+      case 'Invoices':
+        return <Invoices {...pageProps} />
+      case 'Messages':
+        return <Messages {...pageProps} />
+      case 'Analytics':
+        return <Analytics {...pageProps} />
+      case 'Settings':
+        return <Settings {...pageProps} />
+      case 'Subscription':
+        return <Subscription {...pageProps} />
+      case 'BusinessWorkspaces':
+        return <BusinessWorkspaces {...pageProps} />
+      case 'Landing':
+        return <Landing {...pageProps} />
+      case 'Pricing':
+        return <Pricing {...pageProps} />
+      case 'Legal':
+        return <Legal {...pageProps} />
+      case 'Privacy':
+        return <Privacy {...pageProps} />
+      case 'Terms':
+        return <Terms {...pageProps} />
+      case 'Sessions':
+        return <Sessions {...pageProps} />
+      case 'ChangeEmail':
+        return <ChangeEmail {...pageProps} />
+      case 'Upgrade':
+        return <Upgrade {...pageProps} />
+      case 'TrialSetup':
+        return <TrialSetup {...pageProps} />
+      case 'Login':
+        return <Login {...pageProps} />
+      case 'Register':
+        return <Register {...pageProps} />
+      case 'ForgotPassword':
+        return <ForgotPassword {...pageProps} />
+      case 'ResetPassword':
+        return <ResetPassword {...pageProps} />
+      case 'VerifyEmail':
+        return <VerifyEmail {...pageProps} />
+      case 'MfaChallenge':
+        return <MfaChallenge {...pageProps} />
+      case 'Onboarding':
+        return <Onboarding {...pageProps} />
+      case 'Help':
+        return <Help {...pageProps} />
+      case 'Transactions':
+        return <Transactions {...pageProps} />
+      default: {
+        const unhandledPage: never = currentPage
+        throw new Error(`Unhandled V3 page: ${unhandledPage}`)
+      }
+    }
   }
 
   return <PlanProvider authUser={authUser}>{renderPage()}</PlanProvider>
