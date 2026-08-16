@@ -218,19 +218,17 @@ Deleted the separate backend sidecar route file:
 
 ## Phase 6 Audit Correction
 
-The final audit found these frontend sidecar files still exist on `main`:
+Current verification confirms these frontend sidecar files do not exist on `main`:
 
 - `In-Ex-Ledger-API/public/js/transaction-undo-button.js`
 - `In-Ex-Ledger-API/public/js/transaction-checkbox-actions.js`
 - `In-Ex-Ledger-API/public/js/transaction-checkbox-actions-v2.js`
 
-Do not delete them blindly if their behavior is still wanted. They should be treated as implementation notes/source material, then moved into the real transaction owner files before deletion.
-
-Current reference search did not find active HTML/global references to these files, so they appear to be disconnected sidecars. Still, the useful behavior should be reviewed before deletion.
+Their useful behavior has been rebuilt in the real transaction owner files where kept.
 
 ## Remaining Work
 
-Undo and checkbox row actions are not properly active from owner files. If still wanted, rebuild them directly inside the real transaction owner files.
+Undo and checkbox row actions are active from owner files. Do not recreate sidecar files.
 
 Do not recreate sidecar files.
 
@@ -331,25 +329,23 @@ Final search found no active leftovers for:
 
 ## Phase 6 Audit Correction
 
-The final audit found another auth/MFA bandaid candidate that was not part of the original Phase 3 list:
+Current verification confirms this auth/MFA bandaid candidate does not exist on `main`:
 
 - `In-Ex-Ledger-API/middleware/accountSwitchMfaTrust.js`
 
-This file may contain useful behavior, but the implementation is suspicious because it overrides `res.json` on `/auth/login` to intercept the login response and convert an MFA-required response into a trusted-browser session.
+The useful trusted-browser behavior now belongs to the explicit auth/MFA owner flow. Do not recreate middleware that monkey-patches `res.json`.
 
-Do not delete it blindly.
-
-Correct destination if kept:
+Correct destination for future related work:
 
 - `In-Ex-Ledger-API/routes/auth.routes.js`
 - a dedicated MFA trust/auth service owned by the auth flow
 
-Consolidation direction:
+Completed consolidation direction:
 
-- Move trusted-browser account-switch behavior into the explicit login/MFA route flow.
-- Avoid monkey-patching `res.json` from middleware.
-- Keep the global MFA trust cookie behavior only if it is an intentional product/security decision.
-- Delete `accountSwitchMfaTrust.js` only after the behavior is represented in the real auth/MFA owner flow, or after the feature is intentionally removed.
+- Trusted-browser account-switch behavior belongs in the explicit login/MFA route flow.
+- Do not monkey-patch `res.json` from middleware.
+- Keep global MFA trust cookie behavior only as an intentional product/security decision.
+- Keep `accountSwitchMfaTrust.js` deleted.
 
 ## Phase 3 Definition of Done
 
@@ -364,35 +360,33 @@ Consolidation direction:
 
 ## Status
 
-Phase 4 has started as review only. Do not delete billing or subscription sidecar files until their useful behavior has been moved into the owner files.
+Phase 4 is complete. Billing/subscription sidecar behavior has been moved into owner files or intentionally removed.
 
 ## Findings
 
 ### `billing-checkout-overrides.routes.js`
 
-Status: active.
+Status: deleted after consolidation.
 
-Current owner problem: this file is mounted before `billing.routes.js` and intercepts `POST /api/billing/checkout-session`.
+Former owner problem: this file was mounted before `billing.routes.js` and intercepted `POST /api/billing/checkout-session`.
 
 Purpose: normalize a downgraded/free-selected trial before checkout so the main checkout route can create the normal Stripe checkout instead of blocking the user as if they already had paid Pro access.
 
-This behavior appears useful and should be kept.
+The useful behavior was moved into the billing owner flow.
 
 Correct destination:
 
 - `In-Ex-Ledger-API/routes/billing.routes.js`
 
-Consolidation direction:
+Completed consolidation direction:
 
-- Move `isTrialReupgradeAttempt(subscription)` into `billing.routes.js`.
-- Move the `cancel_at_period_end = false` trial normalization into the top of the real `router.post("/checkout-session", ...)` route.
-- After that, remove the mount from `routes/index.js` and delete `billing-checkout-overrides.routes.js`.
-
-Do not delete this file before consolidation.
+- Keep trial re-upgrade handling in `billing.routes.js`.
+- Keep trial normalization in the real `router.post("/checkout-session", ...)` route.
+- Keep the override route unmounted and deleted.
 
 ### `billing-reactivation.routes.js`
 
-Status: contains wanted product behavior, but current review did not find it mounted in `routes/index.js`.
+Status: consolidated/removed; no `billing-reactivation.routes.js` file remains.
 
 Purpose: lets a trialing user reactivate Pro during the trial after they selected Basic/free for the post-trial plan.
 
@@ -406,18 +400,16 @@ Correct destination:
 
 - `In-Ex-Ledger-API/routes/billing.routes.js`
 
-Consolidation direction:
+Completed consolidation direction:
 
-- Move the `reactivate-trial-pro` route into `billing.routes.js`.
-- Reuse existing billing helpers already in `billing.routes.js` where possible, including `stripeRequest`, `normalizeAdditionalBusinesses`, and `resolveBillingBusinessScope`.
+- Keep any trial reactivation behavior in `billing.routes.js`.
+- Reuse billing owner helpers in `billing.routes.js`.
 - Keep rate limiting, auth, and CSRF protection.
-- Delete `billing-reactivation.routes.js` only after the route exists in `billing.routes.js` and is mounted through the normal billing router.
-
-Do not delete this file before consolidation.
+- Keep `billing-reactivation.routes.js` deleted.
 
 ### `subscription-reactivation.js`
 
-Status: contains wanted frontend behavior, but current `subscription.html` review shows it is not loaded directly. The subscription page loads `subscription.js`.
+Status: consolidated/removed; no `subscription-reactivation.js` file remains.
 
 Purpose: intercept the Pro CTA only when the user is in the downgraded-trial state and call `/api/billing/reactivate-trial-pro` instead of starting brand-new checkout.
 
@@ -425,18 +417,16 @@ Correct destination:
 
 - `In-Ex-Ledger-API/public/js/subscription.js`
 
-Consolidation direction:
+Completed consolidation direction:
 
-- Move `isTrialDowngradedToBasic(subscription)` into `subscription.js`.
-- Move the Pro reactivation click behavior into the existing Pro CTA handler in `subscription.js`.
-- Ensure it uses the existing subscription page state instead of refetching duplicate state where possible.
-- Delete `subscription-reactivation.js` only after the behavior is integrated and the page uses it from `subscription.js`.
-
-Do not delete this file before consolidation.
+- Keep downgraded-trial UI behavior in the subscription owner file.
+- Keep Pro reactivation click behavior in the existing Pro CTA handler.
+- Use existing subscription page state where possible.
+- Keep `subscription-reactivation.js` deleted.
 
 ### `subscriptionTrialCheckoutPatch.js`
 
-Status: patch-style monkey patch.
+Status: deleted after consolidation.
 
 Purpose: prevents trialing snapshots from masquerading as paid/remaining paid access by forcing trialing snapshots to:
 
@@ -449,13 +439,11 @@ Correct destination:
 
 - `In-Ex-Ledger-API/services/subscriptionService.js`
 
-Consolidation direction:
+Completed consolidation direction:
 
-- Move the normalization into the actual subscription snapshot builder inside `subscriptionService.js`.
+- Keep normalization in the actual subscription snapshot builder inside `subscriptionService.js`.
 - Trialing access should remain effective Pro trial access, but it should not be treated as paid access for checkout blocking.
-- Delete `subscriptionTrialCheckoutPatch.js` only after the snapshot logic is native to `subscriptionService.js` and no require/import points to the patch module.
-
-Do not delete this file before consolidation.
+- Keep `subscriptionTrialCheckoutPatch.js` deleted.
 
 ## What Cannot Be Safely Implemented From This Connector
 
@@ -509,20 +497,19 @@ Old localStorage dark setting -> app resets to light
 
 ## Findings
 
-- `theme-boot.js` exists and currently forces light mode early by setting `lb_theme` and `data-theme` to `light`.
+- `theme-boot.js` does not exist on current `main`; do not recreate it as a sidecar.
 - `tokens.css` still contains a full `[data-theme="dark"]` block.
 - `global.js` still contains `setGlobalTheme(theme)` and can accept `"dark"`.
 - Duplicate dark-mode drift CSS was later found under `In-Ex-Ledger-API/public/css/core/` and is tracked in the Additional Cleanup Candidates section.
 
 ## Remaining Work
 
-Keep the current light-mode lock until the later redesign pass resumes.
+Keep theme behavior owned by V3/app code until the later redesign pass resumes.
 
 Preferred final architecture:
 
-- Move the force-light behavior into `global.js` as the owner of theme behavior.
-- Keep `theme-boot.js` only if it is intentionally needed as an early anti-flash light-mode lock.
-- If `theme-boot.js` stays, document that it is not a patch; it is the early light-mode enforcement layer.
+- Keep force-light behavior in owner code rather than a public sidecar.
+- Do not recreate `theme-boot.js` unless the team explicitly accepts a permanent early anti-flash layer.
 - Prevent `setGlobalTheme("dark")` from applying dark mode while dark mode is disabled.
 - Remove or hide any visible dark-mode toggle while dark mode is disabled.
 - Reset stale `lb_theme=dark` values to `light`.
@@ -614,7 +601,7 @@ Action:
 
 - Reviewed HTML/CSS imports for both CSS files.
 - Kept one intentional dark-mode-disabled owner path in `public/css/core/dark-mode.css`.
-- `theme-boot.js` remains as the early light-mode lock.
+- `theme-boot.js` is gone; do not recreate it as a public sidecar.
 - Deleted duplicate `dark-mode-final.css` / `dark-mode-disabled.css` after behavior was consolidated.
 
 ## Recovery / Checksum Artifacts
