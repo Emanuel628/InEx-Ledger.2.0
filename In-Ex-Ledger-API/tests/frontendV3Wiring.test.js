@@ -237,6 +237,27 @@ test("v3 settings keeps destructive data workflow outside the page controller", 
   assert.match(primitivesSource, /export function Field/);
 });
 
+test("v3 transactions keeps review queue and review labels outside the page controller", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const reviewPanelSource = fs.readFileSync(
+    path.join(frontendRoot, "components", "transactions", "ReviewQueuePanel.tsx"),
+    "utf8"
+  );
+  const reviewSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionReview.ts"), "utf8");
+
+  assert.match(pageSource, /import ReviewQueuePanel from '\.\.\/components\/transactions\/ReviewQueuePanel'/);
+  assert.match(pageSource, /from '\.\.\/lib\/transactionReview'/);
+  assert.match(pageSource, /<ReviewQueuePanel/);
+  assert.doesNotMatch(pageSource, /function ReviewQueuePanel/);
+  assert.doesNotMatch(pageSource, /function reviewText/);
+  assert.doesNotMatch(pageSource, /function normalizeReviewLabels/);
+  assert.match(reviewPanelSource, /export default function ReviewQueuePanel/);
+  assert.match(reviewPanelSource, /Mapping: \{reviewText\(item\.categoryReason\)\}/);
+  assert.match(reviewSource, /export function reviewText\(value: unknown\)/);
+  assert.match(reviewSource, /export function normalizeReviewLabels/);
+  assert.match(reviewSource, /\^mapped\$/i);
+});
+
 test("v3 frontend dependencies are pinned", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "frontend-v3", "package.json"), "utf8"));
   for (const section of ["dependencies", "devDependencies"]) {
@@ -448,11 +469,12 @@ test("v3 transactions restores tax estimate, review fixes, receipt upload, recur
 test("v3 transactions render review reasons safely and wire filter date range plus category handoff", () => {
   const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const reviewSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionReview.ts"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
 
   assert.match(apiSource, /categoryReason\?: unknown/);
-  assert.match(pageSource, /function reviewText\(value: unknown\)/);
-  assert.match(pageSource, /reviewText\(record\.summary\)/);
+  assert.match(reviewSource, /function reviewText\(value: unknown\)/);
+  assert.match(reviewSource, /reviewText\(record\.summary\)/);
   assert.doesNotMatch(pageSource, /\{reviewItem\.supportSummary \|\| reviewItem\.reviewNotes \|\| reviewItem\.categoryReason\}/);
   assert.match(apiSource, /start_date/);
   assert.match(apiSource, /end_date/);
@@ -481,14 +503,16 @@ test("v3 transactions render review reasons safely and wire filter date range pl
 test("v3 transactions use Categories page source for dropdowns and clean review labels", () => {
   const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const reviewPanelSource = fs.readFileSync(path.join(frontendRoot, "components", "transactions", "ReviewQueuePanel.tsx"), "utf8");
+  const reviewSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionReview.ts"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
 
   assert.match(apiSource, /\/api\/categories\?limit=500&offset=0&include_inactive=true/);
   assert.match(apiSource, /function mapCategoryOption/);
   assert.match(apiSource, /category\.is_active !== false/);
-  assert.match(pageSource, /function normalizeReviewLabels/);
-  assert.match(pageSource, /\^mapped\$/i);
-  assert.match(pageSource, /Mapping: \{reviewText\(item\.categoryReason\)\}/);
+  assert.match(reviewSource, /function normalizeReviewLabels/);
+  assert.match(reviewSource, /\^mapped\$/i);
+  assert.match(reviewPanelSource, /Mapping: \{reviewText\(item\.categoryReason\)\}/);
   assert.match(pageSource, /tax-profile-note/);
   assert.match(cssSource, /\.tax-profile-note/);
 });

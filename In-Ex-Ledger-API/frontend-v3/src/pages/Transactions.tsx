@@ -27,6 +27,7 @@ import AppShell from '../components/AppShell'
 import BankCsvHelpGuide from '../components/BankCsvHelp'
 import LoadingDots from '../components/LoadingDots'
 import RecurringTemplatesWorkflow from '../components/transactions/RecurringTemplatesWorkflow'
+import ReviewQueuePanel from '../components/transactions/ReviewQueuePanel'
 import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
@@ -55,6 +56,7 @@ import {
 } from '../lib/transactionsApi'
 import { uploadReceipt } from '../lib/receiptsApi'
 import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
+import { hasReviewFor, normalizeReviewLabels, reviewLabelsFor, reviewText } from '../lib/transactionReview'
 
 const TRANSACTION_PAGE_SIZE_KEY = 'inex-v3-transactions-page-size'
 
@@ -1061,62 +1063,6 @@ function ProgressivePanel({
   )
 }
 
-function ReviewQueuePanel({
-  reviewQueue,
-  onOpenTransaction,
-  onAttachReceipt,
-  onManageCategories,
-}: {
-  reviewQueue: ReviewQueueResponse
-  onOpenTransaction: (transactionId: string) => void
-  onAttachReceipt: (transactionId: string) => void
-  onManageCategories: () => void
-}) {
-  const items = (reviewQueue.queue || []).slice(0, 5)
-  if (!items.length) {
-    return <p className="progressive-panel-note">No missing categories, receipts, or support items right now.</p>
-  }
-
-  return (
-    <div className="review-queue-list">
-      {items.map((item) => {
-        const labels = normalizeReviewLabels(
-          item.issueLabels.length
-            ? item.issueLabels
-            : item.issueEntries.map((entry) => entry.label || entry.issueCode || 'Review needed'),
-          item.description,
-        )
-        const actionLabel = item.quickAction?.label || 'Review'
-
-        return (
-          <article className="review-queue-item" key={item.id}>
-            <div>
-              <strong>{item.description}</strong>
-              <span>{labels.slice(0, 2).join(', ')}</span>
-              {reviewText(item.categoryReason) ? <small>Mapping: {reviewText(item.categoryReason)}</small> : null}
-            </div>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => {
-                if (item.quickAction?.supportType === 'receipt' || labels.some((label) => /receipt/i.test(label))) {
-                  onAttachReceipt(item.id)
-                } else if (labels.some((label) => /category|tax mapping/i.test(label))) {
-                  onManageCategories()
-                } else {
-                  onOpenTransaction(item.id)
-                }
-              }}
-            >
-              {actionLabel}
-            </button>
-          </article>
-        )
-      })}
-    </div>
-  )
-}
-
 const emptyDraft: TransactionDraft = {
   kind: 'Income',
   amount: '',
@@ -1662,81 +1608,10 @@ function getActiveCurrency() {
   return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
 }
 
-function reviewLabelsFor(transaction: Transaction) {
-  return normalizeReviewLabels(transaction.reviewIssues.flatMap((issue) => {
-    const directLabels = issue.issueLabels?.map(reviewText).filter(Boolean) || []
-    const entryLabels = issue.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode)).filter(Boolean) || []
-    const summaries = [issue.supportSummary, issue.reviewNotes].map(reviewText).filter(Boolean)
-
-    return [...directLabels, ...entryLabels, ...summaries]
-  }), transaction.description)
-}
-
-function normalizeReviewLabels(labels: string[], description = '') {
-  const seen = new Set<string>()
-  const hasDescription = hasUsableDescription(description)
-  return labels
-    .map((label) => reviewText(label).trim())
-    .map(canonicalReviewLabel)
-    .filter((label) => {
-      if (!label || /^mapped$/i.test(label)) return false
-      const key = reviewLabelKey(label)
-      if (key === 'description' && hasDescription) return false
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-}
-
-function canonicalReviewLabel(label: string) {
-  if (/description|merchant|vendor|memo|payer/i.test(label) && /missing|required|needed|blank|empty|add/i.test(label)) {
-    return 'Description is missing'
-  }
-  if (/receipt|support|source document|proof/i.test(label) && /missing|required|needed|attach|upload/i.test(label)) {
-    return 'Receipt or support missing'
-  }
-  if (/category|tax mapping|tax line|deduct/i.test(label) && /missing|required|needed|map|uncategorized/i.test(label)) {
-    return 'Tax mapping needed'
-  }
-  return label
-}
-
-function reviewLabelKey(label: string) {
-  if (/^description is missing$/i.test(label)) return 'description'
-  if (/^receipt or support missing$/i.test(label)) return 'receipt_support'
-  if (/^tax mapping needed$/i.test(label)) return 'tax_mapping'
-  return label.toLowerCase()
-}
-
-function hasUsableDescription(description: string) {
-  const normalized = description.trim().toLowerCase()
-  return Boolean(normalized && normalized !== 'untitled transaction' && normalized !== '(no description)')
-}
-
 function readSavedPageSize() {
   if (typeof window === 'undefined') return 20
   const saved = Number(window.localStorage.getItem(TRANSACTION_PAGE_SIZE_KEY))
   return [10, 20, 50].includes(saved) ? saved : 20
-}
-
-function reviewText(value: unknown): string {
-  if (value == null) return ''
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  if (Array.isArray(value)) return value.map(reviewText).filter(Boolean).join(', ')
-  if (typeof value === 'object') {
-    const record = value as Record<string, unknown>
-    return reviewText(record.summary)
-      || [reviewText(record.reasonLabel), reviewText(record.confidenceLabel)].filter(Boolean).join(' - ')
-      || reviewText(record.label)
-      || reviewText(record.code)
-      || ''
-  }
-  return ''
-}
-
-function hasReviewFor(labels: string[], patterns: RegExp[]) {
-  return labels.some((label) => patterns.some((pattern) => pattern.test(label)))
 }
 
 function formatIsoDate(value: string) {
