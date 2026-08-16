@@ -1577,3 +1577,12 @@ test that had been failing identically since PR 13).
   Added focused tests for a preserved validation 400 and a generic unexpected
   list failure. Focused invoice suites: **23/23 passing**. Now **28 of 40**
   route files use the pattern; Phase 4 remains **3.75/5**.
+
+- **PR 33** (`chore/remove-invoices-v1-error-mapper-drift`): correction pass
+  after reviewing the code updated so far for over-engineering drift. Removed
+  the unnecessary `invoices-v1.routes.js` router-level `{ error }` mapper
+  because `server.js` already owns that standard envelope and request-id
+  behavior. Updated the standalone invoice route tests to mount the shared
+  `attachCentralErrorHandler` helper instead of relying on route-local
+  duplication or Express's default error handler. Focused invoice suites:
+  **23/23 passing**.

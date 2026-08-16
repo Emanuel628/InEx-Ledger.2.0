@@ -6,6 +6,7 @@ const crypto = require("node:crypto");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-invoice-email";
 process.env.CSRF_SECRET =
@@ -44,6 +45,7 @@ function buildApp(router, mountPath = "/api/invoices-v1") {
   app.use(express.json());
   app.use(ensureCsrfCookie);
   app.use(mountPath, router);
+  attachCentralErrorHandler(app);
   return app;
 }
 

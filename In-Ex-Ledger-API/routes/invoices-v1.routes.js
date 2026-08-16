@@ -581,13 +581,4 @@ router.patch("/:id/restore", asyncRoute(async (req, res) => {
   res.json(result.rows[0]);
 }));
 
-router.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
-  if (status >= 500) {
-    logError("invoices-v1 route error:", err);
-  }
-  const error = status < 500 ? err.message : "Internal server error";
-  res.status(status).json({ error });
-});
-
 module.exports = router;
