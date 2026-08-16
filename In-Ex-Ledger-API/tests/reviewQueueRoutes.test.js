@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ROUTE_PATH = require.resolve("../routes/review.routes.js");
 
@@ -268,6 +269,7 @@ function loadReviewRouterFixture(options = {}) {
   const app = express();
   app.use(express.json());
   app.use("/api/review", router);
+  attachCentralErrorHandler(app, { logError: (...args) => state.logErrors.push(args) });
 
   return { app, state };
 }
@@ -384,7 +386,7 @@ test("GET /api/review/queue returns 500 when dataset build fails", async () => {
   const response = await request(app).get("/api/review/queue");
 
   assert.equal(response.status, 500);
-  assert.equal(response.body.error, "Failed to load review queue.");
+  assert.equal(response.body.error, "Internal server error");
   assert.equal(state.logErrors.length, 1);
 });
 
@@ -447,6 +449,7 @@ test("GET /api/review/queue returns an empty payload for a fresh account", async
   const app = express();
   app.use(express.json());
   app.use("/api/review", router);
+  attachCentralErrorHandler(app);
 
   const response = await request(app).get("/api/review/queue");
 
@@ -508,6 +511,15 @@ test("GET /api/review/issues/:transactionId anchors issue reads to the owned tra
   assert.match(issueQuery.sql, /t\.deleted_at IS NULL/i);
 });
 
+test("GET /api/review/issues/:transactionId rejects an invalid id", async () => {
+  const { app } = loadReviewRouterFixture();
+
+  const response = await request(app).get("/api/review/issues/not-a-uuid");
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error, "Invalid transaction ID.");
+});
+
 test("POST /api/review/issues creates a reviewer issue", async () => {
   const { app } = loadReviewRouterFixture();
 
@@ -526,6 +538,20 @@ test("POST /api/review/issues creates a reviewer issue", async () => {
   assert.equal(response.body.issue_status, "open");
 });
 
+test("POST /api/review/issues rejects invalid issue payloads", async () => {
+  const { app } = loadReviewRouterFixture();
+
+  const response = await request(app)
+    .post("/api/review/issues")
+    .send({
+      transaction_id: "not-a-uuid",
+      issue_code: "reviewer_note"
+    });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error, "transaction_id must be a valid UUID.");
+});
+
 test("PATCH /api/review/issues/:id updates reviewer issue state", async () => {
   const { app } = loadReviewRouterFixture();
 
@@ -539,4 +565,15 @@ test("PATCH /api/review/issues/:id updates reviewer issue state", async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.issue_status, "waived");
   assert.equal(response.body.review_notes, "Immaterial test item");
+});
+
+test("PATCH /api/review/issues/:id returns 404 when the issue is missing", async () => {
+  const { app } = loadReviewRouterFixture({ missingIssue: true });
+
+  const response = await request(app)
+    .patch("/api/review/issues/3fa85f64-5717-4562-b3fc-2c963f66afa6")
+    .send({ issue_status: "resolved" });
+
+  assert.equal(response.status, 404);
+  assert.equal(response.body.error, "Review issue not found.");
 });

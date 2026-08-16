@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-check-email-verified-secret";
 
@@ -12,7 +13,7 @@ const { signToken } = require("../middleware/auth.middleware.js");
 
 const ROUTE_PATH = require.resolve("../routes/check-email-verified.routes.js");
 
-function loadRoute({ verified = false } = {}) {
+function loadRoute({ verified = false, queryImpl = null } = {}) {
   const originalLoad = Module._load.bind(Module);
 
   Module._load = function(requestName, parent, isMain) {
@@ -20,6 +21,9 @@ function loadRoute({ verified = false } = {}) {
       return {
         pool: {
           async query(sql, params = []) {
+            if (queryImpl) {
+              return queryImpl(sql, params);
+            }
             if (/SELECT email_verified FROM users WHERE email = \$1 LIMIT 1/i.test(sql)) {
               if (String(params[0] || "").toLowerCase() === "person@example.com") {
                 return { rows: [{ email_verified: verified }], rowCount: 1 };
@@ -41,6 +45,7 @@ function loadRoute({ verified = false } = {}) {
     const router = require("../routes/check-email-verified.routes.js");
     const app = express();
     app.use("/api/check-email-verified", router);
+    attachCentralErrorHandler(app);
     return {
       app,
       cleanup() {
@@ -91,6 +96,20 @@ test("check-email-verified rejects invalid verification state tokens", async () 
   }
 });
 
+test("check-email-verified requires a verification state", async () => {
+  const fixture = loadRoute({ verified: false });
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/check-email-verified");
+
+    assert.equal(response.status, 400);
+    assert.equal(response.body.error, "Verification state is required");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("check-email-verified rejects signed states whose email payload fails shared normalization", async () => {
   const fixture = loadRoute({ verified: false });
 
@@ -101,6 +120,25 @@ test("check-email-verified rejects signed states whose email payload fails share
 
     assert.equal(response.status, 401);
     assert.match(String(response.body?.error || ""), /invalid verification state/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("check-email-verified returns a generic 500 for unexpected database failures", async () => {
+  const fixture = loadRoute({
+    queryImpl: async () => {
+      throw new Error("connection reset");
+    }
+  });
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/check-email-verified")
+      .query({ state: makeState("person@example.com") });
+
+    assert.equal(response.status, 500);
+    assert.equal(response.body.error, "Internal server error");
   } finally {
     fixture.cleanup();
   }

@@ -4,7 +4,7 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
@@ -113,8 +113,7 @@ function validateOptionalNumber(value, fieldName, { min = null, max = null } = {
 // GET /api/analytics/dashboard
 // Key financial metrics over the trailing 12 months
 // ---------------------------------------------------------------------------
-router.get("/dashboard", async (req, res) => {
-  try {
+router.get("/dashboard", asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const hasTaxEstimates = hasFeatureAccess(subscription, FEATURE_KEYS.TAX_ESTIMATES);
@@ -363,19 +362,14 @@ router.get("/dashboard", async (req, res) => {
         total: Number(r.total)
       }))
     });
-  } catch (err) {
-    logError("GET /analytics/dashboard error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while loading dashboard analytics. Please try again or contact support if the problem persists." });
-  }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // GET /api/analytics/cash-flow
 // Project the next 3 months of cash flow based on the trailing 6-month average
 // and recurring transactions
 // ---------------------------------------------------------------------------
-router.get("/cash-flow", async (req, res) => {
-  try {
+router.get("/cash-flow", asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const since = monthStartOffset(5);
 
@@ -502,19 +496,14 @@ router.get("/cash-flow", async (req, res) => {
       recurring_monthly_expense: Number(recurringMonthlyExpense.toFixed(2)),
       projections
     });
-  } catch (err) {
-    logError("GET /analytics/cash-flow error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while loading cash flow projection. Please try again or contact support if the problem persists." });
-  }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // GET /api/analytics/seasonal
 // Monthly income averages across all available history, with deviation from
 // the overall mean to highlight seasonal highs and lows
 // ---------------------------------------------------------------------------
-router.get("/seasonal", async (req, res) => {
-  try {
+router.get("/seasonal", asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     // Average income per calendar month across all history
@@ -537,7 +526,8 @@ router.get("/seasonal", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      return res.json({ months: [], overall_avg: 0, insights: [] });
+      res.json({ months: [], overall_avg: 0, insights: [] });
+      return;
     }
 
     const months = result.rows.map((r) => ({
@@ -577,19 +567,14 @@ router.get("/seasonal", async (req, res) => {
       overall_avg: Number(overall.toFixed(2)),
       insights
     });
-  } catch (err) {
-    logError("GET /analytics/seasonal error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while loading seasonal analysis. Please try again or contact support if the problem persists." });
-  }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /api/analytics/whatif
 // Simulate changes to income or expenses and return projected impact
 // Payload: { income_change_pct?, expense_change_pct?, weeks_off?, custom_income?, custom_expense? }
 // ---------------------------------------------------------------------------
-router.post("/whatif", async (req, res) => {
-  try {
+router.post("/whatif", asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const since = monthStartOffset(5);
 
@@ -606,7 +591,7 @@ router.post("/whatif", async (req, res) => {
       max: 1000
     });
     if (parsedIncomeChange.error) {
-      return res.status(400).json({ error: parsedIncomeChange.error });
+      throw new ApiError(400, parsedIncomeChange.error);
     }
 
     const parsedExpenseChange = validateOptionalNumber(expense_change_pct, "expense_change_pct", {
@@ -614,12 +599,12 @@ router.post("/whatif", async (req, res) => {
       max: 1000
     });
     if (parsedExpenseChange.error) {
-      return res.status(400).json({ error: parsedExpenseChange.error });
+      throw new ApiError(400, parsedExpenseChange.error);
     }
 
     const parsedWeeksOff = validateOptionalNumber(weeks_off, "weeks_off", { min: 0, max: 52 });
     if (parsedWeeksOff.error) {
-      return res.status(400).json({ error: parsedWeeksOff.error });
+      throw new ApiError(400, parsedWeeksOff.error);
     }
 
     const parsedCustomIncome = validateOptionalNumber(custom_income, "custom_income", {
@@ -627,7 +612,7 @@ router.post("/whatif", async (req, res) => {
       max: MAX_ANALYTICS_AMOUNT
     });
     if (parsedCustomIncome.error) {
-      return res.status(400).json({ error: parsedCustomIncome.error });
+      throw new ApiError(400, parsedCustomIncome.error);
     }
 
     const parsedCustomExpense = validateOptionalNumber(custom_expense, "custom_expense", {
@@ -635,7 +620,7 @@ router.post("/whatif", async (req, res) => {
       max: MAX_ANALYTICS_AMOUNT
     });
     if (parsedCustomExpense.error) {
-      return res.status(400).json({ error: parsedCustomExpense.error });
+      throw new ApiError(400, parsedCustomExpense.error);
     }
 
     // Fetch trailing 6-month average as baseline
@@ -721,10 +706,6 @@ router.post("/whatif", async (req, res) => {
       },
       messages
     });
-  } catch (err) {
-    logError("POST /analytics/whatif error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while computing the what-if scenario. Please try again or contact support if the problem persists." });
-  }
-});
+}));
 
 module.exports = router;

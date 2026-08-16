@@ -5,36 +5,35 @@ const router = express.Router();
 const { pool } = require("../db.js");
 const { verifyToken } = require("../middleware/auth.middleware.js");
 const { normalizeEmail } = require("../utils/emailNormalization.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
-router.get("/", async (req, res) => {
+router.get("/", asyncRoute(async (req, res) => {
   const state = String(req.query.state || "").trim();
   if (!state) {
-    return res.status(400).json({ error: "Verification state is required" });
+    throw new ApiError(400, "Verification state is required");
   }
 
-  let email = "";
+  let payload;
   try {
-    const payload = verifyToken(state);
-    if (payload?.purpose !== "verify_email_status") {
-      return res.status(401).json({ error: "Invalid verification state" });
-    }
-    email = normalizeEmail(payload.email);
-    if (!email) {
-      return res.status(401).json({ error: "Invalid verification state" });
-    }
+    payload = verifyToken(state);
   } catch (_) {
-    return res.status(401).json({ error: "Invalid verification state" });
+    throw new ApiError(401, "Invalid verification state");
   }
 
-  try {
-    const result = await pool.query(
-      "SELECT email_verified FROM users WHERE email = $1 LIMIT 1",
-      [email]
-    );
-    return res.json({ verified: !!result.rows[0]?.email_verified });
-  } catch (_) {
-    return res.status(500).json({ error: "Failed to check verification status" });
+  if (payload?.purpose !== "verify_email_status") {
+    throw new ApiError(401, "Invalid verification state");
   }
-});
+
+  const email = normalizeEmail(payload.email);
+  if (!email) {
+    throw new ApiError(401, "Invalid verification state");
+  }
+
+  const result = await pool.query(
+    "SELECT email_verified FROM users WHERE email = $1 LIMIT 1",
+    [email]
+  );
+  res.json({ verified: !!result.rows[0]?.email_verified });
+}));
 
 module.exports = router;

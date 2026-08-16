@@ -6,7 +6,7 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { buildNormalizedExportDataset } = require("../services/exportDatasetService.js");
-const { logError } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -475,8 +475,7 @@ function buildEmptyQueueResponse(businessId, business, startDate, endDate) {
   };
 }
 
-router.get("/queue", async (req, res) => {
-  try {
+router.get("/queue", asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const startDate = parseDateFilter(req.query.startDate);
     const endDate = parseDateFilter(req.query.endDate);
@@ -591,7 +590,8 @@ router.get("/queue", async (req, res) => {
 
     const business = businessResult.rows[0] || {};
     if (!transactionResult.rows.length) {
-      return res.json(buildEmptyQueueResponse(businessId, business, startDate, endDate));
+      res.json(buildEmptyQueueResponse(businessId, business, startDate, endDate));
+      return;
     }
 
     const dataset = buildNormalizedExportDataset({
@@ -608,25 +608,20 @@ router.get("/queue", async (req, res) => {
     });
 
     const queue = buildQueueRows(dataset.rows, issueStateRowsByTransaction);
-    return res.json({
+    res.json({
       queue,
       summary: summarizeQueue(queue),
       supportSummary: dataset.supportSummary,
       totals: dataset.totals,
       metadata: dataset.metadata
     });
-  } catch (err) {
-    logError("GET /review/queue error:", err);
-    return res.status(500).json({ error: "Failed to load review queue." });
-  }
-});
+}));
 
-router.get("/issues/:transactionId", async (req, res) => {
-  try {
+router.get("/issues/:transactionId", asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const transactionId = String(req.params.transactionId || "").trim();
     if (!isUuid(transactionId)) {
-      return res.status(400).json({ error: "Invalid transaction ID." });
+      throw new ApiError(400, "Invalid transaction ID.");
     }
 
     const result = await pool.query(
@@ -648,15 +643,10 @@ router.get("/issues/:transactionId", async (req, res) => {
         ORDER BY trs.updated_at DESC, trs.created_at DESC`,
       [businessId, transactionId]
     );
-    return res.json(result.rows);
-  } catch (err) {
-    logError("GET /review/issues/:transactionId error:", err);
-    return res.status(500).json({ error: "Failed to load review issues." });
-  }
-});
+    res.json(result.rows);
+}));
 
-router.post("/issues", async (req, res) => {
-  try {
+router.post("/issues", asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const transactionId = String(req.body?.transaction_id || "").trim();
     const issueCode = normalizeIssueCode(req.body?.issue_code);
@@ -665,16 +655,16 @@ router.post("/issues", async (req, res) => {
     const reviewNotes = String(req.body?.review_notes || "").trim() || null;
 
     if (!isUuid(transactionId)) {
-      return res.status(400).json({ error: "transaction_id must be a valid UUID." });
+      throw new ApiError(400, "transaction_id must be a valid UUID.");
     }
     if (!issueCode) {
-      return res.status(400).json({ error: "issue_code is required." });
+      throw new ApiError(400, "issue_code is required.");
     }
     if (!VALID_ISSUE_SEVERITIES.has(issueSeverity)) {
-      return res.status(400).json({ error: "issue_severity must be warning or hard." });
+      throw new ApiError(400, "issue_severity must be warning or hard.");
     }
     if (!VALID_ISSUE_STATUSES.has(issueStatus)) {
-      return res.status(400).json({ error: "issue_status must be open, resolved, or waived." });
+      throw new ApiError(400, "issue_status must be open, resolved, or waived.");
     }
 
     const txCheck = await pool.query(
@@ -682,7 +672,7 @@ router.post("/issues", async (req, res) => {
       [transactionId, businessId]
     );
     if (!txCheck.rowCount) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
 
     const result = await pool.query(
@@ -697,21 +687,16 @@ router.post("/issues", async (req, res) => {
        RETURNING id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at, created_at`,
       [transactionId, businessId, issueCode, issueSeverity, issueStatus, reviewNotes, req.user.id]
     );
-    return res.status(201).json({
+    res.status(201).json({
       ...result.rows[0],
       created_by_name: req.user.display_name || req.user.full_name || req.user.email || "",
       resolved_by_name: issueStatus === "resolved" || issueStatus === "waived"
         ? (req.user.display_name || req.user.full_name || req.user.email || "")
         : ""
     });
-  } catch (err) {
-    logError("POST /review/issues error:", err);
-    return res.status(500).json({ error: "Failed to save review issue." });
-  }
-});
+}));
 
-router.patch("/issues/:id", async (req, res) => {
-  try {
+router.patch("/issues/:id", asyncRoute(async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const issueId = String(req.params.id || "").trim();
     const issueStatus = req.body?.issue_status == null
@@ -722,10 +707,10 @@ router.patch("/issues/:id", async (req, res) => {
       : String(req.body.review_notes).trim();
 
     if (!isUuid(issueId)) {
-      return res.status(400).json({ error: "Invalid review issue ID." });
+      throw new ApiError(400, "Invalid review issue ID.");
     }
     if (issueStatus && !VALID_ISSUE_STATUSES.has(issueStatus)) {
-      return res.status(400).json({ error: "issue_status must be open, resolved, or waived." });
+      throw new ApiError(400, "issue_status must be open, resolved, or waived.");
     }
 
     const result = await pool.query(
@@ -747,19 +732,15 @@ router.patch("/issues/:id", async (req, res) => {
       [issueStatus, reviewNotes || null, req.user.id, issueId, businessId]
     );
     if (!result.rowCount) {
-      return res.status(404).json({ error: "Review issue not found." });
+      throw new ApiError(404, "Review issue not found.");
     }
-    return res.json({
+    res.json({
       ...result.rows[0],
       created_by_name: "",
       resolved_by_name: result.rows[0].issue_status === "resolved" || result.rows[0].issue_status === "waived"
         ? (req.user.display_name || req.user.full_name || req.user.email || "")
         : ""
     });
-  } catch (err) {
-    logError("PATCH /review/issues/:id error:", err);
-    return res.status(500).json({ error: "Failed to update review issue." });
-  }
-});
+}));
 
 module.exports = router;

@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 31.0 / 54 action items (~57%)
+## Overall: 31.25 / 54 action items (~58%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -153,7 +153,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [~] Docker/Nixpacks/start scripts reconciled
 - [x] Reproducible installs (`npm ci`) in CI/deployment (`afdefa17`, `6a313ff0`)
 
-## Phase 4 - API Error And Response Consistency — 3.5 / 5
+## Phase 4 - API Error And Response Consistency — 3.75 / 5
 - [~] Consolidated `ApiError`/`sendError`/async-route pattern introduced — Pass 27's
   suggested design already had most of its foundation in place and just wasn't being
   used: `server.js` already has a final Express error handler that derives status
@@ -299,6 +299,25 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   (plus 3/3 ASVS controls) — 8 more than the prior baseline, all new. Now
   **17 of 40** route files use the pattern; checklist item stays at half
   credit — 23 to go.
+  **Follow-up, same PR sequence**: converted 3 more route files —
+  `check-email-verified.routes.js`, `review.routes.js`, and
+  `analytics.routes.js`. `check-email-verified` now preserves its specific
+  400/401 state-validation responses while unexpected database failures go
+  through the central generic 500 handler. `review.routes.js` no longer carries
+  per-handler `try/catch`/`logError` boilerplate around queue and issue handlers;
+  invalid IDs/payloads and missing rows are explicit `ApiError` 400/404s, and
+  unexpected dataset/query failures route through the shared handler.
+  `analytics.routes.js` keeps the analytics math/query behavior intact while
+  replacing four bespoke 500 messages with shared error routing and converting
+  what-if validation failures to `ApiError(400, ...)`. Added
+  `tests/analyticsRouteErrors.test.js` and expanded existing
+  `checkEmailVerifiedRoutes.test.js`/`reviewQueueRoutes.test.js` coverage for
+  central-handler 500s and representative validation/not-found branches. Full
+  suite via `npm run test:all`: **1506/1506 passing** (plus 3/3 ASVS controls).
+  Now **20 of 40** route files use the pattern. Phase 4 moves from **3.5/5**
+  to **3.75/5**; overall moves from **31.0/54 (~57%)** to
+  **31.25/54 (~58%)**. Checklist item remains partial because half the route
+  files still need conversion.
 - [~] Client-facing error envelopes normalized — partial; this PR folded one more error
   class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
   generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
@@ -1407,3 +1426,25 @@ test that had been failing identically since PR 13).
   `npm run test:all`: **1492/1492 passing** (plus 3/3 ASVS controls) — 8
   more than PR 25's baseline, all new. Now **17 of 40** route files use
   the pattern; checklist item stays at half credit — 23 to go.
+
+- **PR 27** (`chore/expand-api-error-rollout-6`): same phase, same item,
+  quarter-point progress for reaching the halfway mark on route conversion.
+  Converted `check-email-verified.routes.js`, `review.routes.js`, and
+  `analytics.routes.js` to the shared `asyncRoute`/`ApiError` pattern.
+
+  `check-email-verified.routes.js` now preserves its specific 400/401
+  verification-state responses while unexpected database failures go through
+  the central generic 500 handler. `review.routes.js` now routes queue and
+  review-issue failures through the shared handler, with explicit 400/404
+  `ApiError`s for invalid IDs, invalid payloads, missing transactions, and
+  missing review issues. `analytics.routes.js` keeps the analytics formulas and
+  query behavior unchanged, but removes four local `try/catch` blocks and
+  converts what-if validation failures to `ApiError(400, ...)`.
+
+  Added `tests/analyticsRouteErrors.test.js` and expanded
+  `tests/checkEmailVerifiedRoutes.test.js` plus
+  `tests/reviewQueueRoutes.test.js` for central-handler 500s and
+  representative validation/not-found cases. Full suite via
+  `npm run test:all`: **1506/1506 passing** (plus 3/3 ASVS controls). Now
+  **20 of 40** route files use the pattern. Phase 4: **3.5/5 → 3.75/5**;
+  overall: **31.0/54 (~57%) → 31.25/54 (~58%)**.
