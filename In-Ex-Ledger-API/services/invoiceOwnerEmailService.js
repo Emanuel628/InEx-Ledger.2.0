@@ -11,6 +11,12 @@ const {
   appendOptionalEmailFooter,
   getOptionalEmailRecipientForBusiness
 } = require("./emailPreferencesService.js");
+const {
+  buildEmailDedupeKey,
+  reserveEmailDelivery,
+  markEmailDeliverySent,
+  markEmailDeliveryFailed
+} = require("./emailDeliveryDedupeService.js");
 
 function getResendClient() {
   const apiKey = String(process.env.RESEND_API_KEY || "").trim();
@@ -59,17 +65,46 @@ async function sendInvoiceOwnerActivityEmail({
       details,
       actionUrl: buildAppUrl(actionUrl || "/")
     }), owner.user_id);
-    const result = await resendClient.emails.send({
-      from: getFromEmail(),
-      to: owner.email,
-      subject: emailContent.subject,
-      html: emailContent.html,
-      text: emailContent.text
+
+    const dedupeKey = buildEmailDedupeKey("invoice-owner-activity", businessId, [
+      kind,
+      owner.email,
+      emailContent.subject,
+      JSON.stringify(details || []),
+      actionUrl || ""
+    ]);
+    const reserved = await reserveEmailDelivery(db, {
+      dedupeKey,
+      category: "invoice.owner-activity",
+      businessId,
+      recipientEmail: owner.email,
+      metadata: { kind, actionUrl: actionUrl || null }
     });
-    if (result?.error) {
-      throw new Error(result.error.message || "Invoice owner email send failed.");
+    if (!reserved) {
+      logWarn("invoiceOwnerEmailService: owner activity email skipped by dedupe", {
+        businessId,
+        kind
+      });
+      return false;
     }
-    return true;
+
+    try {
+      const result = await resendClient.emails.send({
+        from: getFromEmail(),
+        to: owner.email,
+        subject: emailContent.subject,
+        html: emailContent.html,
+        text: emailContent.text
+      });
+      if (result?.error) {
+        throw new Error(result.error.message || "Invoice owner email send failed.");
+      }
+      await markEmailDeliverySent(db, dedupeKey, result?.data?.id || result?.id || null);
+      return true;
+    } catch (sendErr) {
+      await markEmailDeliveryFailed(db, dedupeKey, sendErr);
+      throw sendErr;
+    }
   } catch (err) {
     logWarn("invoiceOwnerEmailService: owner activity email failed", {
       businessId,

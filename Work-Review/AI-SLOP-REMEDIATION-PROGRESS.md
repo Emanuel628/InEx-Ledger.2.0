@@ -716,7 +716,7 @@ test that had been failing identically since PR 13).
 
 ## Phase 9 - Integrations, Idempotency, Side Effects — 4.5 / 5
 - [x] Stripe mutation idempotency keys reviewed beyond checkout (`buildStripeMutationIdempotencyKey` covers customer create, portal config create, subscription cancel/resume/switch, and direct additional-business subscription updates)
-- [~] Durable dedupe/outbox behavior for important emails (`email_delivery_dedupe` + billing lifecycle email dedupe; remaining email families still need review)
+- [~] Durable dedupe/outbox behavior for important emails (`email_delivery_dedupe` covers billing lifecycle and invoice owner-activity emails, including the inbound-reply webhook path whose only prior replay guard was a 5-minute in-memory `svix-id` cache that doesn't survive redelivery outside that window or multiple app instances; `emailReminderService` cron-overlap races and `exportEmailService` generated/failed sends still need review)
 - [x] Plaid partial-failure/cursor/retry behavior hardened (row-level failures and unknown accounts mark the batch partial, keep the prior cursor, and surface connection error state)
 - [x] Export/receipt cleanup paths made explicit and testable (export history deletion commits DB cleanup before best-effort file cleanup and returns cleanup status; receipt delete pending-rename path rechecked)
 - [x] Required vs. best-effort side effects separated (completed export generation no longer fails or waits on audit/email side effects; failures are logged)
