@@ -38,6 +38,7 @@ const {
   appendOptionalEmailFooter,
   getOptionalEmailPreferenceForUser
 } = require("../services/emailPreferencesService.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   buildAppUrl,
   normalizeBillingCurrency,
@@ -759,24 +760,19 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   return { business: normalizeBusinessProfileRow(result.rows[0] || null) };
 }
 
-router.get("/", async (req, res) => {
-  try {
-    const activeBusinessId = await resolveBusinessIdForUser(req.user);
-    const businesses = await listBusinessesForUser(req.user.id);
-    const activeBusiness = businesses.find((business) => business.id === activeBusinessId) || null;
+router.get("/", asyncRoute(async (req, res) => {
+  const activeBusinessId = await resolveBusinessIdForUser(req.user);
+  const businesses = await listBusinessesForUser(req.user.id);
+  const activeBusiness = businesses.find((business) => business.id === activeBusinessId) || null;
 
-    res.json({
-      active_business_id: activeBusinessId,
-      active_business: activeBusiness,
-      businesses
-    });
-  } catch (err) {
-    logError("GET /businesses error:", err.message);
-    res.status(500).json({ error: "Failed to load businesses." });
-  }
-});
+  res.json({
+    active_business_id: activeBusinessId,
+    active_business: activeBusiness,
+    businesses
+  });
+}));
 
-router.post("/provision-add-on", async (req, res) => {
+router.post("/provision-add-on", asyncRoute(async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) {
     return res.status(400).json({ success: false, error: "Business name is required." });
@@ -872,45 +868,35 @@ router.post("/provision-add-on", async (req, res) => {
   } finally {
     client.release();
   }
-});
+}));
 
-router.get("/:id/profile", async (req, res) => {
-  try {
-    const business = await fetchOwnedBusinessProfile(req.user.id, req.params.id);
-    if (!business) {
-      return res.status(404).json({ error: "Business not found." });
-    }
-    res.json(business);
-  } catch (err) {
-    logError("GET /businesses/:id/profile error:", err.message);
-    res.status(500).json({ error: "Failed to load business profile." });
+router.get("/:id/profile", asyncRoute(async (req, res) => {
+  const business = await fetchOwnedBusinessProfile(req.user.id, req.params.id);
+  if (!business) {
+    throw new ApiError(404, "Business not found.");
   }
-});
+  res.json(business);
+}));
 
-router.put("/:id/profile", async (req, res) => {
-  try {
-    const result = await updateOwnedBusinessProfile(req.user.id, req.params.id, req.body ?? {});
-    if (!result) {
-      return res.status(404).json({ error: "Business not found." });
-    }
-    if (result.error) {
-      return res.status(400).json({ error: result.error });
-    }
-    void invalidateSnapshotsForBusiness({
-      businessId: req.params.id,
-      reason: "Business filing profile changed after export."
-    }).catch((error) => logError("Business profile snapshot invalidation failed:", error));
-    res.json(result.business);
-  } catch (err) {
-    logError("PUT /businesses/:id/profile error:", err.message);
-    res.status(500).json({ error: "Failed to update business profile." });
+router.put("/:id/profile", asyncRoute(async (req, res) => {
+  const result = await updateOwnedBusinessProfile(req.user.id, req.params.id, req.body ?? {});
+  if (!result) {
+    throw new ApiError(404, "Business not found.");
   }
-});
+  if (result.error) {
+    throw new ApiError(400, result.error);
+  }
+  void invalidateSnapshotsForBusiness({
+    businessId: req.params.id,
+    reason: "Business filing profile changed after export."
+  }).catch((error) => logError("Business profile snapshot invalidation failed:", error));
+  res.json(result.business);
+}));
 
-router.post("/", async (req, res) => {
+router.post("/", asyncRoute(async (req, res) => {
   const validation = normalizeBusinessPayload(req.body);
   if (!validation.valid) {
-    return res.status(400).json({ error: validation.error });
+    throw new ApiError(400, validation.error);
   }
 
   const client = await pool.connect();
@@ -999,41 +985,39 @@ router.post("/", async (req, res) => {
     } catch (_) {
       // noop
     }
+    if (err.status && err.status < 500) {
+      throw err;
+    }
     logError("POST /businesses error:", err.message);
-    res.status(500).json({ error: "Failed to create business." });
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
-router.post("/:id/activate", async (req, res) => {
-  try {
-    const updated = await setActiveBusinessForUser(req.user.id, req.params.id);
-    if (!updated) {
-      return res.status(404).json({ error: "Business not found." });
-    }
-
-    req.user.business_id = req.params.id;
-    const businesses = await listBusinessesForUser(req.user.id);
-    const activeBusiness = businesses.find((business) => business.id === req.params.id) || null;
-
-    res.json({
-      active_business_id: req.params.id,
-      active_business: activeBusiness,
-      businesses
-    });
-  } catch (err) {
-    logError("POST /businesses/:id/activate error:", err.message);
-    res.status(500).json({ error: "Failed to switch business." });
+router.post("/:id/activate", asyncRoute(async (req, res) => {
+  const updated = await setActiveBusinessForUser(req.user.id, req.params.id);
+  if (!updated) {
+    throw new ApiError(404, "Business not found.");
   }
-});
+
+  req.user.business_id = req.params.id;
+  const businesses = await listBusinessesForUser(req.user.id);
+  const activeBusiness = businesses.find((business) => business.id === req.params.id) || null;
+
+  res.json({
+    active_business_id: req.params.id,
+    active_business: activeBusiness,
+    businesses
+  });
+}));
 
 /**
  * DELETE /api/businesses/:id
  * Delete a business account and all its associated data.
  * Requires password confirmation. Cannot delete the user's only business.
  */
-router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, res) => {
+router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, asyncRoute(async (req, res) => {
   const { password } = req.body ?? {};
   const businessId = req.params.id;
 
@@ -1261,6 +1245,6 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
     logError("DELETE /businesses/:id error:", err.message);
     res.status(500).json({ error: "Failed to delete business." });
   }
-});
+}));
 
 module.exports = router;

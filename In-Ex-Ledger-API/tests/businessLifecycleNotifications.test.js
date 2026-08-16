@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const BUSINESSES_ROUTE_PATH = require.resolve("../routes/businesses.routes.js");
 
@@ -230,6 +231,7 @@ function loadBusinessesRouterFixture(options = {}) {
   const app = express();
   app.use(express.json());
   app.use("/api/businesses", router);
+  attachCentralErrorHandler(app);
 
   return {
     app,
