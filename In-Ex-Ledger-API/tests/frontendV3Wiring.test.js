@@ -214,6 +214,29 @@ test("v3 transactions keeps recurring template workflow outside the page control
   assert.match(workflowSource, /function RecurringTemplateModal/);
 });
 
+test("v3 settings keeps destructive data workflow outside the page controller", () => {
+  const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Settings.tsx"), "utf8");
+  const dataPanelSource = fs.readFileSync(
+    path.join(frontendRoot, "components", "settings", "DataSettingsPanel.tsx"),
+    "utf8"
+  );
+  const primitivesSource = fs.readFileSync(
+    path.join(frontendRoot, "components", "settings", "SettingsPrimitives.tsx"),
+    "utf8"
+  );
+
+  assert.match(pageSource, /import DataSettingsPanel from '\.\.\/components\/settings\/DataSettingsPanel'/);
+  assert.match(pageSource, /<DataSettingsPanel/);
+  assert.doesNotMatch(pageSource, /function DataSettings/);
+  assert.doesNotMatch(pageSource, /deleteAllTransactions/);
+  assert.doesNotMatch(pageSource, /deleteMyAccount/);
+  assert.match(dataPanelSource, /export default function DataSettingsPanel/);
+  assert.match(dataPanelSource, /deleteAllTransactions/);
+  assert.match(dataPanelSource, /deleteMyAccount/);
+  assert.match(primitivesSource, /export function SettingsPanel/);
+  assert.match(primitivesSource, /export function Field/);
+});
+
 test("v3 frontend dependencies are pinned", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "frontend-v3", "package.json"), "utf8"));
   for (const section of ["dependencies", "devDependencies"]) {
@@ -331,12 +354,13 @@ test("v3 header business switcher is wired instead of decorative, and the topbar
 test("v3 app avoids hard reloads for SPA-owned state changes", () => {
   const sources = readFrontendFiles().map(({ source }) => source).join("\n");
   const settingsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Settings.tsx"), "utf8");
+  const dataSettingsSource = fs.readFileSync(path.join(frontendRoot, "components", "settings", "DataSettingsPanel.tsx"), "utf8");
   const planProviderSource = fs.readFileSync(path.join(frontendRoot, "context", "PlanContext.tsx"), "utf8");
 
   assert.doesNotMatch(sources, /window\.location\.reload\(\)/);
   assert.doesNotMatch(sources, /location\.reload\(\)/);
-  assert.match(settingsSource, /setStatusMessage\(`Deleted \$\{result\.count\} transaction\(s\)\.`\)/);
-  assert.doesNotMatch(settingsSource, /window\.alert\(`Deleted \$\{result\.count\} transaction\(s\)\.`\)/);
+  assert.match(dataSettingsSource, /setStatusMessage\(`Deleted \$\{result\.count\} transaction\(s\)\.`\)/);
+  assert.doesNotMatch(`${settingsSource}\n${dataSettingsSource}`, /window\.alert\(`Deleted \$\{result\.count\} transaction\(s\)\.`\)/);
   assert.match(planProviderSource, /const currentBusinessId = authUser\?\.currentBusinessId/);
   assert.match(planProviderSource, /\[authUserId, currentBusinessId\]/);
 });
@@ -359,6 +383,7 @@ test("v3 money formatters use the active business currency on app pages", () => 
 test("v3 settings normalizes business profile fields before saving", () => {
   const settingsApiSource = fs.readFileSync(path.join(frontendRoot, "lib", "settingsApi.ts"), "utf8");
   const settingsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Settings.tsx"), "utf8");
+  const primitivesSource = fs.readFileSync(path.join(frontendRoot, "components", "settings", "SettingsPrimitives.tsx"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
 
   assert.match(settingsApiSource, /if \(profile\.region === 'US'\) \{/);
@@ -371,7 +396,7 @@ test("v3 settings normalizes business profile fields before saving", () => {
   assert.match(settingsSource, /Prince Edward Island/);
   assert.match(settingsSource, /placeholder="MM-DD"/);
   assert.match(settingsSource, /validateBusinessProfile/);
-  assert.match(settingsSource, /settings-field-error/);
+  assert.match(primitivesSource, /settings-field-error/);
   assert.doesNotMatch(settingsSource, /type="date"[\s\S]*Fiscal year start/);
   assert.match(cssSource, /\.settings-field\.is-invalid/);
 });
