@@ -30,8 +30,8 @@ const appPages = [
   { path: '/analytics', heading: 'Analytics' },
   { path: '/messages', heading: 'Messages' },
   { path: '/settings', heading: 'Settings' },
-  { path: '/billing', heading: 'Billing' },
-  { path: '/subscription', heading: 'Subscription' },
+  { path: '/billing', heading: 'Manage plan' },
+  { path: '/subscription', heading: 'Manage plan' },
   { path: '/sessions', heading: 'Sessions' },
   { path: '/help', heading: 'Help' },
 ]

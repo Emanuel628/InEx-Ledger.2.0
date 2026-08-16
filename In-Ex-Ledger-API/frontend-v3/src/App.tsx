@@ -148,6 +148,7 @@ const pageSlugByPage: Partial<Record<AppPage, string>> = {
 const pageBySlug = new Map(
   Object.entries(pageSlugByPage).map(([page, slug]) => [slug, page as AppPage]),
 )
+pageBySlug.set('billing', 'Subscription')
 
 function getInitialPageFromPath(): AppPage | null {
   const normalized = window.location.pathname
