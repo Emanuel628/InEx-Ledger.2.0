@@ -2,6 +2,11 @@
 
 This file tracks product, billing, design, and UX items that are important but not part of the current critical-fix batch.
 
+> **Note (2026-08-17):** the "Files to audit" lists below originally pointed
+> at the pre-V3 vanilla frontend (`public/html/`, `public/js/`, `public/css/`).
+> That frontend is archived; the live product is `frontend-v3/`. Paths have
+> been corrected to their V3 equivalents where one exists.
+
 ## Billing
 
 ### Additional Business yearly billing support
@@ -25,8 +30,8 @@ The app may currently expose only monthly Additional Business add-ons in the UI.
 - If an active Pro subscription is yearly, Business Access updates should use yearly add-on pricing.
 
 #### Files to audit
-- `In-Ex-Ledger-API/public/js/subscription.js`
-- `In-Ex-Ledger-API/public/html/subscription.html`
+- `In-Ex-Ledger-API/frontend-v3/src/pages/Subscription.tsx`
+- `In-Ex-Ledger-API/frontend-v3/src/lib/billingApi.ts`
 - `In-Ex-Ledger-API/routes/billing.routes.js`
 - `In-Ex-Ledger-API/services/stripePriceConfig.js`
 - `In-Ex-Ledger-API/services/subscriptionService.js`
@@ -65,9 +70,8 @@ The current Categories page has poor visual hierarchy. Category pills are too sm
 - Improve mobile/desktop-view behavior so the page does not feel like tiny pills floating inside oversized cards.
 
 #### Files to audit
-- `In-Ex-Ledger-API/public/html/categories.html`
-- `In-Ex-Ledger-API/public/css/pages/categories.css`
-- `In-Ex-Ledger-API/public/js/categories-backend.js`
+- `In-Ex-Ledger-API/frontend-v3/src/pages/Categories.tsx`
+- `In-Ex-Ledger-API/frontend-v3/src/lib/categoriesApi.ts`
 
 #### Priority
 Medium. Visual quality issue, not a launch blocker.
@@ -87,10 +91,7 @@ Landing page needs another content/UX pass before heavier promotion.
 - Confirm pricing/plan messaging matches the actual Stripe/app behavior.
 
 #### Files to audit
-- `In-Ex-Ledger-API/legacy/public-html/auth-public/landing.html`
-- `In-Ex-Ledger-API/public/css/pages/landing.css`
-- `In-Ex-Ledger-API/public/js/landing.js`
-- `In-Ex-Ledger-API/public/js/i18n.js`
+- `In-Ex-Ledger-API/frontend-v3/src/pages/Landing.tsx`
 
 #### Priority
 Medium. Important for conversion, but separate from critical backend/security fixes.

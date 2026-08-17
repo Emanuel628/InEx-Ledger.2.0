@@ -1,7 +1,7 @@
 # Terms of Service Review
 
 Date: 2026-05-20
-Scope: Verified review of `In-Ex-Ledger-API/public/html/terms.html` against the current InEx Ledger product and common production SaaS contract structure.
+Scope: Verified review of the Terms page against the current InEx Ledger product and common production SaaS contract structure. Originally reviewed at `In-Ex-Ledger-API/public/html/terms.html`; the live Terms page is now `In-Ex-Ledger-API/frontend-v3/src/pages/Terms.tsx` (the legacy HTML is archived, not served). Re-verified 2026-08-17: the gaps below (no named legal entity, no explicit license-grant section, no survival/boilerplate clauses) are still present in the current V3 page.
 Status: Open. This stays in `Work-To-Do/` because the Terms are improved but still incomplete.
 
 ## What This Review Is

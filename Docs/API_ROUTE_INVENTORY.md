@@ -1,8 +1,8 @@
 # API Route Inventory
 
-Last reviewed: 2026-07-28
+Last reviewed: 2026-08-17
 
-This inventory documents the mounted API surface from [server.js](/c:/Projects/InEx-Ledger.2.0/In-Ex-Ledger-API/server.js) and [routes/index.js](/c:/Projects/InEx-Ledger.2.0/In-Ex-Ledger-API/routes/index.js). It is intended as a security and operations reference, not a full endpoint-by-endpoint API spec.
+This inventory documents the mounted API surface from [server.js](../In-Ex-Ledger-API/server.js) and [routes/index.js](../In-Ex-Ledger-API/routes/index.js). It is intended as a security and operations reference, not a full endpoint-by-endpoint API spec.
 
 ## Global API Controls
 
@@ -80,6 +80,17 @@ Authn values:
 | `/api/bills` | `bills.routes.js` when `ENABLE_V2_BUSINESS=true` | `Cookie Session` | V2 feature flag + V2 entitlement + business scope | Required on mutation | `createDataApiLimiter({ keyPrefix: "rl:v2:bills" })` | Legacy V2 bill CRUD surface. |
 | `/api/projects` | `projects.routes.js` when `ENABLE_V2_BUSINESS=true` | `Cookie Session` | V2 feature flag + V2 entitlement + business scope | Required on mutation | `createDataApiLimiter({ keyPrefix: "rl:v2:projects" })` | Legacy V2 project CRUD surface. |
 | `/api/billable-expenses` | `billable-expenses.routes.js` when `ENABLE_V2_BUSINESS=true` | `Cookie Session` | V2 feature flag + V2 entitlement + business scope | Required on mutation | `createDataApiLimiter({ keyPrefix: "rl:v2:billable-expenses" })` | Legacy V2 billable-expense CRUD surface. |
+
+## Individual Routes Registered Directly on `routes/index.js`
+
+Two routes are registered directly on the root `/api` router in
+[routes/index.js](../In-Ex-Ledger-API/routes/index.js) rather than through a
+mounted sub-router, so they don't show up under a "Mount Prefix" row above:
+
+| Route | Authn | Authz / Scope | Notes |
+|---|---|---|---|
+| `GET /api/arap-summary` | `Cookie Session` | `requireV2BusinessEnabled` + `requireV2Entitlement` (same V2 gate as the Legacy V2 business-tier surfaces below) | Returns `arApService.getArApSummary()` for the active business. |
+| `GET /api/exports/history` | `Cookie Session` | Soft pre-gate: if the business's effective plan tier is not Pro/Business, responds `200 []` immediately instead of erroring, so Basic-tier preload calls don't surface console errors | Registered *before* the `/exports` router mount, so it runs first for Pro/Business tiers and then calls `next()`, falling through to the real `/history` handler(s) inside `exports.routes.js` (mounted at `/api/exports`, see the `/api/exports` row above). |
 
 ## Special Cases Worth Watching
 

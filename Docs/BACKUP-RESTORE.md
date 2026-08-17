@@ -80,8 +80,10 @@ mkdir -p "$RECEIPT_STORAGE_DIR"
 tar -C "$RECEIPT_STORAGE_DIR" -xzf receipts-<timestamp>.tar.gz
 ```
 
-Confirm `getReceiptStorageStatus()` reports `mode = 'local'` and that a few
-receipts open in the app.
+Confirm `getReceiptStorageStatus()` reports `mode = 'enforced'` (production
+with `RECEIPT_STORAGE_PERSISTENT=true` — see `services/receiptStorage.js`;
+the other possible values are `development`, `degraded`, and
+`persistent-confirmed`) and that a few receipts open in the app.
 
 ### Secret restore
 

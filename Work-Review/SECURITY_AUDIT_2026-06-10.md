@@ -1,3 +1,16 @@
+> **Note (2026-08-17):** this is a dated audit-with-findings document, which
+> per `Docs/README.md`'s own Docs/-vs-Work-Review/ rule ("Move audit, review,
+> and sweep documents to `Work-Review/`") belongs in `Work-Review/`, not
+> `Docs/` — it has been moved there accordingly. Its file-path findings
+> (`public/js/auth.js`, `public/js/global.js`, `public/js/login.js`,
+> `public/js/mfa-challenge.js`) refer to the pre-V3 vanilla frontend's
+> client-side token handling; the live product is now `frontend-v3/`, which
+> uses the cookie-session model described in `Docs/AUTHENTICATION.md`
+> ("Backend Session Model" section). Finding #1's own status note already
+> says token storage was removed from the main frontend flow — the remaining
+> findings have not been individually re-verified against `frontend-v3/` in
+> this pass and should be re-checked before treating them as current.
+
 # Security Audit - 2026-06-10
 
 Scope: `In-Ex-Ledger-API` and API-hosted frontend security controls reviewed against:

@@ -109,27 +109,35 @@ Acceptable separate files:
 
 ## Owner map
 
-### Global navigation, theme, and Quick Add
+> **Note (2026-08-17):** the sections below originally named files in the
+> pre-V3 vanilla frontend (`public/js/`, `public/html/`, `public/css/`).
+> That frontend is archived; the live product is `frontend-v3/`. Paths are
+> corrected below to their V3 equivalents. "Quick Add" as a named feature was
+> not found in `frontend-v3/src` — treat that specific rule as historical
+> until re-confirmed against the current UI.
+
+### Global navigation and theme
 
 Owner files:
 
-- `In-Ex-Ledger-API/public/js/global.js`
-- `In-Ex-Ledger-API/public/css/core/`
+- `In-Ex-Ledger-API/frontend-v3/src/components/AppShell.tsx`
+- `In-Ex-Ledger-API/frontend-v3/src/lib/navigation.ts`
+- `In-Ex-Ledger-API/frontend-v3/src/styles/`
 
 Rules:
 
-- Quick Add visibility and feature gating belong in `global.js`.
-- Do not create hide-after-render Quick Add scripts.
-- Theme runtime behavior belongs in `global.js` unless an early boot file is intentionally documented.
+- Global nav structure and feature gating for it belong in `AppShell.tsx` / `navigation.ts`.
+- Theme runtime behavior (`data-theme`) belongs in `AppShell.tsx` unless an early boot file is intentionally documented.
 
 ### Transactions
 
 Owner files:
 
 - `In-Ex-Ledger-API/routes/transactions.routes.js`
-- `In-Ex-Ledger-API/public/html/transactions.html`
-- `In-Ex-Ledger-API/public/js/transactions.js`
-- `In-Ex-Ledger-API/public/css/pages/transactions.css`
+- `In-Ex-Ledger-API/frontend-v3/src/pages/Transactions.tsx`
+- `In-Ex-Ledger-API/frontend-v3/src/components/transactions/`
+- `In-Ex-Ledger-API/frontend-v3/src/lib/transactionsApi.ts`
+- `In-Ex-Ledger-API/frontend-v3/src/hooks/useTransactionsPageData.ts`
 
 Rules:
 
@@ -142,13 +150,14 @@ Owner files:
 
 - `In-Ex-Ledger-API/routes/billing.routes.js`
 - `In-Ex-Ledger-API/services/subscriptionService.js`
-- `In-Ex-Ledger-API/public/js/subscription.js`
+- `In-Ex-Ledger-API/frontend-v3/src/pages/Subscription.tsx`
+- `In-Ex-Ledger-API/frontend-v3/src/lib/billingApi.ts`
 
 Rules:
 
 - Checkout normalization belongs in `billing.routes.js`.
 - Subscription snapshot rules belong in `subscriptionService.js`.
-- Subscription page behavior belongs in `subscription.js`.
+- Subscription page behavior belongs in `Subscription.tsx` / `billingApi.ts`.
 - Do not create billing override routes or subscription patch modules.
 
 ### Auth and MFA

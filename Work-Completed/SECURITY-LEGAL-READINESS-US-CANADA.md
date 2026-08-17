@@ -1,3 +1,13 @@
+> **STATUS: DONE — DO NOT USE THIS FILE FOR CURRENT STATE.**
+> This memo's own body text below still says "not complete" and "stays in
+> `Work-To-Do/`" — that was true when written, but every verified gap it
+> raised was resolved and the file was moved here on 2026-05-22 (see
+> `Work-To-Do/WORK-TO-DO-STATUS.md`'s entry for this file: CSV
+> formula-injection hardening, `Docs/PIA.md`/`Docs/SECURITY_PLAN.md`
+> rewrites to match code, Quebec breach-notice language and incident
+> register, and `Docs/SUBPROCESSORS.md` all landed). Retained for
+> historical reference only; the body below is left as originally written.
+
 # Security-Legal Readiness - US and Canada
 
 Date: 2026-05-20

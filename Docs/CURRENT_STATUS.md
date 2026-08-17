@@ -1,6 +1,6 @@
 # Current Launch Status
 
-Last updated: 2026-07-28
+Last updated: 2026-08-17
 
 This is the current repo-level status document.
 
@@ -10,12 +10,13 @@ InEx Ledger is in final launch stabilization.
 
 The app is no longer in major feature-build mode. The frontend has completed its migration from vanilla HTML/CSS/JS to a React + TypeScript single-page app (`frontend-v3`); the v3 SPA is now the canonical logged-in product experience, covering the full app-core surface plus the entire auth bridge (login, register, forgot/reset password, email verification, MFA challenge). See [V3_ROUTE_INVENTORY.md](V3_ROUTE_INVENTORY.md) for the authoritative per-route status.
 
+Since this file's last update, a separate code-quality/security remediation pass ("AI-slop remediation," tracked in `Work-Review/AI-SLOP-REMEDIATION-PROGRESS.md`) ran to completion across all ten of its phases — error-handling consistency, dynamic-SQL discipline, idempotency/dedupe correctness on Stripe and email side effects, route/service decomposition, and this documentation pass itself. That work was internal code quality and correctness, not product features, and does not change anything in this file's feature-status sections below.
+
 The remaining work is mostly:
 
 - live browser and production-like smoke verification
 - Stripe-side validation
 - final UX and copy polish
-- final documentation and launch discipline
 
 ## Completed Work
 

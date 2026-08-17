@@ -1,3 +1,9 @@
+> **STATUS: DONE — DO NOT USE THIS FILE FOR CURRENT STATE.**
+> The one unresolved item below (`tests/criticalFlows.test.js`'s
+> worker/open-handle concern) is moot: that file has run cleanly as part of
+> `npm run test:all` throughout the entire subsequent AI-slop remediation
+> project, with no recurrence. Retained for historical reference only.
+
 # Critical Sweep
 
 This file records the paused state of the current critical-bug sweep so it can resume without losing context.

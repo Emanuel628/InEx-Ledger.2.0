@@ -1,3 +1,12 @@
+> **STATUS: DUPLICATE — DO NOT USE THIS FILE FOR CURRENT STATE.**
+> This is a near-identical copy of `Docs/ACCOUNTING_TRUST_RULES.md`, which is
+> the actual canonical, maintained source of truth for these rules (per
+> `Docs/README.md`'s own Docs/-vs-Work-Review/ convention). This copy's GDPR
+> export route references in §5 and §8 (`GET /api/privacy/data-export` /
+> `GET /api/privacy/export-data`) are wrong and stale — the real route is
+> `POST /api/privacy/export` (`routes/privacy.routes.js`) — and were only
+> fixed in the `Docs/` copy, not here. Retained for historical reference only.
+
 # Accounting Trust Rules
 
 This document is the single source of truth for how InEx Ledger handles mutation, locking, archiving, and exports. All routes, services, and UI elements must conform to these rules.
@@ -82,7 +91,16 @@ All original fields remain intact. No data is overwritten. The archive metadata 
 
 ### Restore behavior
 
-Restore is **not currently supported** through the UI. An archived transaction cannot be unarchived. This is intentional: if a transaction needs to be re-entered, create a new one.
+**Correction (2026-08-17): this section was wrong and is now stale relative
+to the code.** Restore *is* supported: `POST /api/transactions/undo-delete`
+(`routes/transactions.routes.js`, backed by
+`restoreMostRecentArchivedTransaction`) restores the most recently archived
+transaction for the business, is wired into the live UI's "Undo delete"
+button, subject to the same accounting-period lock as any other edit, and
+excludes bulk-delete-all archives and adjustment rows. It only ever restores
+one step back (a stack of the last 20 archived candidates, most recent
+first) — there is still no way to browse and restore an arbitrary older
+archived transaction from further back in history.
 
 ### Who can archive
 
