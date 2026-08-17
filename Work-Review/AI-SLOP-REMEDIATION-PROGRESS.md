@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 46.5 / 54 action items (~86%)
+## Overall: 47.0 / 54 action items (~87%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -40,7 +40,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
     frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
     rather than silently working around it.
 
-## Phase 2 - Security Contract Cleanup — 6.0 / 7
+## Phase 2 - Security Contract Cleanup — 6.5 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
 - [x] Bearer-token acceptance removed from normal app auth paths — verified via
   `git log -p` that commit `6a075ad1` (the same commit credited for the item
@@ -82,7 +82,27 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   required for the current operating model. Closing at full credit on that
   basis rather than leaving an intentionally-deferred decision permanently
   half-scored.
-- [~] CSRF/origin tests for representative mutating routes (`c665b36b`)
+- [x] CSRF/origin tests for representative mutating routes (`c665b36b`) —
+  the source finding (`PROGRAMMING-QUALITY-RESEARCH-2026-08-09.md`) is "Add
+  CSRF/origin tests for representative mutating API routes **and allowed
+  webhook exceptions**." `tests/csrfE2E.test.js` already covers the first
+  half well: route-inventory checks that every mutation route file applies
+  `requireCsrfProtection`, plus e2e valid/missing/invalid/mismatched-token
+  cases. It also has a test confirming the billing webhook is *structurally*
+  exempt from CSRF (no `requireCsrfProtection` in its handler chain) — but
+  nothing anywhere exercised whether that exemption is actually safe, i.e.
+  whether `verifyWebhookSignature` in `routes/billing.routes.js` really
+  rejects a request that isn't from Stripe. It does (checked the function
+  directly: missing signature, malformed header, wrong secret, tampered
+  body, and a stale timestamp outside the 5-minute tolerance window all
+  throw before any event is processed), but there was zero test coverage of
+  any of those paths at the HTTP level. Added 6 tests to
+  `tests/billingWebhook.test.js` exercising exactly that: each rejection
+  path returns 400 without touching subscription sync or the free-plan
+  fallback, plus one confirming a valid signature among multiple (secret
+  rotation) is still accepted. Full suite via `npm run test:all`:
+  **1594/1594 passing** (plus 3/3 ASVS controls) — 6 more than the
+  pre-existing baseline, all new.
 - [x] MFA/signup transient tokens confirmed short-lived/single-purpose — read
   `routes/auth.routes.js` end to end rather than assuming. Every non-final auth
   token carries a `purpose` claim that's checked with strict equality on
@@ -1754,3 +1774,22 @@ test that had been failing identically since PR 13).
   of the same rollout, not separate effort. No code change, both items
   closed by verification. Phase 4 moves to **4.5/5**; Overall to
   **46.5/54 (~86%)**.
+
+- **PR 40** (`chore/test-webhook-signature-rejection`): Phase 2, closes
+  another of the ten `[~]` items. The source finding was "Add CSRF/origin
+  tests for representative mutating API routes **and allowed webhook
+  exceptions**" — `tests/csrfE2E.test.js` already covered the CSRF half
+  well (route-inventory + e2e token cases) and had a test confirming the
+  billing webhook is *structurally* exempt from CSRF, but nothing verified
+  the exemption is actually safe. Read `verifyWebhookSignature` in
+  `routes/billing.routes.js` directly: it rejects a missing signature, a
+  malformed header, a signature from the wrong secret, a tampered body, and
+  a timestamp outside the 5-minute tolerance window — all correct — but
+  zero test coverage exercised any of those paths at the HTTP level before
+  this. Added 6 tests to `tests/billingWebhook.test.js` covering each
+  rejection path (asserting 400 and that subscription sync/free-plan
+  fallback never run) plus a secret-rotation case (a valid signature among
+  multiple `v1=` values is still accepted). Full suite via
+  `npm run test:all`: **1594/1594 passing** (plus 3/3 ASVS controls) — 6
+  more than the pre-existing baseline, all new. Phase 2 moves to **6.5/7**;
+  Overall to **47.0/54 (~87%)**.
