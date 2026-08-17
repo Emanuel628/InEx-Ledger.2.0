@@ -79,8 +79,34 @@ async function loadReminderState(db, businessId, reminderKey) {
   return result.rows[0] || null;
 }
 
-async function saveReminderState(db, businessId, reminderKey, { count = 0, metadata = {} } = {}) {
-  await db.query(
+// Atomically claims the right to send a reminder in one round trip, so two
+// overlapping cron runs can't both pass a "have we sent this?" check and
+// both send. For a one-shot key (cooldownDays omitted) the claim can only
+// ever be won once, ever -- ON CONFLICT DO NOTHING loses to any existing
+// row, claimed or not. For a repeatable key (cooldownDays set) the DO
+// UPDATE branch re-checks the cooldown as part of the same statement that
+// claims it, closing the read-then-write race window the previous
+// load-then-save pattern left open. Mirrors usageLimitEmailService.js's
+// claimThresholds(): the claim is won before the email is sent, and a
+// send failure after a won claim is not retried until the key is eligible
+// again -- the same accepted trade-off already used there, rather than a
+// new one introduced here.
+async function claimReminderState(db, businessId, reminderKey, { count = 0, metadata = {}, cooldownDays = null } = {}) {
+  const params = [businessId, reminderKey, Math.max(Number(count) || 0, 0), JSON.stringify(metadata || {})];
+  if (cooldownDays == null) {
+    const result = await db.query(
+      `INSERT INTO business_email_reminders (
+         business_id, reminder_key, last_sent_at, last_count, metadata_json, updated_at
+       ) VALUES ($1, $2, NOW(), $3, $4::jsonb, NOW())
+       ON CONFLICT (business_id, reminder_key) DO NOTHING
+       RETURNING business_id`,
+      params
+    );
+    return result.rowCount > 0;
+  }
+
+  params.push(String(Math.max(Number(cooldownDays) || 0, 0)));
+  const result = await db.query(
     `INSERT INTO business_email_reminders (
        business_id, reminder_key, last_sent_at, last_count, metadata_json, updated_at
      ) VALUES ($1, $2, NOW(), $3, $4::jsonb, NOW())
@@ -88,9 +114,12 @@ async function saveReminderState(db, businessId, reminderKey, { count = 0, metad
        SET last_sent_at = NOW(),
            last_count = EXCLUDED.last_count,
            metadata_json = EXCLUDED.metadata_json,
-           updated_at = NOW()`,
-    [businessId, reminderKey, Math.max(Number(count) || 0, 0), JSON.stringify(metadata || {})]
+           updated_at = NOW()
+     WHERE business_email_reminders.last_sent_at < NOW() - ($5 || ' days')::interval
+     RETURNING business_id`,
+    params
   );
+  return result.rowCount > 0;
 }
 
 function resolveTrialReminder(daysUntil) {
@@ -145,14 +174,19 @@ async function sendTrialLifecycleReminders({ db = pool, resendClient = getResend
     }
 
     try {
-      const prior = await loadReminderState(db, row.business_id, reminder.key);
-      if (prior) {
+      const recipient = await getOptionalEmailRecipientForBusiness(row.business_id, db);
+      if (!recipient?.marketing_email_opt_in || !recipient.email) {
         stats.skipped += 1;
         continue;
       }
 
-      const recipient = await getOptionalEmailRecipientForBusiness(row.business_id, db);
-      if (!recipient?.marketing_email_opt_in || !recipient.email) {
+      const claimed = await claimReminderState(db, row.business_id, reminder.key, {
+        metadata: {
+          trial_ends_at: new Date(trialEnd).toISOString(),
+          days_until: daysUntil
+        }
+      });
+      if (!claimed) {
         stats.skipped += 1;
         continue;
       }
@@ -164,12 +198,6 @@ async function sendTrialLifecycleReminders({ db = pool, resendClient = getResend
       await sendEmail(resendClient, {
         to: recipient.email,
         ...emailContent
-      });
-      await saveReminderState(db, row.business_id, reminder.key, {
-        metadata: {
-          trial_ends_at: new Date(trialEnd).toISOString(),
-          days_until: daysUntil
-        }
       });
       stats.sent += 1;
     } catch (err) {
@@ -273,6 +301,18 @@ async function sendReviewQueueReminderEmails({ db = pool, resendClient = getRese
         continue;
       }
 
+      const claimed = await claimReminderState(db, row.business_id, REVIEW_REMINDER_KEY, {
+        count,
+        metadata: {
+          last_login_at: lastLoginAt ? lastLoginAt.toISOString() : null
+        },
+        cooldownDays: REVIEW_REMINDER_COOLDOWN_DAYS
+      });
+      if (!claimed) {
+        stats.skipped += 1;
+        continue;
+      }
+
       const lang = await getPreferredLanguageForUser(row.user_id);
       const emailContent = appendOptionalEmailFooter(buildReviewQueueReminderEmail(lang, {
         count,
@@ -281,12 +321,6 @@ async function sendReviewQueueReminderEmails({ db = pool, resendClient = getRese
       await sendEmail(resendClient, {
         to: recipient.email,
         ...emailContent
-      });
-      await saveReminderState(db, row.business_id, REVIEW_REMINDER_KEY, {
-        count,
-        metadata: {
-          last_login_at: lastLoginAt ? lastLoginAt.toISOString() : null
-        }
       });
       await recordAuditEvent(db, {
         userId: row.user_id,
@@ -332,8 +366,13 @@ async function sendCancellationEndingSoonReminders({ db = pool, resendClient = g
         continue;
       }
 
-      const prior = await loadReminderState(db, row.business_id, CANCELLATION_ENDING_SOON_KEY);
-      if (prior) {
+      const claimed = await claimReminderState(db, row.business_id, CANCELLATION_ENDING_SOON_KEY, {
+        metadata: {
+          current_period_end: new Date(row.current_period_end).toISOString(),
+          days_until: daysUntil
+        }
+      });
+      if (!claimed) {
         stats.skipped += 1;
         continue;
       }
@@ -350,12 +389,6 @@ async function sendCancellationEndingSoonReminders({ db = pool, resendClient = g
       await sendEmail(resendClient, {
         to: row.email,
         ...emailContent
-      });
-      await saveReminderState(db, row.business_id, CANCELLATION_ENDING_SOON_KEY, {
-        metadata: {
-          current_period_end: new Date(row.current_period_end).toISOString(),
-          days_until: daysUntil
-        }
       });
       stats.sent += 1;
     } catch (err) {
@@ -389,6 +422,8 @@ module.exports = {
     resolveTrialReminder,
     getOpenReviewItemCount,
     getLastLoginAt,
-    buildAppUrl
+    buildAppUrl,
+    loadReminderState,
+    claimReminderState
   }
 };
