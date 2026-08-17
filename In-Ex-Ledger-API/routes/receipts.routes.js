@@ -522,7 +522,9 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), asyncRoute(as
     if (err.status && err.status < 500) {
       throw err;
     }
-    logError("POST /receipts error:", err);
+    // Rethrown to asyncRoute -> the central error handler, which logs a
+    // sanitized structured version already -- no need to also dump the raw
+    // Error object here.
     throw err;
   } finally {
     client.release();
@@ -700,7 +702,7 @@ router.patch("/:id/attach", asyncRoute(async (req, res) => {
     if (err.status && err.status < 500) {
       throw err;
     }
-    logError("PATCH /receipts/:id/attach error:", err);
+    // Rethrown to the central error handler; see the same comment in POST /receipts above.
     throw err;
   } finally {
     client.release();
@@ -895,7 +897,7 @@ router.delete("/:id", asyncRoute(async (req, res) => {
     if (err.status && err.status < 500) {
       throw err;
     }
-    logError("DELETE /receipts/:id error:", err);
+    // Rethrown to the central error handler; see the same comment in POST /receipts above.
     throw err;
   } finally {
     client.release();

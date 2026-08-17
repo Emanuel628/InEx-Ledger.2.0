@@ -63,3 +63,54 @@ test("asyncRoute forwards a synchronous throw to next()", async () => {
 
   assert.equal(forwarded.message, "sync boom");
 });
+
+// Express resets req.params as an error bubbles up past the route-specific
+// layer that matched it, so a central app-level error handler can't read
+// req.params directly -- it's always {} by the time that handler runs.
+// asyncRoute snapshots params onto the error itself, while req.params still
+// reflects the route that threw, so the central handler can log them later.
+test("asyncRoute snapshots non-empty req.params onto a thrown error as routeParams", async () => {
+  const thrown = new Error("not found");
+  const handler = asyncRoute(async () => {
+    throw thrown;
+  });
+
+  let forwarded = null;
+  await handler({ params: { id: "abc123" } }, {}, (err) => { forwarded = err; });
+
+  assert.deepEqual(forwarded.routeParams, { id: "abc123" });
+});
+
+test("asyncRoute does not attach routeParams when the route has none", async () => {
+  const handler = asyncRoute(async () => {
+    throw new Error("boom");
+  });
+
+  let forwarded = null;
+  await handler({ params: {} }, {}, (err) => { forwarded = err; });
+
+  assert.equal("routeParams" in forwarded, false);
+});
+
+test("asyncRoute snapshots params for a rejected promise too, not just a thrown error", async () => {
+  const handler = asyncRoute(async () => {
+    await Promise.reject(new Error("boom"));
+  });
+
+  let forwarded = null;
+  await handler({ params: { businessId: "biz_1" } }, {}, (err) => { forwarded = err; });
+
+  assert.deepEqual(forwarded.routeParams, { businessId: "biz_1" });
+});
+
+test("asyncRoute does not overwrite routeParams already set on the error", async () => {
+  const thrown = Object.assign(new Error("boom"), { routeParams: { id: "original" } });
+  const handler = asyncRoute(async () => {
+    throw thrown;
+  });
+
+  let forwarded = null;
+  await handler({ params: { id: "should-not-overwrite" } }, {}, (err) => { forwarded = err; });
+
+  assert.deepEqual(forwarded.routeParams, { id: "original" });
+});

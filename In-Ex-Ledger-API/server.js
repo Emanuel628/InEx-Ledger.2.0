@@ -602,6 +602,10 @@ app.use((err, req, res, next) => {
     method: req.method,
     path: req.path,
     message: err.message,
+    ...(err.code && { code: err.code }),
+    ...(err.constraint && { constraint: err.constraint }),
+    ...(req.user?.id && { userId: req.user.id }),
+    ...(err.routeParams && { params: err.routeParams }),
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
   const message = status < 500 ? err.message : 'Internal server error';

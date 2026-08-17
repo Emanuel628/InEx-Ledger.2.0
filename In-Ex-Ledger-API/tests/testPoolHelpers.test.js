@@ -6,12 +6,21 @@ const express = require("express");
 const request = require("supertest");
 
 const { attachCentralErrorHandler } = require("./helpers/testPool.js");
+const { asyncRoute } = require("../utils/apiError.js");
 
-function buildApp({ thrown, logSpy } = {}) {
+function buildApp({ thrown, logSpy, user } = {}) {
   const app = express();
   app.get("/x", (req, res, next) => {
+    if (user) req.user = user;
     next(thrown);
   });
+  // Routed through the real asyncRoute, same as production route files --
+  // it's the thing that snapshots req.params onto the error before it
+  // bubbles past the layer where params would otherwise reset to {}.
+  app.get("/x/:id", asyncRoute(async (req) => {
+    if (user) req.user = user;
+    throw thrown;
+  }));
   attachCentralErrorHandler(app, logSpy ? { logError: logSpy } : {});
   return app;
 }
@@ -48,6 +57,56 @@ test("attachCentralErrorHandler calls the provided logError spy with structured 
   assert.equal(calls[0].context.method, "GET");
   assert.equal(calls[0].context.path, "/x");
   assert.equal(calls[0].context.message, "Bad input.");
+});
+
+test("attachCentralErrorHandler includes err.code and err.constraint when present", async () => {
+  const calls = [];
+  const err = Object.assign(new Error("Duplicate."), {
+    status: 409,
+    code: "23505",
+    constraint: "accounts_business_id_name_key"
+  });
+  await request(buildApp({ thrown: err, logSpy: (message, context) => calls.push({ message, context }) })).get("/x");
+
+  assert.equal(calls[0].context.code, "23505");
+  assert.equal(calls[0].context.constraint, "accounts_business_id_name_key");
+});
+
+test("attachCentralErrorHandler omits code/constraint when the error doesn't carry them", async () => {
+  const calls = [];
+  const err = Object.assign(new Error("Bad input."), { status: 400 });
+  await request(buildApp({ thrown: err, logSpy: (message, context) => calls.push({ message, context }) })).get("/x");
+
+  assert.equal("code" in calls[0].context, false);
+  assert.equal("constraint" in calls[0].context, false);
+});
+
+test("attachCentralErrorHandler includes userId when req.user is set", async () => {
+  const calls = [];
+  const err = new Error("boom");
+  await request(buildApp({
+    thrown: err,
+    user: { id: "user_123" },
+    logSpy: (message, context) => calls.push({ message, context })
+  })).get("/x");
+
+  assert.equal(calls[0].context.userId, "user_123");
+});
+
+test("attachCentralErrorHandler includes non-empty route params", async () => {
+  const calls = [];
+  const err = new Error("boom");
+  await request(buildApp({ thrown: err, logSpy: (message, context) => calls.push({ message, context }) })).get("/x/abc123");
+
+  assert.deepEqual(calls[0].context.params, { id: "abc123" });
+});
+
+test("attachCentralErrorHandler omits params when the route has none", async () => {
+  const calls = [];
+  const err = new Error("boom");
+  await request(buildApp({ thrown: err, logSpy: (message, context) => calls.push({ message, context }) })).get("/x");
+
+  assert.equal("params" in calls[0].context, false);
 });
 
 test("attachCentralErrorHandler does not log when no spy is provided", async () => {

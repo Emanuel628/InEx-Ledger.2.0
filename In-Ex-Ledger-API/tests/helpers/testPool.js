@@ -141,7 +141,11 @@ function attachCentralErrorHandler(app, { logError } = {}) {
         status,
         method: req.method,
         path: req.path,
-        message: err.message
+        message: err.message,
+        ...(err.code && { code: err.code }),
+        ...(err.constraint && { constraint: err.constraint }),
+        ...(req.user?.id && { userId: req.user.id }),
+        ...(err.routeParams && { params: err.routeParams })
       });
     }
     const message = status < 500 ? err.message : "Internal server error";

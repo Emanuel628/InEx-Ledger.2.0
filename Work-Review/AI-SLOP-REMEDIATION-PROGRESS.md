@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 48.0 / 54 action items (~89%)
+## Overall: 48.5 / 54 action items (~90%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -40,7 +40,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
     frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
     rather than silently working around it.
 
-## Phase 2 - Security Contract Cleanup — 6.5 / 7
+## Phase 2 - Security Contract Cleanup — 7 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
 - [x] Bearer-token acceptance removed from normal app auth paths — verified via
   `git log -p` that commit `6a075ad1` (the same commit credited for the item
@@ -131,19 +131,36 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   `tests/v3AuthTokenStorage.test.js`, which fails if any future `setItem` call
   writes a key outside an explicit allowlist, or writes an
   access/refresh/session/auth/jwt-token-shaped key under any name.
-- [~] Route-local error/log paths sanitized (`25df086b`, `24931740`) — still half
-  credit, one more file done. `24931740` (direct commit, outside this PR sequence)
-  adds `utils/routeErrorContext.js` (`buildRouteErrorContext`/`summarizeRouteError`)
-  and rolls it out across every `logError()` call site in
-  `routes/transactions.routes.js` — structured `{ err: { name, message, code,
-  constraint, status }, requestId, method, path, userId, params, businessId }`
-  instead of dumping the raw error object, matching Pass 27's suggested fix
-  ("Log structured fields: request ID, route, user ID, business ID, error code,
-  status, sanitized message"). Includes a self-enforcing guardrail test
-  (`routeErrorContext.test.js`) that scans the route file's source and fails if
-  any `logError(` call site doesn't route through `buildRouteErrorContext`. Only
-  one route file converted so far — the rest of the ~15 route files still log
-  raw `err`/`err.stack` directly.
+- [x] Route-local error/log paths sanitized (`25df086b`, `24931740`) — rather
+  than rolling `buildRouteErrorContext` out file-by-file across the ~19
+  remaining route files (a huge, mostly-redundant lift now that 38 of 40
+  files already run through `asyncRoute`), enriched the one mechanism that
+  already serves all of them: `server.js`'s central error handler. It logged
+  `requestId`/`status`/`method`/`path`/`message` already but was missing
+  `err.code`, `err.constraint`, `userId`, and route params compared to
+  `buildRouteErrorContext`'s shape — added all four (mirrored in
+  `tests/helpers/testPool.js`'s `attachCentralErrorHandler`, the shared test
+  fixture, so both stay in sync). Route params turned out to be a real, not
+  cosmetic, gap: Express resets `req.params` to `{}` as an error bubbles up
+  past the route-specific layer that matched it, so a central app-level
+  handler can never read `req.params` directly — confirmed this by writing a
+  test for it first and watching it fail, not by inspection. Fixed properly
+  rather than dropping the field: `asyncRoute` now snapshots non-empty
+  `req.params` onto the error as `err.routeParams` while it's still valid,
+  and the central handler reads that instead. Also found and removed 3
+  redundant raw-`Error`-object `logError()` calls in `routes/receipts.routes.js`
+  (`POST /`, `PATCH /:id/attach`, `DELETE /:id`) — each logged the unsanitized
+  error and then rethrew it anyway, meaning the error was already being
+  logged a second time, more richly, by the central handler; the local dump
+  was pure duplication of the exact kind this item exists to remove. Added
+  9 new tests (5 in `testPoolHelpers.test.js` covering the enriched fields,
+  4 in `apiError.test.js` covering `routeParams` snapshotting including the
+  no-clobber-if-already-set case). `routes/transactions.routes.js` keeps its
+  existing direct `buildRouteErrorContext` usage as-is — still the right
+  choice there since it threads route-specific `businessId` into `extra`,
+  which the central handler can't do generically. Full suite via
+  `npm run test:all`: **1614/1614 passing** (plus 3/3 ASVS controls) — 9
+  more than the pre-existing baseline, all new.
 
 ## Phase 3 - Startup, Deployment, Migration Safety — 5.5 / 6
 - [x] Checksum repair removed from `prestart` (`391319b9`)
@@ -1874,3 +1891,35 @@ test that had been failing identically since PR 13).
   suite via `npm run test:all`: **1605/1605 passing** (plus 3/3 ASVS
   controls) — 2 more than the pre-existing baseline, all new. Phase 3 moves
   to **5.5/6**; Overall to **48.0/54 (~89%)**.
+
+- **PR 43** (`chore/enrich-central-error-handler`): Phase 2, closes the last
+  of the ten `[~]` items in this phase (Phase 2 reaches **7/7**). Rather
+  than rolling `buildRouteErrorContext` out file-by-file across the ~19
+  remaining route files — a huge, mostly-redundant lift now that 38 of 40
+  files already run through `asyncRoute` — enriched the one mechanism that
+  already serves all of them: `server.js`'s central error handler. It was
+  missing `err.code`, `err.constraint`, `userId`, and route params compared
+  to `buildRouteErrorContext`'s shape. Route params turned out to be a real
+  gap, not a cosmetic one: wrote the test first and watched it fail —
+  Express resets `req.params` to `{}` as an error bubbles up past the
+  route-specific layer that matched it, so a central app-level handler can
+  never read `req.params` directly. Fixed properly instead of dropping the
+  field: `asyncRoute` (`utils/apiError.js`) now snapshots non-empty
+  `req.params` onto the error as `err.routeParams` while it's still valid,
+  and the central handler reads that. Mirrored the same enrichment in
+  `tests/helpers/testPool.js`'s `attachCentralErrorHandler` so the real
+  handler and the shared test fixture stay in sync, per the project's own
+  established discipline for that file. Also found and removed 3 redundant
+  raw-`Error`-object `logError()` calls in `routes/receipts.routes.js`
+  (`POST /`, `PATCH /:id/attach`, `DELETE /:id`) — each logged the
+  unsanitized error and then rethrew it anyway, so it was already being
+  logged a second time, more richly, by the central handler; pure
+  duplication of the exact pattern this item exists to remove.
+  `transactions.routes.js` keeps its existing direct `buildRouteErrorContext`
+  usage as-is, since it threads route-specific `businessId` into `extra`,
+  which the central handler can't do generically. Added 9 tests (5 in
+  `testPoolHelpers.test.js`, 4 in `apiError.test.js`, including the
+  no-clobber-if-`routeParams`-already-set case). Full suite via
+  `npm run test:all`: **1614/1614 passing** (plus 3/3 ASVS controls) — 9
+  more than the pre-existing baseline, all new. Overall to
+  **48.5/54 (~90%)**.
