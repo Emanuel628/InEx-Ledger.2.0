@@ -18,14 +18,52 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 34.75 / 54 action items (~64%)
+## Overall: 49.5 / 54 action items (~92%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
-## Phase 1 - Stop New Damage: Gates, Secrets, Repo Hygiene — 5.5 / 6
+## Phase 1 - Stop New Damage: Gates, Secrets, Repo Hygiene — 6.0 / 6
 - [x] `npm run test:all` wired into CI (`phase7-guardrails.yml`)
-- [~] Brittle source-shape tests replaced with behavior tests — partial; ongoing, folds
-  into Phase 7's "prefer tests around behavior" rule.
+- [x] Brittle source-shape tests replaced with behavior tests — inventoried all 22
+  files across the suite that read frontend-v3 `.ts`/`.tsx` source as text. Most
+  turned out to be either false positives (files that `readFileSync` a script only to
+  `vm`-execute it and test real runtime behavior) or legitimate structural/source-level
+  invariants explicitly worth keeping (CSRF route-inventory, migration-file content
+  pinning, nixpacks/Dockerfile config checks, doc-sync checks) — retained unchanged per
+  this item's own stated finish line. Converted the genuinely brittle ones:
+  `tests/frontendV3ApiContracts.test.js`'s transaction-mapper and `/api/me` contract
+  tests now transpile `transactionsApi.ts`/`authApi.ts` with the real TypeScript
+  compiler and run the real `mapTransaction`/`mapLegacyUser` functions in a `vm`
+  sandbox (exported both — previously module-private — specifically for this), instead
+  of regexing fallback expressions out of the source. `tests/frontendV3Wiring.test.js`'s
+  Canadian tax-rate test now calls the real (newly-exported) `resolveEstimatedTaxProfile`
+  the same way instead of pinning literal `AB: 0.29`-style constants in a regex. Its two
+  `apiClient.ts` tests now load the real module with a mocked `fetch`/`document.cookie`/
+  `FormData` sandbox and assert on actual request sequences (401 → refresh → retry;
+  403 CSRF failure → refresh → retry with the new token), replacing literal-code-fragment
+  regexes with genuine behavior tests. Its debounce/stale-response-guard test for
+  `Receipts.tsx` had its magic-number (`275`) and private-ref-name pins relaxed to
+  structural pattern checks, since there's no React/jsdom test harness in this repo to
+  drive true component behavior — introducing one solely for this single assertion
+  would be disproportionate, so it stays a source check with the genuine brittleness
+  removed. The root-landing favicon test's exact cache-bust query string
+  (`?v=20260726a`, guaranteed to go stale on the next legitimate asset update) was
+  relaxed to match any cache-bust value. The legacy-auth-defaults test now signs a real
+  JWT via `auth.middleware.js`'s exported `signToken` and decodes its actual `exp`-`iat`
+  lifetime instead of regexing `|| 60 * 60`; the two remaining non-exported constants
+  (the auth-cookie maxAge and the refresh rate limit) stay source checks but now assert
+  on numeric magnitude rather than pinning exact literal formatting.
+  `tests/startupMigrationSafety.test.js`'s server-init-before-listen test previously
+  compared `indexOf` positions of two strings inside a sliced function body; it now
+  requires the real `server.js`/`db.js` fresh, spies on the real `initDatabase` and
+  `app.listen` calls, invokes the real `startServer()`, and asserts the actual call
+  order. `tests/internalSupportRoutes.test.js`'s rate-limiter-before-secret-check test
+  was investigated too: unlike the other `indexOf` cases, `router.use(A); router.use(B)`
+  ordering in Express *is* the actual behavior (Express always runs middleware in
+  registration order), so converting it to a live 429-triggering test would need either
+  running in production mode or new store-injection plumbing for a check that's already
+  faithful — left unchanged as a legitimate source-level invariant. Full backend suite:
+  1631/1631 passing; `frontend-v3` type-checks and builds clean.
 - [x] Tracked E2E/session artifacts with credentials removed — verified none present
 - [x] `.gitleaks.toml` tightened to narrow, specific allowlist — verified
 - [x] Ignores for runtime/browser/session artifacts — verified (`test-results/` etc.)
@@ -40,7 +78,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
     frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
     rather than silently working around it.
 
-## Phase 2 - Security Contract Cleanup — 6.0 / 7
+## Phase 2 - Security Contract Cleanup — 7 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
 - [x] Bearer-token acceptance removed from normal app auth paths — verified via
   `git log -p` that commit `6a075ad1` (the same commit credited for the item
@@ -60,25 +98,49 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   frontend source file ever constructs an `Authorization` header, closing the
   audit's own suggested CI check (Pass 31) for the client side of this
   contract.
-- [~] Internal support shared-secret access hardened (commits `25026802`,
-  `2ae677c9`, this PR) — the audit's suggested fix has four parts: agent
-  identity, role/scope checks, a limiter, and durable audit. Read
-  `routes/internalSupport.routes.js` and `middleware/requireSupportSecret.js`
-  directly rather than assuming the prior commits' scope: durable audit was
-  already done (every access is logged, with the log helper auto-sanitizing
-  emails) and the secret comparison already uses `crypto.timingSafeEqual`
+- [x] Internal support shared-secret access hardened (commits `25026802`,
+  `2ae677c9`) — the audit's suggested fix has four parts: agent identity,
+  role/scope checks, a limiter, and durable audit. Durable audit was already
+  done (every access is logged, with the log helper auto-sanitizing emails)
+  and the secret comparison already uses `crypto.timingSafeEqual`
   (constant-time, no timing side-channel). A limiter was missing — every
   `/internal/support/*` request only got the generic 300/min global tier sized
-  for ordinary app traffic. Added `createInternalSupportLimiter()` (30
-  requests/15 min, IP-keyed) and wired it ahead of the secret check so
-  failed-guess attempts count toward the same window, not just successful
-  ones. **Still open, and staying at half credit because of it**: per-agent
-  identity and role/scope checks. That's the audit's actual "High" severity
-  concern (no accountability beyond an IP+URL log line if the shared secret
-  leaks or is misused) and it's explicitly a product decision — "decide
-  whether the internal support API is production-required" — not something to
-  make unilaterally inside a remediation PR.
-- [~] CSRF/origin tests for representative mutating routes (`c665b36b`)
+  for ordinary app traffic — fixed with `createInternalSupportLimiter()` (30
+  requests/15 min, IP-keyed), wired ahead of the secret check so failed-guess
+  attempts count toward the same window, not just successful ones. The
+  remaining piece — per-agent identity and role/scope checks — is the
+  audit's actual "High" severity concern (no accountability beyond an IP+URL
+  log line if the shared secret leaks or is misused), and it's explicitly a
+  product decision: **accepted product decision (confirmed with the product
+  owner)** — the internal support API currently uses a single production
+  secret with timing-safe validation, dedicated rate limiting, and durable
+  access auditing; per-agent identity and role/scoped authorization are
+  intentionally deferred until the product has multiple support operators or
+  external support tooling requiring individual attribution, and are not
+  required for the current operating model. Closing at full credit on that
+  basis rather than leaving an intentionally-deferred decision permanently
+  half-scored.
+- [x] CSRF/origin tests for representative mutating routes (`c665b36b`) —
+  the source finding (`PROGRAMMING-QUALITY-RESEARCH-2026-08-09.md`) is "Add
+  CSRF/origin tests for representative mutating API routes **and allowed
+  webhook exceptions**." `tests/csrfE2E.test.js` already covers the first
+  half well: route-inventory checks that every mutation route file applies
+  `requireCsrfProtection`, plus e2e valid/missing/invalid/mismatched-token
+  cases. It also has a test confirming the billing webhook is *structurally*
+  exempt from CSRF (no `requireCsrfProtection` in its handler chain) — but
+  nothing anywhere exercised whether that exemption is actually safe, i.e.
+  whether `verifyWebhookSignature` in `routes/billing.routes.js` really
+  rejects a request that isn't from Stripe. It does (checked the function
+  directly: missing signature, malformed header, wrong secret, tampered
+  body, and a stale timestamp outside the 5-minute tolerance window all
+  throw before any event is processed), but there was zero test coverage of
+  any of those paths at the HTTP level. Added 6 tests to
+  `tests/billingWebhook.test.js` exercising exactly that: each rejection
+  path returns 400 without touching subscription sync or the free-plan
+  fallback, plus one confirming a valid signature among multiple (secret
+  rotation) is still accepted. Full suite via `npm run test:all`:
+  **1594/1594 passing** (plus 3/3 ASVS controls) — 6 more than the
+  pre-existing baseline, all new.
 - [x] MFA/signup transient tokens confirmed short-lived/single-purpose — read
   `routes/auth.routes.js` end to end rather than assuming. Every non-final auth
   token carries a `purpose` claim that's checked with strict equality on
@@ -107,53 +169,117 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   `tests/v3AuthTokenStorage.test.js`, which fails if any future `setItem` call
   writes a key outside an explicit allowlist, or writes an
   access/refresh/session/auth/jwt-token-shaped key under any name.
-- [~] Route-local error/log paths sanitized (`25df086b`, `24931740`) — still half
-  credit, one more file done. `24931740` (direct commit, outside this PR sequence)
-  adds `utils/routeErrorContext.js` (`buildRouteErrorContext`/`summarizeRouteError`)
-  and rolls it out across every `logError()` call site in
-  `routes/transactions.routes.js` — structured `{ err: { name, message, code,
-  constraint, status }, requestId, method, path, userId, params, businessId }`
-  instead of dumping the raw error object, matching Pass 27's suggested fix
-  ("Log structured fields: request ID, route, user ID, business ID, error code,
-  status, sanitized message"). Includes a self-enforcing guardrail test
-  (`routeErrorContext.test.js`) that scans the route file's source and fails if
-  any `logError(` call site doesn't route through `buildRouteErrorContext`. Only
-  one route file converted so far — the rest of the ~15 route files still log
-  raw `err`/`err.stack` directly.
+- [x] Route-local error/log paths sanitized (`25df086b`, `24931740`) — rather
+  than rolling `buildRouteErrorContext` out file-by-file across the ~19
+  remaining route files (a huge, mostly-redundant lift now that 38 of 40
+  files already run through `asyncRoute`), enriched the one mechanism that
+  already serves all of them: `server.js`'s central error handler. It logged
+  `requestId`/`status`/`method`/`path`/`message` already but was missing
+  `err.code`, `err.constraint`, `userId`, and route params compared to
+  `buildRouteErrorContext`'s shape — added all four (mirrored in
+  `tests/helpers/testPool.js`'s `attachCentralErrorHandler`, the shared test
+  fixture, so both stay in sync). Route params turned out to be a real, not
+  cosmetic, gap: Express resets `req.params` to `{}` as an error bubbles up
+  past the route-specific layer that matched it, so a central app-level
+  handler can never read `req.params` directly — confirmed this by writing a
+  test for it first and watching it fail, not by inspection. Fixed properly
+  rather than dropping the field: `asyncRoute` now snapshots non-empty
+  `req.params` onto the error as `err.routeParams` while it's still valid,
+  and the central handler reads that instead. Also found and removed 3
+  redundant raw-`Error`-object `logError()` calls in `routes/receipts.routes.js`
+  (`POST /`, `PATCH /:id/attach`, `DELETE /:id`) — each logged the unsanitized
+  error and then rethrew it anyway, meaning the error was already being
+  logged a second time, more richly, by the central handler; the local dump
+  was pure duplication of the exact kind this item exists to remove. Added
+  9 new tests (5 in `testPoolHelpers.test.js` covering the enriched fields,
+  4 in `apiError.test.js` covering `routeParams` snapshotting including the
+  no-clobber-if-already-set case). `routes/transactions.routes.js` keeps its
+  existing direct `buildRouteErrorContext` usage as-is — still the right
+  choice there since it threads route-specific `businessId` into `extra`,
+  which the central handler can't do generically. Full suite via
+  `npm run test:all`: **1614/1614 passing** (plus 3/3 ASVS controls) — 9
+  more than the pre-existing baseline, all new.
 
-## Phase 3 - Startup, Deployment, Migration Safety — 4.5 / 6
+## Phase 3 - Startup, Deployment, Migration Safety — 6 / 6
 - [x] Checksum repair removed from `prestart` (`391319b9`)
 - [x] Server does not listen before DB init/migration readiness (`fabc898f`)
-- [~] Read-only migration verification split from repair commands
-- [~] Environment validation for required production settings — still half credit,
-  but real progress: the audit (Pass 10) found `envValidationService.js`'s
-  production-required list too narrow for what's actually mounted and
-  security-sensitive. Checked each flagged variable's real failure mode on `main`
-  first rather than blanket-requiring the whole list: `REDIS_URL`,
-  `PDF_WORKER_URL`/`PDF_WORKER_SECRET`, and `EXPORT_PUBLIC_KEY_JWK`/
-  `EXPORT_PRIVATE_KEY_JWK` are all unconditionally required by the app's own
-  existing logic (`middleware/rateLimiter.js`'s `isRateLimitingRequired()` is
-  literally `isProduction()`; PDF/secure export have no feature flag gating them)
-  but previously only failed at request time (`pdfWorkerClient.js` throws,
-  `crypto.routes.js`/`rateLimiter.js` degrade to 503/in-memory) instead of at
-  startup — added all 5 to the production-required list, plus the
-  previously-undocumented `EXPORT_PRIVATE_KEY_JWK` to `.env.example`. Left the
-  inbound-email/support-reply HMAC secrets alone: the audit itself says some of
-  this list is "optional by design," there's no code-level signal (no
-  `ENABLE_INBOUND_EMAIL`-style flag) for which deployments intend to use those
-  features, and guessing would be the same kind of unilateral scope call flagged
-  elsewhere in this file — those routes already fail closed with a clear 503 if
-  unconfigured, so there's no security gap, just an ops-observability gap that
-  needs a product answer on which surfaces are actually expected in production.
-  Not marking `[x]`: the audit's fuller suggested design (a real two-tier
-  core-vs-feature-gated validator, plus an env-validation matrix in
-  `Docs/PRODUCTION-READINESS.md`) still isn't built. 5 new/expanded tests in
-  `tests/envValidationService.test.js`, all passing; `tests/launchBlockers.test.js`
-  unaffected (its assertion is a `.includes()` check, not an exact list).
-- [~] Docker/Nixpacks/start scripts reconciled
+- [x] Read-only migration verification split from repair commands — read
+  `scripts/repair-migration-checksums.js` directly rather than assuming
+  this needed new code: the split already existed functionally.
+  `package.json`'s `migrations:verify-checksums` and
+  `migrations:repair-checksums` are two distinctly-named commands, both
+  resolving to this one script, gated by a hard safety default — no flag
+  means read-only (reports drift and exits non-zero, mutates nothing);
+  `--write` is required to actually update `schema_migrations.checksum`,
+  and even then only inside a transaction. `migrations:verify-checksums`
+  never passes `--write`, so it's structurally incapable of mutating
+  regardless of what it finds. What was actually missing was proof: the
+  script had zero test coverage, so nothing would catch a regression (e.g.
+  someone flipping the default). Added a `require.main === module` guard
+  and exported `parseArgs`/`buildDriftReport`/`main` (matching the existing
+  pattern in `scripts/check-child-business-fk-readiness.js`), then added 9
+  tests in `tests/repairMigrationChecksumsScript.test.js`: argument parsing,
+  drift/missing-file detection, and — the actual safety property — `main()`
+  with no `--write` throws without issuing a single `UPDATE`, `--write`
+  performs the scoped repair, no-drift is a no-op regardless of flags, and
+  missing applied-migration files refuse to repair even with `--write`.
+  Full suite via `npm run test:all`: **1603/1603 passing** (plus 3/3 ASVS
+  controls) — 9 more than the pre-existing baseline, all new.
+- [x] Environment validation for required production settings — the
+  remaining piece from the earlier half-credit pass was building the fuller
+  suggested design: a real two-tier core-vs-feature-gated validator, plus an
+  env-validation matrix in `Docs/PRODUCTION-READINESS.md`. User confirmed
+  the intent directly: build the two-tier structure and the doc without
+  changing which vars are actually required today — leave the
+  inbound-email/support-reply secrets question as a documented, deliberate
+  exception rather than a product call made unilaterally. Rewrote
+  `envValidationService.js`'s flat required-list into an explicit
+  `ENV_VARIABLE_REGISTRY` (`{ name, tier: "core" | "production", reason }`)
+  plus a separate `OPTIONAL_FEATURE_ENV_VARIABLES` list documenting the
+  inbound-email secrets and their fail-closed 503 behavior;
+  `collectRequiredEnvironmentVariables` now derives its output from the
+  registry instead of a hand-maintained array. Verified behavior preservation
+  by running the full pre-existing `tests/envValidationService.test.js`
+  unchanged against the new implementation — all 13 tests passed with zero
+  edits, confirming the required-variable set for both `production` and
+  non-production is byte-identical to before. Added 4 new tests locking in
+  the registry's own shape (only two known tiers, every entry has a reason,
+  no duplicate names, optional entries never leak into the required list).
+  `Docs/PRODUCTION-READINESS.md` was badly stale (dated 2026-06-07, missing
+  `INEX_LEDGER_SUPPORT_SECRET`/`REDIS_URL`/`PDF_WORKER_URL`/
+  `PDF_WORKER_SECRET`/`EXPORT_PUBLIC_KEY_JWK`/`EXPORT_PRIVATE_KEY_JWK` from
+  its required list even though code already required all of them) —
+  rewrote its "Required environment variables" section as a real matrix
+  (variable / tier / why) matching the registry exactly, plus the
+  feature-gated table with each secret's fail-closed behavior. Full suite
+  via `npm run test:all`: **1618/1618 passing** (plus 3/3 ASVS controls) —
+  4 more than the pre-existing baseline, all new.
+- [x] Docker/Nixpacks/start scripts reconciled — checked both of the
+  audit's original findings against current `main` before assuming either
+  was still open. Both were already fixed: Nixpacks has a real
+  `[phases.build]` running `npm run build:frontend-v3` and verifying
+  `public/app-v3/index.html` exists (the original finding was that Nixpacks
+  had no build phase and could deploy a stale checked-in bundle), and every
+  install step across the Dockerfile and both `nixpacks.toml` files already
+  uses `npm ci`, not `npm install` (the reproducible-installs item, already
+  `[x]` separately). What was still genuinely inconsistent: `Dockerfile`
+  pins `node:20-bookworm-slim` but both `nixpacks.toml` files used the
+  unversioned `nixPkgs = ["nodejs"]`, which resolves to whatever Node
+  version the Nixpacks/nixpkgs channel defaults to — not necessarily 20,
+  and not guaranteed stable across rebuilds. Pinned both to
+  `nixPkgs = ["nodejs_20"]` and added `"engines": {"node": "20.x"}` to
+  `package.json`. Added 2 tests to `tests/frontendV3BuildPipeline.test.js`
+  (which already covered the build-phase/`npm ci` properties): one asserts
+  the Dockerfile/nixpacks/package.json Node major version all agree, the
+  other asserts the root and API-local `nixpacks.toml` files stay
+  semantic mirrors of each other (they differ only by a
+  `cd In-Ex-Ledger-API && ` prefix and incidental TOML array line-wrapping,
+  confirmed by diffing them directly). Full suite via `npm run test:all`:
+  **1605/1605 passing** (plus 3/3 ASVS controls) — 2 more than the
+  pre-existing baseline, all new.
 - [x] Reproducible installs (`npm ci`) in CI/deployment (`afdefa17`, `6a313ff0`)
 
-## Phase 4 - API Error And Response Consistency — 3.75 / 5
+## Phase 4 - API Error And Response Consistency — 4.5 / 5
 - [~] Consolidated `ApiError`/`sendError`/async-route pattern introduced — Pass 27's
   suggested design already had most of its foundation in place and just wasn't being
   used: `server.js` already has a final Express error handler that derives status
@@ -372,15 +498,95 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   and generic unexpected database failures. Focused invoice suites:
   **23/23 passing**. Now **28 of 40** route files use the pattern. Phase score
   unchanged at **3.75/5**.
-- [~] Client-facing error envelopes normalized — partial; this PR folded one more error
-  class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
-  generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
-  not a repo-wide envelope standard, so it stays at half credit.
+  **Follow-up, same PR sequence**: outside-this-chat work landed 8 more
+  conversions between PR 35 and this note, bringing the count to **38 of 40**
+  before this batch started — the only two files not using the pattern were
+  `auth.routes.js` (2551 lines, 23 routes, by far the largest remaining file)
+  and `region.routes.js` (verified N/A: a single sync handler with one
+  static 503 branch, no hand-rolled multi-shape error responses to unify).
+  Started `auth.routes.js`'s conversion in batches given its size and
+  security sensitivity — this PR converts the first 7 routes
+  (`/register`, `/send-verification`, `/complete-verified-signup`, `/login`,
+  `/refresh`, `/logout`, `GET /verify-email`), leaving 16 more (MFA, password
+  reset/recovery, email change) for follow-up PRs; not counting the file as
+  converted yet since it's partial. `/login` and `/refresh` needed the most
+  care: both had a route-local `try/catch` whose `catch` block treated
+  every error as either a specific translated response or a generic 500 —
+  converting the 400/401/403/423 branches to `throw new ApiError(...)`
+  without also fixing the `catch` would have meant the catch's own
+  `isTransientLoginInfrastructureError` check (and its final generic-500
+  fallback) swallowed those intentional throws and reported them all as 500.
+  Fixed by having the `catch` only translate the one specific case it exists
+  for and rethrow everything else unchanged. `GET /verify-email` responds
+  with plain text, not the JSON `{error}` envelope, since it's a link
+  opened directly in a browser rather than a JS API client — left its
+  response bodies untouched, only wrapped it in `asyncRoute` so an
+  unexpected throw doesn't become a hung/unhandled-rejection request instead
+  of a response. **Real bug found by writing the test first, not by
+  inspection**: `/login`'s transient-infrastructure-error path threw
+  `ApiError(503, "Sign-in is temporarily unavailable...")` — but the central
+  handler replaces the message of *any* status >= 500 with the generic
+  "Internal server error" by design (it hides 500 detail in production), so
+  that deliberately-informative 503 message would have been silently lost.
+  Fixed by keeping it as a direct `res.status(503).json({error: "..."})`
+  response instead of a throw, the same "extra info the central handler
+  can't carry" exception class as `AccountingPeriodLockedError` elsewhere in
+  this rollout — just for the message itself rather than extra fields. Once
+  found, checked whether this same mistake existed anywhere else already on
+  `main`: it did, in two files converted in earlier (non-auth) batches —
+  `crypto.routes.js`'s `GET /export-public-key` and three identical spots in
+  `messages.routes.js` — both threw a 503 `ApiError` with a message that was
+  already being silently swallowed by the central handler on `main` right
+  now. Fixed all three the same way. `tests/cryptoRoutes.test.js` already
+  had a test hitting this exact path but only asserted the status code, not
+  the body — strengthened it to assert the real message, which would have
+  caught this the moment it was introduced. Added
+  `tests/authRouteErrors.test.js` (10 tests covering `/login`'s and
+  `/refresh`'s error paths, including the transient-503 case and confirming
+  unexpected DB failures produce a generic 500 rather than a leaked message)
+  and one new test in `tests/cryptoRoutes.test.js`. Full suite via
+  `npm run test:all`: **1629/1629 passing** (plus 3/3 ASVS controls) — 11
+  more than the pre-existing baseline, all new. Route-file count stays at
+  **38 of 40** (unchanged, since `auth.routes.js` isn't fully converted
+  yet); Phase score unchanged.
+- [x] Client-facing error envelopes normalized — with 38 of 40 route files now on
+  `asyncRoute`/`ApiError` (see the rollout item above), the central handler's
+  `{ error: message }` shape (plus `requestId` on 500s) is the de facto
+  repo-wide standard now, not just a route-file-local mapping. Grepped every
+  `routes/*.js` file for any remaining non-`{error}` shaped response and
+  checked each hit individually rather than assuming they're all leftover
+  gaps: the `{ ok: false, status, error }`/`{ ok: false }` shapes in
+  `email.routes.js`, `supportEmail.routes.js`, and `plaid.routes.js` are all
+  server-to-server webhook responses, not client-facing (Plaid's was already
+  an accepted exception as of PR 34); `internalSupport.routes.js`'s
+  `{ ok: false, message }` is that route file's own internal-tooling API
+  surface (gated by the shared secret above), a different consumer from the
+  V3 browser client, and internally consistent with its own `{ ok: true,
+  item }` success shape throughout. **Known, narrow exception, left alone**:
+  `businesses.routes.js`'s `POST /provision-add-on` (Stripe-subscription
+  business provisioning, wrapped in a real DB transaction with Stripe
+  compensation on failure) still returns `{ success: false/true, error }`
+  instead of the standard shape. No V3 frontend caller was found for this
+  route (grepped `frontend-v3/src` for the path), so its actual usage is
+  unverified; reshaping a route with live billing-compensation logic and an
+  unconfirmed caller isn't a safe "while we're here" edit, so it's flagged
+  here rather than touched.
 - [x] V2 CRUD routes no longer misclassify bad-ID/validation as 500 (`32210ac6`,
   `0e3fc909`)
 - [x] Repeated validation helpers shared where duplication is real (`f4c0e99f` — v2 UUID
   validation)
-- [~] Representative tests for error status/code/message
+- [x] Representative tests for error status/code/message — 7 dedicated
+  `tests/*RouteErrors.test.js` files now exist (`accountsRouteErrors`,
+  `analyticsRouteErrors`, `businessRouteErrors`, `capitalAssetsRouteErrors`,
+  `categoriesRouteErrors`, `v2RouteErrors`, `vehicleClaimsRouteErrors`), plus
+  every other route conversion PR in this rollout added its own status/
+  message assertions inline. 21 test files assert on a response's `.code`
+  field specifically (e.g. the `accounting_period_locked` extra-fields case).
+  This is a natural byproduct of the `asyncRoute`/`ApiError` rollout, not a
+  separate effort — as that rollout's route-file count climbs, so does this
+  coverage, and it's already broad enough across enough different route
+  families (V1 CRUD, V2 CRUD, business logic, complex domain errors) to call
+  representative.
 
 ## Phase 5 - Database Invariants And Multi-Tenant Boundaries — 5 / 5
 - [x] `CHECK` constraint for subscription `plan_code`/`status` (`e7e14acb`)
@@ -1656,5 +1862,306 @@ test that had been failing identically since PR 13).
   `sendTrialLifecycleReminders` runs against one shared mock table, asserting
   exactly one of the two sends. Full suite via `npm run test:all`:
   **1588/1588 passing** (plus 3/3 ASVS controls) — 22 more than the pre-existing
-  baseline, all new. Phase 9 reaches **5/5**; Overall moves from 34.25/54 to
-  **34.75/54 (~64%)**.
+  baseline, all new. Phase 9 reaches **5/5**.
+
+- **PR 37** (`docs/recompute-tracker-percentage`): no code change, tracker
+  correction. A user question about how "Phase 9 of 10 done" squared with a
+  64% headline number prompted an actual recount instead of trusting either
+  figure. Counting every `- [x]`/`- [~]`/`- [ ]` marker in the file directly
+  (54 total, matching the stated denominator) gives 40 `[x]` + 10 `[~]` = 45.0,
+  not the 34.75 the headline claimed after PR 36's edit. Two phase headers had
+  independently drifted from their own item markers: Phase 2 said `6.0 / 7`
+  against 4 `[x]` + 3 `[~]` = 5.5, and Phase 4 said `3.75 / 5` against 2 `[x]`
+  + 3 `[~]` = 3.5 — the latter isn't even a value 5 items scored at
+  {0, 0.5, 1.0} can produce, a clear sign of hand-adjusted drift rather than a
+  real recompute. Every other phase header already matched its own markers.
+  This confirms the "recompute before ever changing the headline number" rule
+  in this file's own legend had been violated repeatedly, including by PR 36
+  itself, which only added +0.5 for Phase 9 instead of recomputing from
+  scratch. Corrected both stale phase headers and the Overall line; every
+  header now reconciles exactly with a direct marker count. **Overall: 45.0 / 54
+  (~83%)** — a large jump, but it reflects work already done across many prior
+  PRs that the drifting headline simply hadn't been credited for, not new work
+  in this PR.
+
+- **PR 38** (`docs/accept-support-secret-scope`): Phase 2, closes one of the
+  ten `[~]` items — a user asked to work through all ten half-credit items,
+  starting with two flagged as requiring an actual product/scope decision
+  rather than a code fix. Re-read `routes/internalSupport.routes.js` and
+  `middleware/requireSupportSecret.js` to confirm nothing had changed since
+  the item was last scored: still a single shared secret, timing-safe
+  comparison, durable audit logging, and a dedicated rate limiter — only
+  per-agent identity and role/scope checks remain unbuilt. Rather than
+  building that unilaterally (real feature work: API keys per support agent,
+  a role model, none of it implied by anything already in the codebase) or
+  leaving it stuck at half credit indefinitely, asked the product owner
+  directly. **Decision**: the internal support API's shared-secret model is
+  an accepted risk for the current operating model (one support surface, no
+  external tooling needing individual attribution) — per-agent identity is
+  deferred until that changes, not a gap to keep chasing. No code change;
+  closing the item at full credit on the strength of that decision, same as
+  how other explicitly-scoped-out audit findings in this file are handled.
+  Phase 2 moves to **6.0/7**; Overall to **45.5/54 (~84%)**.
+
+- **PR 39** (`docs/verify-error-envelope-and-test-coverage`): Phase 4, closes
+  two more of the ten `[~]` items — both turned out to already be
+  substantially done by the natural progress of the `asyncRoute`/`ApiError`
+  rollout, just never re-verified and re-credited. Checked rather than
+  assumed: grepped every `routes/*.js` file for any response shape other
+  than `{ error }` and read each hit. The remaining ones are all legitimate,
+  already-precedented exceptions — three webhook route files respond with
+  their own `{ ok, ... }` shape (server-to-server, not client-facing;
+  Plaid's was already accepted in PR 34), and `internalSupport.routes.js`
+  keeps its own internal-tooling envelope consistently (a different consumer
+  from the V3 browser client). One narrow, real exception flagged and left
+  alone rather than silently ignored: `businesses.routes.js`'s
+  `POST /provision-add-on` still returns `{ success, error }`; it wraps a
+  live Stripe-compensation transaction and no V3 frontend caller was found
+  for it, so it's not a safe drive-by edit. With that mapped, the "client-
+  facing error envelopes normalized" item closes at full credit — the
+  `{ error }` shape is now the de facto repo-wide standard, not just
+  route-file-local. Separately, "representative tests for error status/
+  code/message" also closes: 7 dedicated `tests/*RouteErrors.test.js` files
+  exist plus inline coverage from every rollout PR, spanning V1 CRUD, V2
+  CRUD, business logic, and complex domain-error cases — a natural byproduct
+  of the same rollout, not separate effort. No code change, both items
+  closed by verification. Phase 4 moves to **4.5/5**; Overall to
+  **46.5/54 (~86%)**.
+
+- **PR 40** (`chore/test-webhook-signature-rejection`): Phase 2, closes
+  another of the ten `[~]` items. The source finding was "Add CSRF/origin
+  tests for representative mutating API routes **and allowed webhook
+  exceptions**" — `tests/csrfE2E.test.js` already covered the CSRF half
+  well (route-inventory + e2e token cases) and had a test confirming the
+  billing webhook is *structurally* exempt from CSRF, but nothing verified
+  the exemption is actually safe. Read `verifyWebhookSignature` in
+  `routes/billing.routes.js` directly: it rejects a missing signature, a
+  malformed header, a signature from the wrong secret, a tampered body, and
+  a timestamp outside the 5-minute tolerance window — all correct — but
+  zero test coverage exercised any of those paths at the HTTP level before
+  this. Added 6 tests to `tests/billingWebhook.test.js` covering each
+  rejection path (asserting 400 and that subscription sync/free-plan
+  fallback never run) plus a secret-rotation case (a valid signature among
+  multiple `v1=` values is still accepted). Full suite via
+  `npm run test:all`: **1594/1594 passing** (plus 3/3 ASVS controls) — 6
+  more than the pre-existing baseline, all new. Phase 2 moves to **6.5/7**;
+  Overall to **47.0/54 (~87%)**.
+
+- **PR 41** (`chore/test-migration-checksum-script-safety`): Phase 3, closes
+  another of the ten `[~]` items. Read `scripts/repair-migration-checksums.js`
+  directly instead of assuming the "split" needed new code: it already
+  existed functionally — `migrations:verify-checksums`/
+  `migrations:repair-checksums` are two distinctly-named npm commands
+  resolving to the same script, gated by a hard default (no `--write` means
+  read-only, reports drift and exits non-zero without mutating anything).
+  What was missing was proof — zero test coverage meant nothing would catch
+  a regression to that default. Added a `require.main === module` guard and
+  exported `parseArgs`/`buildDriftReport`/`main` (same pattern as
+  `scripts/check-child-business-fk-readiness.js`, which already does this
+  for testability), then added 9 tests: argument parsing, drift/missing-file
+  detection, and the actual safety property — no `--write` throws without
+  issuing a single `UPDATE`, `--write` performs the scoped repair inside a
+  transaction, no-drift is a no-op regardless of flags, and missing
+  applied-migration files refuse to repair even with `--write`. Full suite
+  via `npm run test:all`: **1603/1603 passing** (plus 3/3 ASVS controls) — 9
+  more than the pre-existing baseline, all new. Phase 3 moves to **5.0/6**;
+  Overall to **47.5/54 (~88%)**.
+
+- **PR 42** (`chore/pin-nixpacks-node-version`): Phase 3, closes another of
+  the ten `[~]` items. Checked both of the audit's original Docker/Nixpacks
+  findings against current `main` before assuming either was still open —
+  both were already fixed (Nixpacks has a real build phase verifying
+  `public/app-v3/index.html`; every install step already uses `npm ci`).
+  What was still genuinely inconsistent: `Dockerfile` pins
+  `node:20-bookworm-slim` but both `nixpacks.toml` files used the
+  unversioned `nixPkgs = ["nodejs"]`. Pinned both to `nixPkgs =
+  ["nodejs_20"]` and added `"engines": {"node": "20.x"}` to `package.json`.
+  Added 2 tests to `tests/frontendV3BuildPipeline.test.js`: Node major
+  version agreement across Dockerfile/nixpacks/package.json, and that the
+  root and API-local `nixpacks.toml` files stay semantic mirrors of each
+  other (confirmed by diffing them directly — they differ only by a `cd
+  In-Ex-Ledger-API && ` prefix and incidental TOML line-wrapping). Full
+  suite via `npm run test:all`: **1605/1605 passing** (plus 3/3 ASVS
+  controls) — 2 more than the pre-existing baseline, all new. Phase 3 moves
+  to **5.5/6**; Overall to **48.0/54 (~89%)**.
+
+- **PR 43** (`chore/enrich-central-error-handler`): Phase 2, closes the last
+  of the ten `[~]` items in this phase (Phase 2 reaches **7/7**). Rather
+  than rolling `buildRouteErrorContext` out file-by-file across the ~19
+  remaining route files — a huge, mostly-redundant lift now that 38 of 40
+  files already run through `asyncRoute` — enriched the one mechanism that
+  already serves all of them: `server.js`'s central error handler. It was
+  missing `err.code`, `err.constraint`, `userId`, and route params compared
+  to `buildRouteErrorContext`'s shape. Route params turned out to be a real
+  gap, not a cosmetic one: wrote the test first and watched it fail —
+  Express resets `req.params` to `{}` as an error bubbles up past the
+  route-specific layer that matched it, so a central app-level handler can
+  never read `req.params` directly. Fixed properly instead of dropping the
+  field: `asyncRoute` (`utils/apiError.js`) now snapshots non-empty
+  `req.params` onto the error as `err.routeParams` while it's still valid,
+  and the central handler reads that. Mirrored the same enrichment in
+  `tests/helpers/testPool.js`'s `attachCentralErrorHandler` so the real
+  handler and the shared test fixture stay in sync, per the project's own
+  established discipline for that file. Also found and removed 3 redundant
+  raw-`Error`-object `logError()` calls in `routes/receipts.routes.js`
+  (`POST /`, `PATCH /:id/attach`, `DELETE /:id`) — each logged the
+  unsanitized error and then rethrew it anyway, so it was already being
+  logged a second time, more richly, by the central handler; pure
+  duplication of the exact pattern this item exists to remove.
+  `transactions.routes.js` keeps its existing direct `buildRouteErrorContext`
+  usage as-is, since it threads route-specific `businessId` into `extra`,
+  which the central handler can't do generically. Added 9 tests (5 in
+  `testPoolHelpers.test.js`, 4 in `apiError.test.js`, including the
+  no-clobber-if-`routeParams`-already-set case). Full suite via
+  `npm run test:all`: **1614/1614 passing** (plus 3/3 ASVS controls) — 9
+  more than the pre-existing baseline, all new. Overall to
+  **48.5/54 (~90%)**.
+
+- **PR 44** (`chore/two-tier-env-validator`): Phase 3, closes the last of
+  the ten `[~]` items in this phase (Phase 3 reaches **6/6**). Asked the
+  user directly what to do about the item's one remaining real open
+  question (should the inbound-email secrets become required) rather than
+  deciding unilaterally; the answer was to build the two-tier design and
+  doc without changing which vars are currently required, leaving that
+  question as a documented exception. Rewrote `envValidationService.js`'s
+  flat required-list into an explicit `ENV_VARIABLE_REGISTRY`
+  (`{ name, tier: "core" | "production", reason }`) plus a separate
+  `OPTIONAL_FEATURE_ENV_VARIABLES` list documenting the inbound-email
+  secrets and their fail-closed 503 behavior; `collectRequiredEnvironmentVariables`
+  now derives its output from the registry. Verified behavior preservation
+  the direct way: ran the full pre-existing `tests/envValidationService.test.js`
+  unchanged against the new implementation — all 13 passed with zero edits,
+  confirming the required-variable set for both `production` and
+  non-production is byte-identical to before this PR. Added 4 tests locking
+  in the registry's own shape. `Docs/PRODUCTION-READINESS.md` turned out to
+  be badly stale (dated 2026-06-07) — missing 6 vars from its required list
+  that code has actually required since an earlier PR
+  (`INEX_LEDGER_SUPPORT_SECRET`, `REDIS_URL`, `PDF_WORKER_URL`,
+  `PDF_WORKER_SECRET`, `EXPORT_PUBLIC_KEY_JWK`, `EXPORT_PRIVATE_KEY_JWK`).
+  Rewrote its "Required environment variables" section as a real matrix
+  matching the registry exactly, plus a feature-gated table with each
+  optional secret's fail-closed behavior. Full suite via `npm run test:all`:
+  **1618/1618 passing** (plus 3/3 ASVS controls) — 4 more than the
+  pre-existing baseline, all new. Overall to **49.0/54 (~91%)**.
+
+- **PR 45** (`chore/convert-auth-routes-batch-1`): Phase 4, first batch on
+  the last of the ten `[~]` items — the `asyncRoute`/`ApiError` rollout is
+  now down to one real file. 38 of 40 route files already use the pattern
+  (8 more landed from outside this chat since PR 35); the only two holdouts
+  were `auth.routes.js` (2551 lines, 23 routes, the largest remaining file
+  by a wide margin) and `region.routes.js` (verified not applicable — a
+  single sync handler with one static 503 branch, nothing to unify).
+  Converted the first 7 of `auth.routes.js`'s 23 routes:
+  `/register`, `/send-verification`, `/complete-verified-signup`, `/login`,
+  `/refresh`, `/logout`, `GET /verify-email`. Given the file's size and
+  security sensitivity, splitting the conversion into batches rather than
+  one large diff, matching how every other large file in this rollout
+  (`billing.routes.js`, `transactions.routes.js`, `exports.routes.js`) was
+  handled.
+
+  `/login` and `/refresh` needed real care: both had a `try/catch` whose
+  `catch` translated one specific error into a specific response and
+  otherwise fell back to a generic 500 — converting the 400/401/403/423
+  branches to `throw new ApiError(...)` without also fixing the `catch`
+  would have meant its own fallback caught those intentional throws too and
+  reported them as 500. Fixed by having the `catch` only handle the one
+  case it exists for and rethrow everything else unchanged.
+
+  **Real bug caught by writing the test first, not by inspection**:
+  `/login`'s transient-infrastructure-error path threw
+  `ApiError(503, "Sign-in is temporarily unavailable...")`, but
+  `server.js`'s central handler replaces the message of *any* status >= 500
+  with a generic "Internal server error" by design. That deliberately
+  user-facing 503 message would have been silently lost the moment this
+  shipped. Fixed by keeping it a direct response instead of a throw — the
+  same "extra info the central handler can't carry" exception class as
+  `AccountingPeriodLockedError` elsewhere in this rollout, just for the
+  message itself. Checked whether the same mistake already existed anywhere
+  on `main`: it did, in two files converted in earlier, unrelated batches —
+  `crypto.routes.js`'s `GET /export-public-key` and three spots in
+  `messages.routes.js` — both silently swallowing a deliberate 503 message
+  right now. Fixed all three the same way, and strengthened
+  `tests/cryptoRoutes.test.js`'s existing test for that path (it asserted
+  the status code but never the body, so it hadn't caught the bug it was
+  sitting right next to).
+
+  Added `tests/authRouteErrors.test.js` (10 tests) and one new test in
+  `tests/cryptoRoutes.test.js`. Full suite via `npm run test:all`:
+  **1629/1629 passing** (plus 3/3 ASVS controls) — 11 more than the
+  pre-existing baseline, all new. Route-file count stays at **38 of 40**
+  (not counting `auth.routes.js` until it's fully converted); Phase 4 and
+  Overall unchanged — 16 more routes to go in follow-up PRs.
+
+- **PR 46** (`chore/convert-brittle-source-shape-tests`): Phase 1, closes
+  the last of the ten `[~]` items in this phase (Phase 1 reaches **6/6**).
+  The user's instruction for this item was specific: don't convert
+  everything that reads source as text — inventory first, convert only the
+  genuinely brittle implementation-detail tests, and explicitly keep
+  source-level checks where the thing being protected really is a
+  source-level rule. Delegated the 22-file inventory to a background
+  research agent while other work continued; it came back with roughly
+  9 genuine offenders, concentrated in `tests/frontendV3ApiContracts.test.js`
+  (2) and `tests/frontendV3Wiring.test.js` (5), plus one each in
+  `tests/startupMigrationSafety.test.js` and `tests/internalSupportRoutes.test.js`.
+
+  For the two API-contract mapper tests and three of the `frontendV3Wiring`
+  tests, built a small `vm` + real-`typescript`-compiler loader (following
+  the precedent already set by `tests/frontendV3Navigation.test.js`) that
+  transpiles a `lib/*.ts` file and runs it in a sandbox with a stubbed
+  `require` for its own relative imports, so the tests call the actual
+  exported function against real inputs instead of regexing the source.
+  `mapTransaction` (`transactionsApi.ts`), `mapLegacyUser` (`authApi.ts`),
+  and `resolveEstimatedTaxProfile` (`transactionsApi.ts`) were all
+  module-private — exported all three specifically to make this possible,
+  the same "export the pure function for testability" pattern
+  `navigation.ts` already used for its own tests. The two `apiClient.ts`
+  tests needed a further step: `apiClient.ts` isn't a pure function, it
+  drives `fetch`/`document.cookie`/`window.location`, none of which exist
+  in a bare `vm` context — built a minimal sandbox providing a scripted
+  `fetch` mock plus a cookie-jar-backed `document` stub, then asserted on
+  the actual request sequence (a 401 triggers exactly one refresh and one
+  retry; a stale-CSRF 403 on a multipart request triggers exactly one
+  `/api/me` refresh and one retry carrying the new token, with the
+  multipart body's `Content-Type` never set). Cross-realm `assert.deepEqual`
+  on plain objects returned from the `vm` sandbox fails on prototype
+  identity even when the values are equal — switched those specific
+  assertions to a `JSON.stringify` comparison instead of chasing a false
+  regression.
+
+  For the two tests where full behavioral conversion wasn't proportionate
+  (no React/jsdom harness exists in this repo to actually drive
+  `Receipts.tsx`'s debounce, and `startServer()`'s DB-before-listen
+  ordering needed real module mocking rather than a pure-function export),
+  took the calibrated middle path the user's instruction allowed: relaxed
+  the literal magic-number/private-var-name pins that made them brittle
+  (`Receipts.tsx`'s debounce `275` and `searchSequenceRef` name; the
+  root-landing favicon's exact `?v=20260726a` cache-bust value) while
+  keeping them as source checks for the structural invariant that
+  actually matters, and for `startupMigrationSafety.test.js`'s
+  server-init-before-listen test, went ahead and built the real thing: it
+  now requires `server.js`/`db.js` fresh, spies on the real `initDatabase`
+  and `app.listen`, calls the real `startServer()`, and asserts the actual
+  call order rather than comparing `indexOf` positions in a source slice.
+  The legacy-auth-defaults test (JWT expiry / cookie maxAge / refresh rate
+  limit) got a hybrid fix: the JWT expiry is now checked by signing a real
+  token via the exported `signToken` and decoding its lifetime; the other
+  two constants aren't exported, so they stay source checks but assert on
+  numeric magnitude instead of pinning literal `60 * 60`/`120` formatting.
+
+  Investigated `tests/internalSupportRoutes.test.js`'s rate-limiter-before-
+  secret-check test last, expecting to convert it the same way (fire
+  enough requests to trigger a real 429). Concluded it shouldn't change:
+  unlike the other `indexOf` cases, `router.use(A); router.use(B)` order in
+  an Express router *is* the actual runtime behavior (Express always runs
+  middleware in registration order) — the existing check isn't a brittle
+  proxy for the invariant, it already tests the invariant directly.
+  Reaching a real 429 in this test environment would need either running
+  in production mode or new rate-limiter store-injection plumbing, for a
+  check that was already faithful — left unchanged as a legitimate
+  source-level rule, per the user's own carve-out for exactly this case.
+
+  Full suite via `npm run test:all`: **1631/1631 passing** (plus 3/3 ASVS
+  controls) — 2 more than the pre-existing baseline (net, after removing
+  and replacing several regex-only tests with fewer, higher-value behavior
+  tests). `frontend-v3` type-checks (`tsc -b --noEmit`) and builds clean.
+  Overall to **49.5/54 (~92%)**.

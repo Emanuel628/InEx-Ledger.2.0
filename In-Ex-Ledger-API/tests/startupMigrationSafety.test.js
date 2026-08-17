@@ -27,17 +27,48 @@ test("database startup accepts known historical checksum drift without rewriting
   assert.match(initDatabaseBody, /canAcceptHistoricalMigrationDrift/);
 });
 
-test("server does not listen for traffic before database initialization completes", () => {
-  const serverSource = fs.readFileSync(path.join(apiRoot, "server.js"), "utf8");
-  const startServerBody = serverSource.slice(
-    serverSource.indexOf("async function startServer()"),
-    serverSource.indexOf("function shutdown(signal)")
-  );
+test("server does not listen for traffic before database initialization completes", async () => {
+  process.env.NODE_ENV = "test";
+  process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret";
+  process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret";
 
-  const initIndex = startServerBody.indexOf("await initializeDatabaseWithRetry()");
-  const listenIndex = startServerBody.indexOf("app.listen(");
+  const dbModulePath = require.resolve("../db.js");
+  const serverModulePath = require.resolve("../server.js");
+  delete require.cache[serverModulePath];
+  delete require.cache[dbModulePath];
 
-  assert.ok(initIndex !== -1, "startServer must await database initialization");
-  assert.ok(listenIndex !== -1, "startServer must open the HTTP listener");
-  assert.ok(initIndex < listenIndex, "database initialization must complete before app.listen");
+  // db.js is required (and its exports mutated) before server.js so that
+  // server.js's own `const { initDatabase } = require('./db.js')` captures
+  // this spy instead of the real, network-calling implementation.
+  const dbModule = require("../db.js");
+  const originalInitDatabase = dbModule.initDatabase;
+  const callOrder = [];
+  dbModule.initDatabase = async () => {
+    callOrder.push("db-init-start");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    callOrder.push("db-init-complete");
+  };
+
+  const { app, startServer } = require("../server.js");
+  const originalListen = app.listen;
+  app.listen = (...args) => {
+    callOrder.push("listen");
+    const onListening = args.find((arg) => typeof arg === "function");
+    if (onListening) onListening();
+    return { close: (done) => { if (done) done(); } };
+  };
+
+  try {
+    await startServer();
+    assert.deepEqual(
+      callOrder,
+      ["db-init-start", "db-init-complete", "listen"],
+      "app.listen must not run until database initialization has actually completed"
+    );
+  } finally {
+    app.listen = originalListen;
+    dbModule.initDatabase = originalInitDatabase;
+    delete require.cache[serverModulePath];
+    delete require.cache[dbModulePath];
+  }
 });

@@ -39,3 +39,34 @@ test("Docker image builds v3 assets instead of relying on committed leftovers", 
   assert.match(source, /public\/app-v3\/index\.html/);
   assert.match(source, /CMD \["npm", "start"\]/);
 });
+
+test("Nixpacks and Docker agree on the Node major version", () => {
+  const nixpacks = read("nixpacks.toml");
+  const dockerfile = read("Dockerfile");
+  const pkg = JSON.parse(read("package.json"));
+
+  const dockerMajor = dockerfile.match(/FROM node:(\d+)/)?.[1];
+  const nixpacksMajor = nixpacks.match(/nixPkgs = \["nodejs_(\d+)"\]/)?.[1];
+  const enginesMajor = pkg.engines?.node?.match(/^(\d+)/)?.[1];
+
+  assert.ok(dockerMajor, "Dockerfile should pin a Node major version");
+  assert.ok(nixpacksMajor, "nixpacks.toml should pin a specific nodejs_<major> package, not the unversioned 'nodejs'");
+  assert.equal(nixpacksMajor, dockerMajor);
+  assert.equal(enginesMajor, dockerMajor);
+});
+
+test("root and API-local nixpacks.toml stay mirrors of each other", () => {
+  const apiNixpacks = read("nixpacks.toml");
+  const rootNixpacks = fs.readFileSync(path.join(repoRoot, "..", "nixpacks.toml"), "utf8");
+
+  // The root file builds from the monorepo root, so every command is
+  // prefixed with "cd In-Ex-Ledger-API && "; stripping that prefix and
+  // collapsing whitespace (TOML array formatting differs by line length,
+  // not content) should make the two files semantically identical.
+  const normalize = (source) =>
+    source
+      .replace(/cd In-Ex-Ledger-API && /g, "")
+      .replace(/\s+/g, "");
+
+  assert.equal(normalize(rootNixpacks), normalize(apiNixpacks));
+});

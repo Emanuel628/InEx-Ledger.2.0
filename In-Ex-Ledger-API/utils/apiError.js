@@ -20,15 +20,33 @@ class ApiError extends Error {
   }
 }
 
+// Express resets req.params as an error bubbles up past the route-specific
+// layer that matched it, so a central app-level error handler can't read
+// req.params -- by the time it runs, params is always {}. Snapshotting them
+// onto the error here, while req.params still reflects the route that threw,
+// is what lets the central handler log which resource id actually failed.
+function attachRouteParams(err, req) {
+  if (
+    err &&
+    typeof err === "object" &&
+    err.routeParams === undefined &&
+    req.params &&
+    Object.keys(req.params).length
+  ) {
+    err.routeParams = req.params;
+  }
+  return err;
+}
+
 // Wraps an async Express route handler so a rejected promise (including a
 // thrown ApiError) is forwarded to next(err) instead of becoming an unhandled
 // rejection. Express does not do this automatically for async handlers.
 function asyncRoute(handler) {
   return function wrappedAsyncRoute(req, res, next) {
     try {
-      return Promise.resolve(handler(req, res, next)).catch(next);
+      return Promise.resolve(handler(req, res, next)).catch((err) => next(attachRouteParams(err, req)));
     } catch (err) {
-      next(err);
+      next(attachRouteParams(err, req));
     }
   };
 }

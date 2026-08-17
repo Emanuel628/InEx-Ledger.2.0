@@ -573,3 +573,142 @@ test("webhook: billing lifecycle email dedupe skips an already reserved delivery
     fixture.cleanup();
   }
 });
+
+// ── signature verification (the CSRF exception's actual safety guard) ───────
+//
+// billing.routes.js's POST /webhook is the app's one deliberate CSRF
+// exception (server-to-server, uses Stripe signature verification instead --
+// see tests/csrfE2E.test.js's "billing webhook explicitly skips CSRF" test).
+// That structural test only confirms the route omits requireCsrfProtection;
+// it never exercised whether verifyWebhookSignature's rejection paths
+// actually reject anything. These do.
+
+test("webhook: missing stripe-signature header is rejected with 400 before any event processing", async () => {
+  const fixture = loadBillingRouter();
+
+  try {
+    const { event } = buildWebhookEvent("customer.subscription.deleted");
+    const res = await request(fixture.app)
+      .post("/api/billing/webhook")
+      .set("Content-Type", "application/octet-stream")
+      .send(JSON.stringify(event));
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, "Invalid webhook signature");
+    assert.equal(fixture.state.syncCalls.length, 0);
+    assert.equal(fixture.state.freePlanCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: malformed stripe-signature header (no t=/v1= parts) is rejected with 400", async () => {
+  const fixture = loadBillingRouter();
+
+  try {
+    const { event } = buildWebhookEvent("customer.subscription.deleted");
+    const res = await request(fixture.app)
+      .post("/api/billing/webhook")
+      .set("stripe-signature", "not-a-real-signature-header")
+      .set("Content-Type", "application/octet-stream")
+      .send(JSON.stringify(event));
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, "Invalid webhook signature");
+    assert.equal(fixture.state.syncCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: signature signed with the wrong secret is rejected with 400", async () => {
+  const fixture = loadBillingRouter();
+
+  try {
+    const { event } = buildWebhookEvent("customer.subscription.deleted");
+    const rawBody = JSON.stringify(event);
+    const { header } = makeWebhookSignature(rawBody, "whsec_a_totally_different_secret");
+    const res = await request(fixture.app)
+      .post("/api/billing/webhook")
+      .set("stripe-signature", header)
+      .set("Content-Type", "application/octet-stream")
+      .send(rawBody);
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, "Invalid webhook signature");
+    assert.equal(fixture.state.syncCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: signature payload mismatch (body changed after signing) is rejected with 400", async () => {
+  const fixture = loadBillingRouter();
+
+  try {
+    const { event } = buildWebhookEvent("customer.subscription.deleted");
+    const rawBody = JSON.stringify(event);
+    const { header } = makeWebhookSignature(rawBody, WEBHOOK_SECRET);
+    const tamperedBody = JSON.stringify({ ...event, id: `${event.id}_tampered` });
+    const res = await request(fixture.app)
+      .post("/api/billing/webhook")
+      .set("stripe-signature", header)
+      .set("Content-Type", "application/octet-stream")
+      .send(tamperedBody);
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, "Invalid webhook signature");
+    assert.equal(fixture.state.syncCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: timestamp outside the 5-minute tolerance window is rejected with 400", async () => {
+  const fixture = loadBillingRouter();
+
+  try {
+    const { event } = buildWebhookEvent("customer.subscription.deleted");
+    const rawBody = JSON.stringify(event);
+    const staleTimestamp = Math.floor(Date.now() / 1000) - 10 * 60; // 10 minutes old
+    const payload = `${staleTimestamp}.${rawBody}`;
+    const sig = crypto.createHmac("sha256", WEBHOOK_SECRET).update(payload).digest("hex");
+    const staleHeader = `t=${staleTimestamp},v1=${sig}`;
+
+    const res = await request(fixture.app)
+      .post("/api/billing/webhook")
+      .set("stripe-signature", staleHeader)
+      .set("Content-Type", "application/octet-stream")
+      .send(rawBody);
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, "Invalid webhook signature");
+    assert.equal(fixture.state.syncCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: a matching v1 signature among multiple (secret rotation) is accepted", async () => {
+  const fixture = loadBillingRouter();
+
+  try {
+    const { event } = buildWebhookEvent("customer.subscription.deleted");
+    const rawBody = JSON.stringify(event);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const payload = `${timestamp}.${rawBody}`;
+    const realSig = crypto.createHmac("sha256", WEBHOOK_SECRET).update(payload).digest("hex");
+    const decoySig = crypto.createHmac("sha256", "whsec_decoy_rotated_out").update(payload).digest("hex");
+    const header = `t=${timestamp},v1=${decoySig},v1=${realSig}`;
+
+    const res = await request(fixture.app)
+      .post("/api/billing/webhook")
+      .set("stripe-signature", header)
+      .set("Content-Type", "application/octet-stream")
+      .send(rawBody);
+
+    assert.equal(res.status, 200);
+  } finally {
+    fixture.cleanup();
+  }
+});

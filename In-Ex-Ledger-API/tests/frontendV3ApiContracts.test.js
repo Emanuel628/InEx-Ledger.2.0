@@ -2,12 +2,45 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 
 const repoRoot = path.resolve(__dirname, "..");
 const frontendRoot = path.join(repoRoot, "frontend-v3", "src");
+const frontendPackageRoot = path.join(repoRoot, "frontend-v3");
 
 function read(relativePath) {
   return fs.readFileSync(path.join(frontendRoot, relativePath), "utf8");
+}
+
+// Transpiles a lib/*.ts module with the real TypeScript compiler and runs it
+// in a sandbox so tests can call its real exported functions instead of
+// pattern-matching the source text. `stubs` supplies CommonJS modules for
+// the file's own relative imports (types are erased, so only runtime
+// dependencies actually used by the functions under test need real bodies).
+function loadLibModule(relativePath, stubs = {}) {
+  const ts = require(path.join(frontendPackageRoot, "node_modules", "typescript"));
+  const source = read(relativePath);
+  const transpiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022
+    }
+  }).outputText;
+
+  const sandbox = {
+    exports: {},
+    module: { exports: {} },
+    require(specifier) {
+      if (Object.prototype.hasOwnProperty.call(stubs, specifier)) {
+        return stubs[specifier];
+      }
+      throw new Error(`Unexpected require('${specifier}') while loading ${relativePath}`);
+    },
+    URL
+  };
+  sandbox.exports = sandbox.module.exports;
+  vm.runInNewContext(transpiled, sandbox, { filename: relativePath });
+  return sandbox.module.exports;
 }
 
 test("v3 transaction contract stays server-driven and id-based", () => {
@@ -27,37 +60,122 @@ test("v3 transaction contract stays server-driven and id-based", () => {
   assert.doesNotMatch(source, /account_name\)/);
 });
 
-test("v3 transaction mapper expects the legacy row fields the API returns", () => {
-  const source = read(path.join("lib", "transactionsApi.ts"));
+function loadTransactionsApiModule() {
+  return loadLibModule(path.join("lib", "transactionsApi.ts"), {
+    "./apiClient": {
+      apiRequest: async () => {
+        throw new Error("apiRequest should not be called by mapTransaction");
+      }
+    },
+    "./categoriesApi": {
+      getTaxLineOptions: () => []
+    }
+  });
+}
 
-  for (const field of [
-    "account_id",
-    "account_name",
-    "category_id",
-    "category_name",
-    "receipt_count",
-    "review_status",
-    "review_notes"
-  ]) {
-    assert.match(source, new RegExp(`${field}[?]?:`), `LegacyTransaction should include ${field}`);
-    assert.match(source, new RegExp(`row\\.${field}`), `mapTransaction should consume ${field}`);
-  }
+test("v3 transaction mapper maps a full legacy row's real fields onto the Transaction shape", () => {
+  const { mapTransaction } = loadTransactionsApiModule();
 
-  assert.match(source, /description: row\.description \|\| 'Untitled transaction'/);
-  assert.match(source, /category: row\.category_name \|\| 'Uncategorized'/);
-  assert.match(source, /account: row\.account_name \|\| 'Account'/);
+  const mapped = mapTransaction({
+    id: "txn-1",
+    account_id: "acct-1",
+    account_name: "Checking",
+    category_id: "cat-1",
+    category_name: "Software",
+    amount: "42.50",
+    type: "expense",
+    cleared: true,
+    description: "Zoom subscription",
+    date: "2026-01-15",
+    note: "monthly",
+    receipt_count: 2,
+    review_status: "flagged",
+    review_notes: "needs a second look",
+    receipt_status: "attached",
+    receipt_missing_reason: null,
+    business_purpose: "software"
+  });
+
+  assert.equal(mapped.accountId, "acct-1");
+  assert.equal(mapped.categoryId, "cat-1");
+  assert.equal(mapped.category, "Software");
+  assert.equal(mapped.account, "Checking");
+  assert.equal(mapped.amount, -42.5, "expense amounts should be negative");
+  assert.equal(mapped.receipt, "Attached");
+  assert.equal(mapped.reviewStatus, "flagged");
+  assert.equal(mapped.reviewNotes, "needs a second look");
+  assert.equal(mapped.receiptStatus, "attached");
+  assert.equal(mapped.cleared, true);
 });
 
-test("v3 /api/me contract preserves active business localization and tier data", () => {
-  const source = read(path.join("lib", "authApi.ts"));
+test("v3 transaction mapper falls back to defaults when optional legacy fields are absent", () => {
+  const { mapTransaction } = loadTransactionsApiModule();
 
-  assert.match(source, /active_business\?: LegacyBusiness \| null/);
-  assert.match(source, /language\?: string/);
-  assert.match(source, /currency\?: string/);
-  assert.match(source, /subscription\?: \{[\s\S]*effectiveTier\?: string[\s\S]*tier\?: string[\s\S]*planCode\?: string/);
-  assert.match(source, /currentBusinessId: user\.active_business_id \|\| user\.business_id \|\| activeBusiness\?\.id \|\| null/);
-  assert.match(source, /currency: activeBusiness\.currency \|\| \(activeBusiness\.region === 'CA' \? 'CAD' : 'USD'\)/);
-  assert.match(source, /language: activeBusiness\.language \|\| null/);
+  const mapped = mapTransaction({
+    id: "txn-2",
+    account_id: "acct-2",
+    category_id: "cat-2",
+    amount: 10,
+    type: "income",
+    date: "2026-01-16"
+  });
+
+  assert.equal(mapped.description, "Untitled transaction");
+  assert.equal(mapped.category, "Uncategorized");
+  assert.equal(mapped.account, "Account");
+  assert.equal(mapped.receipt, "Missing");
+  assert.equal(mapped.amount, 10, "income amounts should stay positive");
+  assert.equal(mapped.receiptStatus, "pending", "an unrecognized/missing receipt_status should fall back to pending");
+});
+
+function loadAuthApiModule() {
+  return loadLibModule(path.join("lib", "authApi.ts"), {
+    "./apiClient": {
+      apiRequest: async () => {
+        throw new Error("apiRequest should not be called by mapLegacyUser");
+      }
+    }
+  });
+}
+
+test("v3 /api/me contract maps a real legacy user's active business localization and tier data", () => {
+  const { mapLegacyUser } = loadAuthApiModule();
+
+  const mapped = mapLegacyUser({
+    id: "user-1",
+    email: "owner@example.com",
+    full_name: "Ada Lovelace",
+    active_business_id: "biz-1",
+    active_business: {
+      id: "biz-1",
+      name: "Analytical Engines Ltd",
+      region: "CA",
+      language: "fr"
+    },
+    subscription: { effectiveTier: "business" }
+  });
+
+  assert.equal(mapped.currentBusinessId, "biz-1");
+  assert.equal(mapped.business.currency, "CAD", "a CA business with no explicit currency should default to CAD");
+  assert.equal(mapped.business.language, "fr");
+  assert.equal(mapped.tier, "business");
+});
+
+test("v3 /api/me contract falls back through business_id and defaults currency to USD outside Canada", () => {
+  const { mapLegacyUser } = loadAuthApiModule();
+
+  const mapped = mapLegacyUser({
+    id: "user-2",
+    email: "member@example.com",
+    business_id: "biz-legacy",
+    active_business: { id: "biz-2", region: "US" },
+    subscription: { tier: "pro" }
+  });
+
+  assert.equal(mapped.currentBusinessId, "biz-legacy", "business_id should be preferred over the active business's own id");
+  assert.equal(mapped.business.currency, "USD");
+  assert.equal(mapped.business.language, null);
+  assert.equal(mapped.tier, "pro");
 });
 
 test("v3 business profile contract keeps region and province available for tax math", () => {

@@ -24,6 +24,7 @@ const {
   verifyPassword
 } = require("../utils/authUtils.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   AUDIT_ACTIONS,
   recordAuditEvent,
@@ -948,7 +949,7 @@ async function insertRecognizedSignInDevice(user, deviceContext) {
 /**
  * POST /register
  */
-router.post("/register", authLimiter, async (req, res) => {
+router.post("/register", authLimiter, asyncRoute(async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
   const firstName = String(req.body?.first_name || req.body?.firstName || "").trim();
@@ -970,27 +971,27 @@ router.post("/register", authLimiter, async (req, res) => {
     req.body?.marketingEmailOptIn === true;
 
   if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+    throw new ApiError(400, "Email and password are required");
   }
 
   if (!firstName || !lastName) {
-    return res.status(400).json({ error: "First name and last name are required" });
+    throw new ApiError(400, "First name and last name are required");
   }
 
   if (firstName.length < 2 || firstName.length > 80) {
-    return res.status(400).json({ error: "First name must be between 2 and 80 characters." });
+    throw new ApiError(400, "First name must be between 2 and 80 characters.");
   }
 
   if (lastName.length < 2 || lastName.length > 80) {
-    return res.status(400).json({ error: "Last name must be between 2 and 80 characters." });
+    throw new ApiError(400, "Last name must be between 2 and 80 characters.");
   }
 
   if (!isStrongPassword(password)) {
-    return res.status(400).json({ error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol." });
+    throw new ApiError(400, "Password must be at least 8 characters and include an uppercase letter, number, and symbol.");
   }
 
   if (!tosConsent) {
-    return res.status(400).json({ error: "You must accept the Terms and Privacy Policy to create an account." });
+    throw new ApiError(400, "You must accept the Terms and Privacy Policy to create an account.");
   }
 
   const hashedPassword = await hashPassword(password);
@@ -1098,19 +1099,18 @@ router.post("/register", authLimiter, async (req, res) => {
         logError("Register rollback failed:", rollbackErr);
       }
     }
-    logError("Register error:", err);
-    return res.status(500).json({ error: "Registration failed" });
+    throw err;
   } finally {
     client.release();
   }
-});
+}));
 
 
 /**
  * POST /send-verification
  * Sends a verification email via the Resend API.
  */
-router.post("/send-verification", authLimiter, async (req, res) => {
+router.post("/send-verification", authLimiter, asyncRoute(async (req, res) => {
   let email = normalizeEmail(req.body?.email);
   const verificationState = String(req.body?.verificationState || "").trim();
   let resolvedFromState = false;
@@ -1128,83 +1128,73 @@ router.post("/send-verification", authLimiter, async (req, res) => {
     return res.status(200).json({ message: "If the email is registered and still pending verification, a verification link was sent." });
   }
 
-  try {
-    const result = await pool.query("SELECT email, email_verified FROM users WHERE email = $1", [email]);
-    const user = result.rows[0];
+  const result = await pool.query("SELECT email, email_verified FROM users WHERE email = $1", [email]);
+  const user = result.rows[0];
 
-    if (user && !user.email_verified) {
-      const { token } = await createVerificationToken(email);
-      const verificationLink = buildVerificationLink(req, token);
-      const lang = await getPreferredLanguageForEmail(email);
-      const emailContent = buildVerificationEmail(lang, verificationLink);
-      await sendAppEmail({ to: email, ...emailContent });
-    }
-
-    res.status(200).json({
-      message: "If the email is registered and still pending verification, a verification link was sent.",
-      ...(resolvedFromState ? { verification_state: createVerificationStatusToken(email) } : {})
-    });
-  } catch (err) {
-    logError("Send verification error:", err);
-    res.status(500).json({ error: "Failed to send verification email." });
+  if (user && !user.email_verified) {
+    const { token } = await createVerificationToken(email);
+    const verificationLink = buildVerificationLink(req, token);
+    const lang = await getPreferredLanguageForEmail(email);
+    const emailContent = buildVerificationEmail(lang, verificationLink);
+    await sendAppEmail({ to: email, ...emailContent });
   }
-});
 
-router.post("/complete-verified-signup", requireCsrfProtection, authLimiter, async (req, res) => {
+  res.status(200).json({
+    message: "If the email is registered and still pending verification, a verification link was sent.",
+    ...(resolvedFromState ? { verification_state: createVerificationStatusToken(email) } : {})
+  });
+}));
+
+router.post("/complete-verified-signup", requireCsrfProtection, authLimiter, asyncRoute(async (req, res) => {
   const rawToken = String(req.body?.signupBootstrapToken || "").trim();
   if (!rawToken) {
-    return res.status(400).json({ error: "Signup bootstrap token is required." });
+    throw new ApiError(400, "Signup bootstrap token is required.");
   }
 
   let payload;
   try {
     payload = verifyToken(rawToken);
   } catch (_) {
-    return res.status(401).json({ error: "Invalid signup bootstrap token." });
+    throw new ApiError(401, "Invalid signup bootstrap token.");
   }
 
   if (payload?.purpose !== "verified_signup_bootstrap" || !payload?.id || !payload?.email) {
-    return res.status(401).json({ error: "Invalid signup bootstrap token." });
+    throw new ApiError(401, "Invalid signup bootstrap token.");
   }
 
+  const user = await findUserById(payload.id);
+  if (!user || normalizeEmail(user.email) !== normalizeEmail(payload.email)) {
+    throw new ApiError(404, "User not found.");
+  }
+  if (!user.email_verified) {
+    throw new ApiError(409, "Email is not verified yet.");
+  }
+
+  const deviceContext = buildSignInDeviceContext(user, req);
+  const tokenFingerprintHash = String(payload.device_fingerprint_hash || "").trim();
+  const currentFingerprintHash = String(deviceContext?.fingerprintHash || "").trim();
+  if (!tokenFingerprintHash || !currentFingerprintHash || tokenFingerprintHash !== currentFingerprintHash) {
+    throw new ApiError(403, "Signup session does not match this device.");
+  }
+
+  const session = await issueAuthenticatedSession(res, user, null, { req });
   try {
-    const user = await findUserById(payload.id);
-    if (!user || normalizeEmail(user.email) !== normalizeEmail(payload.email)) {
-      return res.status(404).json({ error: "User not found." });
+    const recognizedDevice = await getRecognizedSignInDevice(user.id, currentFingerprintHash);
+    if (recognizedDevice) {
+      await touchRecognizedSignInDevice(user.id, deviceContext);
+    } else {
+      await insertRecognizedSignInDevice(user, deviceContext);
     }
-    if (!user.email_verified) {
-      return res.status(409).json({ error: "Email is not verified yet." });
-    }
-
-    const deviceContext = buildSignInDeviceContext(user, req);
-    const tokenFingerprintHash = String(payload.device_fingerprint_hash || "").trim();
-    const currentFingerprintHash = String(deviceContext?.fingerprintHash || "").trim();
-    if (!tokenFingerprintHash || !currentFingerprintHash || tokenFingerprintHash !== currentFingerprintHash) {
-      return res.status(403).json({ error: "Signup session does not match this device." });
-    }
-
-    const session = await issueAuthenticatedSession(res, user, null, { req });
-    try {
-      const recognizedDevice = await getRecognizedSignInDevice(user.id, currentFingerprintHash);
-      if (recognizedDevice) {
-        await touchRecognizedSignInDevice(user.id, deviceContext);
-      } else {
-        await insertRecognizedSignInDevice(user, deviceContext);
-      }
-    } catch (securitySignalErr) {
-      logWarn("Verified-signup device registration warning:", securitySignalErr?.message || securitySignalErr);
-    }
-
-    return res.status(200).json({
-      email_verified: true,
-      onboarding_completed: false,
-      next: "/onboarding"
-    });
-  } catch (err) {
-    logError("Complete verified signup error:", err);
-    return res.status(500).json({ error: "Failed to complete verified signup." });
+  } catch (securitySignalErr) {
+    logWarn("Verified-signup device registration warning:", securitySignalErr?.message || securitySignalErr);
   }
-});
+
+  return res.status(200).json({
+    email_verified: true,
+    onboarding_completed: false,
+    next: "/onboarding"
+  });
+}));
 
 /**
  * POST /login
@@ -1212,13 +1202,13 @@ router.post("/complete-verified-signup", requireCsrfProtection, authLimiter, asy
  * onboarding; email verification happens via a 6-digit code inside
  * onboarding rather than gating sign-in itself.
  */
-router.post("/login", authLimiter, async (req, res) => {
+router.post("/login", authLimiter, asyncRoute(async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
   const clientIp = extractClientIp(req);
 
   if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+    throw new ApiError(400, "Email and password are required");
   }
 
   try {
@@ -1233,7 +1223,7 @@ router.post("/login", authLimiter, async (req, res) => {
         action: AUDIT_ACTIONS.LOGIN_FAILURE,
         metadata: { reason: "unknown_email", email_mask: maskEmail(email) }
       });
-      return res.status(401).json({ error: "Invalid credentials" });
+      throw new ApiError(401, "Invalid credentials");
     }
 
     if (user.is_erased) {
@@ -1242,7 +1232,7 @@ router.post("/login", authLimiter, async (req, res) => {
         email: maskEmail(email),
         ip: clientIp
       });
-      return res.status(401).json({ error: "Invalid credentials" });
+      throw new ApiError(401, "Invalid credentials");
     }
 
     if (isLoginLocked(user)) {
@@ -1289,7 +1279,7 @@ router.post("/login", authLimiter, async (req, res) => {
           locked_until: failureState.lockedUntil.toISOString()
         });
       }
-      return res.status(401).json({ error: "Invalid credentials" });
+      throw new ApiError(401, "Invalid credentials");
     }
 
     if (Number(user.failed_login_attempts || 0) > 0 || user.login_locked_until) {
@@ -1419,26 +1409,28 @@ router.post("/login", authLimiter, async (req, res) => {
     }
     res.status(200).json(buildPublicSessionPayload(session));
   } catch (err) {
-    logError("Login error:", err);
     if (isTransientLoginInfrastructureError(err)) {
+      // A 5xx thrown as ApiError would have its message replaced with the
+      // generic "Internal server error" by the central handler (it hides
+      // all 5xx detail by design) -- this message is deliberately shown to
+      // the user, so it has to be a direct response, not a throw.
       return res.status(503).json({
         error: "Sign-in is temporarily unavailable. Please try again in a moment."
       });
     }
-
-    return res.status(500).json({ error: "Login failed" });
+    throw err;
   }
-});
+}));
 
 /**
  * POST /refresh
  */
-router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, res) => {
+router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, asyncRoute(async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (!rawToken) {
     clearRefreshCookie(res);
     clearAccessCookie(res);
-    return res.status(401).json({ error: "Missing refresh token" });
+    throw new ApiError(401, "Missing refresh token");
   }
 
   const hashed = hashRefreshToken(rawToken);
@@ -1457,19 +1449,19 @@ router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, 
     if (!result.rowCount) {
       clearRefreshCookie(res);
       clearAccessCookie(res);
-      return res.status(401).json({ error: "Invalid refresh token" });
+      throw new ApiError(401, "Invalid refresh token");
     }
     if (result.rows[0].is_erased) {
       await revokeAllRefreshTokensForUser(result.rows[0].user_id);
       clearRefreshCookie(res);
       clearAccessCookie(res);
-      return res.status(401).json({ error: "Invalid refresh token" });
+      throw new ApiError(401, "Invalid refresh token");
     }
     if (!result.rows[0].email_verified) {
       await revokeRefreshTokenByHash(hashed);
       clearRefreshCookie(res);
       clearAccessCookie(res);
-      return res.status(403).json({ error: "Please verify your email before signing in." });
+      throw new ApiError(403, "Please verify your email before signing in.");
     }
 
     await revokeRefreshTokenByHash(hashed);
@@ -1505,17 +1497,20 @@ router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, 
     setAccessCookie(res, token);
     res.status(200).json({ subscription });
   } catch (err) {
-    logError("Refresh token error:", err);
+    // Clear refresh state on any failure, including the ApiErrors thrown
+    // above -- calling clearCookie twice for those is harmless, and this
+    // keeps "any failure while refreshing clears cookies" a single rule
+    // instead of two paths that have to stay in sync.
     clearRefreshCookie(res);
     clearAccessCookie(res);
-    res.status(500).json({ error: "Failed to refresh token" });
+    throw err;
   }
-});
+}));
 
 /**
  * POST /logout
  */
-router.post("/logout", requireAuth, requireCsrfProtection, async (req, res) => {
+router.post("/logout", requireAuth, requireCsrfProtection, asyncRoute(async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (rawToken) {
     const hashed = hashRefreshToken(rawToken);
@@ -1532,13 +1527,16 @@ router.post("/logout", requireAuth, requireCsrfProtection, async (req, res) => {
   clearAccessCookie(res);
   clearMfaTrustCookie(res);
   res.status(204).end();
-});
+}));
 
 /**
  * GET /verify-email
- * The link clicked by the user in their email.
+ * The link clicked by the user in their email. Responds with plain text,
+ * not the JSON {error} envelope -- this is a link opened directly in a
+ * browser, not a JS API client, so a readable text response (and a
+ * redirect on success) is the right shape here, not JSON.
  */
-router.get("/verify-email", async (req, res) => {
+router.get("/verify-email", asyncRoute(async (req, res) => {
   const token = req.query?.token;
   if (!token) return res.status(400).send("Token is required.");
 
@@ -1570,7 +1568,7 @@ router.get("/verify-email", async (req, res) => {
     logError("Verification error:", err);
     return res.status(500).send("Verification failed.");
   }
-});
+}));
 
 router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection, requireMfaIfEnabled, async (req, res) => {
   const currentPassword = req.body?.currentPassword;

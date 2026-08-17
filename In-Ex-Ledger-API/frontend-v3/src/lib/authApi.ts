@@ -265,7 +265,7 @@ async function authRequest<T>(url: string, init: ApiRequestInit = {}) {
   return apiRequest<T>(url, init)
 }
 
-function mapLegacyUser(user: LegacyUser | null): AuthUser | null {
+export function mapLegacyUser(user: LegacyUser | null): AuthUser | null {
   if (!user?.id || !user.email) {
     return null
   }

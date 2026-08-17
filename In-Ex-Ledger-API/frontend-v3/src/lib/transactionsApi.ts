@@ -437,7 +437,7 @@ export async function deleteRecurringTemplate(templateId: string) {
   await apiRequest(`/api/recurring/${templateId}`, { method: 'DELETE' })
 }
 
-function mapTransaction(row: LegacyTransaction, reviewItemsByTransaction = new Map<string, ReviewQueueItem>()): Transaction {
+export function mapTransaction(row: LegacyTransaction, reviewItemsByTransaction = new Map<string, ReviewQueueItem>()): Transaction {
   const amount = Math.abs(Number(row.amount || 0))
   const signedAmount = row.type === 'income' ? amount : -amount
   const receiptCount = Number(row.receipt_count || 0)
@@ -522,7 +522,7 @@ function mapCategoryOption(category: LegacyCategoryOption): CategoryOption {
   }
 }
 
-function resolveEstimatedTaxProfile(business: LegacyBusiness | null): BusinessTaxProfile {
+export function resolveEstimatedTaxProfile(business: LegacyBusiness | null): BusinessTaxProfile {
   const region = String(business?.region || business?.country || 'US').toUpperCase() === 'CA' ? 'CA' : 'US'
   const province = String(business?.province || '').toUpperCase()
   const rate = region === 'CA' ? estimatedCanadianRate(province) : 0.28

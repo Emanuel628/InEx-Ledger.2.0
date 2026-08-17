@@ -160,8 +160,8 @@ async function writeRepairs(drifted) {
   }
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+async function main(argv = process.argv.slice(2)) {
+  const args = parseArgs(argv);
   if (args.help) {
     printHelp();
     return;
@@ -206,11 +206,24 @@ async function main() {
   console.log(`Updated checksum metadata for ${report.drifted.length} migration(s).`);
 }
 
-main()
-  .catch((error) => {
-    console.error(error.message || error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await pool.end().catch(() => {});
-  });
+if (require.main === module) {
+  main()
+    .catch((error) => {
+      console.error(error.message || error);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await pool.end().catch(() => {});
+    });
+}
+
+module.exports = {
+  main,
+  parseArgs,
+  buildDriftReport,
+  printReport,
+  printHelp,
+  loadCurrentMigrationChecksums,
+  loadAppliedMigrations,
+  writeRepairs
+};
