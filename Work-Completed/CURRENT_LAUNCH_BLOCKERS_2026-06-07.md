@@ -1,3 +1,12 @@
+> **STATUS: DONE — DO NOT USE THIS FILE FOR CURRENT STATE.**
+> This audit predates the frontend's migration to the React `frontend-v3` SPA
+> and describes the old vanilla `public/js` frontend as "current." Item 2's
+> export-batching blocker and item 5's placeholder-page exposure concern are
+> both resolved in the current V3/backend code (verified 2026-08-17). Item 1's
+> "needs live QA" framing is superseded by `Docs/CURRENT_STATUS.md`, which is
+> the maintained source of truth for outstanding launch verification work.
+> Retained for historical reference only.
+
 # Current Launch Blockers
 
 Last repo audit: 2026-06-03

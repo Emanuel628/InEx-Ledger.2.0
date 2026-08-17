@@ -1,5 +1,17 @@
 # CPA Export Dataset Spec
 
+> **Staleness note (2026-08-17):** the design goals and rules in sections 1-2
+> below still hold, but the exact field-level dataset shape documented later
+> in this file has drifted from the real return value of
+> `buildNormalizedExportDataset()` in
+> `In-Ex-Ledger-API/services/exportDatasetService.js` (e.g. the real return
+> object's top-level keys are `rows`, `includedRows`, `excludedRows`,
+> `categorySummary`, `receiptSummary`, `mappingSummary`, `supportSummary`,
+> and `totals` — verify each field name and nesting against that function
+> directly rather than trusting this doc's exact schema listing). Treat this
+> file as directional design intent, not a byte-accurate contract, until it
+> is fully re-verified field-by-field against the current service code.
+
 This document defines the canonical export dataset for InEx Ledger's CPA-ready export system.
 
 It is the contract that sits between:

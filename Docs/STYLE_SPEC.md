@@ -1,5 +1,17 @@
 # InEx Ledger - Impeccable Style Spec
 
+> **Staleness note (2026-08-17):** the exact token values below (color hex
+> codes, `--radius`, etc.) have drifted from the shipped V3 CSS at
+> `In-Ex-Ledger-API/frontend-v3/src/styles/index.css` — for example `--ink`
+> is documented as `#0f1923` but is actually `#0c1f3a`, `--green` is
+> documented as `#1a7a4a` but is actually `#078c58`, `--red` is documented as
+> `#b91c1c` but is actually `#d83b3b`, and `--radius` is documented as `10px`
+> but is actually `8px`. The token *names* and overall system (semantic
+> color roles, spacing rhythm, action hierarchy, card/table/pill rules) still
+> describe the real design language accurately. Treat this file as directional
+> and always confirm exact values against `frontend-v3/src/styles/index.css`
+> before hand-copying a hex code or pixel value from here.
+
 Frozen design baseline extracted from the landing page and transactions page.
 This document is the source of truth for the rest of the impeccable.style rollout.
 Do not change it mid-rollout without a deliberate revision decision.

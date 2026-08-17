@@ -17,12 +17,6 @@ npm run migrations:verify-checksums
 npm run migrations:repair-checksums
 ```
 
-Also currently used by:
-
-```bash
-npm run prestart
-```
-
 Purpose:
 
 - Verifies migration checksum consistency.
@@ -38,6 +32,12 @@ Policy:
 - Keep while migration checksum repair is required.
 - Do not create additional checksum repair scripts with overlapping behavior.
 - If checksum repair becomes permanent owner logic, move that behavior into the migration runner and retire this script.
+- **Not wired into `prestart` or any automatic path, deliberately** — there
+  is no `prestart` script in `package.json`. Running the write-capable
+  `--write` repair unattended before every boot was identified as unsafe
+  (see `Docs/STARTUP_AND_MIGRATIONS.md`) and removed; repairing checksums is
+  an operator action taken after manual review, covered directly by
+  `tests/startupMigrationSafety.test.js`.
 
 ### `log_scan.js`
 
@@ -171,21 +171,6 @@ Policy:
 
 - Keep while CI uses it.
 - If frontend source structure changes, update this script instead of bypassing it.
-
-### `scripts/log_scan.js`
-
-Current status:
-
-- Review required.
-
-Purpose:
-
-- Appears to duplicate or overlap with `In-Ex-Ledger-API/scripts/log_scan.js`.
-
-Policy:
-
-- Keep only if it is intentionally referenced by root-level documentation or root-level workflows.
-- Otherwise remove it and point documentation to `In-Ex-Ledger-API/scripts/log_scan.js`.
 
 ## Retired / historical recovery scripts
 

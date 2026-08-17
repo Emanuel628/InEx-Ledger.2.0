@@ -1,3 +1,14 @@
+> **STATUS: DONE — DO NOT USE THIS FILE FOR CURRENT STATE.**
+> This is a dated (2026-05-22) point-in-time status snapshot of `Work-To-Do/`
+> file movements. Several files it tracks as "still in `Work-To-Do/`" have
+> since moved further (`OWNER-FILE-FOLLOWUP-WORK.md`,
+> `UNFINISHED-CLEANUP-WORK.md`, and `IMPECCABLE_STYLE_FRONTEND_ROLLOUT_PLAN.md`
+> are now in `Work-Completed/`; `Docs/SECURITY_AUDIT_2026-06-10.md` is now
+> `Work-Review/SECURITY_AUDIT_2026-06-10.md` — all moved 2026-08-17). The
+> current, actively maintained remediation tracker is
+> `Work-Review/AI-SLOP-REMEDIATION-PROGRESS.md`. Retained for historical
+> reference only.
+
 # Work-To-Do Status Review
 
 Reviewed against the current codebase on 2026-05-22 (branch `claude/update-work-to-do-status-Orqxm`).

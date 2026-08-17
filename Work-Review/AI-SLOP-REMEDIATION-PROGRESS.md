@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 50.0 / 54 action items (~93%)
+## Overall: 54.0 / 54 action items (100%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -1034,13 +1034,62 @@ test that had been failing identically since PR 13).
 - [x] Export/receipt cleanup paths made explicit and testable (export history deletion commits DB cleanup before best-effort file cleanup and returns cleanup status; receipt delete pending-rename path rechecked)
 - [x] Required vs. best-effort side effects separated (completed export generation no longer fails or waits on audit/email side effects; failures are logged)
 
-## Phase 10 - Documentation And Final Stabilization — 0 / 4
-- [ ] Source-of-truth docs updated to match code
-- [ ] Stale `Work-*` docs contradicting runtime behavior removed/archived
-- [ ] Concise architecture notes added (auth, startup/migrations, V3 routing, dynamic
-  SQL, paid-feature enforcement)
-- [ ] Final targeted file inventory confirming no review-only/generated artifacts were
-  promoted into runtime
+## Phase 10 - Documentation And Final Stabilization — 4 / 4
+- [x] Source-of-truth docs updated to match code — two background-agent audits (one
+  over `Work-Review`/`Work-To-Do`/`Work-Completed`, one over `Docs/`) found concrete
+  drift, each independently spot-verified against real code before acting. Fixed:
+  `Docs/DEPLOYMENT.md` (4 wrong defaults/paths: `JWT_EXPIRY_SECONDS`,
+  `EXPORT_GRANT_TTL_MS`, `receiptStorage.configured` health field name, dead
+  `/html/subscription.html` reference), `Docs/ACCOUNTING_TRUST_RULES.md` (wrong GDPR
+  export route in two sections, stale "restore not supported" claim — restore is real,
+  via `POST /api/transactions/undo-delete`), `Docs/BACKUP-RESTORE.md` (wrong
+  `receiptStorage` mode value), `Docs/MAINTENANCE-SCRIPTS.md` (removed a subsection
+  describing a root `scripts/log_scan.js` that doesn't exist), `Docs/API_ROUTE_INVENTORY.md`
+  (added the 2 routes registered directly on `routes/index.js` that weren't in the
+  mount-prefix table: `GET /api/arap-summary`, `GET /api/exports/history`, plus a
+  Windows-path link fix), `Docs/CPA_CODEBASE_AUDIT_MATRIX.md` (dead pre-V3 frontend
+  paths corrected to their `legacy/public-html/` archive locations),
+  `Docs/PRODUCT-BACKLOG.md` and `Docs/REPO-GOVERNANCE.md` (dead `public/js`/`public/html`
+  "files to audit" / owner-map paths replaced with the real `frontend-v3/` files).
+  Two severely-stale specs (`Docs/STYLE_SPEC.md`'s exact color/radius token values,
+  `Docs/CPA_EXPORT_DATASET_SPEC.md`'s exact field-level dataset shape) were judged too
+  large to safely rewrite byte-accurate in this pass — each got an explicit staleness
+  banner naming the concrete drift and pointing at the real source (the CSS file / the
+  `exportDatasetService.js` function) instead of silently leaving them looking current.
+- [x] Stale `Work-*` docs contradicting runtime behavior removed/archived — moved to
+  `Work-Completed/` with a "STATUS: DONE" banner explaining the specific contradiction:
+  `CRITICAL_SWEEP.md`, `CURRENT_LAUNCH_BLOCKERS_2026-06-07.md` (pre-V3-migration
+  frontend described as current), `SECURITY-LEGAL-READINESS-US-CANADA.md`
+  (self-contradicting closing verdict), `OWNER-FILE-FOLLOWUP-WORK.md` and
+  `UX-FUNNEL-AND-SETTINGS-IMPROVEMENTS.md` (100%-complete checklists), and two
+  frontend-cleanup plans (`UNFINISHED-CLEANUP-WORK.md`,
+  `IMPECCABLE_STYLE_FRONTEND_ROLLOUT_PLAN.md`) whose entire premise — consolidating
+  sidecar files in the pre-V3 vanilla frontend — is moot now that frontend is archived
+  dead code, not an actively developed surface. `WORK-TO-DO-STATUS.md`, a 2026-05-22
+  point-in-time snapshot that was itself out of date about where several of these files
+  now live, moved the same way. `Docs/SECURITY_AUDIT_2026-06-10.md` moved to
+  `Work-Review/` (per this repo's own Docs-vs-Work-Review placement rule for
+  audit/findings documents) with a banner flagging its stale legacy-frontend findings.
+  `Work-Review/MUTATION_AUDIT.md`, a near-duplicate of `Docs/ACCOUNTING_TRUST_RULES.md`,
+  got a "duplicate, not canonical" banner rather than a silent second copy of the fix.
+  `Work-To-Do/TERMS-OF-SERVICE-REVIEW-2026-05-20.md` was re-verified against the current
+  `frontend-v3/src/pages/Terms.tsx` and correctly left open — its flagged gaps are real
+  and unresolved.
+- [x] Concise architecture notes added — `Docs/AUTHENTICATION.md` gained a "Backend
+  Session Model" section (cookie policy, password hashing, MFA design,
+  `asyncRoute`/`ApiError`, rate limiting); new `Docs/STARTUP_AND_MIGRATIONS.md` (boot
+  order, migration runner, checksum-drift safety, retry behavior); new
+  `Docs/PAID_FEATURE_ENFORCEMENT.md` covers both the primary catalog/bridge/route
+  gating system and the separate, older `requireV2BusinessEnabled`/
+  `requireV2Entitlement` gate found while auditing the route inventory (previously
+  undocumented). `Docs/README.md` gained an "Architecture notes" index linking all six
+  architecture docs (the three above plus the pre-existing `V3_ROUTE_INVENTORY.md`,
+  `DYNAMIC_SQL_RULES.md`, `API_ROUTE_INVENTORY.md`).
+- [x] Final targeted file inventory confirming no review-only/generated artifacts were
+  promoted into runtime — checked for `.orig`/`.bak`/`.tmp`/`.rej` stray files, dated
+  recovery folders, stray root-level `.md` files, and untracked files at the end of the
+  pass (clean: only the two new architecture docs above were untracked, both
+  intentional). `.gitignore` coverage for `test-results/`/`storage/`/logs re-confirmed.
 
 ## PR Log
 
@@ -2393,3 +2442,67 @@ test that had been failing identically since PR 13).
   claim). Overall recomputed directly from the checklist markers (50 `[x]`
   + 4 `[ ]` = 54 total, matching every phase header's own sum): unchanged
   at **50.0/54 (~93%)**.
+
+- **PR 49** (`claude/billing-ui-checkout-updates-673wux`): Phase 10, closes
+  the initiative. All four items were documentation/archival work, no
+  application code changed.
+
+  Ran two background research agents first (one over
+  `Work-Review`/`Work-To-Do`/`Work-Completed`, one over `Docs/`), each told
+  explicitly to research only and not touch files, then independently
+  spot-verified every finding against real code before acting — same
+  discipline as every prior PR in this tracker.
+
+  **Docs fixed to match code**: `Docs/DEPLOYMENT.md` (`JWT_EXPIRY_SECONDS`
+  default was documented as 900, actually 3600; `EXPORT_GRANT_TTL_MS`
+  default was documented as 300000, actually 60000; a `/health` field name
+  was wrong; Stripe checkout's entry page was documented as a dead
+  `/html/subscription.html`), `Docs/ACCOUNTING_TRUST_RULES.md` (wrong GDPR
+  export route in two places; a "restore not supported" claim that's been
+  false since `POST /api/transactions/undo-delete` shipped),
+  `Docs/BACKUP-RESTORE.md` (wrong `receiptStorage` mode value),
+  `Docs/MAINTENANCE-SCRIPTS.md` (a subsection about a root
+  `scripts/log_scan.js` that doesn't exist — removed),
+  `Docs/API_ROUTE_INVENTORY.md` (added `GET /api/arap-summary` and
+  `GET /api/exports/history`, both registered directly on `routes/index.js`
+  and missing from the mount-prefix table), `Docs/CPA_CODEBASE_AUDIT_MATRIX.md`,
+  `Docs/PRODUCT-BACKLOG.md`, and `Docs/REPO-GOVERNANCE.md` (all three had
+  "files to audit" / owner-map paths pointing at the pre-V3 vanilla frontend;
+  corrected to the real `frontend-v3/` files or the `legacy/public-html/`
+  archive location). `Docs/STYLE_SPEC.md` and `Docs/CPA_EXPORT_DATASET_SPEC.md`
+  were too large to safely rewrite byte-accurate in one pass, so each got an
+  explicit staleness banner naming the concrete drift instead of silently
+  staying wrong.
+
+  **Stale docs archived**: moved to `Work-Completed/` with a "STATUS: DONE"
+  banner explaining the specific contradiction — `CRITICAL_SWEEP.md`,
+  `CURRENT_LAUNCH_BLOCKERS_2026-06-07.md`, `SECURITY-LEGAL-READINESS-US-CANADA.md`,
+  `OWNER-FILE-FOLLOWUP-WORK.md`, `UX-FUNNEL-AND-SETTINGS-IMPROVEMENTS.md`,
+  `UNFINISHED-CLEANUP-WORK.md`, `IMPECCABLE_STYLE_FRONTEND_ROLLOUT_PLAN.md`
+  (the latter two's entire premise — cleaning up the pre-V3 vanilla frontend —
+  is moot now that frontend is archived, unreferenced dead code, not an
+  actively developed surface), and `WORK-TO-DO-STATUS.md` (a stale
+  2026-05-22 snapshot). `Docs/SECURITY_AUDIT_2026-06-10.md` moved to
+  `Work-Review/` per this repo's own Docs-vs-Work-Review placement rule.
+  `Work-Review/MUTATION_AUDIT.md`, a near-duplicate of
+  `Docs/ACCOUNTING_TRUST_RULES.md`, got a "duplicate, not canonical" banner.
+  `Work-To-Do/TERMS-OF-SERVICE-REVIEW-2026-05-20.md` was re-verified against
+  the current `frontend-v3/src/pages/Terms.tsx` and correctly left open.
+
+  **New architecture notes**: `Docs/AUTHENTICATION.md` gained a "Backend
+  Session Model" section; new `Docs/STARTUP_AND_MIGRATIONS.md`; new
+  `Docs/PAID_FEATURE_ENFORCEMENT.md` documents both the primary
+  catalog/bridge/route gate and a second, separate, previously-undocumented
+  gate (`api/utils/requireV2BusinessEnabled.js`'s `requireV2BusinessEnabled`/
+  `requireV2Entitlement`) found while fixing the route inventory.
+  `Docs/README.md` gained an "Architecture notes" index.
+
+  **Final inventory**: no `.orig`/`.bak`/`.tmp`/`.rej` files, no dated
+  recovery folders, no stray root `.md` files, no unexpected untracked files.
+
+  Full suite via `npm run test:all`: **1646/1646 passing** (plus 3/3 ASVS
+  controls) — unchanged from PR 48's baseline, as expected for a
+  documentation-only PR. Phase 10 goes from 0/4 to **4/4**. Overall
+  recomputed from the checklist markers (54 `[x]` + 0 `[ ]` = 54 total,
+  matching every phase header's own sum): **54.0/54 (100%)** — this closes
+  the AI-slop/overengineering remediation initiative tracked in this file.

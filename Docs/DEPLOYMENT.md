@@ -10,9 +10,9 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 - [ ] `DATABASE_URL` is set and points to the production database
 - [ ] `DB_SSL_REJECT_UNAUTHORIZED` is set appropriately (`true` for production)
 - [ ] `JWT_SECRET` is a strong random string (>= 32 characters), unique to production
-- [ ] `JWT_EXPIRY_SECONDS` is set (default: 900)
+- [ ] `JWT_EXPIRY_SECONDS` is set (default: 3600, i.e. 1 hour — `middleware/auth.middleware.js`)
 - [ ] `EXPORT_GRANT_SECRET` is a strong random string, unique to production
-- [ ] `EXPORT_GRANT_TTL_MS` is set (default: 300000)
+- [ ] `EXPORT_GRANT_TTL_MS` is set (default: 60000, i.e. 60 seconds — `services/exportGrantService.js`)
 - [ ] `RESEND_API_KEY` is set with a valid Resend API key
 - [ ] `EMAIL_FROM` is set to a verified sender address
 - [ ] `APP_BASE_URL` is set to the public app origin, for example `https://inexledger.com`
@@ -63,11 +63,11 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 ## Post-Deployment Verification
 
 - [ ] `GET /health` returns `"status":"healthy"` and shows `rateLimiting.mode="enforced"`
-- [ ] `GET /health` shows `receiptStorage.persistentConfirmed=true`
+- [ ] `GET /health` shows `receiptStorage.configured=true`
 - [ ] Landing page loads at `/`
 - [ ] Login endpoint responds (does not return 500)
 - [ ] `GET /api/billing/subscription` responds for an authenticated user
-- [ ] Stripe checkout starts from `/html/subscription.html`
+- [ ] Stripe checkout starts from `/subscription` (v3 SPA; the legacy `/html/subscription.html` page is archived and no longer served)
 - [ ] Stripe billing portal opens for an active customer
 - [ ] A test transaction can be created and retrieved
 - [ ] Receipt upload completes for a file > 1 MB

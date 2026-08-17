@@ -13,6 +13,19 @@ Do not use this folder for stale blockers, finished roadmap phases, or historica
 - production gate: [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md)
 - release steps: [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)
 
+## Architecture notes
+
+Short, code-verified notes on how specific subsystems actually work, kept
+close to the code they describe rather than duplicated into a single giant
+architecture doc:
+
+- authentication (cookie session model, MFA, backend error handling): [AUTHENTICATION.md](AUTHENTICATION.md)
+- startup and migration safety: [STARTUP_AND_MIGRATIONS.md](STARTUP_AND_MIGRATIONS.md)
+- V3 frontend routing and migration status: [V3_ROUTE_INVENTORY.md](V3_ROUTE_INVENTORY.md)
+- dynamic SQL construction rules: [DYNAMIC_SQL_RULES.md](DYNAMIC_SQL_RULES.md)
+- paid-feature/plan enforcement: [PAID_FEATURE_ENFORCEMENT.md](PAID_FEATURE_ENFORCEMENT.md)
+- mounted API surface inventory: [API_ROUTE_INVENTORY.md](API_ROUTE_INVENTORY.md)
+
 ## Folder structure
 
 ### `Docs/`

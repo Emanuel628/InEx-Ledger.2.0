@@ -4,7 +4,7 @@ InEx Ledger is a focused bookkeeping app for solo operators and very small servi
 
 ## Repo Status
 
-As of 2026-07-28, the product is in final launch stabilization.
+As of 2026-08-17, the product is in final launch stabilization.
 
 Major foundation work is done:
 
@@ -14,6 +14,7 @@ Major foundation work is done:
 - export packet and review logic have had multiple hardening passes
 - major roadmap cleanup and product-scope tightening has already happened
 - the frontend has migrated from vanilla HTML/CSS/JS to a React + TypeScript SPA (`In-Ex-Ledger-API/frontend-v3`), which is now the canonical logged-in product experience, including the full auth bridge (login, register, password reset, email verification, MFA) and live English/Spanish/French UI switching
+- a full code-quality/security remediation pass across error handling, dynamic SQL, idempotency/dedupe correctness, route decomposition, and documentation is complete (`Work-Review/AI-SLOP-REMEDIATION-PROGRESS.md`)
 
 What remains is mostly final QA, production verification, and targeted polish rather than large product construction.
 

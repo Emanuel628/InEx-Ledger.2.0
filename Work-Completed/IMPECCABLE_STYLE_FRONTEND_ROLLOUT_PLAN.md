@@ -1,3 +1,13 @@
+> **STATUS: DONE — DO NOT USE THIS FILE FOR CURRENT STATE.**
+> This rollout plan targets the pre-V3 vanilla frontend (`public/css/core/*`,
+> page-by-page `public/html/*` restyling). That frontend has since been
+> superseded by the `frontend-v3/` React SPA (verified 2026-08-17), which
+> ships its own token/component system (see `Docs/STYLE_SPEC.md`, itself
+> partially stale against the real V3 CSS — see its own staleness note).
+> This phase-by-phase page rollout plan no longer maps to how the live
+> frontend is built or styled. Retained for historical design-direction
+> reference only.
+
 # Impeccable Style Frontend Rollout Plan
 
 This document defines the rollout plan for applying the `impeccable.style` design direction across the frontend in a controlled way.

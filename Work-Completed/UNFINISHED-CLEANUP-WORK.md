@@ -1,3 +1,19 @@
+> **STATUS: DONE — DO NOT USE THIS FILE FOR CURRENT STATE.**
+> This entire document describes cleanup/consolidation work inside the
+> pre-V3 vanilla frontend (`public/js/`, `public/html/`, `public/css/`).
+> That frontend has since been superseded by the `frontend-v3/` React SPA
+> (verified 2026-08-17): the old HTML pages now 301-redirect to their V3
+> route (see `server.js`'s `V3_APP_PAGES` redirect loop) rather than being
+> served as live content, so `public/js/*.js` and `public/css/*` are
+> effectively unreferenced/dead code, not an actively-developed surface that
+> needs sidecar-file consolidation. The remaining open items here (Phase 4's
+> "needs full-file access," the Additional Cleanup Candidates section) are
+> moot for the same reason — there is no more feature work happening against
+> this frontend to keep clean. If the dead `public/js`/`public/html`/`public/css`
+> tree is ever deleted outright (as opposed to consolidated), that is a
+> separate, simpler decision than what this document was written for.
+> Retained for historical reference only.
+
 # Unfinished Cleanup Work
 
 This is the single source of truth for cleanup work that is not finished yet.

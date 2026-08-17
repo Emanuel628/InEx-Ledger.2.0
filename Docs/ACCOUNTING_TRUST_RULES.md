@@ -82,7 +82,15 @@ All original fields remain intact. No data is overwritten. The archive metadata 
 
 ### Restore behavior
 
-Restore is **not currently supported** through the UI. An archived transaction cannot be unarchived. This is intentional: if a transaction needs to be re-entered, create a new one.
+Restore *is* supported: `POST /api/transactions/undo-delete`
+(`routes/transactions.routes.js`, backed by
+`restoreMostRecentArchivedTransaction`) restores the most recently archived
+transaction for the business, is wired into the live UI's "Undo delete"
+button, subject to the same accounting-period lock as any other edit, and
+excludes bulk-delete-all archives and adjustment rows. It only ever restores
+one step back (a stack of the last 20 archived candidates, most recent
+first) — there is still no way to browse and restore an arbitrary older
+archived transaction from further back in history.
 
 ### Who can archive
 
@@ -131,7 +139,7 @@ Tax-mapped fields (category `tax_map_us`, `tax_map_ca`) apply only to live (non-
 
 ### GDPR data export
 
-The privacy data export (`GET /api/privacy/data-export`) intentionally includes archived transactions as part of the complete personal data record. This is correct behavior under data-portability obligations.
+The privacy data export (`POST /api/privacy/export`) intentionally includes archived transactions as part of the complete personal data record. This is correct behavior under data-portability obligations.
 
 ---
 
@@ -182,6 +190,6 @@ The privacy data export (`GET /api/privacy/data-export`) intentionally includes 
 | `GET /api/analytics/*` | Reports | n/a | ✅ |
 | `POST /api/exports/request-grant` | PDF export | n/a | ✅ (in worker) |
 | `POST /api/exports/secure-export` | PDF export | n/a | ✅ (in worker) |
-| `GET /api/privacy/export-data` | GDPR export | n/a | intentionally includes all |
+| `POST /api/privacy/export` | GDPR export | n/a | intentionally includes all |
 | `PUT /api/categories/:id` | Category rename | no (name only) | n/a |
 | `PUT /api/accounts/:id` | Account rename | no (name only) | n/a |
