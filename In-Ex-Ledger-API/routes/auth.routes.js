@@ -1570,414 +1570,387 @@ router.get("/verify-email", asyncRoute(async (req, res) => {
   }
 }));
 
-router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection, requireMfaIfEnabled, async (req, res) => {
+router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection, requireMfaIfEnabled, asyncRoute(async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const newPassword = req.body?.newPassword;
   const confirmPassword = req.body?.confirmPassword;
 
   if (!currentPassword || !newPassword || !confirmPassword) {
-    return res.status(400).json({ error: "All password fields are required." });
+    throw new ApiError(400, "All password fields are required.");
   }
 
   if (newPassword !== confirmPassword) {
-    return res.status(400).json({ error: "New passwords do not match." });
+    throw new ApiError(400, "New passwords do not match.");
   }
 
   if (!isStrongPassword(newPassword)) {
-    return res.status(400).json({
-      error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol."
-    });
+    throw new ApiError(400, "Password must be at least 8 characters and include an uppercase letter, number, and symbol.");
   }
 
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const { match } = await verifyPassword(currentPassword, user.password_hash);
-    if (!match) {
-      return res.status(401).json({ error: "Current password is incorrect." });
-    }
-
-    const samePassword = await verifyPassword(newPassword, user.password_hash);
-    if (samePassword.match) {
-      return res.status(400).json({ error: "Choose a different password." });
-    }
-
-    const nextHash = await hashPassword(newPassword);
-    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [nextHash, user.id]);
-    const session = await resetCurrentRefreshSession(res, user, {
-      mfaAuthenticated: !!req.user?.mfa_authenticated,
-      req
-    });
-    await revokeTrustedMfaDevicesForUser(user.id);
-    clearMfaTrustCookie(res);
-    logInfo("Password changed", {
-      userId: user.id,
-      businessId: req.user?.business_id || null,
-      via: "authenticated_change"
-    });
-    await recordAuditEventForRequest(pool, req, {
-      userId: user.id,
-      businessId: req.user?.business_id || null,
-      action: AUDIT_ACTIONS.PASSWORD_CHANGED,
-      metadata: { via: "authenticated_change" }
-    });
-    await sendPasswordChangedConfirmationEmail(user, req);
-
-    return res.status(200).json({
-      success: true,
-      message: "Password updated.",
-      subscription: session.subscription
-    });
-  } catch (err) {
-    logError("Change password error:", err);
-    return res.status(500).json({ error: "Unable to update password." });
+  const user = await findUserById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
   }
-});
 
-router.get("/mfa/status", requireAuth, async (req, res) => {
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    return res.status(200).json(buildMfaStatusPayload(user));
-  } catch (err) {
-    logError("MFA status error:", err);
-    return res.status(500).json({ error: "Unable to load MFA status." });
+  const { match } = await verifyPassword(currentPassword, user.password_hash);
+  if (!match) {
+    throw new ApiError(401, "Current password is incorrect.");
   }
-});
 
-router.post("/mfa/reauth", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  const samePassword = await verifyPassword(newPassword, user.password_hash);
+  if (samePassword.match) {
+    throw new ApiError(400, "Choose a different password.");
+  }
+
+  const nextHash = await hashPassword(newPassword);
+  await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [nextHash, user.id]);
+  const session = await resetCurrentRefreshSession(res, user, {
+    mfaAuthenticated: !!req.user?.mfa_authenticated,
+    req
+  });
+  await revokeTrustedMfaDevicesForUser(user.id);
+  clearMfaTrustCookie(res);
+  logInfo("Password changed", {
+    userId: user.id,
+    businessId: req.user?.business_id || null,
+    via: "authenticated_change"
+  });
+  await recordAuditEventForRequest(pool, req, {
+    userId: user.id,
+    businessId: req.user?.business_id || null,
+    action: AUDIT_ACTIONS.PASSWORD_CHANGED,
+    metadata: { via: "authenticated_change" }
+  });
+  await sendPasswordChangedConfirmationEmail(user, req);
+
+  return res.status(200).json({
+    success: true,
+    message: "Password updated.",
+    subscription: session.subscription
+  });
+}));
+
+router.get("/mfa/status", requireAuth, asyncRoute(async (req, res) => {
+  const user = await findUserById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res.status(200).json(buildMfaStatusPayload(user));
+}));
+
+router.post("/mfa/reauth", requireAuth, requireCsrfProtection, mfaVerifyLimiter, asyncRoute(async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
   if (!currentPassword) {
-    return res.status(400).json({ error: "Current password is required." });
+    throw new ApiError(400, "Current password is required.");
   }
 
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    if (!user.mfa_enabled) {
-      return res.status(400).json({ error: "MFA is not enabled for this account." });
-    }
+  const user = await findUserById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  if (!user.mfa_enabled) {
+    throw new ApiError(400, "MFA is not enabled for this account.");
+  }
 
-    const { match } = await verifyPassword(currentPassword, user.password_hash);
-    if (!match) {
-      return res.status(401).json({ error: "Current password is incorrect." });
-    }
+  const { match } = await verifyPassword(currentPassword, user.password_hash);
+  if (!match) {
+    throw new ApiError(401, "Current password is incorrect.");
+  }
 
-    if (!code || !mfaToken) {
-      const userLang = await getPreferredLanguageForUser(user.id);
-      const isFrench = userLang === "fr";
-      const pendingToken = await createMfaEmailChallenge(user, req, {
-        tokenPurpose: "mfa_sensitive_reauth",
-        tokenPayload: { reason: "account_delete" },
-        lang: userLang,
-        mfaContentKey: "signin",
-        locationPath: "/settings",
-        subject: isFrench ? "Code de sécurité pour supprimer votre compte" : "Security code to delete your account",
-        heading: isFrench ? "Vérification avant suppression du compte" : "Verify before account deletion",
-        body: isFrench
-          ? "Saisissez ce code pour confirmer la suppression définitive de votre compte."
-          : "Enter this code to confirm permanent account deletion.",
-        footer: isFrench
-          ? "Si vous n’avez pas demandé cette suppression, ignorez ce courriel."
-          : "If you did not request account deletion, ignore this email."
-      });
-
-      return res.status(200).json({
-        pending_verification: true,
-        mfa_token: pendingToken,
-        message: "We emailed you a verification code. Enter it to continue account deletion."
-      });
-    }
-
-    let pending;
-    try {
-      pending = verifyToken(mfaToken);
-    } catch (error) {
-      return res.status(401).json({ error: "Verification session expired. Start again." });
-    }
-
-    if (
-      pending.purpose !== "mfa_sensitive_reauth" ||
-      pending.id !== user.id ||
-      pending.email !== user.email ||
-      pending.reason !== "account_delete"
-    ) {
-      return res.status(401).json({ error: "Verification session expired. Start again." });
-    }
-
-    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-    if (!challenge) {
-      return res.status(401).json({ error: "Verification code expired. Start again." });
-    }
-
-    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-      return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
-    }
-
-    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-      await recordFailedMfaEmailAttempt(challenge.id);
-      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-        return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
-      }
-      return res.status(401).json({ error: "Invalid verification code." });
-    }
-
-    await consumeMfaEmailChallenge(challenge.id);
-    const reauthToken = signToken(
-      {
-        purpose: "mfa_sensitive_reauth",
-        reason: "account_delete",
-        id: user.id,
-        email: user.email
-      },
-      MFA_REAUTH_TOKEN_EXPIRY_SECONDS
-    );
+  if (!code || !mfaToken) {
+    const userLang = await getPreferredLanguageForUser(user.id);
+    const isFrench = userLang === "fr";
+    const pendingToken = await createMfaEmailChallenge(user, req, {
+      tokenPurpose: "mfa_sensitive_reauth",
+      tokenPayload: { reason: "account_delete" },
+      lang: userLang,
+      mfaContentKey: "signin",
+      locationPath: "/settings",
+      subject: isFrench ? "Code de sécurité pour supprimer votre compte" : "Security code to delete your account",
+      heading: isFrench ? "Vérification avant suppression du compte" : "Verify before account deletion",
+      body: isFrench
+        ? "Saisissez ce code pour confirmer la suppression définitive de votre compte."
+        : "Enter this code to confirm permanent account deletion.",
+      footer: isFrench
+        ? "Si vous n’avez pas demandé cette suppression, ignorez ce courriel."
+        : "If you did not request account deletion, ignore this email."
+    });
 
     return res.status(200).json({
-      success: true,
-      reauthenticated: true,
-      reauth_token: reauthToken,
-      message: "MFA verification complete. You can now delete your account."
+      pending_verification: true,
+      mfa_token: pendingToken,
+      message: "We emailed you a verification code. Enter it to continue account deletion."
     });
-  } catch (err) {
-    logError("MFA reauth error:", err);
-    return res.status(500).json({ error: "Unable to verify MFA right now." });
   }
-});
 
-router.post("/mfa/enable", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  let pending;
+  try {
+    pending = verifyToken(mfaToken);
+  } catch (error) {
+    throw new ApiError(401, "Verification session expired. Start again.");
+  }
+
+  if (
+    pending.purpose !== "mfa_sensitive_reauth" ||
+    pending.id !== user.id ||
+    pending.email !== user.email ||
+    pending.reason !== "account_delete"
+  ) {
+    throw new ApiError(401, "Verification session expired. Start again.");
+  }
+
+  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+  if (!challenge) {
+    throw new ApiError(401, "Verification code expired. Start again.");
+  }
+
+  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
+    throw new ApiError(429, "Too many invalid verification attempts. Start again.");
+  }
+
+  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
+    await recordFailedMfaEmailAttempt(challenge.id);
+    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
+      throw new ApiError(429, "Too many invalid verification attempts. Start again.");
+    }
+    throw new ApiError(401, "Invalid verification code.");
+  }
+
+  await consumeMfaEmailChallenge(challenge.id);
+  const reauthToken = signToken(
+    {
+      purpose: "mfa_sensitive_reauth",
+      reason: "account_delete",
+      id: user.id,
+      email: user.email
+    },
+    MFA_REAUTH_TOKEN_EXPIRY_SECONDS
+  );
+
+  return res.status(200).json({
+    success: true,
+    reauthenticated: true,
+    reauth_token: reauthToken,
+    message: "MFA verification complete. You can now delete your account."
+  });
+}));
+
+router.post("/mfa/enable", requireAuth, requireCsrfProtection, mfaVerifyLimiter, asyncRoute(async (req, res) => {
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
 
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+  const user = await findUserById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
-    if (!code || !mfaToken) {
-      const userLang = await getPreferredLanguageForUser(user.id);
-      const pendingToken = await createMfaEmailChallenge(user, req, {
-        tokenPurpose: "mfa_settings_enable",
-        tokenPayload: { target_state: true },
-        lang: userLang,
-        mfaContentKey: "mfa_enable",
-        locationPath: "/settings"
-      });
-
-      return res.status(200).json({
-        pending_verification: true,
-        mfa_token: pendingToken,
-        message: "We emailed you a verification code. Enter it to finish turning MFA on."
-      });
-    }
-
-    let pending;
-    try {
-      pending = verifyToken(mfaToken);
-    } catch (error) {
-      return res.status(401).json({ error: "Verification session expired. Start again." });
-    }
-
-    if (pending.purpose !== "mfa_settings_enable" || pending.id !== user.id || pending.email !== user.email) {
-      return res.status(401).json({ error: "Verification session expired. Start again." });
-    }
-
-    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-    if (!challenge) {
-      return res.status(401).json({ error: "Verification code expired. Start again." });
-    }
-
-    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-      return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
-    }
-
-    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-      await recordFailedMfaEmailAttempt(challenge.id);
-      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-        return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
-      }
-      return res.status(401).json({ error: "Invalid verification code." });
-    }
-
-    await consumeMfaEmailChallenge(challenge.id);
-    await pool.query(
-      `UPDATE users
-          SET mfa_enabled = true,
-              mfa_secret_encrypted = NULL,
-              mfa_recovery_codes_hash = '[]'::jsonb,
-              mfa_temp_secret_encrypted = NULL,
-              mfa_temp_recovery_codes_hash = '[]'::jsonb,
-              mfa_enabled_at = COALESCE(mfa_enabled_at, NOW())
-        WHERE id = $1`,
-      [user.id]
-    );
-
-    const refreshedUser = await findUserById(user.id);
-    const session = await resetCurrentRefreshSession(res, refreshedUser, {
-      mfaAuthenticated: true,
-      req
-    });
-    await revokeTrustedMfaDevicesForUser(user.id);
-    clearMfaTrustCookie(res);
-    logInfo("MFA enabled", {
-      userId: user.id,
-      businessId: req.user?.business_id || null
+  if (!code || !mfaToken) {
+    const userLang = await getPreferredLanguageForUser(user.id);
+    const pendingToken = await createMfaEmailChallenge(user, req, {
+      tokenPurpose: "mfa_settings_enable",
+      tokenPayload: { target_state: true },
+      lang: userLang,
+      mfaContentKey: "mfa_enable",
+      locationPath: "/settings"
     });
 
     return res.status(200).json({
-      success: true,
-      message: "MFA enabled.",
-      status: buildMfaStatusPayload(refreshedUser),
-      subscription: session.subscription
+      pending_verification: true,
+      mfa_token: pendingToken,
+      message: "We emailed you a verification code. Enter it to finish turning MFA on."
     });
-  } catch (err) {
-    logError("MFA enable error:", err);
-    return res.status(500).json({ error: "Unable to enable MFA." });
   }
-});
 
-router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  let pending;
+  try {
+    pending = verifyToken(mfaToken);
+  } catch (error) {
+    throw new ApiError(401, "Verification session expired. Start again.");
+  }
+
+  if (pending.purpose !== "mfa_settings_enable" || pending.id !== user.id || pending.email !== user.email) {
+    throw new ApiError(401, "Verification session expired. Start again.");
+  }
+
+  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+  if (!challenge) {
+    throw new ApiError(401, "Verification code expired. Start again.");
+  }
+
+  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
+    throw new ApiError(429, "Too many invalid verification attempts. Start again.");
+  }
+
+  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
+    await recordFailedMfaEmailAttempt(challenge.id);
+    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
+      throw new ApiError(429, "Too many invalid verification attempts. Start again.");
+    }
+    throw new ApiError(401, "Invalid verification code.");
+  }
+
+  await consumeMfaEmailChallenge(challenge.id);
+  await pool.query(
+    `UPDATE users
+        SET mfa_enabled = true,
+            mfa_secret_encrypted = NULL,
+            mfa_recovery_codes_hash = '[]'::jsonb,
+            mfa_temp_secret_encrypted = NULL,
+            mfa_temp_recovery_codes_hash = '[]'::jsonb,
+            mfa_enabled_at = COALESCE(mfa_enabled_at, NOW())
+      WHERE id = $1`,
+    [user.id]
+  );
+
+  const refreshedUser = await findUserById(user.id);
+  const session = await resetCurrentRefreshSession(res, refreshedUser, {
+    mfaAuthenticated: true,
+    req
+  });
+  await revokeTrustedMfaDevicesForUser(user.id);
+  clearMfaTrustCookie(res);
+  logInfo("MFA enabled", {
+    userId: user.id,
+    businessId: req.user?.business_id || null
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "MFA enabled.",
+    status: buildMfaStatusPayload(refreshedUser),
+    subscription: session.subscription
+  });
+}));
+
+router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter, asyncRoute(async (req, res) => {
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
 
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+  const user = await findUserById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
-    if (!code || !mfaToken) {
-      const userLang = await getPreferredLanguageForUser(user.id);
-      const pendingToken = await createMfaEmailChallenge(user, req, {
-        tokenPurpose: "mfa_settings_disable",
-        tokenPayload: { target_state: false },
-        lang: userLang,
-        mfaContentKey: "mfa_disable",
-        locationPath: "/settings"
-      });
-
-      return res.status(200).json({
-        pending_verification: true,
-        mfa_token: pendingToken,
-        message: "We emailed you a verification code. Enter it to finish turning MFA off."
-      });
-    }
-
-    let pending;
-    try {
-      pending = verifyToken(mfaToken);
-    } catch (error) {
-      return res.status(401).json({ error: "Verification session expired. Start again." });
-    }
-
-    if (pending.purpose !== "mfa_settings_disable" || pending.id !== user.id || pending.email !== user.email) {
-      return res.status(401).json({ error: "Verification session expired. Start again." });
-    }
-
-    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-    if (!challenge) {
-      return res.status(401).json({ error: "Verification code expired. Start again." });
-    }
-
-    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-      return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
-    }
-
-    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-      await recordFailedMfaEmailAttempt(challenge.id);
-      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-        return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
-      }
-      return res.status(401).json({ error: "Invalid verification code." });
-    }
-
-    await consumeMfaEmailChallenge(challenge.id);
-    await pool.query(
-      `UPDATE users
-          SET mfa_enabled = false,
-              mfa_secret_encrypted = NULL,
-              mfa_recovery_codes_hash = '[]'::jsonb,
-              mfa_temp_secret_encrypted = NULL,
-              mfa_temp_recovery_codes_hash = '[]'::jsonb,
-              mfa_enabled_at = NULL
-        WHERE id = $1`,
-      [user.id]
-    );
-
-    const refreshedUser = await findUserById(user.id);
-    const session = await resetCurrentRefreshSession(res, refreshedUser, { req });
-    await revokeTrustedMfaDevicesForUser(user.id);
-    clearMfaTrustCookie(res);
-    logInfo("MFA disabled", {
-      userId: user.id,
-      businessId: req.user?.business_id || null
+  if (!code || !mfaToken) {
+    const userLang = await getPreferredLanguageForUser(user.id);
+    const pendingToken = await createMfaEmailChallenge(user, req, {
+      tokenPurpose: "mfa_settings_disable",
+      tokenPayload: { target_state: false },
+      lang: userLang,
+      mfaContentKey: "mfa_disable",
+      locationPath: "/settings"
     });
 
     return res.status(200).json({
-      success: true,
-      message: "MFA disabled.",
-      status: buildMfaStatusPayload(refreshedUser),
-      subscription: session.subscription
+      pending_verification: true,
+      mfa_token: pendingToken,
+      message: "We emailed you a verification code. Enter it to finish turning MFA off."
     });
-  } catch (err) {
-    logError("MFA disable error:", err);
-    return res.status(500).json({ error: "Unable to disable MFA." });
   }
-});
 
-router.post("/mfa/verify", requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  let pending;
+  try {
+    pending = verifyToken(mfaToken);
+  } catch (error) {
+    throw new ApiError(401, "Verification session expired. Start again.");
+  }
+
+  if (pending.purpose !== "mfa_settings_disable" || pending.id !== user.id || pending.email !== user.email) {
+    throw new ApiError(401, "Verification session expired. Start again.");
+  }
+
+  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+  if (!challenge) {
+    throw new ApiError(401, "Verification code expired. Start again.");
+  }
+
+  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
+    throw new ApiError(429, "Too many invalid verification attempts. Start again.");
+  }
+
+  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
+    await recordFailedMfaEmailAttempt(challenge.id);
+    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
+      throw new ApiError(429, "Too many invalid verification attempts. Start again.");
+    }
+    throw new ApiError(401, "Invalid verification code.");
+  }
+
+  await consumeMfaEmailChallenge(challenge.id);
+  await pool.query(
+    `UPDATE users
+        SET mfa_enabled = false,
+            mfa_secret_encrypted = NULL,
+            mfa_recovery_codes_hash = '[]'::jsonb,
+            mfa_temp_secret_encrypted = NULL,
+            mfa_temp_recovery_codes_hash = '[]'::jsonb,
+            mfa_enabled_at = NULL
+      WHERE id = $1`,
+    [user.id]
+  );
+
+  const refreshedUser = await findUserById(user.id);
+  const session = await resetCurrentRefreshSession(res, refreshedUser, { req });
+  await revokeTrustedMfaDevicesForUser(user.id);
+  clearMfaTrustCookie(res);
+  logInfo("MFA disabled", {
+    userId: user.id,
+    businessId: req.user?.business_id || null
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "MFA disabled.",
+    status: buildMfaStatusPayload(refreshedUser),
+    subscription: session.subscription
+  });
+}));
+
+router.post("/mfa/verify", requireCsrfProtection, mfaVerifyLimiter, asyncRoute(async (req, res) => {
   const mfaToken = req.body?.mfaToken;
   const code = req.body?.code;
   const trustDevice = req.body?.trustDevice !== false;
 
   if (!mfaToken || !code) {
-    return res.status(400).json({ error: "MFA token and code are required." });
+    throw new ApiError(400, "MFA token and code are required.");
   }
 
   try {
     const pending = verifyToken(mfaToken);
     if (!pending.id || pending.purpose !== "mfa_pending") {
-      return res.status(401).json({ error: "Invalid MFA session." });
+      throw new ApiError(401, "Invalid MFA session.");
     }
 
     const user = await findUserById(pending.id);
     if (!user || user.email !== pending.email) {
-      return res.status(401).json({ error: "MFA session is no longer valid." });
+      throw new ApiError(401, "MFA session is no longer valid.");
     }
     if (!user.mfa_enabled) {
-      return res.status(401).json({ error: "MFA session is no longer valid." });
+      throw new ApiError(401, "MFA session is no longer valid.");
     }
 
     const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
     if (!challenge) {
-      return res.status(401).json({ error: "Verification code expired. Sign in again to get a new one." });
+      throw new ApiError(401, "Verification code expired. Sign in again to get a new one.");
     }
 
     if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-      return res.status(429).json({ error: "Too many invalid verification attempts. Sign in again to get a new code." });
+      throw new ApiError(429, "Too many invalid verification attempts. Sign in again to get a new code.");
     }
 
     if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
       const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
       await recordFailedMfaEmailAttempt(challenge.id);
       if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-        return res.status(429).json({ error: "Too many invalid verification attempts. Sign in again to get a new code." });
+        throw new ApiError(429, "Too many invalid verification attempts. Sign in again to get a new code.");
       }
-      return res.status(401).json({ error: "Invalid verification code." });
+      throw new ApiError(401, "Invalid verification code.");
     }
 
     await consumeMfaEmailChallenge(challenge.id);
@@ -1994,32 +1967,35 @@ router.post("/mfa/verify", requireCsrfProtection, mfaVerifyLimiter, async (req, 
     });
     return res.status(200).json(buildPublicSessionPayload(session));
   } catch (err) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
     if (err instanceof EmailNotVerifiedError) {
       clearRefreshCookie(res);
       clearAccessCookie(res);
       clearMfaTrustCookie(res);
-      return res.status(403).json({ error: "Please verify your email before signing in." });
+      throw new ApiError(403, "Please verify your email before signing in.");
     }
     logError("MFA verify error:", err?.message || err);
-    return res.status(401).json({ error: "Invalid or expired MFA session." });
+    throw new ApiError(401, "Invalid or expired MFA session.");
   }
-});
+}));
 
-router.post("/mfa/resend", requireCsrfProtection, authLimiter, async (req, res) => {
+router.post("/mfa/resend", requireCsrfProtection, authLimiter, asyncRoute(async (req, res) => {
   const mfaToken = String(req.body?.mfaToken || "").trim();
   if (!mfaToken) {
-    return res.status(400).json({ error: "MFA token is required." });
+    throw new ApiError(400, "MFA token is required.");
   }
 
   try {
     const pending = verifyToken(mfaToken);
     if (!pending.id || pending.purpose !== "mfa_pending") {
-      return res.status(401).json({ error: "Verification session expired. Sign in again." });
+      throw new ApiError(401, "Verification session expired. Sign in again.");
     }
 
     const user = await findUserById(pending.id);
     if (!user || user.email !== pending.email || !user.mfa_enabled) {
-      return res.status(401).json({ error: "Verification session expired. Sign in again." });
+      throw new ApiError(401, "Verification session expired. Sign in again.");
     }
 
     const userLang = await getPreferredLanguageForUser(user.id);
@@ -2036,10 +2012,13 @@ router.post("/mfa/resend", requireCsrfProtection, authLimiter, async (req, res) 
       message: "We emailed you a new verification code."
     });
   } catch (err) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
     logError("MFA resend error:", err);
-    return res.status(401).json({ error: "Verification session expired. Sign in again." });
+    throw new ApiError(401, "Verification session expired. Sign in again.");
   }
-});
+}));
 
 /**
  * POST /verify-email/send-code
@@ -2047,338 +2026,315 @@ router.post("/mfa/resend", requireCsrfProtection, authLimiter, async (req, res) 
  * before onboarding or MFA enrollment. Pure email verification only -- MFA
  * is opted into separately and later, in Settings.
  */
-router.post("/verify-email/send-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    if (user.email_verified) {
-      return res.status(400).json({ error: "Email is already verified." });
-    }
-
-    const userLang = await getPreferredLanguageForUser(user.id);
-    const mfaToken = await createMfaEmailChallenge(user, req, {
-      businessId: req.user?.business_id || null,
-      tokenPurpose: "signup_email_verify",
-      lang: userLang,
-      mfaContentKey: "signup",
-      locationPath: "/onboarding"
-    });
-
-    return res.status(200).json({
-      success: true,
-      mfa_token: mfaToken,
-      message: "We emailed you a verification code."
-    });
-  } catch (err) {
-    logError("Signup verification code send error:", err);
-    return res.status(500).json({ error: "Unable to send verification code." });
+router.post("/verify-email/send-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, asyncRoute(async (req, res) => {
+  const user = await findUserById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
   }
-});
+  if (user.email_verified) {
+    throw new ApiError(400, "Email is already verified.");
+  }
+
+  const userLang = await getPreferredLanguageForUser(user.id);
+  const mfaToken = await createMfaEmailChallenge(user, req, {
+    businessId: req.user?.business_id || null,
+    tokenPurpose: "signup_email_verify",
+    lang: userLang,
+    mfaContentKey: "signup",
+    locationPath: "/onboarding"
+  });
+
+  return res.status(200).json({
+    success: true,
+    mfa_token: mfaToken,
+    message: "We emailed you a verification code."
+  });
+}));
 
 /**
  * POST /verify-email/confirm-code
  * Confirms the signup email-verification code. Only marks the email
  * verified -- MFA enrollment is a separate, later step in Settings.
  */
-router.post("/verify-email/confirm-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+router.post("/verify-email/confirm-code", requireAuth, requireCsrfProtection, mfaVerifyLimiter, asyncRoute(async (req, res) => {
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
 
   if (!code || !mfaToken) {
-    return res.status(400).json({ error: "Verification code and token are required." });
+    throw new ApiError(400, "Verification code and token are required.");
   }
 
+  const user = await findUserById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  let pending;
   try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    let pending;
-    try {
-      pending = verifyToken(mfaToken);
-    } catch (error) {
-      return res.status(401).json({ error: "Verification session expired. Request a new code." });
-    }
-
-    if (pending.purpose !== "signup_email_verify" || pending.id !== user.id || pending.email !== user.email) {
-      return res.status(401).json({ error: "Verification session expired. Request a new code." });
-    }
-
-    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-    if (!challenge) {
-      return res.status(401).json({ error: "Verification code expired. Request a new code." });
-    }
-
-    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-      return res.status(429).json({ error: "Too many invalid attempts. Request a new code." });
-    }
-
-    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-      await recordFailedMfaEmailAttempt(challenge.id);
-      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-        return res.status(429).json({ error: "Too many invalid attempts. Request a new code." });
-      }
-      return res.status(401).json({ error: "Invalid verification code." });
-    }
-
-    await consumeMfaEmailChallenge(challenge.id);
-    await pool.query(`UPDATE users SET email_verified = true WHERE id = $1`, [user.id]);
-
-    const refreshedUser = await findUserById(user.id);
-    const session = await resetCurrentRefreshSession(res, refreshedUser, {
-      mfaAuthenticated: false,
-      req
-    });
-    logInfo("Signup email verified", { userId: user.id });
-
-    return res.status(200).json({
-      success: true,
-      ...buildPublicSessionPayload(session)
-    });
-  } catch (err) {
-    logError("Verify-email confirm-code error:", err);
-    return res.status(500).json({ error: "Unable to verify code." });
+    pending = verifyToken(mfaToken);
+  } catch (error) {
+    throw new ApiError(401, "Verification session expired. Request a new code.");
   }
-});
+
+  if (pending.purpose !== "signup_email_verify" || pending.id !== user.id || pending.email !== user.email) {
+    throw new ApiError(401, "Verification session expired. Request a new code.");
+  }
+
+  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+  if (!challenge) {
+    throw new ApiError(401, "Verification code expired. Request a new code.");
+  }
+
+  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
+    throw new ApiError(429, "Too many invalid attempts. Request a new code.");
+  }
+
+  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
+    await recordFailedMfaEmailAttempt(challenge.id);
+    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
+      throw new ApiError(429, "Too many invalid attempts. Request a new code.");
+    }
+    throw new ApiError(401, "Invalid verification code.");
+  }
+
+  await consumeMfaEmailChallenge(challenge.id);
+  await pool.query(`UPDATE users SET email_verified = true WHERE id = $1`, [user.id]);
+
+  const refreshedUser = await findUserById(user.id);
+  const session = await resetCurrentRefreshSession(res, refreshedUser, {
+    mfaAuthenticated: false,
+    req
+  });
+  logInfo("Signup email verified", { userId: user.id });
+
+  return res.status(200).json({
+    success: true,
+    ...buildPublicSessionPayload(session)
+  });
+}));
 
 /**
  * POST /forgot-password
  */
-router.post("/forgot-password", passwordLimiter, async (req, res) => {
+router.post("/forgot-password", passwordLimiter, asyncRoute(async (req, res) => {
   const email = normalizeEmail(req.body?.email);
-  if (!email) return res.status(400).json({ error: "Email is required" });
-
-  try {
-    const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
-    if (userResult.rowCount > 0) {
-      const { token: code } = await createPasswordResetToken(email);
-      logInfo("Password reset requested", {
-        email: maskEmail(email),
-        delivery: "primary_email"
-      });
-
-      try {
-        const lang = await getPreferredLanguageForEmail(email);
-        const emailContent = buildPasswordResetEmail(lang, code);
-        await sendAppEmail({ to: email, ...emailContent });
-      } catch (emailErr) {
-        logError("[forgot-password] failed to send reset email", {
-          email: maskEmail(email),
-          message: emailErr?.message || String(emailErr)
-        });
-        // Continue — do not expose email delivery failure to the caller
-      }
-
-    }
-    // Always return 200 for security reasons (don't leak which emails exist)
-    return res.status(200).json({ message: "If the email is registered, a reset code was sent." });
-  } catch (err) {
-    logError("Forgot password error:", err);
-    res.status(500).json({ error: "Internal server error." });
+  if (!email) {
+    throw new ApiError(400, "Email is required");
   }
-});
 
-router.post("/account-recovery", passwordLimiter, async (req, res) => {
+  const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+  if (userResult.rowCount > 0) {
+    const { token: code } = await createPasswordResetToken(email);
+    logInfo("Password reset requested", {
+      email: maskEmail(email),
+      delivery: "primary_email"
+    });
+
+    try {
+      const lang = await getPreferredLanguageForEmail(email);
+      const emailContent = buildPasswordResetEmail(lang, code);
+      await sendAppEmail({ to: email, ...emailContent });
+    } catch (emailErr) {
+      logError("[forgot-password] failed to send reset email", {
+        email: maskEmail(email),
+        message: emailErr?.message || String(emailErr)
+      });
+      // Continue — do not expose email delivery failure to the caller
+    }
+
+  }
+  // Always return 200 for security reasons (don't leak which emails exist)
+  return res.status(200).json({ message: "If the email is registered, a reset code was sent." });
+}));
+
+router.post("/account-recovery", passwordLimiter, asyncRoute(async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const recoveryEmail = normalizeEmail(req.body?.recoveryEmail);
   if (!email || !recoveryEmail) {
-    return res.status(400).json({ error: "Primary and recovery email are required." });
+    throw new ApiError(400, "Primary and recovery email are required.");
   }
 
-  try {
-    const userResult = await pool.query(
-      `SELECT id, email
-         FROM users
-        WHERE email = $1
-          AND recovery_email = $2
-          AND recovery_email_verified = true
-        LIMIT 1`,
-      [email, recoveryEmail]
-    );
+  const userResult = await pool.query(
+    `SELECT id, email
+       FROM users
+      WHERE email = $1
+        AND recovery_email = $2
+        AND recovery_email_verified = true
+      LIMIT 1`,
+    [email, recoveryEmail]
+  );
 
-    if (userResult.rowCount > 0) {
-      const { token: code } = await createPasswordResetToken(email);
-      logInfo("Account recovery password reset requested", {
-        email: maskEmail(email),
-        recoveryEmail: maskEmail(recoveryEmail),
-        delivery: "recovery_email"
-      });
-
-      try {
-        const lang = await getPreferredLanguageForEmail(email);
-        const emailContent = buildPasswordResetEmail(lang, code);
-        await sendAppEmail({ to: recoveryEmail, ...emailContent });
-      } catch (emailErr) {
-        logError("[account-recovery] failed to send reset email", {
-          recoveryEmail: maskEmail(recoveryEmail),
-          message: emailErr?.message || String(emailErr)
-        });
-      }
-    }
-
-    return res.status(200).json({
-      message: "If the account and recovery email match, a reset code was sent."
+  if (userResult.rowCount > 0) {
+    const { token: code } = await createPasswordResetToken(email);
+    logInfo("Account recovery password reset requested", {
+      email: maskEmail(email),
+      recoveryEmail: maskEmail(recoveryEmail),
+      delivery: "recovery_email"
     });
-  } catch (err) {
-    logError("Account recovery error:", err);
-    return res.status(500).json({ error: "Internal server error." });
+
+    try {
+      const lang = await getPreferredLanguageForEmail(email);
+      const emailContent = buildPasswordResetEmail(lang, code);
+      await sendAppEmail({ to: recoveryEmail, ...emailContent });
+    } catch (emailErr) {
+      logError("[account-recovery] failed to send reset email", {
+        recoveryEmail: maskEmail(recoveryEmail),
+        message: emailErr?.message || String(emailErr)
+      });
+    }
   }
-});
+
+  return res.status(200).json({
+    message: "If the account and recovery email match, a reset code was sent."
+  });
+}));
 
 /**
  * POST /reset-password
  */
-router.post("/reset-password", passwordLimiter, async (req, res) => {
+router.post("/reset-password", passwordLimiter, asyncRoute(async (req, res) => {
   const { token, password, confirmPassword } = req.body;
   const requestEmail = normalizeEmail(req.body?.email);
 
   if (!requestEmail || !token || !password || password !== confirmPassword) {
-    return res.status(400).json({ error: "Invalid input or passwords do not match." });
+    throw new ApiError(400, "Invalid input or passwords do not match.");
   }
 
   if (!isStrongPassword(password)) {
-    return res.status(400).json({ error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol." });
+    throw new ApiError(400, "Password must be at least 8 characters and include an uppercase letter, number, and symbol.");
   }
 
   const email = await consumePasswordResetToken(requestEmail, token);
-  if (!email) return res.status(400).json({ error: "Code expired or invalid." });
-
-  try {
-    const hashedPassword = await hashPassword(password);
-    const userResult = await pool.query(
-      `UPDATE users
-          SET password_hash = $1,
-              failed_login_attempts = 0,
-              login_locked_until = NULL
-        WHERE email = $2
-      RETURNING id`,
-      [hashedPassword, email]
-    );
-    if (userResult.rowCount) {
-      const userId = userResult.rows[0].id;
-      await pool.query("UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false", [userId]);
-      await pool.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [userId]);
-      logInfo("Password reset completed", {
-        userId,
-        email: maskEmail(email)
-      });
-      await recordAuditEvent(pool, {
-        userId,
-        action: AUDIT_ACTIONS.PASSWORD_RESET_COMPLETE,
-        metadata: { email_mask: maskEmail(email) }
-      });
-      await sendPasswordChangedConfirmationEmail({ id: userId, email }, req, {
-        lang: await getPreferredLanguageForEmail(email)
-      });
-    }
-    return res.status(200).json({ message: "Password updated successfully." });
-  } catch (err) {
-    logError("Reset password error:", err);
-    res.status(500).json({ error: "Failed to reset password." });
+  if (!email) {
+    throw new ApiError(400, "Code expired or invalid.");
   }
-});
 
-router.post("/recovery-email/request", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
+  const hashedPassword = await hashPassword(password);
+  const userResult = await pool.query(
+    `UPDATE users
+        SET password_hash = $1,
+            failed_login_attempts = 0,
+            login_locked_until = NULL
+      WHERE email = $2
+    RETURNING id`,
+    [hashedPassword, email]
+  );
+  if (userResult.rowCount) {
+    const userId = userResult.rows[0].id;
+    await pool.query("UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false", [userId]);
+    await pool.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [userId]);
+    logInfo("Password reset completed", {
+      userId,
+      email: maskEmail(email)
+    });
+    await recordAuditEvent(pool, {
+      userId,
+      action: AUDIT_ACTIONS.PASSWORD_RESET_COMPLETE,
+      metadata: { email_mask: maskEmail(email) }
+    });
+    await sendPasswordChangedConfirmationEmail({ id: userId, email }, req, {
+      lang: await getPreferredLanguageForEmail(email)
+    });
+  }
+  return res.status(200).json({ message: "Password updated successfully." });
+}));
+
+router.post("/recovery-email/request", requireAuth, requireCsrfProtection, authLimiter, asyncRoute(async (req, res) => {
   const recoveryEmail = normalizeEmail(req.body?.recoveryEmail);
   const currentPassword = req.body?.currentPassword;
 
   if (!recoveryEmail || !currentPassword) {
-    return res.status(400).json({ error: "Recovery email and current password are required." });
+    throw new ApiError(400, "Recovery email and current password are required.");
   }
 
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+  const user = await findUserById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
-    if (recoveryEmail === normalizeEmail(user.email)) {
-      return res.status(400).json({ error: "Recovery email must be different from your sign-in email." });
-    }
+  if (recoveryEmail === normalizeEmail(user.email)) {
+    throw new ApiError(400, "Recovery email must be different from your sign-in email.");
+  }
 
-    const { match } = await verifyPassword(currentPassword, user.password_hash);
-    if (!match) {
-      return res.status(401).json({ error: "Current password is incorrect." });
-    }
+  const { match } = await verifyPassword(currentPassword, user.password_hash);
+  if (!match) {
+    throw new ApiError(401, "Current password is incorrect.");
+  }
 
-    const { token } = await createRecoveryEmailToken(user.id, recoveryEmail);
-    const confirmLink = buildRecoveryEmailVerificationLink(req, token);
-    const lang = await getPreferredLanguageForUser(user.id);
-    const isFrench = lang === "fr";
-    await sendAppEmail({
-      to: recoveryEmail,
-      subject: isFrench ? "Confirmez votre courriel de récupération" : "Confirm your recovery email",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
-          <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
-            <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
-            <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${isFrench ? "Confirmez votre courriel de récupération" : "Confirm your recovery email"}</h1>
-          </div>
-          <div style="padding: 28px;">
-            <p style="margin: 0 0 16px; color: #0f172a; font-size: 15px; line-height: 1.6;">
-              ${isFrench
-                ? "Cliquez sur le lien ci-dessous pour confirmer ce courriel comme courriel de récupération pour votre compte InEx Ledger."
-                : "Use the link below to confirm this address as the recovery email for your InEx Ledger account."}
-            </p>
-            <p style="margin: 0 0 18px;">
-              <a href="${confirmLink}" style="display: inline-block; padding: 12px 16px; border-radius: 10px; background: #2563a8; color: #ffffff; text-decoration: none; font-weight: 600;">
-                ${isFrench ? "Confirmer le courriel de récupération" : "Confirm recovery email"}
-              </a>
-            </p>
-            <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
-              ${isFrench
-                ? "Ce lien expire dans 30 minutes. Si vous n’avez pas demandé ce changement, ignorez ce courriel."
-                : "This link expires in 30 minutes. If you did not request this change, ignore this email."}
-            </p>
-          </div>
+  const { token } = await createRecoveryEmailToken(user.id, recoveryEmail);
+  const confirmLink = buildRecoveryEmailVerificationLink(req, token);
+  const lang = await getPreferredLanguageForUser(user.id);
+  const isFrench = lang === "fr";
+  await sendAppEmail({
+    to: recoveryEmail,
+    subject: isFrench ? "Confirmez votre courriel de récupération" : "Confirm your recovery email",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+        <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+          <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
+          <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${isFrench ? "Confirmez votre courriel de récupération" : "Confirm your recovery email"}</h1>
         </div>
-      `,
-      text: isFrench
-        ? `Confirmez votre courriel de récupération\n\nUtilisez ce lien dans les 30 minutes : ${confirmLink}`
-        : `Confirm your recovery email\n\nUse this link within 30 minutes: ${confirmLink}`
-    });
+        <div style="padding: 28px;">
+          <p style="margin: 0 0 16px; color: #0f172a; font-size: 15px; line-height: 1.6;">
+            ${isFrench
+              ? "Cliquez sur le lien ci-dessous pour confirmer ce courriel comme courriel de récupération pour votre compte InEx Ledger."
+              : "Use the link below to confirm this address as the recovery email for your InEx Ledger account."}
+          </p>
+          <p style="margin: 0 0 18px;">
+            <a href="${confirmLink}" style="display: inline-block; padding: 12px 16px; border-radius: 10px; background: #2563a8; color: #ffffff; text-decoration: none; font-weight: 600;">
+              ${isFrench ? "Confirmer le courriel de récupération" : "Confirm recovery email"}
+            </a>
+          </p>
+          <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
+            ${isFrench
+              ? "Ce lien expire dans 30 minutes. Si vous n’avez pas demandé ce changement, ignorez ce courriel."
+              : "This link expires in 30 minutes. If you did not request this change, ignore this email."}
+          </p>
+        </div>
+      </div>
+    `,
+    text: isFrench
+      ? `Confirmez votre courriel de récupération\n\nUtilisez ce lien dans les 30 minutes : ${confirmLink}`
+      : `Confirm your recovery email\n\nUse this link within 30 minutes: ${confirmLink}`
+  });
 
-    return res.status(200).json({
-      message: "Check your recovery email for a confirmation link."
-    });
-  } catch (err) {
-    logError("Recovery email request error:", err);
-    return res.status(500).json({ error: "Unable to save recovery email." });
-  }
-});
+  return res.status(200).json({
+    message: "Check your recovery email for a confirmation link."
+  });
+}));
 
 /**
  * POST /request-email-change
  * Initiates email change: verifies current password, sends link to new address.
  */
-router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, requireMfaIfEnabled, async (req, res) => {
+router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, requireMfaIfEnabled, asyncRoute(async (req, res) => {
   const { newEmail, currentPassword } = req.body ?? {};
   const email = normalizeEmail(newEmail);
   const wantsCodeFlow = req.body?.verificationMode === "mfa_code";
 
   if (!email || !currentPassword) {
-    return res.status(400).json({ error: "newEmail and currentPassword are required" });
+    throw new ApiError(400, "newEmail and currentPassword are required");
   }
 
-  try {
-    const result = await pool.query(
-      "SELECT id, email, password_hash FROM users WHERE id = $1",
-      [req.user.id]
-    );
-    const user = result.rows[0];
-    if (!user) return res.status(404).json({ error: "User not found" });
+  const result = await pool.query(
+    "SELECT id, email, password_hash FROM users WHERE id = $1",
+    [req.user.id]
+  );
+  const user = result.rows[0];
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
-    const { match } = await verifyPassword(currentPassword, user.password_hash);
-    if (!match) return res.status(401).json({ error: "Current password is incorrect" });
+  const { match } = await verifyPassword(currentPassword, user.password_hash);
+  if (!match) {
+    throw new ApiError(401, "Current password is incorrect");
+  }
 
-    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
-    if (existing.rowCount > 0) {
-      return res.status(409).json({ error: "Email already in use" });
-    }
+  const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+  if (existing.rowCount > 0) {
+    throw new ApiError(409, "Email already in use");
+  }
 
     const lang = await getPreferredLanguageForUser(req.user.id);
     let emailContent;
@@ -2409,69 +2365,63 @@ router.post("/request-email-change", requireAuth, requireCsrfProtection, authLim
       const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
       emailContent = buildEmailChangeEmail(lang, confirmLink);
     }
-    // Send to the CURRENT address so only the real account owner can approve
-    // the change. Sending to the new address would let an attacker who stole
-    // a session redirect the account to their own email.
-    await sendAppEmail({ to: user.email, ...emailContent });
+  // Send to the CURRENT address so only the real account owner can approve
+  // the change. Sending to the new address would let an attacker who stole
+  // a session redirect the account to their own email.
+  await sendAppEmail({ to: user.email, ...emailContent });
 
-    res.json({
-      message: wantsCodeFlow
-        ? "A verification code has been sent to your current email address."
-        : "A confirmation link has been sent to your current email address.",
-      verification_mode: wantsCodeFlow ? "mfa_code" : "link"
-    });
-  } catch (err) {
-    logError("Request email change error:", err);
-    res.status(500).json({ error: "Failed to initiate email change." });
-  }
-});
+  res.json({
+    message: wantsCodeFlow
+      ? "A verification code has been sent to your current email address."
+      : "A confirmation link has been sent to your current email address.",
+    verification_mode: wantsCodeFlow ? "mfa_code" : "link"
+  });
+}));
 
-router.post("/confirm-email-change", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
+router.post("/confirm-email-change", requireAuth, requireCsrfProtection, authLimiter, asyncRoute(async (req, res) => {
   const code = String(req.body?.code || "").trim();
   if (!/^\d{6}$/.test(code)) {
-    return res.status(400).json({ error: "A valid 6-digit code is required." });
+    throw new ApiError(400, "A valid 6-digit code is required.");
   }
 
-  try {
-    const result = await consumeEmailChangeTokenForUser(code, req.user.id);
-    if (!result?.user_id || !result?.new_email) {
-      return res.status(400).json({ error: "Invalid or expired code." });
+  const result = await consumeEmailChangeTokenForUser(code, req.user.id);
+  if (!result?.user_id || !result?.new_email) {
+    throw new ApiError(400, "Invalid or expired code.");
+  }
+
+  const { user_id, new_email } = result;
+  const currentUserResult = await pool.query("SELECT email FROM users WHERE id = $1 LIMIT 1", [user_id]);
+  const oldEmail = normalizeEmail(currentUserResult.rows[0]?.email);
+  await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
+  await revokeAllRefreshTokensForUser(user_id);
+  await revokeTrustedMfaDevicesForUser(user_id);
+  clearRefreshCookie(res);
+  clearAccessCookie(res);
+  clearMfaTrustCookie(res);
+  await recordAuditEvent(pool, {
+    userId: user_id,
+    action: AUDIT_ACTIONS.EMAIL_CHANGE_COMPLETE,
+    metadata: {
+      old_email_mask: maskEmail(oldEmail),
+      new_email_mask: maskEmail(new_email)
     }
+  });
+  await sendEmailChangedConfirmationEmails({
+    userId: user_id,
+    oldEmail,
+    newEmail: new_email
+  });
 
-    const { user_id, new_email } = result;
-    const currentUserResult = await pool.query("SELECT email FROM users WHERE id = $1 LIMIT 1", [user_id]);
-    const oldEmail = normalizeEmail(currentUserResult.rows[0]?.email);
-    await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
-    await revokeAllRefreshTokensForUser(user_id);
-    await revokeTrustedMfaDevicesForUser(user_id);
-    clearRefreshCookie(res);
-    clearAccessCookie(res);
-    clearMfaTrustCookie(res);
-    await recordAuditEvent(pool, {
-      userId: user_id,
-      action: AUDIT_ACTIONS.EMAIL_CHANGE_COMPLETE,
-      metadata: {
-        old_email_mask: maskEmail(oldEmail),
-        new_email_mask: maskEmail(new_email)
-      }
-    });
-    await sendEmailChangedConfirmationEmails({
-      userId: user_id,
-      oldEmail,
-      newEmail: new_email
-    });
-
-    res.json({ success: true, message: "Email updated. Please sign in with your new address." });
-  } catch (err) {
-    logError("Confirm email change code error:", err);
-    res.status(500).json({ error: "Email change failed." });
-  }
-});
+  res.json({ success: true, message: "Email updated. Please sign in with your new address." });
+}));
 
 /**
  * GET /confirm-email-change
+ * Link opened directly from an email, not a JS API client -- response
+ * bodies stay plain text/redirects, wrapped in asyncRoute only for
+ * unhandled-throw safety (same as GET /verify-email above).
  */
-router.get("/confirm-email-change", async (req, res) => {
+router.get("/confirm-email-change", asyncRoute(async (req, res) => {
   const { token } = req.query;
   if (!token) return res.status(400).send("Token is required.");
 
@@ -2507,9 +2457,14 @@ router.get("/confirm-email-change", async (req, res) => {
     logError("Confirm email change error:", err);
     res.status(500).send("Email change failed.");
   }
-});
+}));
 
-router.get("/confirm-recovery-email", async (req, res) => {
+/**
+ * GET /confirm-recovery-email
+ * Same as GET /confirm-email-change above: a browser-opened email link,
+ * not a JS API client, so its plain-text/redirect responses stay as-is.
+ */
+router.get("/confirm-recovery-email", asyncRoute(async (req, res) => {
   const token = req.query?.token;
   if (!token) {
     return res.status(400).send("Token is required.");
@@ -2534,7 +2489,7 @@ router.get("/confirm-recovery-email", async (req, res) => {
     logError("Confirm recovery email error:", err);
     return res.status(500).send("Recovery email confirmation failed.");
   }
-});
+}));
 
 router.all([
   "/forgot-password",
