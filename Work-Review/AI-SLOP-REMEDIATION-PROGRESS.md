@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 47.0 / 54 action items (~87%)
+## Overall: 47.5 / 54 action items (~88%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -145,10 +145,31 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   one route file converted so far — the rest of the ~15 route files still log
   raw `err`/`err.stack` directly.
 
-## Phase 3 - Startup, Deployment, Migration Safety — 4.5 / 6
+## Phase 3 - Startup, Deployment, Migration Safety — 5.0 / 6
 - [x] Checksum repair removed from `prestart` (`391319b9`)
 - [x] Server does not listen before DB init/migration readiness (`fabc898f`)
-- [~] Read-only migration verification split from repair commands
+- [x] Read-only migration verification split from repair commands — read
+  `scripts/repair-migration-checksums.js` directly rather than assuming
+  this needed new code: the split already existed functionally.
+  `package.json`'s `migrations:verify-checksums` and
+  `migrations:repair-checksums` are two distinctly-named commands, both
+  resolving to this one script, gated by a hard safety default — no flag
+  means read-only (reports drift and exits non-zero, mutates nothing);
+  `--write` is required to actually update `schema_migrations.checksum`,
+  and even then only inside a transaction. `migrations:verify-checksums`
+  never passes `--write`, so it's structurally incapable of mutating
+  regardless of what it finds. What was actually missing was proof: the
+  script had zero test coverage, so nothing would catch a regression (e.g.
+  someone flipping the default). Added a `require.main === module` guard
+  and exported `parseArgs`/`buildDriftReport`/`main` (matching the existing
+  pattern in `scripts/check-child-business-fk-readiness.js`), then added 9
+  tests in `tests/repairMigrationChecksumsScript.test.js`: argument parsing,
+  drift/missing-file detection, and — the actual safety property — `main()`
+  with no `--write` throws without issuing a single `UPDATE`, `--write`
+  performs the scoped repair, no-drift is a no-op regardless of flags, and
+  missing applied-migration files refuse to repair even with `--write`.
+  Full suite via `npm run test:all`: **1603/1603 passing** (plus 3/3 ASVS
+  controls) — 9 more than the pre-existing baseline, all new.
 - [~] Environment validation for required production settings — still half credit,
   but real progress: the audit (Pass 10) found `envValidationService.js`'s
   production-required list too narrow for what's actually mounted and
@@ -1793,3 +1814,23 @@ test that had been failing identically since PR 13).
   `npm run test:all`: **1594/1594 passing** (plus 3/3 ASVS controls) — 6
   more than the pre-existing baseline, all new. Phase 2 moves to **6.5/7**;
   Overall to **47.0/54 (~87%)**.
+
+- **PR 41** (`chore/test-migration-checksum-script-safety`): Phase 3, closes
+  another of the ten `[~]` items. Read `scripts/repair-migration-checksums.js`
+  directly instead of assuming the "split" needed new code: it already
+  existed functionally — `migrations:verify-checksums`/
+  `migrations:repair-checksums` are two distinctly-named npm commands
+  resolving to the same script, gated by a hard default (no `--write` means
+  read-only, reports drift and exits non-zero without mutating anything).
+  What was missing was proof — zero test coverage meant nothing would catch
+  a regression to that default. Added a `require.main === module` guard and
+  exported `parseArgs`/`buildDriftReport`/`main` (same pattern as
+  `scripts/check-child-business-fk-readiness.js`, which already does this
+  for testability), then added 9 tests: argument parsing, drift/missing-file
+  detection, and the actual safety property — no `--write` throws without
+  issuing a single `UPDATE`, `--write` performs the scoped repair inside a
+  transaction, no-drift is a no-op regardless of flags, and missing
+  applied-migration files refuse to repair even with `--write`. Full suite
+  via `npm run test:all`: **1603/1603 passing** (plus 3/3 ASVS controls) — 9
+  more than the pre-existing baseline, all new. Phase 3 moves to **5.0/6**;
+  Overall to **47.5/54 (~88%)**.
