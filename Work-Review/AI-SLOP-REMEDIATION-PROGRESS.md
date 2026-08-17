@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 34.75 / 54 action items (~64%)
+## Overall: 45.0 / 54 action items (~83%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -40,7 +40,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
     frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
     rather than silently working around it.
 
-## Phase 2 - Security Contract Cleanup — 6.0 / 7
+## Phase 2 - Security Contract Cleanup — 5.5 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
 - [x] Bearer-token acceptance removed from normal app auth paths — verified via
   `git log -p` that commit `6a075ad1` (the same commit credited for the item
@@ -153,7 +153,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [~] Docker/Nixpacks/start scripts reconciled
 - [x] Reproducible installs (`npm ci`) in CI/deployment (`afdefa17`, `6a313ff0`)
 
-## Phase 4 - API Error And Response Consistency — 3.75 / 5
+## Phase 4 - API Error And Response Consistency — 3.5 / 5
 - [~] Consolidated `ApiError`/`sendError`/async-route pattern introduced — Pass 27's
   suggested design already had most of its foundation in place and just wasn't being
   used: `server.js` already has a final Express error handler that derives status
@@ -1656,5 +1656,24 @@ test that had been failing identically since PR 13).
   `sendTrialLifecycleReminders` runs against one shared mock table, asserting
   exactly one of the two sends. Full suite via `npm run test:all`:
   **1588/1588 passing** (plus 3/3 ASVS controls) — 22 more than the pre-existing
-  baseline, all new. Phase 9 reaches **5/5**; Overall moves from 34.25/54 to
-  **34.75/54 (~64%)**.
+  baseline, all new. Phase 9 reaches **5/5**.
+
+- **PR 37** (`docs/recompute-tracker-percentage`): no code change, tracker
+  correction. A user question about how "Phase 9 of 10 done" squared with a
+  64% headline number prompted an actual recount instead of trusting either
+  figure. Counting every `- [x]`/`- [~]`/`- [ ]` marker in the file directly
+  (54 total, matching the stated denominator) gives 40 `[x]` + 10 `[~]` = 45.0,
+  not the 34.75 the headline claimed after PR 36's edit. Two phase headers had
+  independently drifted from their own item markers: Phase 2 said `6.0 / 7`
+  against 4 `[x]` + 3 `[~]` = 5.5, and Phase 4 said `3.75 / 5` against 2 `[x]`
+  + 3 `[~]` = 3.5 — the latter isn't even a value 5 items scored at
+  {0, 0.5, 1.0} can produce, a clear sign of hand-adjusted drift rather than a
+  real recompute. Every other phase header already matched its own markers.
+  This confirms the "recompute before ever changing the headline number" rule
+  in this file's own legend had been violated repeatedly, including by PR 36
+  itself, which only added +0.5 for Phase 9 instead of recomputing from
+  scratch. Corrected both stale phase headers and the Overall line; every
+  header now reconciles exactly with a direct marker count. **Overall: 45.0 / 54
+  (~83%)** — a large jump, but it reflects work already done across many prior
+  PRs that the drifting headline simply hadn't been credited for, not new work
+  in this PR.
