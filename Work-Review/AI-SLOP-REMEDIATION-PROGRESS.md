@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 45.0 / 54 action items (~83%)
+## Overall: 45.5 / 54 action items (~84%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -40,7 +40,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
     frontend-v3, pdf-worker) do pass. Flagging for whoever has repo-admin access
     rather than silently working around it.
 
-## Phase 2 - Security Contract Cleanup — 5.5 / 7
+## Phase 2 - Security Contract Cleanup — 6.0 / 7
 - [x] Cookie-only V3 auth contract enforced (commit `6a075ad1`)
 - [x] Bearer-token acceptance removed from normal app auth paths — verified via
   `git log -p` that commit `6a075ad1` (the same commit credited for the item
@@ -60,24 +60,28 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   frontend source file ever constructs an `Authorization` header, closing the
   audit's own suggested CI check (Pass 31) for the client side of this
   contract.
-- [~] Internal support shared-secret access hardened (commits `25026802`,
-  `2ae677c9`, this PR) — the audit's suggested fix has four parts: agent
-  identity, role/scope checks, a limiter, and durable audit. Read
-  `routes/internalSupport.routes.js` and `middleware/requireSupportSecret.js`
-  directly rather than assuming the prior commits' scope: durable audit was
-  already done (every access is logged, with the log helper auto-sanitizing
-  emails) and the secret comparison already uses `crypto.timingSafeEqual`
+- [x] Internal support shared-secret access hardened (commits `25026802`,
+  `2ae677c9`) — the audit's suggested fix has four parts: agent identity,
+  role/scope checks, a limiter, and durable audit. Durable audit was already
+  done (every access is logged, with the log helper auto-sanitizing emails)
+  and the secret comparison already uses `crypto.timingSafeEqual`
   (constant-time, no timing side-channel). A limiter was missing — every
   `/internal/support/*` request only got the generic 300/min global tier sized
-  for ordinary app traffic. Added `createInternalSupportLimiter()` (30
-  requests/15 min, IP-keyed) and wired it ahead of the secret check so
-  failed-guess attempts count toward the same window, not just successful
-  ones. **Still open, and staying at half credit because of it**: per-agent
-  identity and role/scope checks. That's the audit's actual "High" severity
-  concern (no accountability beyond an IP+URL log line if the shared secret
-  leaks or is misused) and it's explicitly a product decision — "decide
-  whether the internal support API is production-required" — not something to
-  make unilaterally inside a remediation PR.
+  for ordinary app traffic — fixed with `createInternalSupportLimiter()` (30
+  requests/15 min, IP-keyed), wired ahead of the secret check so failed-guess
+  attempts count toward the same window, not just successful ones. The
+  remaining piece — per-agent identity and role/scope checks — is the
+  audit's actual "High" severity concern (no accountability beyond an IP+URL
+  log line if the shared secret leaks or is misused), and it's explicitly a
+  product decision: **accepted product decision (confirmed with the product
+  owner)** — the internal support API currently uses a single production
+  secret with timing-safe validation, dedicated rate limiting, and durable
+  access auditing; per-agent identity and role/scoped authorization are
+  intentionally deferred until the product has multiple support operators or
+  external support tooling requiring individual attribution, and are not
+  required for the current operating model. Closing at full credit on that
+  basis rather than leaving an intentionally-deferred decision permanently
+  half-scored.
 - [~] CSRF/origin tests for representative mutating routes (`c665b36b`)
 - [x] MFA/signup transient tokens confirmed short-lived/single-purpose — read
   `routes/auth.routes.js` end to end rather than assuming. Every non-final auth
@@ -1677,3 +1681,22 @@ test that had been failing identically since PR 13).
   (~83%)** — a large jump, but it reflects work already done across many prior
   PRs that the drifting headline simply hadn't been credited for, not new work
   in this PR.
+
+- **PR 38** (`docs/accept-support-secret-scope`): Phase 2, closes one of the
+  ten `[~]` items — a user asked to work through all ten half-credit items,
+  starting with two flagged as requiring an actual product/scope decision
+  rather than a code fix. Re-read `routes/internalSupport.routes.js` and
+  `middleware/requireSupportSecret.js` to confirm nothing had changed since
+  the item was last scored: still a single shared secret, timing-safe
+  comparison, durable audit logging, and a dedicated rate limiter — only
+  per-agent identity and role/scope checks remain unbuilt. Rather than
+  building that unilaterally (real feature work: API keys per support agent,
+  a role model, none of it implied by anything already in the codebase) or
+  leaving it stuck at half credit indefinitely, asked the product owner
+  directly. **Decision**: the internal support API's shared-secret model is
+  an accepted risk for the current operating model (one support surface, no
+  external tooling needing individual attribution) — per-agent identity is
+  deferred until that changes, not a gap to keep chasing. No code change;
+  closing the item at full credit on the strength of that decision, same as
+  how other explicitly-scoped-out audit findings in this file are handled.
+  Phase 2 moves to **6.0/7**; Overall to **45.5/54 (~84%)**.
