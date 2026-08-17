@@ -17,6 +17,7 @@ const {
   CSRF_HEADER_NAME,
   generateCsrfToken
 } = require("../middleware/csrf.middleware.js");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const AUTH_ROUTE_PATH = require.resolve("../routes/auth.routes.js");
 
@@ -422,9 +423,7 @@ function buildApp(router) {
   app.use(cookieParser());
   app.use(express.json());
   app.use("/api/auth", router);
-  app.use((err, _req, res, _next) => {
-    res.status(500).json({ error: err?.message || "error" });
-  });
+  attachCentralErrorHandler(app);
   return app;
 }
 

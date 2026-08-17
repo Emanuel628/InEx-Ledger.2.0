@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 49.5 / 54 action items (~92%)
+## Overall: 50.0 / 54 action items (~93%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -279,8 +279,8 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   pre-existing baseline, all new.
 - [x] Reproducible installs (`npm ci`) in CI/deployment (`afdefa17`, `6a313ff0`)
 
-## Phase 4 - API Error And Response Consistency — 4.5 / 5
-- [~] Consolidated `ApiError`/`sendError`/async-route pattern introduced — Pass 27's
+## Phase 4 - API Error And Response Consistency — 5 / 5
+- [x] Consolidated `ApiError`/`sendError`/async-route pattern introduced — Pass 27's
   suggested design already had most of its foundation in place and just wasn't being
   used: `server.js` already has a final Express error handler that derives status
   from `err.status`/`err.statusCode`, hides 500 details in production, and logs
@@ -549,6 +549,48 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   more than the pre-existing baseline, all new. Route-file count stays at
   **38 of 40** (unchanged, since `auth.routes.js` isn't fully converted
   yet); Phase score unchanged.
+  **Follow-up, same PR sequence — final batch, closes this item**: converted
+  the remaining 16 routes of `auth.routes.js` (change-password, the full MFA
+  cluster — `mfa/status`, `mfa/reauth`, `mfa/enable`, `mfa/disable`,
+  `mfa/verify`, `mfa/resend`, `verify-email/send-code`,
+  `verify-email/confirm-code` — the password/recovery cluster —
+  `forgot-password`, `account-recovery`, `reset-password`,
+  `recovery-email/request` — and the email-change cluster —
+  `request-email-change`, `confirm-email-change` POST, `GET
+  /confirm-email-change`, `GET /confirm-recovery-email`), bringing
+  `auth.routes.js` to all 24 of its routes on `asyncRoute`/`ApiError` and the
+  route-file count to **39 of 40** (`region.routes.js` stays the one
+  confirmed-N/A exception). Most of these routes' `try/catch` blocks were a
+  pure "log the error, return a generic 500" fallback with no real
+  translation logic — for those, converting meant deleting the `try/catch`
+  entirely (its only job is now `asyncRoute`'s), since a removed catch's
+  message was already being discarded by the central handler's own
+  status->=500 rule, so nothing observable changes. `/mfa/verify` and
+  `/mfa/resend` needed the same care as `/login` had: their `catch` blocks
+  translate *any* caught error (including a raw JWT-verify exception) into a
+  specific non-500 status, so converting their internal branches to
+  `throw new ApiError(...)` without restructuring the `catch` would have let
+  it re-swallow those intentional throws into its own generic message.
+  Fixed the same way as `/login`: `catch (err) { if (err instanceof
+  ApiError) throw err; ...only-then handle the real translation case... }`.
+  One incidental discovery while re-running the full suite: an unrelated,
+  pre-existing test file, `tests/authDeviceVerification.test.js`, had its
+  own ad hoc `buildApp` error handler (`(err, req, res, next) =>
+  res.status(500).json(...)`) that ignored `err.status` entirely and always
+  returned 500 — stale infrastructure that predates this rollout's
+  `attachCentralErrorHandler` convention. It had gone unnoticed because none
+  of that file's `/login`-hitting tests exercised a thrown-error branch
+  until this batch's `/mfa/verify` conversion was the first to route a
+  legitimately-thrown `EmailNotVerifiedError` (403) through it, at which
+  point the stale handler flattened it to a wrong 500 and a real test
+  (`"mfa verification refuses to issue session when user becomes
+  unverified"`) failed. Fixed by replacing the local handler with the
+  shared `attachCentralErrorHandler` from `tests/helpers/testPool.js` — the
+  same fixture already used throughout this whole rollout — rather than
+  patching the ad hoc one in place. Full suite via `npm run test:all`:
+  **1631/1631 passing** (plus 3/3 ASVS controls). Phase 4 reaches **5/5**;
+  this closes the last of the ten `[~]` half-credit items from the original
+  batch of ten identified at the start of this PR sequence.
 - [x] Client-facing error envelopes normalized — with 38 of 40 route files now on
   `asyncRoute`/`ApiError` (see the rollout item above), the central handler's
   `{ error: message }` shape (plus `requestId` on 500s) is the de facto
@@ -2165,3 +2207,52 @@ test that had been failing identically since PR 13).
   and replacing several regex-only tests with fewer, higher-value behavior
   tests). `frontend-v3` type-checks (`tsc -b --noEmit`) and builds clean.
   Overall to **49.5/54 (~92%)**.
+
+- **PR 47** (`chore/convert-auth-routes-batch-2`): Phase 4, final batch,
+  closes the last of the ten `[~]` half-credit items identified at the
+  start of this PR sequence (Phase 4 reaches **5/5**). Converted the
+  remaining 16 of `auth.routes.js`'s 24 routes: `/change-password`, the
+  full MFA cluster (`mfa/status`, `mfa/reauth`, `mfa/enable`,
+  `mfa/disable`, `mfa/verify`, `mfa/resend`, `verify-email/send-code`,
+  `verify-email/confirm-code`), the password/recovery cluster
+  (`forgot-password`, `account-recovery`, `reset-password`,
+  `recovery-email/request`), and the email-change cluster
+  (`request-email-change`, `confirm-email-change` POST,
+  `GET /confirm-email-change`, `GET /confirm-recovery-email`) — the last
+  two of which are browser-opened email links, kept on their existing
+  plain-text/redirect response bodies (same reasoning as `GET
+  /verify-email` in the first batch), wrapped in `asyncRoute` purely for
+  unhandled-throw safety. Route-file count reaches **39 of 40**
+  (`region.routes.js` remains the one confirmed-N/A exception).
+
+  Most of the converted routes' `try/catch` blocks were pure "log and
+  return a generic 500" fallbacks with no real translation logic, so
+  converting them meant deleting the `try/catch` outright — `asyncRoute`
+  now does that job, and since the central handler already discards any
+  message on a >=500 error, nothing observable changes by removing it.
+  `/mfa/verify` and `/mfa/resend` needed the same restructuring `/login`
+  needed in the first batch: their `catch` blocks translate *any* caught
+  error (including a raw JWT-verify exception) into a specific non-500
+  status, so converting their internal branches to `throw new
+  ApiError(...)` without fixing the `catch` would have let it re-swallow
+  those intentional throws into its own generic message. Fixed with the
+  same pattern: `if (err instanceof ApiError) throw err;` before the
+  route's own real translation logic.
+
+  Re-running the full suite surfaced one unrelated, pre-existing gap:
+  `tests/authDeviceVerification.test.js` had its own ad hoc `buildApp`
+  error handler that always returned 500 regardless of `err.status` —
+  stale infrastructure predating this rollout's shared
+  `attachCentralErrorHandler` convention. It had gone unnoticed because
+  none of that file's tests previously routed a genuinely-thrown non-500
+  error through it; `/mfa/verify`'s newly-thrown `EmailNotVerifiedError`
+  (403) was the first to, and a real test caught it (expected 403, got
+  500). Fixed by swapping in the shared `attachCentralErrorHandler` from
+  `tests/helpers/testPool.js` instead of patching the local one — the same
+  fixture already used throughout this whole rollout.
+
+  Full suite via `npm run test:all`: **1631/1631 passing** (plus 3/3 ASVS
+  controls; net test count unchanged from the previous PR — this batch's
+  fix was to an existing test's fixture, not new test additions). Overall
+  to **50.0/54 (~93%)** — all ten of the original half-credit `[~]` items
+  from this PR sequence are now closed.
