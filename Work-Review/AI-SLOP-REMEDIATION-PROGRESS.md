@@ -460,6 +460,57 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   and generic unexpected database failures. Focused invoice suites:
   **23/23 passing**. Now **28 of 40** route files use the pattern. Phase score
   unchanged at **3.75/5**.
+  **Follow-up, same PR sequence**: outside-this-chat work landed 8 more
+  conversions between PR 35 and this note, bringing the count to **38 of 40**
+  before this batch started — the only two files not using the pattern were
+  `auth.routes.js` (2551 lines, 23 routes, by far the largest remaining file)
+  and `region.routes.js` (verified N/A: a single sync handler with one
+  static 503 branch, no hand-rolled multi-shape error responses to unify).
+  Started `auth.routes.js`'s conversion in batches given its size and
+  security sensitivity — this PR converts the first 7 routes
+  (`/register`, `/send-verification`, `/complete-verified-signup`, `/login`,
+  `/refresh`, `/logout`, `GET /verify-email`), leaving 16 more (MFA, password
+  reset/recovery, email change) for follow-up PRs; not counting the file as
+  converted yet since it's partial. `/login` and `/refresh` needed the most
+  care: both had a route-local `try/catch` whose `catch` block treated
+  every error as either a specific translated response or a generic 500 —
+  converting the 400/401/403/423 branches to `throw new ApiError(...)`
+  without also fixing the `catch` would have meant the catch's own
+  `isTransientLoginInfrastructureError` check (and its final generic-500
+  fallback) swallowed those intentional throws and reported them all as 500.
+  Fixed by having the `catch` only translate the one specific case it exists
+  for and rethrow everything else unchanged. `GET /verify-email` responds
+  with plain text, not the JSON `{error}` envelope, since it's a link
+  opened directly in a browser rather than a JS API client — left its
+  response bodies untouched, only wrapped it in `asyncRoute` so an
+  unexpected throw doesn't become a hung/unhandled-rejection request instead
+  of a response. **Real bug found by writing the test first, not by
+  inspection**: `/login`'s transient-infrastructure-error path threw
+  `ApiError(503, "Sign-in is temporarily unavailable...")` — but the central
+  handler replaces the message of *any* status >= 500 with the generic
+  "Internal server error" by design (it hides 500 detail in production), so
+  that deliberately-informative 503 message would have been silently lost.
+  Fixed by keeping it as a direct `res.status(503).json({error: "..."})`
+  response instead of a throw, the same "extra info the central handler
+  can't carry" exception class as `AccountingPeriodLockedError` elsewhere in
+  this rollout — just for the message itself rather than extra fields. Once
+  found, checked whether this same mistake existed anywhere else already on
+  `main`: it did, in two files converted in earlier (non-auth) batches —
+  `crypto.routes.js`'s `GET /export-public-key` and three identical spots in
+  `messages.routes.js` — both threw a 503 `ApiError` with a message that was
+  already being silently swallowed by the central handler on `main` right
+  now. Fixed all three the same way. `tests/cryptoRoutes.test.js` already
+  had a test hitting this exact path but only asserted the status code, not
+  the body — strengthened it to assert the real message, which would have
+  caught this the moment it was introduced. Added
+  `tests/authRouteErrors.test.js` (10 tests covering `/login`'s and
+  `/refresh`'s error paths, including the transient-503 case and confirming
+  unexpected DB failures produce a generic 500 rather than a leaked message)
+  and one new test in `tests/cryptoRoutes.test.js`. Full suite via
+  `npm run test:all`: **1629/1629 passing** (plus 3/3 ASVS controls) — 11
+  more than the pre-existing baseline, all new. Route-file count stays at
+  **38 of 40** (unchanged, since `auth.routes.js` isn't fully converted
+  yet); Phase score unchanged.
 - [x] Client-facing error envelopes normalized — with 38 of 40 route files now on
   `asyncRoute`/`ApiError` (see the rollout item above), the central handler's
   `{ error: message }` shape (plus `requestId` on 500s) is the de facto
@@ -1954,3 +2005,51 @@ test that had been failing identically since PR 13).
   optional secret's fail-closed behavior. Full suite via `npm run test:all`:
   **1618/1618 passing** (plus 3/3 ASVS controls) — 4 more than the
   pre-existing baseline, all new. Overall to **49.0/54 (~91%)**.
+
+- **PR 45** (`chore/convert-auth-routes-batch-1`): Phase 4, first batch on
+  the last of the ten `[~]` items — the `asyncRoute`/`ApiError` rollout is
+  now down to one real file. 38 of 40 route files already use the pattern
+  (8 more landed from outside this chat since PR 35); the only two holdouts
+  were `auth.routes.js` (2551 lines, 23 routes, the largest remaining file
+  by a wide margin) and `region.routes.js` (verified not applicable — a
+  single sync handler with one static 503 branch, nothing to unify).
+  Converted the first 7 of `auth.routes.js`'s 23 routes:
+  `/register`, `/send-verification`, `/complete-verified-signup`, `/login`,
+  `/refresh`, `/logout`, `GET /verify-email`. Given the file's size and
+  security sensitivity, splitting the conversion into batches rather than
+  one large diff, matching how every other large file in this rollout
+  (`billing.routes.js`, `transactions.routes.js`, `exports.routes.js`) was
+  handled.
+
+  `/login` and `/refresh` needed real care: both had a `try/catch` whose
+  `catch` translated one specific error into a specific response and
+  otherwise fell back to a generic 500 — converting the 400/401/403/423
+  branches to `throw new ApiError(...)` without also fixing the `catch`
+  would have meant its own fallback caught those intentional throws too and
+  reported them as 500. Fixed by having the `catch` only handle the one
+  case it exists for and rethrow everything else unchanged.
+
+  **Real bug caught by writing the test first, not by inspection**:
+  `/login`'s transient-infrastructure-error path threw
+  `ApiError(503, "Sign-in is temporarily unavailable...")`, but
+  `server.js`'s central handler replaces the message of *any* status >= 500
+  with a generic "Internal server error" by design. That deliberately
+  user-facing 503 message would have been silently lost the moment this
+  shipped. Fixed by keeping it a direct response instead of a throw — the
+  same "extra info the central handler can't carry" exception class as
+  `AccountingPeriodLockedError` elsewhere in this rollout, just for the
+  message itself. Checked whether the same mistake already existed anywhere
+  on `main`: it did, in two files converted in earlier, unrelated batches —
+  `crypto.routes.js`'s `GET /export-public-key` and three spots in
+  `messages.routes.js` — both silently swallowing a deliberate 503 message
+  right now. Fixed all three the same way, and strengthened
+  `tests/cryptoRoutes.test.js`'s existing test for that path (it asserted
+  the status code but never the body, so it hadn't caught the bug it was
+  sitting right next to).
+
+  Added `tests/authRouteErrors.test.js` (10 tests) and one new test in
+  `tests/cryptoRoutes.test.js`. Full suite via `npm run test:all`:
+  **1629/1629 passing** (plus 3/3 ASVS controls) — 11 more than the
+  pre-existing baseline, all new. Route-file count stays at **38 of 40**
+  (not counting `auth.routes.js` until it's fully converted); Phase 4 and
+  Overall unchanged — 16 more routes to go in follow-up PRs.

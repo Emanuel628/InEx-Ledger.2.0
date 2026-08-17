@@ -474,7 +474,11 @@ router.post(
 
     const resend = getResendClient();
     if (!resend) {
-      throw new ApiError(503, "Email service is not configured.");
+      // A thrown 5xx ApiError has its message replaced with the generic
+      // "Internal server error" by the central handler (it hides all 5xx
+      // detail by design) -- this message is deliberately shown to the
+      // client, so it has to be a direct response, not a throw.
+      return res.status(503).json({ error: "Email service is not configured." });
     }
 
     const { rows } = await pool.query(
@@ -767,7 +771,11 @@ router.post(
     const businessId = await resolveBusinessIdForUser(req.user);
     const resend = getResendClient();
     if (!resend) {
-      throw new ApiError(503, "Email service is not configured.");
+      // A thrown 5xx ApiError has its message replaced with the generic
+      // "Internal server error" by the central handler (it hides all 5xx
+      // detail by design) -- this message is deliberately shown to the
+      // client, so it has to be a direct response, not a throw.
+      return res.status(503).json({ error: "Email service is not configured." });
     }
 
     const supportTo = getSupportToEmail();
@@ -930,7 +938,11 @@ router.post(
 
     const resend = getResendClient();
     if (!resend) {
-      throw new ApiError(503, "Email service is not configured.");
+      // A thrown 5xx ApiError has its message replaced with the generic
+      // "Internal server error" by the central handler (it hides all 5xx
+      // detail by design) -- this message is deliberately shown to the
+      // client, so it has to be a direct response, not a throw.
+      return res.status(503).json({ error: "Email service is not configured." });
     }
 
     const businessId = await resolveBusinessIdForUser(req.user);

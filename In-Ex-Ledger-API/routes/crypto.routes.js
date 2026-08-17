@@ -1,7 +1,7 @@
 const express = require("express");
 const { logError } = require("../utils/logger.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { ApiError, asyncRoute } = require("../utils/apiError.js");
+const { asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
 const exportPublicKeyLimiter = createDataApiLimiter({
@@ -42,7 +42,11 @@ router.get("/export-public-key", exportPublicKeyLimiter, asyncRoute((req, res) =
   const parsedKey = getParsedExportPublicKey();
   const keyKid = process.env.EXPORT_PUBLIC_KEY_KID || "export-key-1";
   if (!parsedKey) {
-    throw new ApiError(503, "Export public key not configured.");
+    // A thrown 5xx ApiError has its message replaced with the generic
+    // "Internal server error" by the central handler (it hides all 5xx
+    // detail by design) -- this message is deliberately shown to the
+    // client, so it has to be a direct response, not a throw.
+    return res.status(503).json({ error: "Export public key not configured." });
   }
 
   res.setHeader("Cache-Control", "public, max-age=60, must-revalidate");

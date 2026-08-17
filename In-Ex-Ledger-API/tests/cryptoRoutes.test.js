@@ -114,3 +114,19 @@ test("export public key route logs parse failures and returns 503", async () => 
     fixture.cleanup();
   }
 });
+
+test("export public key route returns its real 503 message, not the central handler's generic one", async () => {
+  const fixture = loadCryptoRouter();
+  try {
+    // No EXPORT_PUBLIC_KEY_JWK set at all -- distinct from the parse-failure
+    // case above, and the path where it would be easiest to silently regress
+    // into a thrown 5xx ApiError, whose message the central handler replaces
+    // with "Internal server error" (it hides all 5xx detail by design).
+    const response = await request(fixture.app).get("/api/crypto/export-public-key");
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(response.body, { error: "Export public key not configured." });
+  } finally {
+    fixture.cleanup();
+  }
+});
