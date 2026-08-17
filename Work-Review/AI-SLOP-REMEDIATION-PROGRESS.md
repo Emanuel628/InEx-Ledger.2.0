@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 34.25 / 54 action items (~63%)
+## Overall: 34.75 / 54 action items (~64%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -714,29 +714,12 @@ test that had been failing identically since PR 13).
 - [x] Hard reloads replaced with state updates where SPA behavior expected
 - [x] `PlanGate` usage normalized against backend feature keys
 
-## Phase 9 - Integrations, Idempotency, Side Effects — 4.5 / 5
+## Phase 9 - Integrations, Idempotency, Side Effects — 5 / 5
 - [x] Stripe mutation idempotency keys reviewed beyond checkout (`buildStripeMutationIdempotencyKey` covers customer create, portal config create, subscription cancel/resume/switch, and direct additional-business subscription updates)
-- [~] Durable dedupe/outbox behavior for important emails (`email_delivery_dedupe` covers billing lifecycle and invoice owner-activity emails, including the inbound-reply webhook path whose only prior replay guard was a 5-minute in-memory `svix-id` cache that doesn't survive redelivery outside that window or multiple app instances; `emailReminderService` cron-overlap races and `exportEmailService` generated/failed sends still need review)
+- [x] Durable dedupe/outbox behavior for important emails (`email_delivery_dedupe` covers billing lifecycle, invoice owner-activity, and export generated/failed emails, including the inbound-reply webhook path whose only prior replay guard was a 5-minute in-memory `svix-id` cache that doesn't survive redelivery outside that window or multiple app instances; `emailReminderService`'s three reminder flows — trial lifecycle, review-queue, cancellation-ending-soon — now claim atomically via `business_email_reminders`' `(business_id, reminder_key)` unique constraint before sending, closing the cron-overlap double-send race)
 - [x] Plaid partial-failure/cursor/retry behavior hardened (row-level failures and unknown accounts mark the batch partial, keep the prior cursor, and surface connection error state)
 - [x] Export/receipt cleanup paths made explicit and testable (export history deletion commits DB cleanup before best-effort file cleanup and returns cleanup status; receipt delete pending-rename path rechecked)
 - [x] Required vs. best-effort side effects separated (completed export generation no longer fails or waits on audit/email side effects; failures are logged)
-
-**NEXT UP for Phase 9 (to reach 5/5):** finish the email dedupe item. Two
-families remain, in priority order:
-1. `exportEmailService.js` (`sendExportGeneratedEmail` / `sendExportFailedEmail`,
-   called from `routes/exports.routes.js`) — no dedupe guard today, so a
-   client-side retry of the export POST resends the email. Likely the more
-   contained fix: wire the same `email_delivery_dedupe` pattern used in
-   `invoiceOwnerEmailService.js` (commit `551fc223`) into these two send
-   paths. `sendExportStaleEmail` in the same file is lower risk (already
-   guarded by an atomic `UPDATE ... WHERE status <> 'invalidated'`).
-2. `emailReminderService.js` (driven by the OS-level cron script
-   `scripts/send-email-reminders.js`) — uses a non-atomic check-then-act
-   (`loadReminderState` SELECT then `saveReminderState` upsert) with no lock
-   between them, so a cron overlap could double-send. Needs either the durable
-   dedupe table or an atomic claim (compare-and-swap), similar to
-   `usageLimitEmailService.js`'s `claimThresholds()`, which is already
-   race-safe and needs no further work.
 
 ## Phase 10 - Documentation And Final Stabilization — 0 / 4
 - [ ] Source-of-truth docs updated to match code
@@ -1631,3 +1614,47 @@ families remain, in priority order:
   coverage for unexpected list failures. Focused mileage suites:
   **26/26 passing**. Now **30 of 40** route files use the pattern; Phase 4
   remains **3.75/5**.
+
+- **PR 36** (`chore/close-out-email-dedupe`): Phase 9, closes the last item —
+  picked up from the "NEXT UP" note left in this file, both families:
+  1. `exportEmailService.js`'s `sendExportGeneratedEmail`/`sendExportFailedEmail`
+     now wire the same `email_delivery_dedupe` pattern `invoiceOwnerEmailService.js`
+     already used (commit `551fc223`): reserve a dedupe key before sending, mark
+     it sent/failed after. The key is built from businessId + recipient email +
+     exportType + date range (+ truncated failure reason for the failed-email
+     case) rather than a per-request export id, since a client-side retry of the
+     export POST re-runs the whole generation pipeline and would mint a new
+     export id every time — a content-shaped key is what actually collapses
+     retries. `sendExportStaleEmail` untouched, per the note (already guarded
+     by `exportSnapshotService.js`'s atomic `UPDATE ... WHERE status <> 'invalidated'`).
+  2. `emailReminderService.js`'s three reminder flows (trial lifecycle,
+     review-queue, cancellation-ending-soon) replaced their non-atomic
+     `loadReminderState` SELECT → send → `saveReminderState` upsert with a new
+     `claimReminderState()` that claims atomically in one round trip via
+     `business_email_reminders`' existing `(business_id, reminder_key)` unique
+     constraint — `INSERT ... ON CONFLICT DO NOTHING` for the one-shot keys
+     (trial/cancellation reminders, claimable exactly once ever), `ON CONFLICT
+     DO UPDATE ... WHERE last_sent_at < NOW() - cooldown` for the repeatable
+     review-queue key. Claim happens before the send, matching
+     `usageLimitEmailService.js`'s `claimThresholds()` exactly, including its
+     accepted trade-off: a send failure after a won claim is not retried until
+     the key is eligible again, rather than inventing a rollback-on-failure
+     scheme the reference implementation doesn't have either. Removed
+     `saveReminderState`, dead after the replacement; kept `loadReminderState`
+     as the review-queue flow's cheap non-atomic pre-filter (avoids a recipient
+     lookup for businesses still inside the 14-day cooldown), with the atomic
+     claim as the actual authoritative gate right before send — same
+     two-layer shape `usageLimitEmailService.js` already uses.
+
+  Both files had zero prior test coverage. Added `tests/exportEmailService.test.js`
+  (8 tests: reserve-before-send, skip-on-lost-reservation, mark-failed-on-provider-error,
+  distinct requests get distinct keys for both generated and failed emails, and a
+  no-op-without-opt-in case) and `tests/emailReminderService.test.js` (14 tests
+  covering `claimReminderState` directly for both the one-shot and cooldown
+  shapes, all three send flows' claim-wins/claim-lost/pre-check paths, and — the
+  test that actually demonstrates the bug is fixed — two concurrent
+  `sendTrialLifecycleReminders` runs against one shared mock table, asserting
+  exactly one of the two sends. Full suite via `npm run test:all`:
+  **1588/1588 passing** (plus 3/3 ASVS controls) — 22 more than the pre-existing
+  baseline, all new. Phase 9 reaches **5/5**; Overall moves from 34.25/54 to
+  **34.75/54 (~64%)**.

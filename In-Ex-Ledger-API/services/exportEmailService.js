@@ -8,6 +8,12 @@ const {
   appendOptionalEmailFooter,
   getOptionalEmailRecipientForBusiness
 } = require("./emailPreferencesService.js");
+const {
+  buildEmailDedupeKey,
+  reserveEmailDelivery,
+  markEmailDeliverySent,
+  markEmailDeliveryFailed
+} = require("./emailDeliveryDedupeService.js");
 
 const EXPORT_STALE_REMINDER_KEY = "export_stale";
 const INVALIDATION_LABELS = [
@@ -103,16 +109,42 @@ async function sendExportGeneratedEmail({
   try {
     const owner = await loadBusinessOwner(businessId, db);
     if (!owner?.email || !owner.marketing_email_opt_in) return false;
-    return await sendEmailToUser({
-      userId: userId || owner.user_id,
-      email: owner.email,
-      kind: "generated",
-      details: [
-        { label: "Format", value: formatExportType(exportType) },
-        { label: "Date range", value: `${startDate} to ${endDate}` }
-      ],
-      actionUrl: buildAppUrl("/exports")
-    }, resendClient);
+
+    const dedupeKey = buildEmailDedupeKey("export-generated", businessId, [
+      owner.email,
+      exportType || "",
+      startDate || "",
+      endDate || ""
+    ]);
+    const reserved = await reserveEmailDelivery(db, {
+      dedupeKey,
+      category: "export.generated",
+      businessId,
+      recipientEmail: owner.email,
+      metadata: { exportType: exportType || null, startDate: startDate || null, endDate: endDate || null }
+    });
+    if (!reserved) {
+      logWarn("exportEmailService: generated email skipped by dedupe", { businessId, exportType });
+      return false;
+    }
+
+    try {
+      await sendEmailToUser({
+        userId: userId || owner.user_id,
+        email: owner.email,
+        kind: "generated",
+        details: [
+          { label: "Format", value: formatExportType(exportType) },
+          { label: "Date range", value: `${startDate} to ${endDate}` }
+        ],
+        actionUrl: buildAppUrl("/exports")
+      }, resendClient);
+      await markEmailDeliverySent(db, dedupeKey);
+      return true;
+    } catch (sendErr) {
+      await markEmailDeliveryFailed(db, dedupeKey, sendErr);
+      throw sendErr;
+    }
   } catch (err) {
     logWarn("exportEmailService: generated email failed", { businessId, message: err?.message });
     return false;
@@ -130,17 +162,45 @@ async function sendExportFailedEmail({
   try {
     const owner = await loadBusinessOwner(businessId, db);
     if (!owner?.email || !owner.marketing_email_opt_in) return false;
-    return await sendEmailToUser({
-      userId: userId || owner.user_id,
-      email: owner.email,
-      kind: "failed",
-      details: [
-        { label: "Format", value: formatExportType(exportType) },
-        ...(startDate && endDate ? [{ label: "Date range", value: `${startDate} to ${endDate}` }] : []),
-        ...(reason ? [{ label: "Issue", value: String(reason).trim().slice(0, 300) }] : [])
-      ],
-      actionUrl: buildAppUrl("/exports")
-    }, resendClient);
+
+    const reasonText = reason ? String(reason).trim().slice(0, 300) : "";
+    const dedupeKey = buildEmailDedupeKey("export-failed", businessId, [
+      owner.email,
+      exportType || "",
+      startDate || "",
+      endDate || "",
+      reasonText
+    ]);
+    const reserved = await reserveEmailDelivery(db, {
+      dedupeKey,
+      category: "export.failed",
+      businessId,
+      recipientEmail: owner.email,
+      metadata: { exportType: exportType || null, startDate: startDate || null, endDate: endDate || null }
+    });
+    if (!reserved) {
+      logWarn("exportEmailService: failed email skipped by dedupe", { businessId, exportType });
+      return false;
+    }
+
+    try {
+      await sendEmailToUser({
+        userId: userId || owner.user_id,
+        email: owner.email,
+        kind: "failed",
+        details: [
+          { label: "Format", value: formatExportType(exportType) },
+          ...(startDate && endDate ? [{ label: "Date range", value: `${startDate} to ${endDate}` }] : []),
+          ...(reasonText ? [{ label: "Issue", value: reasonText }] : [])
+        ],
+        actionUrl: buildAppUrl("/exports")
+      }, resendClient);
+      await markEmailDeliverySent(db, dedupeKey);
+      return true;
+    } catch (sendErr) {
+      await markEmailDeliveryFailed(db, dedupeKey, sendErr);
+      throw sendErr;
+    }
   } catch (err) {
     logWarn("exportEmailService: failed email failed", { businessId, message: err?.message });
     return false;
