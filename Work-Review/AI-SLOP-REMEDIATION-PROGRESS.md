@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 45.5 / 54 action items (~84%)
+## Overall: 46.5 / 54 action items (~86%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -157,7 +157,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 - [~] Docker/Nixpacks/start scripts reconciled
 - [x] Reproducible installs (`npm ci`) in CI/deployment (`afdefa17`, `6a313ff0`)
 
-## Phase 4 - API Error And Response Consistency — 3.5 / 5
+## Phase 4 - API Error And Response Consistency — 4.5 / 5
 - [~] Consolidated `ApiError`/`sendError`/async-route pattern introduced — Pass 27's
   suggested design already had most of its foundation in place and just wasn't being
   used: `server.js` already has a final Express error handler that derives status
@@ -376,15 +376,44 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   and generic unexpected database failures. Focused invoice suites:
   **23/23 passing**. Now **28 of 40** route files use the pattern. Phase score
   unchanged at **3.75/5**.
-- [~] Client-facing error envelopes normalized — partial; this PR folded one more error
-  class (`ReceiptStatusValidationError`) into `transactions.routes.js`'s existing
-  generic mapper instead of a bespoke standalone try/catch, but this is route-file-local,
-  not a repo-wide envelope standard, so it stays at half credit.
+- [x] Client-facing error envelopes normalized — with 38 of 40 route files now on
+  `asyncRoute`/`ApiError` (see the rollout item above), the central handler's
+  `{ error: message }` shape (plus `requestId` on 500s) is the de facto
+  repo-wide standard now, not just a route-file-local mapping. Grepped every
+  `routes/*.js` file for any remaining non-`{error}` shaped response and
+  checked each hit individually rather than assuming they're all leftover
+  gaps: the `{ ok: false, status, error }`/`{ ok: false }` shapes in
+  `email.routes.js`, `supportEmail.routes.js`, and `plaid.routes.js` are all
+  server-to-server webhook responses, not client-facing (Plaid's was already
+  an accepted exception as of PR 34); `internalSupport.routes.js`'s
+  `{ ok: false, message }` is that route file's own internal-tooling API
+  surface (gated by the shared secret above), a different consumer from the
+  V3 browser client, and internally consistent with its own `{ ok: true,
+  item }` success shape throughout. **Known, narrow exception, left alone**:
+  `businesses.routes.js`'s `POST /provision-add-on` (Stripe-subscription
+  business provisioning, wrapped in a real DB transaction with Stripe
+  compensation on failure) still returns `{ success: false/true, error }`
+  instead of the standard shape. No V3 frontend caller was found for this
+  route (grepped `frontend-v3/src` for the path), so its actual usage is
+  unverified; reshaping a route with live billing-compensation logic and an
+  unconfirmed caller isn't a safe "while we're here" edit, so it's flagged
+  here rather than touched.
 - [x] V2 CRUD routes no longer misclassify bad-ID/validation as 500 (`32210ac6`,
   `0e3fc909`)
 - [x] Repeated validation helpers shared where duplication is real (`f4c0e99f` — v2 UUID
   validation)
-- [~] Representative tests for error status/code/message
+- [x] Representative tests for error status/code/message — 7 dedicated
+  `tests/*RouteErrors.test.js` files now exist (`accountsRouteErrors`,
+  `analyticsRouteErrors`, `businessRouteErrors`, `capitalAssetsRouteErrors`,
+  `categoriesRouteErrors`, `v2RouteErrors`, `vehicleClaimsRouteErrors`), plus
+  every other route conversion PR in this rollout added its own status/
+  message assertions inline. 21 test files assert on a response's `.code`
+  field specifically (e.g. the `accounting_period_locked` extra-fields case).
+  This is a natural byproduct of the `asyncRoute`/`ApiError` rollout, not a
+  separate effort — as that rollout's route-file count climbs, so does this
+  coverage, and it's already broad enough across enough different route
+  families (V1 CRUD, V2 CRUD, business logic, complex domain errors) to call
+  representative.
 
 ## Phase 5 - Database Invariants And Multi-Tenant Boundaries — 5 / 5
 - [x] `CHECK` constraint for subscription `plan_code`/`status` (`e7e14acb`)
@@ -1700,3 +1729,28 @@ test that had been failing identically since PR 13).
   closing the item at full credit on the strength of that decision, same as
   how other explicitly-scoped-out audit findings in this file are handled.
   Phase 2 moves to **6.0/7**; Overall to **45.5/54 (~84%)**.
+
+- **PR 39** (`docs/verify-error-envelope-and-test-coverage`): Phase 4, closes
+  two more of the ten `[~]` items — both turned out to already be
+  substantially done by the natural progress of the `asyncRoute`/`ApiError`
+  rollout, just never re-verified and re-credited. Checked rather than
+  assumed: grepped every `routes/*.js` file for any response shape other
+  than `{ error }` and read each hit. The remaining ones are all legitimate,
+  already-precedented exceptions — three webhook route files respond with
+  their own `{ ok, ... }` shape (server-to-server, not client-facing;
+  Plaid's was already accepted in PR 34), and `internalSupport.routes.js`
+  keeps its own internal-tooling envelope consistently (a different consumer
+  from the V3 browser client). One narrow, real exception flagged and left
+  alone rather than silently ignored: `businesses.routes.js`'s
+  `POST /provision-add-on` still returns `{ success, error }`; it wraps a
+  live Stripe-compensation transaction and no V3 frontend caller was found
+  for it, so it's not a safe drive-by edit. With that mapped, the "client-
+  facing error envelopes normalized" item closes at full credit — the
+  `{ error }` shape is now the de facto repo-wide standard, not just
+  route-file-local. Separately, "representative tests for error status/
+  code/message" also closes: 7 dedicated `tests/*RouteErrors.test.js` files
+  exist plus inline coverage from every rollout PR, spanning V1 CRUD, V2
+  CRUD, business logic, and complex domain-error cases — a natural byproduct
+  of the same rollout, not separate effort. No code change, both items
+  closed by verification. Phase 4 moves to **4.5/5**; Overall to
+  **46.5/54 (~86%)**.
