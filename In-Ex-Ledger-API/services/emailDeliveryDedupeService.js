@@ -2,6 +2,17 @@
 
 const crypto = require("crypto");
 
+// If the process dies (crash, deploy, OOM) after reserveEmailDelivery()
+// inserts a 'reserved' row but before markEmailDeliverySent/Failed ever
+// runs, that row would otherwise stay 'reserved' forever -- the ON CONFLICT
+// clause below only reclaims 'failed' rows, so every future genuine attempt
+// at that exact dedupe key would silently no-op, forever. A real send
+// (Resend API call) completes in well under a minute; 15 minutes is a
+// generous margin above that before a 'reserved' row is treated as
+// abandoned and safe to reclaim, while 'sent' rows are never matched here
+// and stay permanently protected regardless of age.
+const STALE_RESERVATION_MINUTES = 15;
+
 function buildEmailDedupeKey(category, scope, parts = []) {
   const normalizedCategory = String(category || "").trim();
   const normalizedScope = String(scope || "").trim();
@@ -44,6 +55,10 @@ async function reserveEmailDelivery(
             failed_at = NULL,
             updated_at = NOW()
       WHERE email_delivery_dedupe.status = 'failed'
+         OR (
+              email_delivery_dedupe.status = 'reserved'
+              AND email_delivery_dedupe.updated_at < NOW() - ($6::bigint * INTERVAL '1 minute')
+            )
       RETURNING dedupe_key`,
     [
       dedupeKey,
@@ -51,6 +66,7 @@ async function reserveEmailDelivery(
       businessId,
       recipientEmail,
       JSON.stringify(metadata && typeof metadata === "object" ? metadata : {}),
+      STALE_RESERVATION_MINUTES,
     ],
   );
   return result.rowCount > 0;

@@ -62,6 +62,7 @@ const {
   normalizeOptionalBillingInterval,
   normalizeOptionalCurrency,
   normalizeAdditionalBusinesses,
+  requireMutationAttemptId,
   normalizeInternalReturnPath,
   buildCheckoutReturnPath,
   isTrialReupgradeAttempt,
@@ -1426,6 +1427,7 @@ router.post(
   billingMutationLimiter,
   async (req, res) => {
     try {
+      const mutationAttemptId = requireMutationAttemptId(req.body?.mutationAttemptId);
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
       const subscription =
         await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
@@ -1445,7 +1447,7 @@ router.post(
           idempotencyKey: buildStripeMutationIdempotencyKey(
             "subscription-cancel",
             billingBusinessId,
-            [subscription.stripeSubscriptionId, "cancel_at_period_end:true"],
+            [subscription.stripeSubscriptionId, "cancel_at_period_end:true", mutationAttemptId],
           ),
         },
       );
@@ -1469,7 +1471,10 @@ router.post(
       res.status(200).json({ subscription: updated });
     } catch (err) {
       logError("POST /api/billing/customer-portal/cancel error:", err.message);
-      res.status(500).json({ error: "Failed to cancel subscription." });
+      const status = err instanceof BillingValidationError ? 400 : 500;
+      res.status(status).json({
+        error: status === 400 ? err.message : "Failed to cancel subscription.",
+      });
     }
   },
 );
@@ -1481,6 +1486,7 @@ router.post(
   billingMutationLimiter,
   async (req, res) => {
     try {
+      const mutationAttemptId = requireMutationAttemptId(req.body?.mutationAttemptId);
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
       let subscription =
         await getSubscriptionSnapshotForBusiness(billingBusinessId);
@@ -1604,6 +1610,7 @@ router.post(
               updatePayload["items[0][price]"] || "",
               updatePayload["items[1][id]"] || "",
               updatePayload["items[1][price]"] || "",
+              mutationAttemptId,
             ],
           ),
         },
@@ -1620,7 +1627,10 @@ router.post(
       res.status(200).json({ subscription });
     } catch (err) {
       logError("POST /api/billing/resume error:", err.message);
-      res.status(500).json({ error: "Failed to resume subscription." });
+      const status = err instanceof BillingValidationError ? 400 : 500;
+      res.status(status).json({
+        error: status === 400 ? err.message : "Failed to resume subscription.",
+      });
     }
   },
 );
@@ -1632,6 +1642,7 @@ router.post(
   billingMutationLimiter,
   async (req, res) => {
     try {
+      const mutationAttemptId = requireMutationAttemptId(req.body?.mutationAttemptId);
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
       const subscription =
         await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
@@ -1673,7 +1684,7 @@ router.post(
           idempotencyKey: buildStripeMutationIdempotencyKey(
             "subscription-cancel",
             billingBusinessId,
-            [subscription.stripeSubscriptionId, "cancel_at_period_end:true"],
+            [subscription.stripeSubscriptionId, "cancel_at_period_end:true", mutationAttemptId],
           ),
         },
       );
@@ -1697,7 +1708,10 @@ router.post(
       res.status(200).json({ subscription: updated });
     } catch (err) {
       logError("POST /api/billing/cancel error:", err.message);
-      res.status(500).json({ error: "Failed to cancel subscription." });
+      const status = err instanceof BillingValidationError ? 400 : 500;
+      res.status(status).json({
+        error: status === 400 ? err.message : "Failed to cancel subscription.",
+      });
     }
   },
 );
@@ -1999,6 +2013,7 @@ router.patch(
       const additionalBusinesses = normalizeAdditionalBusinesses(
         req.body?.additionalBusinesses,
       );
+      const mutationAttemptId = requireMutationAttemptId(req.body?.mutationAttemptId);
 
       const stripeSub = await stripeGet(
         `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
@@ -2029,6 +2044,7 @@ router.patch(
                 subscription.stripeSubscriptionId,
                 existingAddonItem.id,
                 "delete",
+                mutationAttemptId,
               ],
             ),
           },
@@ -2049,6 +2065,7 @@ router.patch(
                 subscription.stripeSubscriptionId,
                 existingAddonItem.id,
                 additionalBusinesses,
+                mutationAttemptId,
               ],
             ),
           },
@@ -2073,6 +2090,7 @@ router.patch(
                 subscription.stripeSubscriptionId,
                 addonPriceId,
                 additionalBusinesses,
+                mutationAttemptId,
               ],
             ),
           },

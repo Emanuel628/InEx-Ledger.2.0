@@ -9,6 +9,7 @@ const request = require("supertest");
 const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const BILLING_ROUTE_PATH = require.resolve("../routes/billing.routes.js");
+const MUTATION_ATTEMPT_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 
 function loadBillingRouter({
   country = "Canada",
@@ -748,7 +749,7 @@ test("legacy billing cancel portal endpoint schedules cancellation directly", as
   try {
     const res = await request(fixture.app)
       .post("/api/billing/customer-portal/cancel")
-      .send({});
+      .send({ mutationAttemptId: MUTATION_ATTEMPT_ID });
 
     assert.equal(res.status, 200);
     assert.equal(res.body.subscription.cancelAtPeriodEnd, true);
@@ -1646,7 +1647,9 @@ test("billing resume clears cancel_at_period_end on the existing Stripe subscrip
   });
 
   try {
-    const res = await request(fixture.app).post("/api/billing/resume").send({});
+    const res = await request(fixture.app)
+      .post("/api/billing/resume")
+      .send({ mutationAttemptId: MUTATION_ATTEMPT_ID });
 
     assert.equal(res.status, 200);
 
@@ -1717,7 +1720,7 @@ test("billing resume can switch a canceling yearly subscription to monthly", asy
   try {
     const res = await request(fixture.app)
       .post("/api/billing/resume")
-      .send({ billingInterval: "monthly" });
+      .send({ billingInterval: "monthly", mutationAttemptId: MUTATION_ATTEMPT_ID });
 
     assert.equal(res.status, 200);
 
@@ -1797,7 +1800,7 @@ test("billing resume switches an already-active (non-canceled) subscription's in
   try {
     const res = await request(fixture.app)
       .post("/api/billing/resume")
-      .send({ billingInterval: "yearly" });
+      .send({ billingInterval: "yearly", mutationAttemptId: MUTATION_ATTEMPT_ID });
 
     assert.equal(res.status, 200);
 

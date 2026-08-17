@@ -104,17 +104,25 @@ async function sendExportGeneratedEmail({
   userId,
   exportType,
   startDate,
-  endDate
+  endDate,
+  exportId
 }, { db = pool, resendClient = getResendClient() } = {}) {
   try {
     const owner = await loadBusinessOwner(businessId, db);
     if (!owner?.email || !owner.marketing_email_opt_in) return false;
 
+    // exportId identifies this specific completed export -- every successful
+    // generation mints a fresh one (storeCompletedExport is not idempotent),
+    // so including it here is what lets two separate exports for the same
+    // date range each get their own email, instead of the second one being
+    // silently treated as a duplicate of the first just because the
+    // recipient/type/date-range happen to match.
     const dedupeKey = buildEmailDedupeKey("export-generated", businessId, [
       owner.email,
       exportType || "",
       startDate || "",
-      endDate || ""
+      endDate || "",
+      exportId || ""
     ]);
     const reserved = await reserveEmailDelivery(db, {
       dedupeKey,
@@ -157,19 +165,26 @@ async function sendExportFailedEmail({
   exportType,
   startDate,
   endDate,
-  reason
+  reason,
+  exportAttemptId
 }, { db = pool, resendClient = getResendClient() } = {}) {
   try {
     const owner = await loadBusinessOwner(businessId, db);
     if (!owner?.email || !owner.marketing_email_opt_in) return false;
 
+    // exportAttemptId identifies this one generation attempt (the caller
+    // mints it once per request -- a grant's jti for the grant-based flow,
+    // a fresh id for the direct flow). Without it, two unrelated failed
+    // attempts for the same date range would collide on the same dedupe key
+    // and only the first failure would ever notify the owner.
     const reasonText = reason ? String(reason).trim().slice(0, 300) : "";
     const dedupeKey = buildEmailDedupeKey("export-failed", businessId, [
       owner.email,
       exportType || "",
       startDate || "",
       endDate || "",
-      reasonText
+      reasonText,
+      exportAttemptId || ""
     ]);
     const reserved = await reserveEmailDelivery(db, {
       dedupeKey,

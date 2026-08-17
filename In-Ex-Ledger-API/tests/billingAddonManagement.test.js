@@ -13,6 +13,7 @@ const BILLING_ROUTE_PATH = require.resolve("../routes/billing.routes.js");
 const ADDON_PRICE_ID = "price_addon_monthly_usd_test";
 const BASE_PRICE_ID = "price_base_monthly_usd_test";
 const ADDON_ITEM_ID = "si_addon_001";
+const MUTATION_ATTEMPT_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
 function makeSub(overrides = {}) {
   const futureTs = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
@@ -396,7 +397,7 @@ test("PATCH /additional-businesses — active Pro user can increase slots", asyn
   try {
     const res = await request(app)
       .patch("/api/billing/additional-businesses")
-      .send({ additionalBusinesses: 2 });
+      .send({ additionalBusinesses: 2, mutationAttemptId: MUTATION_ATTEMPT_ID });
     assert.equal(res.status, 200);
     assert.ok(res.body.subscription);
     assert.equal(state.syncCalls.length, 1);
@@ -436,7 +437,7 @@ test("PATCH /additional-businesses — active Pro user can decrease existing add
   try {
     const res = await request(app)
       .patch("/api/billing/additional-businesses")
-      .send({ additionalBusinesses: 1 });
+      .send({ additionalBusinesses: 1, mutationAttemptId: MUTATION_ATTEMPT_ID });
     assert.equal(res.status, 200);
     assert.equal(state.stripeUpdates.length, 1);
     const update = state.stripeUpdates[0].body;
@@ -473,7 +474,7 @@ test("PATCH /additional-businesses — quantity 0 removes existing addon item", 
   try {
     const res = await request(app)
       .patch("/api/billing/additional-businesses")
-      .send({ additionalBusinesses: 0 });
+      .send({ additionalBusinesses: 0, mutationAttemptId: MUTATION_ATTEMPT_ID });
     assert.equal(res.status, 200);
     assert.equal(state.stripeUpdates.length, 1);
     const update = state.stripeUpdates[0].body;
@@ -495,7 +496,7 @@ test("PATCH /additional-businesses — quantity 0 with no addon item is a no-op 
   try {
     const res = await request(app)
       .patch("/api/billing/additional-businesses")
-      .send({ additionalBusinesses: 0 });
+      .send({ additionalBusinesses: 0, mutationAttemptId: MUTATION_ATTEMPT_ID });
     assert.equal(res.status, 200);
     assert.equal(
       state.stripeUpdates.length,
@@ -530,7 +531,7 @@ test("PATCH /additional-businesses — existing addon item is updated, not dupli
   try {
     const res = await request(app)
       .patch("/api/billing/additional-businesses")
-      .send({ additionalBusinesses: 4 });
+      .send({ additionalBusinesses: 4, mutationAttemptId: MUTATION_ATTEMPT_ID });
     assert.equal(res.status, 200);
     assert.equal(
       state.stripeUpdates.length,
@@ -573,7 +574,7 @@ test("PATCH /additional-businesses ? trialing Pro user can increase slots", asyn
   try {
     const res = await request(app)
       .patch("/api/billing/additional-businesses")
-      .send({ additionalBusinesses: 2 });
+      .send({ additionalBusinesses: 2, mutationAttemptId: MUTATION_ATTEMPT_ID });
     assert.equal(res.status, 200);
     assert.ok(res.body.subscription);
     assert.equal(state.syncCalls.length, 1);
@@ -630,7 +631,7 @@ test("PATCH /additional-businesses — infers pricing terms from Stripe subscrip
   try {
     const res = await request(app)
       .patch("/api/billing/additional-businesses")
-      .send({ additionalBusinesses: 2 });
+      .send({ additionalBusinesses: 2, mutationAttemptId: MUTATION_ATTEMPT_ID });
     assert.equal(res.status, 200);
     assert.equal(state.stripeUpdates.length, 1);
     const update = state.stripeUpdates[0].body;

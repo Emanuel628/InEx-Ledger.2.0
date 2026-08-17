@@ -910,6 +910,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         exportType,
         startDate: grantStartDate,
         endDate: grantEndDate,
+        exportId,
       }), { userId: user.id, businessId, exportType, route: "grant_generate" });
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader(
@@ -987,6 +988,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       exportType: "pdf",
       startDate: grantStartDate,
       endDate: grantEndDate,
+      exportId,
     }), { userId: user.id, businessId, exportType: "pdf", route: "grant_generate" });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -1012,6 +1014,11 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       startDate: grantPayload?.dateRange?.startDate || null,
       endDate: grantPayload?.dateRange?.endDate || null,
       reason: err.message,
+      // The grant token is single-use and minted once per user-initiated
+      // export attempt, so its jti is a real per-attempt identity here --
+      // the same failed attempt (e.g. a duplicate side-effect invocation)
+      // reuses it, while a later distinct attempt gets a new grant/jti.
+      exportAttemptId: grantPayload?.jti || null,
     }), { userId: user?.id, businessId, exportType: grantPayload?.exportType || "pdf", route: "grant_generate" });
     logError("Export generation error", {
       body: sanitizedBody,
@@ -1384,10 +1391,22 @@ router.get("/history/:id/csv", exportGrantLimiter, async (req, res) => {
 // Sensitive fields (ssn, sin, taxId_jwe) are redacted from all log output.
 router.post("/secure-export", secureExportLimiter, async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
+  // Minted once per request so it identifies this one generation attempt --
+  // used as the export-email dedupe identity on the failure path below,
+  // where nothing gets persisted (so there's no exportId to key on instead).
+  const exportAttemptId = crypto.randomUUID();
+  // Declared here (not inside the try below) so the catch block's own
+  // failure-reporting can actually read them -- they used to be declared
+  // with `const` inside the try, which made `user`/`businessId` undefined
+  // bindings in the catch block and threw a ReferenceError on every
+  // unexpected failure, before the "export failed" email or even the 500
+  // response could be sent.
+  let user;
+  let businessId;
   try {
-    const user = req.user;
+    user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
-    const businessId = user.business_id;
+    businessId = user.business_id;
 
     const dateRange = validateDateRange(req.body?.dateRange);
     if (!dateRange) {
@@ -1805,6 +1824,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       exportType: "pdf",
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
+      exportId,
     }), { userId: user.id, businessId, exportType: "pdf", route: "secure_export" });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -1830,6 +1850,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       startDate: req.body?.dateRange?.startDate || null,
       endDate: req.body?.dateRange?.endDate || null,
       reason: err.message,
+      exportAttemptId,
     }), { userId: user?.id, businessId, exportType: "pdf", route: "secure_export" });
     logError("Secure export error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate secure export." });
