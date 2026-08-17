@@ -18,14 +18,52 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 49.0 / 54 action items (~91%)
+## Overall: 49.5 / 54 action items (~92%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
-## Phase 1 - Stop New Damage: Gates, Secrets, Repo Hygiene — 5.5 / 6
+## Phase 1 - Stop New Damage: Gates, Secrets, Repo Hygiene — 6.0 / 6
 - [x] `npm run test:all` wired into CI (`phase7-guardrails.yml`)
-- [~] Brittle source-shape tests replaced with behavior tests — partial; ongoing, folds
-  into Phase 7's "prefer tests around behavior" rule.
+- [x] Brittle source-shape tests replaced with behavior tests — inventoried all 22
+  files across the suite that read frontend-v3 `.ts`/`.tsx` source as text. Most
+  turned out to be either false positives (files that `readFileSync` a script only to
+  `vm`-execute it and test real runtime behavior) or legitimate structural/source-level
+  invariants explicitly worth keeping (CSRF route-inventory, migration-file content
+  pinning, nixpacks/Dockerfile config checks, doc-sync checks) — retained unchanged per
+  this item's own stated finish line. Converted the genuinely brittle ones:
+  `tests/frontendV3ApiContracts.test.js`'s transaction-mapper and `/api/me` contract
+  tests now transpile `transactionsApi.ts`/`authApi.ts` with the real TypeScript
+  compiler and run the real `mapTransaction`/`mapLegacyUser` functions in a `vm`
+  sandbox (exported both — previously module-private — specifically for this), instead
+  of regexing fallback expressions out of the source. `tests/frontendV3Wiring.test.js`'s
+  Canadian tax-rate test now calls the real (newly-exported) `resolveEstimatedTaxProfile`
+  the same way instead of pinning literal `AB: 0.29`-style constants in a regex. Its two
+  `apiClient.ts` tests now load the real module with a mocked `fetch`/`document.cookie`/
+  `FormData` sandbox and assert on actual request sequences (401 → refresh → retry;
+  403 CSRF failure → refresh → retry with the new token), replacing literal-code-fragment
+  regexes with genuine behavior tests. Its debounce/stale-response-guard test for
+  `Receipts.tsx` had its magic-number (`275`) and private-ref-name pins relaxed to
+  structural pattern checks, since there's no React/jsdom test harness in this repo to
+  drive true component behavior — introducing one solely for this single assertion
+  would be disproportionate, so it stays a source check with the genuine brittleness
+  removed. The root-landing favicon test's exact cache-bust query string
+  (`?v=20260726a`, guaranteed to go stale on the next legitimate asset update) was
+  relaxed to match any cache-bust value. The legacy-auth-defaults test now signs a real
+  JWT via `auth.middleware.js`'s exported `signToken` and decodes its actual `exp`-`iat`
+  lifetime instead of regexing `|| 60 * 60`; the two remaining non-exported constants
+  (the auth-cookie maxAge and the refresh rate limit) stay source checks but now assert
+  on numeric magnitude rather than pinning exact literal formatting.
+  `tests/startupMigrationSafety.test.js`'s server-init-before-listen test previously
+  compared `indexOf` positions of two strings inside a sliced function body; it now
+  requires the real `server.js`/`db.js` fresh, spies on the real `initDatabase` and
+  `app.listen` calls, invokes the real `startServer()`, and asserts the actual call
+  order. `tests/internalSupportRoutes.test.js`'s rate-limiter-before-secret-check test
+  was investigated too: unlike the other `indexOf` cases, `router.use(A); router.use(B)`
+  ordering in Express *is* the actual behavior (Express always runs middleware in
+  registration order), so converting it to a live 429-triggering test would need either
+  running in production mode or new store-injection plumbing for a check that's already
+  faithful — left unchanged as a legitimate source-level invariant. Full backend suite:
+  1631/1631 passing; `frontend-v3` type-checks and builds clean.
 - [x] Tracked E2E/session artifacts with credentials removed — verified none present
 - [x] `.gitleaks.toml` tightened to narrow, specific allowlist — verified
 - [x] Ignores for runtime/browser/session artifacts — verified (`test-results/` etc.)
@@ -2053,3 +2091,77 @@ test that had been failing identically since PR 13).
   pre-existing baseline, all new. Route-file count stays at **38 of 40**
   (not counting `auth.routes.js` until it's fully converted); Phase 4 and
   Overall unchanged — 16 more routes to go in follow-up PRs.
+
+- **PR 46** (`chore/convert-brittle-source-shape-tests`): Phase 1, closes
+  the last of the ten `[~]` items in this phase (Phase 1 reaches **6/6**).
+  The user's instruction for this item was specific: don't convert
+  everything that reads source as text — inventory first, convert only the
+  genuinely brittle implementation-detail tests, and explicitly keep
+  source-level checks where the thing being protected really is a
+  source-level rule. Delegated the 22-file inventory to a background
+  research agent while other work continued; it came back with roughly
+  9 genuine offenders, concentrated in `tests/frontendV3ApiContracts.test.js`
+  (2) and `tests/frontendV3Wiring.test.js` (5), plus one each in
+  `tests/startupMigrationSafety.test.js` and `tests/internalSupportRoutes.test.js`.
+
+  For the two API-contract mapper tests and three of the `frontendV3Wiring`
+  tests, built a small `vm` + real-`typescript`-compiler loader (following
+  the precedent already set by `tests/frontendV3Navigation.test.js`) that
+  transpiles a `lib/*.ts` file and runs it in a sandbox with a stubbed
+  `require` for its own relative imports, so the tests call the actual
+  exported function against real inputs instead of regexing the source.
+  `mapTransaction` (`transactionsApi.ts`), `mapLegacyUser` (`authApi.ts`),
+  and `resolveEstimatedTaxProfile` (`transactionsApi.ts`) were all
+  module-private — exported all three specifically to make this possible,
+  the same "export the pure function for testability" pattern
+  `navigation.ts` already used for its own tests. The two `apiClient.ts`
+  tests needed a further step: `apiClient.ts` isn't a pure function, it
+  drives `fetch`/`document.cookie`/`window.location`, none of which exist
+  in a bare `vm` context — built a minimal sandbox providing a scripted
+  `fetch` mock plus a cookie-jar-backed `document` stub, then asserted on
+  the actual request sequence (a 401 triggers exactly one refresh and one
+  retry; a stale-CSRF 403 on a multipart request triggers exactly one
+  `/api/me` refresh and one retry carrying the new token, with the
+  multipart body's `Content-Type` never set). Cross-realm `assert.deepEqual`
+  on plain objects returned from the `vm` sandbox fails on prototype
+  identity even when the values are equal — switched those specific
+  assertions to a `JSON.stringify` comparison instead of chasing a false
+  regression.
+
+  For the two tests where full behavioral conversion wasn't proportionate
+  (no React/jsdom harness exists in this repo to actually drive
+  `Receipts.tsx`'s debounce, and `startServer()`'s DB-before-listen
+  ordering needed real module mocking rather than a pure-function export),
+  took the calibrated middle path the user's instruction allowed: relaxed
+  the literal magic-number/private-var-name pins that made them brittle
+  (`Receipts.tsx`'s debounce `275` and `searchSequenceRef` name; the
+  root-landing favicon's exact `?v=20260726a` cache-bust value) while
+  keeping them as source checks for the structural invariant that
+  actually matters, and for `startupMigrationSafety.test.js`'s
+  server-init-before-listen test, went ahead and built the real thing: it
+  now requires `server.js`/`db.js` fresh, spies on the real `initDatabase`
+  and `app.listen`, calls the real `startServer()`, and asserts the actual
+  call order rather than comparing `indexOf` positions in a source slice.
+  The legacy-auth-defaults test (JWT expiry / cookie maxAge / refresh rate
+  limit) got a hybrid fix: the JWT expiry is now checked by signing a real
+  token via the exported `signToken` and decoding its lifetime; the other
+  two constants aren't exported, so they stay source checks but assert on
+  numeric magnitude instead of pinning literal `60 * 60`/`120` formatting.
+
+  Investigated `tests/internalSupportRoutes.test.js`'s rate-limiter-before-
+  secret-check test last, expecting to convert it the same way (fire
+  enough requests to trigger a real 429). Concluded it shouldn't change:
+  unlike the other `indexOf` cases, `router.use(A); router.use(B)` order in
+  an Express router *is* the actual runtime behavior (Express always runs
+  middleware in registration order) — the existing check isn't a brittle
+  proxy for the invariant, it already tests the invariant directly.
+  Reaching a real 429 in this test environment would need either running
+  in production mode or new rate-limiter store-injection plumbing, for a
+  check that was already faithful — left unchanged as a legitimate
+  source-level rule, per the user's own carve-out for exactly this case.
+
+  Full suite via `npm run test:all`: **1631/1631 passing** (plus 3/3 ASVS
+  controls) — 2 more than the pre-existing baseline (net, after removing
+  and replacing several regex-only tests with fewer, higher-value behavior
+  tests). `frontend-v3` type-checks (`tsc -b --noEmit`) and builds clean.
+  Overall to **49.5/54 (~92%)**.

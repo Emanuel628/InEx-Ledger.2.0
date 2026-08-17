@@ -2,9 +2,65 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 
 const repoRoot = path.resolve(__dirname, "..");
 const frontendRoot = path.join(repoRoot, "frontend-v3", "src");
+const frontendPackageRoot = path.join(repoRoot, "frontend-v3");
+
+// Transpiles a lib/*.ts module with the real TypeScript compiler and runs it
+// in a sandbox so tests can exercise its real exported functions against a
+// mocked fetch/DOM instead of pattern-matching the source text.
+function loadLibModule(relativePath, sandboxExtras = {}) {
+  const ts = require(path.join(frontendPackageRoot, "node_modules", "typescript"));
+  const source = fs.readFileSync(path.join(frontendRoot, relativePath), "utf8");
+  const transpiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022
+    }
+  }).outputText;
+
+  const sandbox = {
+    exports: {},
+    module: { exports: {} },
+    URL,
+    ...sandboxExtras
+  };
+  sandbox.exports = sandbox.module.exports;
+  vm.runInNewContext(transpiled, sandbox, { filename: relativePath });
+  return sandbox.module.exports;
+}
+
+function loadApiClientModule({ fetchImpl, cookieStore = new Map() } = {}) {
+  const assignedUrls = [];
+  const documentStub = {
+    get cookie() {
+      return Array.from(cookieStore.entries()).map(([key, value]) => `${key}=${value}`).join("; ");
+    },
+    set cookie(value) {
+      const [pair] = String(value).split(";");
+      const eq = pair.indexOf("=");
+      if (eq > -1) {
+        cookieStore.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+      }
+    }
+  };
+  const windowStub = {
+    location: { pathname: "/transactions", search: "", hash: "" }
+  };
+  windowStub.location.assign = (url) => assignedUrls.push(url);
+
+  const exports = loadLibModule(path.join("lib", "apiClient.ts"), {
+    fetch: fetchImpl,
+    Headers,
+    FormData,
+    window: windowStub,
+    document: documentStub
+  });
+
+  return { exports, assignedUrls, cookieStore };
+}
 
 function readFrontendFiles() {
   const files = [];
@@ -97,32 +153,80 @@ test("v3 public pages are mapped for direct URL routing", () => {
   }
 });
 
-test("v3 API client refreshes an expired access token before failing authenticated requests", () => {
-  const source = fs.readFileSync(path.join(frontendRoot, "lib", "apiClient.ts"), "utf8");
+test("v3 API client refreshes an expired access token before failing authenticated requests", async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const urlString = String(url);
+    calls.push(urlString);
+    if (urlString === "/api/data") {
+      const attempt = calls.filter((call) => call === "/api/data").length;
+      if (attempt === 1) {
+        return new Response(JSON.stringify({ error: "Token expired." }), { status: 401 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (urlString === "/api/auth/refresh") {
+      return new Response(null, { status: 200 });
+    }
+    throw new Error(`Unexpected fetch: ${urlString}`);
+  };
 
-  assert.match(source, /response\.status === 401 && await refreshAccessToken\(\)/);
-  assert.match(source, /\/api\/auth\/refresh/);
-  assert.match(source, /credentials: 'include'/);
-  assert.match(source, /getCurrentCanonicalPath\(\)/);
-  assert.match(source, /window\.location\.hash/);
-  assert.match(source, /path\.startsWith\('\/app-v3\/'\)/);
-  assert.match(source, /isAuthPath\(path\)/);
-  assert.match(source, /return '\/transactions'/);
+  const { exports: apiClient } = loadApiClientModule({ fetchImpl });
+  const result = await apiClient.apiRequest("/api/data");
+
+  // result is a plain object created in the vm sandbox's own realm, so its
+  // prototype differs from this realm's Object.prototype -- compare by
+  // value (JSON) rather than reference-equal deepEqual.
+  assert.equal(JSON.stringify(result), JSON.stringify({ ok: true }));
+  assert.deepEqual(
+    calls,
+    ["/api/data", "/api/auth/refresh", "/api/data"],
+    "a 401 should trigger exactly one refresh, then exactly one retry of the original request"
+  );
 });
 
-test("v3 API client preserves multipart bodies and retries stale CSRF once", () => {
-  const source = fs.readFileSync(path.join(frontendRoot, "lib", "apiClient.ts"), "utf8");
+test("v3 API client preserves multipart bodies and retries stale CSRF once", async () => {
+  const cookieStore = new Map([["csrf_token", "old-token"]]);
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const urlString = String(url);
+    const headers = init?.headers instanceof Headers ? init.headers : new Headers(init?.headers);
+    calls.push({
+      url: urlString,
+      hasContentType: headers.has("Content-Type"),
+      csrfHeader: headers.get("X-CSRF-Token")
+    });
 
-  assert.match(source, /class ApiRequestError extends Error/);
-  assert.match(source, /code\?: string/);
-  assert.match(source, /details\?: unknown/);
-  assert.match(source, /new ApiRequestError\(data\.error \|\| 'Request failed\.', response\.status, data\.code, data\.details\)/);
-  assert.match(source, /init\.body instanceof FormData/);
-  assert.match(source, /init\.body && !isFormData/);
-  assert.match(source, /response\.status === 403 && await isCsrfFailure\(response\)/);
-  assert.match(source, /await refreshCsrfToken\(\)/);
-  assert.match(source, /fetch\('\/api\/me'/);
-  assert.match(source, /CSRF token missing or invalid\./);
+    if (urlString === "/api/upload") {
+      const attempt = calls.filter((call) => call.url === "/api/upload").length;
+      if (attempt === 1) {
+        return new Response(JSON.stringify({ error: "CSRF token missing or invalid." }), { status: 403 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (urlString === "/api/me") {
+      cookieStore.set("csrf_token", "new-token");
+      return new Response(JSON.stringify({}), { status: 200 });
+    }
+    throw new Error(`Unexpected fetch: ${urlString}`);
+  };
+
+  const { exports: apiClient } = loadApiClientModule({ fetchImpl, cookieStore });
+  const body = new FormData();
+  body.append("file", "contents");
+
+  const result = await apiClient.apiRequest("/api/upload", { method: "POST", body });
+
+  assert.equal(JSON.stringify(result), JSON.stringify({ ok: true }));
+  const uploadCalls = calls.filter((call) => call.url === "/api/upload");
+  assert.equal(uploadCalls.length, 2, "a stale-CSRF 403 should be retried exactly once");
+  assert.equal(uploadCalls[0].csrfHeader, "old-token");
+  assert.equal(uploadCalls[1].csrfHeader, "new-token", "the retry should use the refreshed CSRF token");
+  assert.equal(
+    uploadCalls[0].hasContentType,
+    false,
+    "FormData bodies must not get an explicit Content-Type -- the browser needs to set the multipart boundary itself"
+  );
 });
 
 test("v3 app routes use bare canonical paths and browser back drives page state", () => {
@@ -157,7 +261,10 @@ test("v3 root landing uses the React shell and current favicon", () => {
 
   assert.match(serverSource, /app\.get\('\/', sendFrontendV3App\)/);
   assert.doesNotMatch(serverSource, /app\.get\('\/', \(req, res\)[\s\S]*sendCanonicalPage\('landing'/);
-  assert.match(indexSource, /\/brand\/inex-mark-color\.svg\?v=20260726a/);
+  // The cache-busting query string's exact value changes on every legitimate
+  // asset update -- what matters is that the favicon points at the current
+  // brand mark and carries *some* cache-busting param, not which one.
+  assert.match(indexSource, /\/brand\/inex-mark-color\.svg\?v=[\w-]+/);
 });
 
 test("v3 row action menus are positioned against the viewport to avoid table clipping", () => {
@@ -562,15 +669,33 @@ test("v3 transactions use Categories page source for dropdowns and clean review 
 });
 
 test("v3 transactions use legacy estimated tax percentages including Canada province rates", () => {
-  const source = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
+  const { resolveEstimatedTaxProfile } = loadLibModule(path.join("lib", "transactionsApi.ts"), {
+    require(specifier) {
+      if (specifier === "./apiClient") {
+        return { apiRequest: async () => { throw new Error("apiRequest should not be called"); } };
+      }
+      if (specifier === "./categoriesApi") {
+        return { getTaxLineOptions: () => [] };
+      }
+      throw new Error(`Unexpected require('${specifier}')`);
+    }
+  });
 
-  assert.match(source, /AB: 0\.29/);
-  assert.match(source, /BC: 0\.26/);
-  assert.match(source, /ON: 0\.27/);
-  assert.match(source, /QC: 0\.34/);
-  assert.match(source, /return rates\[province\] \|\| 0\.28/);
-  assert.match(source, /combined income tax \+ CPP rate/);
-  assert.doesNotMatch(source, /QC: 0\.14975/);
+  assert.equal(resolveEstimatedTaxProfile({ region: "CA", province: "AB" }).rate, 0.29);
+  assert.equal(resolveEstimatedTaxProfile({ region: "CA", province: "BC" }).rate, 0.26);
+  assert.equal(resolveEstimatedTaxProfile({ region: "CA", province: "ON" }).rate, 0.27);
+  assert.equal(resolveEstimatedTaxProfile({ region: "CA", province: "QC" }).rate, 0.34);
+  assert.equal(
+    resolveEstimatedTaxProfile({ region: "CA", province: "ZZ" }).rate,
+    0.28,
+    "an unrecognized province should fall back to the default combined rate"
+  );
+  assert.match(resolveEstimatedTaxProfile({ region: "CA", province: "AB" }).note, /combined income tax \+ CPP rate/);
+  assert.notEqual(
+    resolveEstimatedTaxProfile({ region: "CA", province: "QC" }).rate,
+    0.14975,
+    "the Canadian estimate must stay an income-tax buffer, not GST/HST's rate"
+  );
 });
 
 test("v3 transactions expose legacy undo delete and a clickable per-page select affordance", () => {
@@ -642,9 +767,20 @@ test("v3 receipts use red unlinked pills and a transaction picker instead of lin
   assert.match(pageSource, /Link transaction/);
   assert.match(pageSource, /onSearchTransactions={searchReceiptTransactionOptions}/);
   assert.match(pageSource, /useRef\(0\)/);
-  assert.match(pageSource, /window\.setTimeout\(\(\) =>/);
-  assert.match(pageSource, /}, 275\)/);
-  assert.match(pageSource, /searchSequenceRef\.current === sequence/);
+  // The exact debounce delay and ref name are tuning/implementation
+  // details -- what actually needs protecting is that the search is
+  // debounced at all, and that stale (out-of-order) responses are
+  // discarded via a ref-based sequence guard rather than applied blindly.
+  assert.match(
+    pageSource,
+    /window\.setTimeout\(\(\) => \{[\s\S]*?\}, \d+\)/,
+    "transaction search should stay debounced with window.setTimeout"
+  );
+  assert.match(
+    pageSource,
+    /\w+Ref\.current === sequence/,
+    "stale search responses should be discarded via a ref-based sequence guard"
+  );
   assert.match(apiSource, /export async function searchReceiptTransactionOptions/);
   assert.match(apiSource, /params\.set\('limit', '50'\)/);
   assert.doesNotMatch(apiSource, /\/api\/transactions\?limit=500&offset=0/);
@@ -822,11 +958,44 @@ test("phase 7 guardrails installs frontend v3 dependencies before i18n runtime c
 });
 
 test("legacy auth defaults avoid rapid v3 session expiry and refresh throttling", () => {
-  const authRoutes = fs.readFileSync(path.join(repoRoot, "routes", "auth.routes.js"), "utf8");
-  const authMiddleware = fs.readFileSync(path.join(repoRoot, "middleware", "auth.middleware.js"), "utf8");
-  const rateLimitTiers = fs.readFileSync(path.join(repoRoot, "middleware", "rateLimitTiers.js"), "utf8");
+  // auth.middleware.js's default JWT expiry is a plain Node module (not
+  // TS/React), so it costs nothing to require it directly and check the
+  // real signed-token lifetime instead of pattern-matching its source.
+  process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret";
+  const authMiddlewarePath = require.resolve(path.join(repoRoot, "middleware", "auth.middleware.js"));
+  delete require.cache[authMiddlewarePath];
+  const { signToken } = require(authMiddlewarePath);
+  const jwt = require(path.join(repoRoot, "node_modules", "jsonwebtoken"));
 
-  assert.match(authRoutes, /ACCESS_TOKEN_EXPIRY_SECONDS\) \|\| 60 \* 60/);
-  assert.match(authMiddleware, /JWT_EXPIRY_SECONDS\) \|\| 60 \* 60/);
-  assert.match(rateLimitTiers, /max: 120[\s\S]*keyPrefix: "rl:refresh"/);
+  const token = signToken({ sub: "test-user" });
+  const decoded = jwt.decode(token);
+  const expirySeconds = decoded.exp - decoded.iat;
+  assert.ok(
+    expirySeconds >= 30 * 60,
+    `JWT access tokens should last at least 30 minutes by default to avoid rapid v3 session expiry, got ${expirySeconds}s`
+  );
+
+  // auth.routes.js's access-token cookie maxAge and rateLimitTiers.js's
+  // refresh-endpoint limit aren't exported, so these stay source checks --
+  // but assert on the actual numeric magnitude rather than pinning the
+  // literal `60 * 60` / `120` formatting, which would break on any
+  // legitimate retuning that keeps the value reasonable.
+  const authRoutes = fs.readFileSync(path.join(repoRoot, "routes", "auth.routes.js"), "utf8");
+  const accessTokenMatch = authRoutes.match(
+    /ACCESS_TOKEN_EXPIRY_SECONDS = Number\(process\.env\.ACCESS_TOKEN_EXPIRY_SECONDS\) \|\| (\d+) \* (\d+)/
+  );
+  assert.ok(accessTokenMatch, "auth.routes.js should define a numeric default for ACCESS_TOKEN_EXPIRY_SECONDS");
+  const defaultAccessTokenSeconds = Number(accessTokenMatch[1]) * Number(accessTokenMatch[2]);
+  assert.ok(
+    defaultAccessTokenSeconds >= 30 * 60,
+    `the access-token cookie's default maxAge should last at least 30 minutes, got ${defaultAccessTokenSeconds}s`
+  );
+
+  const rateLimitTiers = fs.readFileSync(path.join(repoRoot, "middleware", "rateLimitTiers.js"), "utf8");
+  const refreshLimiterMatch = rateLimitTiers.match(/max:\s*(\d+)[\s\S]{0,80}keyPrefix:\s*"rl:refresh"/);
+  assert.ok(refreshLimiterMatch, "rateLimitTiers.js should define a refresh-endpoint rate limit");
+  assert.ok(
+    Number(refreshLimiterMatch[1]) >= 60,
+    `the refresh endpoint's rate limit should be generous enough to avoid throttling normal session refresh traffic, got max=${refreshLimiterMatch[1]}`
+  );
 });
