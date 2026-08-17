@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs"]
+nixPkgs = ["nodejs_20"]
 
 [phases.install]
 cmds = ["npm ci", "npm --prefix frontend-v3 ci"]

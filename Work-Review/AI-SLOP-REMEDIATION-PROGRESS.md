@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 47.5 / 54 action items (~88%)
+## Overall: 48.0 / 54 action items (~89%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -145,7 +145,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   one route file converted so far — the rest of the ~15 route files still log
   raw `err`/`err.stack` directly.
 
-## Phase 3 - Startup, Deployment, Migration Safety — 5.0 / 6
+## Phase 3 - Startup, Deployment, Migration Safety — 5.5 / 6
 - [x] Checksum repair removed from `prestart` (`391319b9`)
 - [x] Server does not listen before DB init/migration readiness (`fabc898f`)
 - [x] Read-only migration verification split from repair commands — read
@@ -195,7 +195,29 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   `Docs/PRODUCTION-READINESS.md`) still isn't built. 5 new/expanded tests in
   `tests/envValidationService.test.js`, all passing; `tests/launchBlockers.test.js`
   unaffected (its assertion is a `.includes()` check, not an exact list).
-- [~] Docker/Nixpacks/start scripts reconciled
+- [x] Docker/Nixpacks/start scripts reconciled — checked both of the
+  audit's original findings against current `main` before assuming either
+  was still open. Both were already fixed: Nixpacks has a real
+  `[phases.build]` running `npm run build:frontend-v3` and verifying
+  `public/app-v3/index.html` exists (the original finding was that Nixpacks
+  had no build phase and could deploy a stale checked-in bundle), and every
+  install step across the Dockerfile and both `nixpacks.toml` files already
+  uses `npm ci`, not `npm install` (the reproducible-installs item, already
+  `[x]` separately). What was still genuinely inconsistent: `Dockerfile`
+  pins `node:20-bookworm-slim` but both `nixpacks.toml` files used the
+  unversioned `nixPkgs = ["nodejs"]`, which resolves to whatever Node
+  version the Nixpacks/nixpkgs channel defaults to — not necessarily 20,
+  and not guaranteed stable across rebuilds. Pinned both to
+  `nixPkgs = ["nodejs_20"]` and added `"engines": {"node": "20.x"}` to
+  `package.json`. Added 2 tests to `tests/frontendV3BuildPipeline.test.js`
+  (which already covered the build-phase/`npm ci` properties): one asserts
+  the Dockerfile/nixpacks/package.json Node major version all agree, the
+  other asserts the root and API-local `nixpacks.toml` files stay
+  semantic mirrors of each other (they differ only by a
+  `cd In-Ex-Ledger-API && ` prefix and incidental TOML array line-wrapping,
+  confirmed by diffing them directly). Full suite via `npm run test:all`:
+  **1605/1605 passing** (plus 3/3 ASVS controls) — 2 more than the
+  pre-existing baseline, all new.
 - [x] Reproducible installs (`npm ci`) in CI/deployment (`afdefa17`, `6a313ff0`)
 
 ## Phase 4 - API Error And Response Consistency — 4.5 / 5
@@ -1834,3 +1856,21 @@ test that had been failing identically since PR 13).
   via `npm run test:all`: **1603/1603 passing** (plus 3/3 ASVS controls) — 9
   more than the pre-existing baseline, all new. Phase 3 moves to **5.0/6**;
   Overall to **47.5/54 (~88%)**.
+
+- **PR 42** (`chore/pin-nixpacks-node-version`): Phase 3, closes another of
+  the ten `[~]` items. Checked both of the audit's original Docker/Nixpacks
+  findings against current `main` before assuming either was still open —
+  both were already fixed (Nixpacks has a real build phase verifying
+  `public/app-v3/index.html`; every install step already uses `npm ci`).
+  What was still genuinely inconsistent: `Dockerfile` pins
+  `node:20-bookworm-slim` but both `nixpacks.toml` files used the
+  unversioned `nixPkgs = ["nodejs"]`. Pinned both to `nixPkgs =
+  ["nodejs_20"]` and added `"engines": {"node": "20.x"}` to `package.json`.
+  Added 2 tests to `tests/frontendV3BuildPipeline.test.js`: Node major
+  version agreement across Dockerfile/nixpacks/package.json, and that the
+  root and API-local `nixpacks.toml` files stay semantic mirrors of each
+  other (confirmed by diffing them directly — they differ only by a `cd
+  In-Ex-Ledger-API && ` prefix and incidental TOML line-wrapping). Full
+  suite via `npm run test:all`: **1605/1605 passing** (plus 3/3 ASVS
+  controls) — 2 more than the pre-existing baseline, all new. Phase 3 moves
+  to **5.5/6**; Overall to **48.0/54 (~89%)**.

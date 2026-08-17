@@ -2,6 +2,9 @@
   "name": "inex-ledger-api",
   "version": "1.0.0",
   "main": "server.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "backfill:category-tax-maps": "node scripts/backfill-default-category-tax-maps.mjs",
     "backfill:category-tax-maps:dry": "node scripts/backfill-default-category-tax-maps.mjs --dry-run",
