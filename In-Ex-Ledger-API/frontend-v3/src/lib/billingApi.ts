@@ -95,15 +95,29 @@ export async function openBillingPortal() {
   window.location.assign(data.url)
 }
 
+// Each of these three mutations sends a fresh mutationAttemptId per call, the
+// same pattern startCheckout() uses for checkoutAttemptId: it identifies one
+// specific mutation *attempt*, not the desired end-state, so the backend's
+// Stripe idempotency key stays unique across repeated legitimate operations
+// (e.g. cancel -> resume -> cancel) while still deduping true retries of the
+// same attempt (a network-level retry replays the same JSON body, including
+// this same id).
+
 export async function cancelSubscription() {
-  const data = await apiRequest<{ subscription: BillingSubscription }>('/api/billing/cancel', { method: 'POST' })
+  const data = await apiRequest<{ subscription: BillingSubscription }>('/api/billing/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ mutationAttemptId: crypto.randomUUID() }),
+  })
   return data.subscription
 }
 
 export async function resumeSubscription(billingInterval?: BillingInterval) {
   const data = await apiRequest<{ subscription: BillingSubscription }>('/api/billing/resume', {
     method: 'POST',
-    body: JSON.stringify(billingInterval ? { billingInterval } : {}),
+    body: JSON.stringify({
+      mutationAttemptId: crypto.randomUUID(),
+      ...(billingInterval ? { billingInterval } : {}),
+    }),
   })
   return data.subscription
 }
@@ -111,7 +125,7 @@ export async function resumeSubscription(billingInterval?: BillingInterval) {
 export async function updateAdditionalBusinesses(additionalBusinesses: number) {
   const data = await apiRequest<{ subscription: BillingSubscription }>('/api/billing/additional-businesses', {
     method: 'PATCH',
-    body: JSON.stringify({ additionalBusinesses }),
+    body: JSON.stringify({ additionalBusinesses, mutationAttemptId: crypto.randomUUID() }),
   })
   return data.subscription
 }

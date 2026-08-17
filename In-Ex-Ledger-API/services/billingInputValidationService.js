@@ -91,6 +91,24 @@ function normalizeAdditionalBusinesses(input) {
   return value;
 }
 
+// Stripe idempotency keys must identify one specific mutation *attempt*, not
+// the desired end-state -- two calls that both want cancel_at_period_end=true
+// (e.g. cancel, then resume, then cancel again) must not collide on the same
+// key, or Stripe will silently replay the first call's cached response
+// instead of performing the second one. The caller is responsible for
+// generating a fresh UUID per user-initiated action (see checkoutAttemptId
+// for the established precedent) and reusing it only for retries of that
+// same attempt.
+const MUTATION_ATTEMPT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requireMutationAttemptId(input) {
+  const value = String(input || "").trim();
+  if (!MUTATION_ATTEMPT_ID_RE.test(value)) {
+    throw new BillingValidationError("A valid mutation attempt ID is required.");
+  }
+  return value;
+}
+
 function normalizeInternalReturnPath(value, fallback = "/subscription") {
   const next = String(value || "").trim();
   if (!next.startsWith("/") || next.startsWith("//") || /[\r\n]/.test(next)) {
@@ -153,6 +171,7 @@ module.exports = {
   normalizeOptionalBillingInterval,
   normalizeOptionalCurrency,
   normalizeAdditionalBusinesses,
+  requireMutationAttemptId,
   normalizeInternalReturnPath,
   buildCheckoutReturnPath,
   isTrialReupgradeAttempt,

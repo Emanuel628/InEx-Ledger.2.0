@@ -963,8 +963,73 @@ test that had been failing identically since PR 13).
 - [x] `PlanGate` usage normalized against backend feature keys
 
 ## Phase 9 - Integrations, Idempotency, Side Effects — 5 / 5
-- [x] Stripe mutation idempotency keys reviewed beyond checkout (`buildStripeMutationIdempotencyKey` covers customer create, portal config create, subscription cancel/resume/switch, and direct additional-business subscription updates)
-- [x] Durable dedupe/outbox behavior for important emails (`email_delivery_dedupe` covers billing lifecycle, invoice owner-activity, and export generated/failed emails, including the inbound-reply webhook path whose only prior replay guard was a 5-minute in-memory `svix-id` cache that doesn't survive redelivery outside that window or multiple app instances; `emailReminderService`'s three reminder flows — trial lifecycle, review-queue, cancellation-ending-soon — now claim atomically via `business_email_reminders`' `(business_id, reminder_key)` unique constraint before sending, closing the cron-overlap double-send race)
+- [x] Stripe mutation idempotency keys reviewed beyond checkout, correctly this time. The
+  earlier pass (below) had only checked that `buildStripeMutationIdempotencyKey` was
+  *used* on cancel/resume/switch/additional-businesses, not that its output was actually
+  correct — and it wasn't: the key was built purely from the operation name, business
+  scope, and *desired end-state* (e.g. `subscription-cancel` + businessId +
+  `cancel_at_period_end:true`), with no per-attempt component at all. That means cancel,
+  then resume, then cancel again produced the *exact same key* for both cancel calls,
+  since the desired state is identical both times — Stripe would have silently replayed
+  the first cancel's cached response for the second one instead of actually performing
+  it. Same bug for "set additional businesses to 2" repeated after an intervening change,
+  and for repeating an interval switch later. Fixed by having the four affected routes
+  (`POST /cancel`, `POST /customer-portal/cancel`, `POST /resume`, `PATCH
+  /additional-businesses`) require a client-supplied `mutationAttemptId` (a fresh UUID
+  per user-initiated action, mirroring `checkoutAttemptId`'s existing, already-correct
+  pattern on `POST /checkout-session`) and fold it into the key. A genuine retry of the
+  same attempt (same UUID) still reuses the same key; a later legitimate operation
+  reaching the same desired state gets a new UUID and a new key. `tests/stripeMutationIdempotency.test.js`
+  (new, 6 tests) proves this directly for all three named scenarios — cancel → resume →
+  cancel, additional businesses 2 → 1 → 2, and a repeated interval switch — plus retry-key
+  reuse and 400s for a missing/malformed attempt id. `customer-create` and
+  `portal-configuration`'s existing desired-state-hash keys were left untouched since
+  those two are correctly supposed to be idempotent forever (never create two Stripe
+  customers or two portal configs for the same underlying resource) — the bug was
+  specific to the four *mutation* routes, not the design of `buildStripeMutationIdempotencyKey` itself.
+- [x] Durable dedupe/outbox behavior for important emails, with a real identity gap
+  closed. The earlier pass (below) verified `email_delivery_dedupe` was *wired into*
+  export-generated/failed emails, but not that its dedupe key actually identified the
+  right thing: `sendExportGeneratedEmail`/`sendExportFailedEmail` keyed only on
+  business/recipient/type/date-range, with no reference to *which* export. Two separate
+  exports for the identical date range (a legitimate, expected user action) collided on
+  the same key, so the second export's email was silently swallowed as a false
+  duplicate. Fixed by threading the real per-operation identity through: `exportId` (from
+  `storeCompletedExport`, which mints a fresh id per successful generation — never
+  idempotent by content, so it's a genuine per-export identity) for the generated-email
+  case, and an `exportAttemptId` for the failed-email case, since a failed generation
+  never gets a stored id — the grant-based flow uses the grant's own single-use `jti`
+  (already threaded elsewhere in that same code as `grantJti`), and the direct
+  `secure-export` flow mints a fresh UUID once per request. `tests/exportEmailService.test.js`
+  gained 4 tests proving two separate exports/attempts each get their own email while a
+  retried identical operation is still suppressed. Separately, `email_delivery_dedupe`
+  itself had a real reclaim gap unrelated to the key content: a row that crashed between
+  `reserveEmailDelivery` and `markEmailDeliverySent`/`Failed` stayed `'reserved'` forever
+  — the `ON CONFLICT ... WHERE status = 'failed'` clause only ever reclaimed `'failed'`
+  rows, never a stuck `'reserved'` one, so every future genuine send attempt at that exact
+  key would silently no-op indefinitely. Fixed with a 15-minute stale-reservation timeout
+  added to the same `WHERE` clause (`status = 'reserved' AND updated_at` older than the
+  timeout, parameterized rather than string-interpolated); `'sent'` rows are never matched
+  by either branch and stay protected regardless of age, and `'failed'` rows keep their
+  existing immediate-retry behavior unchanged. `tests/emailDeliveryDedupeService.test.js`
+  gained 5 tests (stale reservation reclaimed, fresh reservation not stolen, sent rows
+  protected indefinitely even 30 days later, failed rows still immediately retryable, and
+  a direct assertion on the query text/params actually carrying the new timeout).
+  Incidentally, while adding the `exportId`/`exportAttemptId` plumbing, found and fixed an
+  unrelated pre-existing bug in the same file: `routes/exports.routes.js`'s
+  `POST /secure-export` declared `user`/`businessId` with `const` *inside* its `try`
+  block but referenced both in the `catch` block below it — invalid JS scoping that threw
+  a `ReferenceError` on every genuine failure of that route (verified with a standalone
+  repro), meaning the route's own failure-reporting (and the "export failed" email this
+  PR was adding coverage for) had never actually run; the request would just hang instead
+  of returning a response. Fixed by hoisting both declarations above the `try`. (Original
+  pass, retained for history: `email_delivery_dedupe` covers billing lifecycle, invoice
+  owner-activity, and export generated/failed emails, including the inbound-reply webhook
+  path whose only prior replay guard was a 5-minute in-memory `svix-id` cache that doesn't
+  survive redelivery outside that window or multiple app instances; `emailReminderService`'s
+  three reminder flows — trial lifecycle, review-queue, cancellation-ending-soon — claim
+  atomically via `business_email_reminders`' `(business_id, reminder_key)` unique
+  constraint before sending, closing the cron-overlap double-send race.)
 - [x] Plaid partial-failure/cursor/retry behavior hardened (row-level failures and unknown accounts mark the batch partial, keep the prior cursor, and surface connection error state)
 - [x] Export/receipt cleanup paths made explicit and testable (export history deletion commits DB cleanup before best-effort file cleanup and returns cleanup status; receipt delete pending-rename path rechecked)
 - [x] Required vs. best-effort side effects separated (completed export generation no longer fails or waits on audit/email side effects; failures are logged)
@@ -2256,3 +2321,75 @@ test that had been failing identically since PR 13).
   fix was to an existing test's fixture, not new test additions). Overall
   to **50.0/54 (~93%)** — all ten of the original half-credit `[~]` items
   from this PR sequence are now closed.
+
+- **PR 48** (`fix/stripe-idempotency-and-export-dedupe-identity`): Phase 9.
+  With all ten original `[~]` items closed, went back and specifically
+  re-verified the two Phase 9 items that had been marked `[x]` on the
+  strength of "the dedupe/idempotency machinery is wired in," without
+  independently checking that the *keys themselves* were correct. Both
+  turned out to have real, user-identified bugs.
+
+  **Stripe mutation idempotency**: `buildStripeMutationIdempotencyKey`'s
+  keys on `/cancel`, `/customer-portal/cancel`, `/resume`, and `PATCH
+  /additional-businesses` were built purely from the operation name,
+  business scope, and *desired end-state* — no per-attempt component.
+  Cancel, then resume, then cancel again produced the exact same key for
+  both cancel calls, since both want `cancel_at_period_end: true`; Stripe
+  would silently replay the first cancel's cached response instead of
+  performing the second one. Same collision for repeating an
+  additional-businesses quantity or an interval switch after an
+  intervening change. Fixed by requiring a client-supplied
+  `mutationAttemptId` (fresh UUID per user-initiated action) on all four
+  routes and folding it into the key — mirroring `checkoutAttemptId`'s
+  already-correct pattern on checkout, which was the one mutation route
+  that had never had this bug. `customer-create` and
+  `portal-configuration`'s desired-state-hash keys were deliberately left
+  alone, since those two are supposed to be idempotent forever (one Stripe
+  customer/portal-config per resource), unlike the four mutation routes.
+  New `tests/stripeMutationIdempotency.test.js` (6 tests) proves all three
+  scenarios the user named by name — cancel → resume → cancel, additional
+  businesses 2 → 1 → 2, repeated interval switch — plus retry-key reuse and
+  400s for a missing/malformed attempt id. Updated the existing billing
+  route tests across `billingAddonManagement.test.js` and
+  `billingCurrencyResolution.test.js` to send the now-required attempt id.
+
+  **Export email dedupe identity**: `sendExportGeneratedEmail`/
+  `sendExportFailedEmail` keyed their dedupe entries on
+  business/recipient/type/date-range only — no reference to *which*
+  export. Two separate exports for the identical date range collided on
+  the same key, silently swallowing the second export's email as a false
+  duplicate. Fixed by threading through the real per-operation identity:
+  `exportId` (minted fresh per successful `storeCompletedExport` call) for
+  the generated-email case, and an `exportAttemptId` for the failed-email
+  case (the grant flow's own single-use `jti`; a fresh UUID minted once
+  per request for the direct `secure-export` flow, since nothing gets
+  persisted on failure). 4 new tests in `tests/exportEmailService.test.js`.
+
+  **Stale reserved-email recovery**: separately, `email_delivery_dedupe`'s
+  `reserveEmailDelivery` could only ever reclaim a `'failed'` row — a row
+  stuck in `'reserved'` because the process died between reserving and
+  marking sent/failed stayed reserved forever, silently blocking every
+  future genuine send at that exact key. Added a 15-minute stale-reservation
+  timeout to the same `ON CONFLICT ... WHERE` clause (parameterized, not
+  string-interpolated, following this file's existing `$n::bigint *
+  INTERVAL` convention); `'sent'` rows stay protected indefinitely
+  regardless of age, `'failed'` rows keep their existing immediate-retry
+  behavior. 5 new tests in `tests/emailDeliveryDedupeService.test.js`.
+
+  **Incidental fix**: while adding the exportId/exportAttemptId plumbing,
+  found `routes/exports.routes.js`'s `POST /secure-export` declaring
+  `user`/`businessId` with `const` *inside* its `try` block while
+  referencing both in the `catch` block — invalid JS scoping, confirmed
+  with a standalone repro to throw `ReferenceError` on every genuine
+  failure of that route. This meant the route's own failure response (and
+  the "export failed" email this same PR was adding coverage for) had
+  never actually run on a real failure; the request just hung. Fixed by
+  hoisting both declarations above the `try`.
+
+  Full suite via `npm run test:all`: **1646/1646 passing** (plus 3/3 ASVS
+  controls) — 15 more than the pre-existing baseline, all new. Phase 9
+  stays at **5/5** (both items' bullet text now documents the gap that was
+  found and the fix that closed it, rather than silently keeping the old
+  claim). Overall recomputed directly from the checklist markers (50 `[x]`
+  + 4 `[ ]` = 54 total, matching every phase header's own sum): unchanged
+  at **50.0/54 (~93%)**.
