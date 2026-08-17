@@ -2,39 +2,70 @@
 
 This document is the release gate for public production deploys of InEx Ledger.
 
-Last updated: 2026-06-07.
+Last updated: 2026-08-17.
 
 ## Required environment variables
 
-Always required:
+This is the same list `services/envValidationService.js`'s
+`collectRequiredEnvironmentVariables()` enforces at startup — it's the
+source of truth; this table exists so the reasoning behind each entry
+doesn't only live in code comments. Keep the two in sync when either
+changes; `tests/envValidationService.test.js` will fail if they drift
+apart from each other in behavior (though not from this doc, since a
+markdown file can't be asserted against — review this table by eye
+whenever `ENV_VARIABLE_REGISTRY` changes).
 
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `APP_BASE_URL`
-- `RESEND_API_KEY`
+**Core tier** — required in every environment; nothing meaningful works without these:
 
-Production-required:
+| Variable | Why |
+| --- | --- |
+| `DATABASE_URL` | Database connection string; nothing works without it. |
+| `JWT_SECRET` | Signs and verifies every auth token. |
+| `APP_BASE_URL` | Builds absolute links used in emails and redirects. |
+| `RESEND_API_KEY` | Required for all outbound transactional email. |
 
-- `CSRF_SECRET`
-- `FIELD_ENCRYPTION_KEY`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `EXPORT_GRANT_SECRET`
-- `RECEIPT_STORAGE_DIR`
-- every Stripe price env required by `services/stripePriceConfig.js`
+**Production tier** — required only in production, but unconditionally
+(the feature is core and unconditionally mounted, not behind a flag):
 
-Recommended supporting variables:
+| Variable | Why |
+| --- | --- |
+| `CSRF_SECRET` | Signs the CSRF double-submit token; the CSRF middleware throws on every request if unset. |
+| `FIELD_ENCRYPTION_KEY` | Encrypts sensitive stored fields (e.g. tax IDs) at rest. |
+| `STRIPE_SECRET_KEY` | Required for every billing/Stripe API call. |
+| `STRIPE_WEBHOOK_SECRET` | Verifies inbound Stripe webhook signatures; `POST /api/billing/webhook` rejects everything without it. |
+| `EXPORT_GRANT_SECRET` | Signs short-lived export download grants. |
+| `RECEIPT_STORAGE_DIR` | Filesystem path receipts are persisted to. |
+| `INEX_LEDGER_SUPPORT_SECRET` | Shared secret gating the internal support API. |
+| `REDIS_URL` | Rate limiting is unconditionally required in production; missing this previously degraded silently to a per-instance in-memory limiter instead of failing startup. |
+| `PDF_WORKER_URL` | PDF export is a core, unconditionally-mounted feature; without this every export request fails at request time instead of at startup. |
+| `PDF_WORKER_SECRET` | Authenticates requests to the PDF worker. |
+| `EXPORT_PUBLIC_KEY_JWK` | Public key for verifying secure export grants; the crypto route degrades to 503 without it. |
+| `EXPORT_PRIVATE_KEY_JWK` | Private key for signing secure export grants. |
+| every Stripe price env in `services/stripePriceConfig.js` | Pricing/checkout resolution needs a real Stripe price ID for every plan/interval/currency/region combination. |
+
+**Feature-gated, deliberately not required** — these secrets gate specific
+inbound webhook features, but there's no code-level flag (no
+`ENABLE_INBOUND_EMAIL`-style toggle) to know whether a given deployment
+actually uses them, so requiring them unconditionally would be guessing at
+product scope rather than validating a known contract. Both routes already
+fail closed with a clean `503` when unconfigured — this is an
+ops-observability gap (only surfaces at request time, not startup), not a
+security gap:
+
+| Variable | Gates | Behavior when unset |
+| --- | --- | --- |
+| `SUPPORT_INBOUND_WEBHOOK_SECRET` / `INBOUND_EMAIL_WEBHOOK_SECRET` | Support-reply inbound email webhook | `503 "Support inbound webhook is not configured."` |
+| `INBOUND_EMAIL_WEBHOOK_SECRET` | General inbound email webhook | `503` in the same way |
+| `SUPPORT_REPLY_HMAC_SECRET` | Signs support-reply email links | Only exercised by the inbound-email features above |
+
+Recommended supporting variables (not enforced by `envValidationService.js`,
+but worth setting in production):
 
 - `EMAIL_FROM` or `RESEND_FROM_EMAIL`
 - `STRIPE_API_VERSION`
 - `RECEIPT_STORAGE_PERSISTENT`
-- `REDIS_URL`
 - deploy SHA metadata envs
-- support reply threading envs
-  - `SUPPORT_TO_EMAIL`
-  - `SUPPORT_REPLY_BASE_EMAIL`
-  - `SUPPORT_REPLY_HMAC_SECRET`
-  - inbound webhook secret used by the live webhook route
+- support reply threading envs: `SUPPORT_TO_EMAIL`, `SUPPORT_REPLY_BASE_EMAIL`
 
 ## Required verification commands
 

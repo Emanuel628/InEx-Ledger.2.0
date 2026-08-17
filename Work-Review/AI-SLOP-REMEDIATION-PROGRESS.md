@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 48.5 / 54 action items (~90%)
+## Overall: 49.0 / 54 action items (~91%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -162,7 +162,7 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   `npm run test:all`: **1614/1614 passing** (plus 3/3 ASVS controls) — 9
   more than the pre-existing baseline, all new.
 
-## Phase 3 - Startup, Deployment, Migration Safety — 5.5 / 6
+## Phase 3 - Startup, Deployment, Migration Safety — 6 / 6
 - [x] Checksum repair removed from `prestart` (`391319b9`)
 - [x] Server does not listen before DB init/migration readiness (`fabc898f`)
 - [x] Read-only migration verification split from repair commands — read
@@ -187,31 +187,35 @@ Phase 0 is a standing process rule, not a checklist item, so it is not counted.
   missing applied-migration files refuse to repair even with `--write`.
   Full suite via `npm run test:all`: **1603/1603 passing** (plus 3/3 ASVS
   controls) — 9 more than the pre-existing baseline, all new.
-- [~] Environment validation for required production settings — still half credit,
-  but real progress: the audit (Pass 10) found `envValidationService.js`'s
-  production-required list too narrow for what's actually mounted and
-  security-sensitive. Checked each flagged variable's real failure mode on `main`
-  first rather than blanket-requiring the whole list: `REDIS_URL`,
-  `PDF_WORKER_URL`/`PDF_WORKER_SECRET`, and `EXPORT_PUBLIC_KEY_JWK`/
-  `EXPORT_PRIVATE_KEY_JWK` are all unconditionally required by the app's own
-  existing logic (`middleware/rateLimiter.js`'s `isRateLimitingRequired()` is
-  literally `isProduction()`; PDF/secure export have no feature flag gating them)
-  but previously only failed at request time (`pdfWorkerClient.js` throws,
-  `crypto.routes.js`/`rateLimiter.js` degrade to 503/in-memory) instead of at
-  startup — added all 5 to the production-required list, plus the
-  previously-undocumented `EXPORT_PRIVATE_KEY_JWK` to `.env.example`. Left the
-  inbound-email/support-reply HMAC secrets alone: the audit itself says some of
-  this list is "optional by design," there's no code-level signal (no
-  `ENABLE_INBOUND_EMAIL`-style flag) for which deployments intend to use those
-  features, and guessing would be the same kind of unilateral scope call flagged
-  elsewhere in this file — those routes already fail closed with a clear 503 if
-  unconfigured, so there's no security gap, just an ops-observability gap that
-  needs a product answer on which surfaces are actually expected in production.
-  Not marking `[x]`: the audit's fuller suggested design (a real two-tier
-  core-vs-feature-gated validator, plus an env-validation matrix in
-  `Docs/PRODUCTION-READINESS.md`) still isn't built. 5 new/expanded tests in
-  `tests/envValidationService.test.js`, all passing; `tests/launchBlockers.test.js`
-  unaffected (its assertion is a `.includes()` check, not an exact list).
+- [x] Environment validation for required production settings — the
+  remaining piece from the earlier half-credit pass was building the fuller
+  suggested design: a real two-tier core-vs-feature-gated validator, plus an
+  env-validation matrix in `Docs/PRODUCTION-READINESS.md`. User confirmed
+  the intent directly: build the two-tier structure and the doc without
+  changing which vars are actually required today — leave the
+  inbound-email/support-reply secrets question as a documented, deliberate
+  exception rather than a product call made unilaterally. Rewrote
+  `envValidationService.js`'s flat required-list into an explicit
+  `ENV_VARIABLE_REGISTRY` (`{ name, tier: "core" | "production", reason }`)
+  plus a separate `OPTIONAL_FEATURE_ENV_VARIABLES` list documenting the
+  inbound-email secrets and their fail-closed 503 behavior;
+  `collectRequiredEnvironmentVariables` now derives its output from the
+  registry instead of a hand-maintained array. Verified behavior preservation
+  by running the full pre-existing `tests/envValidationService.test.js`
+  unchanged against the new implementation — all 13 tests passed with zero
+  edits, confirming the required-variable set for both `production` and
+  non-production is byte-identical to before. Added 4 new tests locking in
+  the registry's own shape (only two known tiers, every entry has a reason,
+  no duplicate names, optional entries never leak into the required list).
+  `Docs/PRODUCTION-READINESS.md` was badly stale (dated 2026-06-07, missing
+  `INEX_LEDGER_SUPPORT_SECRET`/`REDIS_URL`/`PDF_WORKER_URL`/
+  `PDF_WORKER_SECRET`/`EXPORT_PUBLIC_KEY_JWK`/`EXPORT_PRIVATE_KEY_JWK` from
+  its required list even though code already required all of them) —
+  rewrote its "Required environment variables" section as a real matrix
+  (variable / tier / why) matching the registry exactly, plus the
+  feature-gated table with each secret's fail-closed behavior. Full suite
+  via `npm run test:all`: **1618/1618 passing** (plus 3/3 ASVS controls) —
+  4 more than the pre-existing baseline, all new.
 - [x] Docker/Nixpacks/start scripts reconciled — checked both of the
   audit's original findings against current `main` before assuming either
   was still open. Both were already fixed: Nixpacks has a real
@@ -1923,3 +1927,30 @@ test that had been failing identically since PR 13).
   `npm run test:all`: **1614/1614 passing** (plus 3/3 ASVS controls) — 9
   more than the pre-existing baseline, all new. Overall to
   **48.5/54 (~90%)**.
+
+- **PR 44** (`chore/two-tier-env-validator`): Phase 3, closes the last of
+  the ten `[~]` items in this phase (Phase 3 reaches **6/6**). Asked the
+  user directly what to do about the item's one remaining real open
+  question (should the inbound-email secrets become required) rather than
+  deciding unilaterally; the answer was to build the two-tier design and
+  doc without changing which vars are currently required, leaving that
+  question as a documented exception. Rewrote `envValidationService.js`'s
+  flat required-list into an explicit `ENV_VARIABLE_REGISTRY`
+  (`{ name, tier: "core" | "production", reason }`) plus a separate
+  `OPTIONAL_FEATURE_ENV_VARIABLES` list documenting the inbound-email
+  secrets and their fail-closed 503 behavior; `collectRequiredEnvironmentVariables`
+  now derives its output from the registry. Verified behavior preservation
+  the direct way: ran the full pre-existing `tests/envValidationService.test.js`
+  unchanged against the new implementation — all 13 passed with zero edits,
+  confirming the required-variable set for both `production` and
+  non-production is byte-identical to before this PR. Added 4 tests locking
+  in the registry's own shape. `Docs/PRODUCTION-READINESS.md` turned out to
+  be badly stale (dated 2026-06-07) — missing 6 vars from its required list
+  that code has actually required since an earlier PR
+  (`INEX_LEDGER_SUPPORT_SECRET`, `REDIS_URL`, `PDF_WORKER_URL`,
+  `PDF_WORKER_SECRET`, `EXPORT_PUBLIC_KEY_JWK`, `EXPORT_PRIVATE_KEY_JWK`).
+  Rewrote its "Required environment variables" section as a real matrix
+  matching the registry exactly, plus a feature-gated table with each
+  optional secret's fail-closed behavior. Full suite via `npm run test:all`:
+  **1618/1618 passing** (plus 3/3 ASVS controls) — 4 more than the
+  pre-existing baseline, all new. Overall to **49.0/54 (~91%)**.

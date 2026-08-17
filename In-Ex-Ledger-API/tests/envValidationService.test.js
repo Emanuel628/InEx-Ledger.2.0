@@ -4,6 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  ENV_VARIABLE_REGISTRY,
+  OPTIONAL_FEATURE_ENV_VARIABLES,
   collectRequiredEnvironmentVariables,
   validateEnvironmentOrThrow,
   isProductionEnvironment
@@ -241,6 +243,40 @@ test("validateEnvironmentOrThrow('development') passes with only the always-requ
   withSyntheticEnv(devEnv, () => {
     assert.doesNotThrow(() => validateEnvironmentOrThrow("development"));
   });
+});
+
+// --- two-tier registry structure ---
+
+test("ENV_VARIABLE_REGISTRY only uses the two known tiers and every entry has a reason", () => {
+  for (const entry of ENV_VARIABLE_REGISTRY) {
+    assert.ok(["core", "production"].includes(entry.tier), `${entry.name} has an unknown tier: ${entry.tier}`);
+    assert.ok(entry.reason && entry.reason.length > 0, `${entry.name} is missing a reason`);
+  }
+});
+
+test("ENV_VARIABLE_REGISTRY has no duplicate variable names", () => {
+  const names = ENV_VARIABLE_REGISTRY.map((entry) => entry.name);
+  assert.deepEqual(names, [...new Set(names)]);
+});
+
+test("collectRequiredEnvironmentVariables derives exactly from the registry's tiers plus Stripe price entries", () => {
+  const coreNames = ENV_VARIABLE_REGISTRY.filter((e) => e.tier === "core").map((e) => e.name);
+  const productionNames = ENV_VARIABLE_REGISTRY.filter((e) => e.tier === "production").map((e) => e.name);
+
+  assert.deepEqual(collectRequiredEnvironmentVariables("development").sort(), [...coreNames].sort());
+
+  const expectedProduction = [...new Set([...coreNames, ...productionNames, ...STRIPE_PRICE_ENTRIES.map((e) => e.env)])];
+  assert.deepEqual(collectRequiredEnvironmentVariables("production").sort(), expectedProduction.sort());
+});
+
+test("OPTIONAL_FEATURE_ENV_VARIABLES entries are documented but never appear in the required list", () => {
+  const required = collectRequiredEnvironmentVariables("production");
+  for (const entry of OPTIONAL_FEATURE_ENV_VARIABLES) {
+    assert.ok(entry.reason && entry.reason.length > 0, "optional entry is missing a reason");
+    for (const name of entry.names) {
+      assert.equal(required.includes(name), false, `${name} is documented as optional but is in the required list`);
+    }
+  }
 });
 
 test("validateEnvironmentOrThrow('development') throws when an always-required var is missing", () => {
