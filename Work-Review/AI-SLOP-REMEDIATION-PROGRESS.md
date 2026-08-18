@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 54.0 / 54 action items (100%)
+## Overall: 54.0 / 92 action items (~59%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -1090,6 +1090,237 @@ test that had been failing identically since PR 13).
   recovery folders, stray root-level `.md` files, and untracked files at the end of the
   pass (clean: only the two new architecture docs above were untracked, both
   intentional). `.gitignore` coverage for `test-results/`/`storage/`/logs re-confirmed.
+
+## Phase 11 - Independent Code-Only Review (2026-08-18): Critical And High Severity — 0 / 12
+
+Found by a fresh, code-only review after Phase 10 closed: five parallel background
+agents each read one slice of the codebase in full (`routes/`, `services/`,
+backend infra/plumbing, frontend `pages/`+`components/`, frontend `lib/`+`hooks/`),
+explicitly barred from reading any `.md` doc so findings weren't just a rehash of prior
+audits. Every item below was independently re-verified against real code (not just
+trusted from the agent's report) before being added here — including one correction to
+an agent's own claim (item 4: the agent said "every PDF a customer downloads is
+invalid"; tracing the actual call chain showed the fake-PDF code path is dead/unreached,
+not live — the real bug is a required-but-unused microservice, not broken customer
+exports).
+
+- [ ] `services/projectService.js` and `services/billableExpenseService.js` call
+  `db.any()`/`db.one()`/`db.oneOrNone()`/`db.result()` — a pg-promise API `db.js` does
+  not implement (it exports a plain `pg.Pool` as `pool`, no such methods on the module
+  itself). Every function in both services throws `TypeError` on every call. Confirmed
+  wired into live, mounted routes (`routes/projects.routes.js`,
+  `routes/billable-expenses.routes.js`, gated behind `ENABLE_V2_BUSINESS`) — the entire
+  Projects and Billable Expenses feature area is 100% non-functional whenever that flag
+  is on.
+- [ ] `services/pdfGeneratorService.js`'s `buildFooterText()` calls `maskTaxId(taxId)`
+  unconditionally, ignoring the `isSecure` flag, so the "Redacted Export" variant still
+  prints the first 5 characters of the real SSN/EIN on every page footer — confirmed
+  `resolvedTaxId` is resolved once, upstream of the `isSecure` branch, with no redaction
+  applied for the redacted path.
+- [ ] Same file: `buildVehicleAuditSchedule` and `buildCapitalAssetSchedule` use `return`
+  inside a `.forEach()` callback when a page fills up — this only skips one iteration,
+  not the whole loop, so once a page fills, every remaining vehicle claim / capital
+  asset is silently dropped from the CPA audit schedule instead of flowing to a new
+  page, while the footer keeps being redrawn at the same position for each dropped row.
+- [ ] `pdf-worker/` is a deployed, CI-tested microservice that `services/envValidationService.js`
+  requires via `PDF_WORKER_URL`/`PDF_WORKER_SECRET` in production, with a comment
+  claiming exports fail without it — but `pdfWorkerClient.js`'s `dispatchPdfJob` (the
+  only caller of the worker) is never invoked anywhere in `routes/` or `services/`;
+  `routes/exports.routes.js` calls `pdfGeneratorService.js`'s in-process
+  `generatePdfExportPair` directly instead. The worker is dead weight the env-validator
+  still pretends is load-bearing, and if it were ever called, `buildPdfContent()`
+  returns a plain UTF-8 text buffer (box-drawing characters, no PDF object structure) —
+  not a valid PDF — that would be served as `Content-Type: application/pdf`. Separately,
+  its IP allowlist middleware trusts `X-Forwarded-For`'s first entry unconditionally
+  with no trusted-proxy validation, so it's trivially spoofable by any external caller.
+- [ ] `frontend-v3/src/pages/Exports.tsx`'s "Custom" date-range preset button has no
+  `onClick` handler at all — a dead, clickable-looking control — and the
+  `className="is-selected"` preset highlight is hardcoded onto the "YTD" button, so it
+  never moves when "Last tax year" or "Q1" is clicked instead.
+- [ ] `frontend-v3/src/pages/Invoices.tsx`'s `formatMoney()` normalizes any currency
+  that isn't `'CAD'` to `'USD'`, but the invoice currency `<select>` offers
+  USD/CAD/EUR/GBP/AUD — an invoice created in EUR/GBP/AUD silently displays its
+  subtotal/tax/total with a `$` symbol instead of the real currency, both in the create
+  form and the invoice list.
+- [ ] `frontend-v3/src/components/transactions/RecurringTemplatesWorkflow.tsx`'s
+  `getActiveCurrency()` is hardcoded to `return 'USD'` unconditionally, unlike every
+  other page's identically-named helper (which reads the business's real currency off
+  `window.__LUNA_ME__`) — recurring template amounts always show `$` even for CAD
+  businesses.
+- [ ] `routes/exports.routes.js`'s `/secure-export` re-implements the entire ~10-table
+  compliance dataset query, category/support-artifact/vehicle-claim map building, and
+  GST/HST Quick/Regular Method + home-office worksheet computation independently,
+  instead of reusing the shared `fetchExportSourceRows()` helper that `/generate`
+  already uses — this is compliance-critical tax logic duplicated across two paths that
+  must now be kept in sync by hand.
+- [ ] `routes/email.routes.js` and `routes/supportEmail.routes.js` independently
+  implement ~200 near-identical lines of HMAC/Svix signature verification and
+  replay-protection (`verifySvixSignature`, `timingSafeHexEqual`, the whole
+  verify-request function, etc.) — and the two copies have already drifted:
+  `email.routes.js` accepts multiple comma-separated secrets for key rotation;
+  `supportEmail.routes.js` only checks a single secret.
+- [ ] `routes/me.routes.js`'s `DELETE /` (account deletion) leaks internal
+  deployment/schema state to the authenticated caller on error: a pre-flight check
+  returns the literal migration filename (`045_drop_cpa_audit_user_fks.sql`) in the JSON
+  error body if that migration hasn't been applied, and the catch-all fallback for the
+  same condition returns `` `Database error code: ${err.code}` `` directly to the client
+  on any other unexpected failure.
+- [ ] `frontend-v3/src/lib/transactionsApi.ts`'s `resolveEstimatedTaxProfile`/
+  `estimatedCanadianRate` hardcode a flat 28% US rate and a per-province Canadian rate
+  table client-side, which `pages/Transactions.tsx` multiplies against a page-local
+  net-total to show an "estimated tax" figure — independent of, and inconsistent with,
+  the backend's real `se_tax_estimate` already surfaced via `lib/analyticsApi.ts` and
+  shown on Analytics/Dashboard. Two independently-computed tax estimates can legitimately
+  disagree in a product where users may rely on this number for withholding/quarterly
+  decisions, and the hardcoded bracket rates have no update path and will go stale every
+  tax year.
+- [ ] `services/vendorService.js`, `customerService.js`, `invoiceService.js`, and
+  `services/billService.js` hard-`DELETE ... RETURNING id` financial records with no
+  amount/currency/length validation before insert and no audit trail — unlike the
+  careful soft-delete + `audit_events` + accounting-lock-check pattern
+  (`transactionAuditService.js`, `accountingLockService.js`) used everywhere else in the
+  app for transactions.
+
+## Phase 12 - Independent Code-Only Review (2026-08-18): Backend Consistency And Concurrency — 0 / 12
+
+Medium-severity backend findings from the same review pass — real quality/consistency
+problems, not launch-blocking on their own, but worth closing before they compound.
+
+- [ ] Inconsistent `asyncRoute`/`ApiError` usage within the same files: GET routes in
+  `transactions.routes.js`, `exports.routes.js`, `businesses.routes.js`, and
+  `billing.routes.js` use the shared helper; most mutation routes (POST/PUT/PATCH/DELETE)
+  in the same four files hand-roll `try/catch` with manual status codes instead, with no
+  functional reason for the split.
+- [ ] `routes/auth.routes.js` — the "resolve pending token → look up active challenge →
+  check attempt count → compare code hash → record failure / consume" MFA email-code
+  sequence is duplicated near-identically 5 times (`mfa/reauth`, `mfa/enable`,
+  `mfa/disable`, `mfa/verify`, `verify-email/confirm-code`).
+- [ ] `requireV2BusinessEnabled`/`requireV2Entitlement` run twice per request on the six
+  V2 sub-routers: once from `routes/index.js`'s `...businessTierOnly` mount, and again
+  from each sub-router's own `router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement)`.
+- [ ] `routes/internalSupport.routes.js`, `supportEmail.routes.js`, and
+  `email.routes.js` each define their own router-local `router.use((err, req, res, next) => ...)`
+  error handler that re-implements — nearly line-for-line — the status/message-hiding
+  logic already centralized in `server.js`'s error handler.
+- [ ] `routes/receipts.routes.js`'s `ensureReceiptListSchema()` issues
+  `ALTER TABLE receipts ADD COLUMN IF NOT EXISTS` plus a backfill `UPDATE` reactively
+  from inside `GET /` whenever a "column does not exist" Postgres error is caught — DDL
+  triggered from live read traffic instead of a migration step.
+- [ ] `routes/analytics.routes.js` has ~700 lines of CPP/CPP2/SE-tax computation and
+  quarter-over-quarter/seasonal-deviation analysis embedded directly in route handlers,
+  unlike every comparable domain area (mileage, vehicle claims, capital assets, home
+  office, Quick/Regular Method) which delegates to a `services/*` module — this leaves
+  the file's tax math untestable independent of Express.
+- [ ] Check-then-act races with no locking: `services/basicPlanUsageService.js`'s
+  `assertCanCreateTransactions`/`assertCanUploadReceipts`/`assertCanImportCsvRows` count
+  usage and return an allowance with nothing enforcing it atomically, so concurrent
+  requests can jointly exceed a Basic-tier business's monthly caps; and
+  `services/vehicleClaimService.js`'s `assertConsistentClaimMethodForYear` SELECTs-then-
+  throws with no lock around the later insert, so two concurrent claim submissions for
+  the same tax year can both pass the "one method per year" check before either commits.
+- [ ] Silent, unlogged decryption failures for sensitive financial identifiers in three
+  services: `gstHstNumberService.js`'s `decryptGstHstNumber`, `taxIdService.js`'s
+  `decryptTaxId`, and `bankConnectionService.js`'s `decryptAccessToken` each swallow any
+  decrypt error into a bare `return null` with zero logging — a botched
+  `FIELD_ENCRYPTION_KEY` rotation would be indistinguishable from "no value was ever
+  stored" and silently blank out tax IDs/GST-HST numbers/bank tokens app-wide.
+- [ ] `services/transactionImportService.js`'s `revertImportBatch` issues two separate
+  `UPDATE`s (soft-deleting the batch's transactions, then marking the import row
+  `reverted`) with no `BEGIN`/`COMMIT` around them — a crash between the two leaves an
+  inconsistent state for a feature whose whole purpose is auditable reversibility.
+- [ ] `db.js` duplicates `utils/dbSslConfig.js`'s DB SSL decision tree almost verbatim
+  instead of importing the already-shared, tested version — confirmed the shared util is
+  currently consumed only by tests, not by the real runtime pool.
+- [ ] `pdf-worker/index.js` compares `WORKER_SECRET` with plain `!==` instead of a
+  timing-safe comparison, inconsistent with every other secret/token comparison in the
+  codebase (`csrf.middleware.js`, `requireSupportSecret.js`, `authUtils.js` all use
+  timing-safe compares).
+- [ ] `scripts/i18n-fix.js` is still wired as a repeatable `npm run i18n:fix` command,
+  but its replacements are already applied to `public/js/i18n.js` and its matcher only
+  checks that the "from" text is unique, never whether the "to" text already exists —
+  re-running it today would silently insert duplicate i18n keys rather than failing
+  cleanly.
+
+## Phase 13 - Independent Code-Only Review (2026-08-18): Frontend Duplication And Races — 0 / 7
+
+- [ ] Money-formatting/currency-resolution logic (`formatMoney`/`getActiveCurrency`) is
+  independently redefined in 6 files (`pages/Transactions.tsx`, `pages/Mileage.tsx`,
+  `pages/Analytics.tsx`, `pages/Invoices.tsx`, `pages/Exports.tsx`,
+  `components/transactions/RecurringTemplatesWorkflow.tsx`) instead of one shared `lib`
+  utility — this exact duplication is what let the Invoices and RecurringTemplatesWorkflow
+  currency bugs in Phase 11 quietly diverge from the correct behavior undetected.
+- [ ] Attachment-picker validation (file-size/count limits, add/remove handlers) is
+  duplicated three times with independently-declared limits: `pages/Messages.tsx`'s
+  `MessageDetailModal` and `ComposeModal`, and `pages/Invoices.tsx`'s own copy — a
+  shared `useFileAttachments` hook would remove ~90 duplicated lines and the risk of the
+  limits drifting apart.
+- [ ] `frontend-v3/src/hooks/useTransactionsPageData.ts`'s `refreshPageData` and
+  `frontend-v3/src/hooks/useMessagesPageData.ts`'s `openThread` have no
+  `AbortController`/ignore-flag/request-ordering guard — rapid filter/page changes or
+  fast thread-switching can let an earlier in-flight response resolve after a later one
+  and silently overwrite fresher state with stale data.
+- [ ] `frontend-v3/src/lib/apiClient.ts`'s `isCsrfFailure` decides whether to retry
+  solely by string-comparing the backend's exact error message
+  (`'CSRF token missing or invalid.'`) — a backend copy/wording change would silently
+  stop the CSRF-refresh retry path from firing.
+- [ ] `frontend-v3/src/lib/invoicesApi.ts`'s `mapStatus` derives "Overdue" by comparing
+  `dueDate` to the browser's local-timezone `new Date()` rather than trusting a
+  backend-computed status, so the same invoice can show as "Sent" vs. "Overdue"
+  depending on the viewer's timezone relative to the due-date boundary.
+- [ ] `frontend-v3/src/lib/transactionReview.ts`'s `canonicalReviewLabel` classifies
+  which fields need review by regex-matching rendered label text
+  (`/amount/i`, `/description|merchant|vendor/i`, etc.) instead of the structured
+  `issueCode` already present on `ReviewQueueItem.issueEntries` — any backend wording
+  change silently breaks which fields get flagged in this compliance-relevant workflow.
+- [ ] `frontend-v3/src/lib/apiClient.ts`'s `apiRequest` and `apiBlobRequest` each
+  independently repeat the full CSRF-retry/401-refresh-retry sequence instead of sharing
+  one implementation — currently in sync, but any future fix to the retry semantics has
+  to be applied in both places by hand.
+
+## Phase 14 - Independent Code-Only Review (2026-08-18): Low Severity Polish And Dead Code — 0 / 7
+
+- [ ] Small utilities duplicated verbatim across files instead of shared: CSV-cell
+  escaping (`pages/Subscription.tsx` / `pages/Analytics.tsx`), blob-download-and-click
+  (`lib/exportsApi.ts` / `lib/settingsApi.ts`), `isCanadaBusiness`
+  (`components/AppShell.tsx` / `pages/Mileage.tsx`), `getPaginationPages`
+  (`pages/Transactions.tsx` / `pages/Mileage.tsx` / `pages/Invoices.tsx`), and the AR/AP
+  aging-bucket `CASE/SUM` SQL in `services/arApService.js`.
+- [ ] Confirmed dead code: `pdfGeneratorService.js` declares `buildVehicleAuditSchedule`
+  and `buildQuickMethodRemittancePage` twice each (function-declaration hoisting means
+  the first ~140 lines of each pair never execute); `middleware/rateLimiter.js`'s
+  `metrics = { increment() {} }` no-op stub is called from 4 sites but never wired to a
+  real backend; `frontend-v3/src/lib/authApi.ts`'s `requestEmailChange` always returns
+  `verificationCode: undefined`, unread by any caller; `routes/receipts.routes.js`
+  imports `https` but never uses it; `supportEmail.routes.js` and `email.routes.js` each
+  have a no-op `catch (err) { throw err; }` wrapping the whole handler, redundant with
+  `asyncRoute`.
+- [ ] `pdfGeneratorService.js`'s live Auto Audit Support Schedule "Method Reference"
+  card contains an out-of-place engineering instruction as customer-facing PDF content:
+  "Run VALIDATE CONSTRAINT after data cleanup to enable query-planner optimization" —
+  unrelated to vehicle deduction methodology, reads like leftover placeholder text.
+- [ ] `server.js` startup logs read as theatrical/AI-generated filler out of step with
+  the rest of the file's structured logging convention (e.g.
+  `'SYSTEM START: INEX_LEDGER_PROD_2026'`, `'SECURITY: JWT_SECRET detected:'`) —
+  harmless (no secret value is actually logged) but stylistically inconsistent.
+- [ ] `window.__LUNA_ME__` (an old internal codename unrelated to the product name) is
+  read directly off `window` by 4 pages (`Analytics.tsx`, `Mileage.tsx`, `Invoices.tsx`,
+  `Transactions.tsx`) for business currency instead of via props/context, bypassing
+  React's normal data flow — deliberately wired in `App.tsx`, but an inconsistent escape
+  hatch a reviewer would ask to be routed through context.
+- [ ] `services/emailPreferencesService.js`'s `getSigningSecret()` falls back to a
+  hardcoded literal secret (`"inex-ledger-email-preferences"`) if none of
+  `EMAIL_PREFERENCES_SECRET`/`SUPPORT_REPLY_HMAC_SECRET`/`JWT_SECRET` are configured —
+  low impact (forged tokens only unsubscribe from optional marketing email) but a
+  hardcoded-secret anti-pattern.
+- [ ] Misc naming/structure nits: duplicate migration filename number prefixes (`007`,
+  `026`, `045`, three separate `048_*.sql` files — alphabetical sort currently keeps
+  execution order deterministic, but there's no single source of truth for "next
+  migration number"); `subscriptionService.js`'s `PLAN_FREE`/`PLAN_BASIC` and
+  `PLAN_V1`/`PLAN_PRO` are redundant unlabeled aliases of the same two values;
+  `middleware/requirePlanFeature.js` has a JSDoc block sitting above the wrong function;
+  `accountingLockService.js`'s `assertNoLockedPeriodTransactionsForCategory`/
+  `assertNoLockedPeriodTransactionsForAccount` are near-duplicates differing only by
+  column name; `invoiceEmailService.js` has an indentation break for ~40 lines.
 
 ## PR Log
 
@@ -2506,3 +2737,49 @@ test that had been failing identically since PR 13).
   recomputed from the checklist markers (54 `[x]` + 0 `[ ]` = 54 total,
   matching every phase header's own sum): **54.0/54 (100%)** — this closes
   the AI-slop/overengineering remediation initiative tracked in this file.
+
+- **PR 50** (`claude/billing-ui-checkout-updates-673wux`): tracker-only, no
+  application code changed. After Phase 10 closed the initiative at 100%, the
+  user asked for a fresh, independent, code-only review — explicitly
+  excluding this tracker and every other doc, so the findings weren't just a
+  rehash of prior audits. Five parallel background agents each read one full
+  slice of the codebase (`routes/`, `services/`, backend infra/plumbing,
+  frontend `pages/`+`components/`, frontend `lib/`+`hooks/`); every finding
+  reported here was independently re-verified against real code (grep/read,
+  not trust) before being added — including correcting one agent's own
+  overstated claim (the pdf-worker item: verified the fake-PDF code path is
+  actually dead/unreached in the live export flow, not "every customer
+  download is invalid" as the agent first reported).
+
+  Added four new phases (11-14, 38 action items, all `[ ]`) documenting what
+  was found: Phase 11 (critical/high — a fully broken V2 feature area, a
+  redacted-export tax-ID leak, a silent CPA-schedule-truncation bug, an
+  orphaned pdf-worker microservice masquerading as required infrastructure,
+  two frontend currency-display bugs, a dead UI button, duplicated
+  compliance-critical export logic, duplicated-and-already-diverged webhook
+  signature verification, an account-deletion endpoint leaking DB internals,
+  a client-side tax estimate that can disagree with the backend's real one,
+  and hard-deleted AR/AP records with no audit trail), Phase 12 (backend
+  consistency/concurrency — inconsistent error-handling convention,
+  duplicated MFA logic, double-applied entitlement middleware, DDL from a
+  GET handler, untestable tax math embedded in routes, unlocked check-then-
+  act races, silently swallowed decrypt failures, a non-transactional
+  multi-step revert, a non-idempotent patch script still wired as an npm
+  command), Phase 13 (frontend duplication/races — the duplicated
+  currency-formatting helpers that directly caused two of Phase 11's bugs,
+  duplicated attachment-validation logic, missing request-cancellation
+  guards in two data hooks, brittle string-matched CSRF-retry detection,
+  timezone-dependent invoice status, regex-over-label-text review
+  classification), and Phase 14 (low-severity dead code and polish — two
+  fully dead duplicate function declarations, a no-op metrics stub, an
+  always-undefined API field, an out-of-place engineering comment shipped as
+  PDF content, theatrical startup log lines, a global-window escape hatch
+  around React's data flow, a hardcoded fallback secret, and assorted
+  naming/duplication nits).
+
+  Per this file's own stated rule ("recompute the overall score from the
+  checklist instead of manually carrying the old number forward"), Overall
+  changes from **54.0/54 (100%)** to **54.0/92 (~59%)** — not a regression in
+  what shipped, but an honest reflection that a fresh independent pass found
+  substantially more real work than the prior phases' scope covered. Fixing
+  Phase 11-14 items is follow-up work, tracked here but not yet started.
