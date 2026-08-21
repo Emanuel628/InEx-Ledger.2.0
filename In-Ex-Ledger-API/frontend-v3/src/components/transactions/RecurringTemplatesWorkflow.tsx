@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import { formatMoney } from '../../lib/money'
 import type {
   AccountOption,
   CategoryOption,
@@ -293,12 +294,4 @@ function formatIsoDate(value: string) {
     return value
   }
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: getActiveCurrency() }).format(value)
-}
-
-function getActiveCurrency() {
-  return 'USD'
 }

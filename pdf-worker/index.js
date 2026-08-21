@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import express from "express";
 import dotenv from "dotenv";
 import ipaddr from "ipaddr.js";
@@ -8,6 +9,12 @@ dotenv.config();
 
 const PORT = Number(process.env.PORT || 9080);
 const WORKER_SECRET = process.env.PDF_WORKER_SECRET;
+// By default the worker trusts only the raw socket address, which cannot be
+// spoofed by the caller. X-Forwarded-For is only honored when this service
+// genuinely sits behind a trusted reverse proxy that sets it, configured by
+// the number of trusted proxy hops in front of this service. With 0 (the
+// default), X-Forwarded-For is ignored entirely.
+const TRUSTED_PROXY_HOPS = Math.max(0, Number(process.env.PDF_WORKER_TRUSTED_PROXY_HOPS || 0));
 const PRIVATE_KEY_JWK = process.env.PDF_WORKER_PRIVATE_KEY_JWK;
 const ALLOWED_CIDRS = (process.env.PDF_WORKER_ALLOWED_CIDRS || "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16")
   .split(",")
@@ -27,9 +34,19 @@ const parsedCidrs = ALLOWED_CIDRS.map((cidr) => {
 });
 
 function getRemoteIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
+  if (TRUSTED_PROXY_HOPS > 0) {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (forwarded) {
+      // The chain grows left-to-right as each trusted proxy appends the
+      // address it received from. The real client is TRUSTED_PROXY_HOPS
+      // entries from the right — anything further left is caller-supplied
+      // and must not be trusted.
+      const chain = forwarded.split(",").map((entry) => entry.trim()).filter(Boolean);
+      const clientIndex = chain.length - TRUSTED_PROXY_HOPS;
+      if (clientIndex >= 0 && chain[clientIndex]) {
+        return chain[clientIndex];
+      }
+    }
   }
   return req.socket.remoteAddress || "";
 }
@@ -166,8 +183,13 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  const token = req.headers["x-worker-token"];
-  if (token !== WORKER_SECRET) {
+  const token = String(req.headers["x-worker-token"] || "");
+  const expected = String(WORKER_SECRET || "");
+  const tokenBuffer = Buffer.from(token, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const isValid =
+    tokenBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(tokenBuffer, expectedBuffer);
+  if (!isValid) {
     logError("Unauthorized worker request", new Error("Invalid token"), { path: req.path });
     return res.status(401).json({ error: "Unauthorized" });
   }

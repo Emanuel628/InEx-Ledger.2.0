@@ -537,10 +537,26 @@ test("v3 app avoids hard reloads for SPA-owned state changes", () => {
 });
 
 test("v3 money formatters use the active business currency on app pages", () => {
-  for (const page of ["Transactions.tsx", "Analytics.tsx", "Mileage.tsx", "Invoices.tsx"]) {
+  // Regression test: formatMoney/getActiveCurrency used to be redefined
+  // independently in each page, which is exactly the duplication that let
+  // Invoices.tsx's currency-collapsing bug (every non-CAD currency,
+  // including EUR/GBP/AUD, displayed as USD) and
+  // RecurringTemplatesWorkflow.tsx's hardcoded 'USD' ship undetected. Both
+  // are now sourced from one shared module, lib/money.ts.
+  const moneyLibSource = fs.readFileSync(path.join(frontendRoot, "lib", "money.ts"), "utf8");
+  assert.match(moneyLibSource, /window\.__LUNA_ME__\?\.business\?\.currency/, "the real active-currency source of truth must live in lib/money.ts");
+  assert.match(moneyLibSource, /export function getActiveCurrency/);
+  assert.match(moneyLibSource, /export function formatMoney/);
+
+  for (const page of ["Transactions.tsx", "Analytics.tsx", "Mileage.tsx", "Invoices.tsx", "Exports.tsx"]) {
     const source = fs.readFileSync(path.join(frontendRoot, "pages", page), "utf8");
-    assert.match(source, /window\.__LUNA_ME__\?\.business\?\.currency/);
+    assert.match(source, /from '\.\.\/lib\/money'/, `${page} must source formatMoney/getActiveCurrency from the shared lib/money module`);
+    assert.doesNotMatch(source, /window\.__LUNA_ME__\?\.business\?\.currency/, `${page} must not re-derive the active currency itself`);
   }
+
+  const recurringWorkflowSource = fs.readFileSync(path.join(frontendRoot, "components", "transactions", "RecurringTemplatesWorkflow.tsx"), "utf8");
+  assert.match(recurringWorkflowSource, /from '\.\.\/\.\.\/lib\/money'/);
+  assert.doesNotMatch(recurringWorkflowSource, /return 'USD'/, "must not hardcode USD regardless of the business's real currency");
 
   const invoicesApiSource = fs.readFileSync(path.join(frontendRoot, "lib", "invoicesApi.ts"), "utf8");
   const invoicesSource = fs.readFileSync(path.join(frontendRoot, "pages", "Invoices.tsx"), "utf8");
@@ -668,7 +684,15 @@ test("v3 transactions use Categories page source for dropdowns and clean review 
   assert.match(cssSource, /\.tax-profile-note/);
 });
 
-test("v3 transactions use legacy estimated tax percentages including Canada province rates", () => {
+test("v3 transactions no longer compute their own estimated-tax dollar figure from hardcoded rates", () => {
+  // Regression test: resolveEstimatedTaxProfile used to hardcode a flat 28%
+  // US rate and a per-province Canadian rate table, and Transactions.tsx
+  // multiplied that rate against the page's net total to produce an
+  // "estimated tax" dollar figure -- independent of, and inconsistent
+  // with, the backend's real se_tax_estimate shown on Analytics. The
+  // dollar estimate now comes from lib/analyticsApi.ts's loadTaxSetAside()
+  // (backend-sourced) instead; resolveEstimatedTaxProfile only derives the
+  // display label (region/province naming), not a rate or dollar amount.
   const { resolveEstimatedTaxProfile } = loadLibModule(path.join("lib", "transactionsApi.ts"), {
     require(specifier) {
       if (specifier === "./apiClient") {
@@ -681,21 +705,21 @@ test("v3 transactions use legacy estimated tax percentages including Canada prov
     }
   });
 
-  assert.equal(resolveEstimatedTaxProfile({ region: "CA", province: "AB" }).rate, 0.29);
-  assert.equal(resolveEstimatedTaxProfile({ region: "CA", province: "BC" }).rate, 0.26);
-  assert.equal(resolveEstimatedTaxProfile({ region: "CA", province: "ON" }).rate, 0.27);
-  assert.equal(resolveEstimatedTaxProfile({ region: "CA", province: "QC" }).rate, 0.34);
-  assert.equal(
-    resolveEstimatedTaxProfile({ region: "CA", province: "ZZ" }).rate,
-    0.28,
-    "an unrecognized province should fall back to the default combined rate"
-  );
-  assert.match(resolveEstimatedTaxProfile({ region: "CA", province: "AB" }).note, /combined income tax \+ CPP rate/);
-  assert.notEqual(
-    resolveEstimatedTaxProfile({ region: "CA", province: "QC" }).rate,
-    0.14975,
-    "the Canadian estimate must stay an income-tax buffer, not GST/HST's rate"
-  );
+  const abProfile = resolveEstimatedTaxProfile({ region: "CA", province: "AB" });
+  assert.equal(abProfile.region, "CA");
+  assert.equal(abProfile.province, "AB");
+  assert.equal(abProfile.label, "AB tax estimate");
+  assert.equal("rate" in abProfile, false, "resolveEstimatedTaxProfile must not compute a client-side tax rate");
+  assert.equal("note" in abProfile, false, "resolveEstimatedTaxProfile must not fabricate a rate-describing note");
+
+  const usProfile = resolveEstimatedTaxProfile({ region: "US" });
+  assert.equal(usProfile.label, "US Schedule C estimate");
+
+  const analyticsApiSource = fs.readFileSync(path.join(frontendRoot, "lib", "analyticsApi.ts"), "utf8");
+  assert.match(analyticsApiSource, /export async function loadTaxSetAside/, "the real backend-sourced tax estimate must be exported for reuse");
+
+  const hookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useTransactionsPageData.ts"), "utf8");
+  assert.match(hookSource, /loadTaxSetAside/, "Transactions page data must source its tax estimate from the backend, not a local computation");
 });
 
 test("v3 transactions expose legacy undo delete and a clickable per-page select affordance", () => {

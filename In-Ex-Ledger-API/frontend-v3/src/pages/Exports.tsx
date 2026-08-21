@@ -31,6 +31,7 @@ import {
   type ExportMode,
   type ExportSettings,
 } from '../lib/exportsApi'
+import { formatMoney } from '../lib/money'
 
 const today = new Date().toISOString().slice(0, 10)
 const yearStart = `${today.slice(0, 4)}-01-01`
@@ -45,9 +46,12 @@ const emptySummary: ExportDatasetSummary = {
   currency: 'USD',
 }
 
+type DatePreset = 'ytd' | 'last-year' | 'q1' | 'custom'
+
 function Exports(props: PageProps) {
   const [startDate, setStartDate] = useState(yearStart)
   const [endDate, setEndDate] = useState(today)
+  const [datePreset, setDatePreset] = useState<DatePreset>('ytd')
   const [language, setLanguage] = useState('en')
   const [currency, setCurrency] = useState('USD')
   const [exportMode, setExportMode] = useState<ExportMode>('workpaper')
@@ -196,9 +200,9 @@ function Exports(props: PageProps) {
         </section>
 
         <section className="summary-strip" aria-label="Export summary">
-          <SummaryItem label="Income" value={formatMoney(summary.income, summary.currency)} tone="income" icon={FileText} />
-          <SummaryItem label="Expenses" value={formatMoney(summary.expenses, summary.currency)} tone="expense" icon={FileSpreadsheet} />
-          <SummaryItem label="Net profit" value={formatMoney(summary.netProfit, summary.currency)} tone="net" icon={Download} />
+          <SummaryItem label="Income" value={formatMoney(summary.income, summary.currency, { maximumFractionDigits: 0 })} tone="income" icon={FileText} />
+          <SummaryItem label="Expenses" value={formatMoney(summary.expenses, summary.currency, { maximumFractionDigits: 0 })} tone="expense" icon={FileSpreadsheet} />
+          <SummaryItem label="Net profit" value={formatMoney(summary.netProfit, summary.currency, { maximumFractionDigits: 0 })} tone="net" icon={Download} />
           <SummaryItem label="Readiness" value={`${summary.readinessIssues} issues`} tone="review" icon={AlertTriangle} />
         </section>
 
@@ -244,7 +248,7 @@ function Exports(props: PageProps) {
               </div>
               <div>
                 <span>Package total</span>
-                <strong>{formatMoney(summary.netProfit, summary.currency)} net</strong>
+                <strong>{formatMoney(summary.netProfit, summary.currency, { maximumFractionDigits: 0 })} net</strong>
               </div>
             </div>
           </section>
@@ -259,20 +263,52 @@ function Exports(props: PageProps) {
             </div>
 
             <div className="export-presets" aria-label="Date range presets">
-              <button className="is-selected" type="button" onClick={() => setPresetRange('ytd', setStartDate, setEndDate)}>YTD</button>
-              <button type="button" onClick={() => setPresetRange('last-year', setStartDate, setEndDate)}>Last tax year</button>
-              <button type="button" onClick={() => setPresetRange('q1', setStartDate, setEndDate)}>Q1</button>
-              <button type="button">Custom</button>
+              <button
+                className={datePreset === 'ytd' ? 'is-selected' : ''}
+                type="button"
+                onClick={() => { setPresetRange('ytd', setStartDate, setEndDate); setDatePreset('ytd') }}
+              >
+                YTD
+              </button>
+              <button
+                className={datePreset === 'last-year' ? 'is-selected' : ''}
+                type="button"
+                onClick={() => { setPresetRange('last-year', setStartDate, setEndDate); setDatePreset('last-year') }}
+              >
+                Last tax year
+              </button>
+              <button
+                className={datePreset === 'q1' ? 'is-selected' : ''}
+                type="button"
+                onClick={() => { setPresetRange('q1', setStartDate, setEndDate); setDatePreset('q1') }}
+              >
+                Q1
+              </button>
+              <button
+                className={datePreset === 'custom' ? 'is-selected' : ''}
+                type="button"
+                onClick={() => setDatePreset('custom')}
+              >
+                Custom
+              </button>
             </div>
 
             <div className="export-field-grid">
               <label>
                 Start date
-                <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => { setStartDate(event.target.value); setDatePreset('custom') }}
+                />
               </label>
               <label>
                 End date
-                <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(event) => { setEndDate(event.target.value); setDatePreset('custom') }}
+                />
               </label>
             </div>
 
@@ -455,7 +491,7 @@ function GeneratePdfModal({
             </div>
             <div>
               <span>Net profit</span>
-              <strong>{formatMoney(summary.netProfit, summary.currency)}</strong>
+              <strong>{formatMoney(summary.netProfit, summary.currency, { maximumFractionDigits: 0 })}</strong>
             </div>
           </section>
 
@@ -568,14 +604,6 @@ function formatDate(value: string) {
     return 'Unknown'
   }
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatMoney(value: number, currency: string) {
-  return value.toLocaleString('en-US', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  })
 }
 
 export default Exports

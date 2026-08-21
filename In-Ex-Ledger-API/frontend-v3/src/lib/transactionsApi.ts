@@ -56,9 +56,7 @@ export type CategoryOption = {
 export type BusinessTaxProfile = {
   region: 'US' | 'CA'
   province: string
-  rate: number
   label: string
-  note: string
 }
 
 export type ReviewQueueItem = {
@@ -522,41 +520,23 @@ function mapCategoryOption(category: LegacyCategoryOption): CategoryOption {
   }
 }
 
+/**
+ * Derives only the display label for the tax-estimate card (e.g. "ON tax
+ * estimate" / "US Schedule C estimate") from the business's region/province.
+ * The actual dollar estimate is NOT computed here -- it comes from the
+ * backend's real se_tax_estimate (see lib/analyticsApi.ts's loadTaxSetAside)
+ * rather than a client-side rate x net-profit approximation. This used to
+ * also compute a hardcoded per-province tax rate and a note describing it,
+ * which could (and did) produce a different dollar figure than the backend's
+ * own estimate shown elsewhere in the app.
+ */
 export function resolveEstimatedTaxProfile(business: LegacyBusiness | null): BusinessTaxProfile {
   const region = String(business?.region || business?.country || 'US').toUpperCase() === 'CA' ? 'CA' : 'US'
   const province = String(business?.province || '').toUpperCase()
-  const rate = region === 'CA' ? estimatedCanadianRate(province) : 0.28
   const label = region === 'CA'
     ? `${province || 'Canada'} tax estimate`
     : 'US Schedule C estimate'
-  const note = region === 'CA'
-    ? `Draft T2125 estimate using the combined income tax + CPP rate for ${province || 'Canada'}: ${formatPercent(rate, province)}. This is not GST/HST.`
-    : `Draft Schedule C estimate based on net profit using a ${formatPercent(rate)} buffer.`
-  return { region, province, rate, label, note }
-}
-
-function estimatedCanadianRate(province: string) {
-  const rates: Record<string, number> = {
-    AB: 0.29,
-    BC: 0.26,
-    MB: 0.31,
-    NB: 0.30,
-    NL: 0.29,
-    NS: 0.33,
-    NT: 0.26,
-    NU: 0.26,
-    ON: 0.27,
-    PE: 0.31,
-    QC: 0.34,
-    SK: 0.31,
-    YT: 0.28,
-  }
-  return rates[province] || 0.28
-}
-
-function formatPercent(rate: number, province = '') {
-  const decimals = province === 'QC' ? 3 : 0
-  return `${(rate * 100).toFixed(decimals)}%`
+  return { region, province, label }
 }
 
 function mapStatus(row: LegacyTransaction, receiptCount: number): TransactionStatus {

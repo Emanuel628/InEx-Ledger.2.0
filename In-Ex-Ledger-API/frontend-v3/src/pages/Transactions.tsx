@@ -51,6 +51,7 @@ import {
   type TransactionDraft,
   type TransactionStatus,
 } from '../lib/transactionsApi'
+import { formatMoney } from '../lib/money'
 import { uploadReceipt } from '../lib/receiptsApi'
 import type { AccountingLock } from '../lib/settingsApi'
 import { hasReviewFor, normalizeReviewLabels, reviewLabelsFor, reviewText } from '../lib/transactionReview'
@@ -79,6 +80,7 @@ function Transactions(props: PageProps) {
     accountOptions,
     categoryOptions,
     taxProfile,
+    taxSetAside,
     accountingLock,
     reviewQueue,
     recurringTemplates,
@@ -122,7 +124,7 @@ function Transactions(props: PageProps) {
   const incomeTotal = transactionSummary.incomeTotal
   const expenseTotal = transactionSummary.expenseTotal
   const netTotal = incomeTotal - expenseTotal
-  const estimatedTax = Math.max(0, netTotal) * (taxProfile?.rate ?? 0.24)
+  const estimatedTax = taxSetAside === null ? null : formatMoney(taxSetAside)
   const reviewCount = reviewQueue.summary?.total ?? transactionRows.filter((row) => row.status !== 'Cleared' || row.receipt === 'Missing').length
   useBodyModalLock(
     drawerOpen
@@ -403,7 +405,7 @@ function Transactions(props: PageProps) {
 
           <section className="summary-with-tax-info" aria-label="Transaction summary">
             <div className="summary-strip">
-              <SummaryItem label="Estimated tax" value={formatMoney(estimatedTax)} tone="tax" icon={CircleDollarSign} />
+              <SummaryItem label="Estimated tax" value={estimatedTax ?? '—'} tone="tax" icon={CircleDollarSign} />
               <SummaryItem label="Net" value={formatMoney(netTotal)} tone="net" icon={CircleDollarSign} />
               <SummaryItem label="Income" value={formatMoney(incomeTotal)} tone="income" icon={TrendingUp} />
               <SummaryItem label="Expenses" value={formatMoney(expenseTotal)} tone="expense" icon={TrendingDown} />
@@ -413,8 +415,8 @@ function Transactions(props: PageProps) {
                 <Info size={16} />
               </button>
               <div className="tax-info-popover tax-profile-note-popover" role="tooltip">
-                <strong>{taxProfile?.label || 'Estimated tax'}</strong>
-                <span>{taxProfile?.note || 'Draft estimate for review before export.'}</span>
+                <strong>{taxProfile?.label || 'Tax set-aside'}</strong>
+                <span>Backend-calculated self-employment tax estimate for the current tax year -- the same figure shown on Analytics. Draft estimate for review before export.</span>
               </div>
             </div>
           </section>
@@ -1537,16 +1539,6 @@ function TransactionFiltersModal({
   )
 }
 
-function formatMoney(value: number) {
-  const currency = getActiveCurrency()
-  const formatted = Math.abs(value).toLocaleString(currency === 'CAD' ? 'en-CA' : 'en-US', {
-    style: 'currency',
-    currency,
-  })
-
-  return value < 0 ? `-${formatted}` : formatted
-}
-
 function isTransactionLocked(transaction: Transaction, lock: AccountingLock | null) {
   const txDate = normalizeDateOnly(transaction.dateIso)
   const lockedThrough = normalizeDateOnly(lock?.lockedThroughDate)
@@ -1555,10 +1547,6 @@ function isTransactionLocked(transaction: Transaction, lock: AccountingLock | nu
 
 function normalizeDateOnly(value?: string | null) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value).slice(0, 10) : ''
-}
-
-function getActiveCurrency() {
-  return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
 }
 
 function formatIsoDate(value: string) {

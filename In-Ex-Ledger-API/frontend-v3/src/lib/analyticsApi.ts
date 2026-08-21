@@ -101,6 +101,20 @@ export async function loadAnalytics() {
   } satisfies AnalyticsSummary
 }
 
+/**
+ * Fetches only the backend-computed self-employment tax set-aside estimate
+ * (GET /api/analytics/dashboard's summary.se_tax_estimate), without the
+ * extra cash-flow request loadAnalytics() also makes. Used by pages that
+ * want to show this same figure without pulling in the full Analytics
+ * dataset -- see Transactions.tsx, which previously computed its own
+ * estimate client-side using hardcoded, unmaintained tax-bracket rates that
+ * could (and did) disagree with this real backend figure.
+ */
+export async function loadTaxSetAside(): Promise<number | null> {
+  const dashboard = await apiRequest<DashboardResponse>('/api/analytics/dashboard')
+  return dashboard.summary?.se_tax_estimate ?? null
+}
+
 function mapCategoryRows(rows: Array<{ category: string; total: number }>) {
   const total = rows.reduce((sum, row) => sum + Number(row.total || 0), 0)
   return rows.map((row) => ({

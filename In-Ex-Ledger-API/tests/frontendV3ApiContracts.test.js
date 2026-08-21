@@ -188,5 +188,4 @@ test("v3 business profile contract keeps region and province available for tax m
   assert.match(settingsSource, /body\.material_participation = Boolean\(profile\.material_participation\)/);
   assert.match(transactionsSource, /type LegacyBusiness = \{[\s\S]*region\?: string \| null[\s\S]*country\?: string \| null[\s\S]*province\?: string \| null/);
   assert.match(transactionsSource, /resolveEstimatedTaxProfile\(business\)/);
-  assert.match(transactionsSource, /estimatedCanadianRate\(province\)/);
 });

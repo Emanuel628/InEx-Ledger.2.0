@@ -188,7 +188,13 @@ function loadExportsRouter(options = {}) {
     generatedEmails: [],
     failedEmails: [],
     warnings: [],
+    // Note: vehicleCostQueryCount is incremented by both the
+    // vehicle_expense_details query and the vehicle_costs query below (an
+    // existing naming quirk in this fixture, kept as-is for the assertions
+    // that already depend on it). vehicleCostsOnlyQueryCount tracks just the
+    // vehicle_costs table so tests can pin down that query's exact count.
     vehicleCostQueryCount: 0,
+    vehicleCostsOnlyQueryCount: 0,
   };
   const grantPayload = options.grantPayload || {
     action: "generate_pdf",
@@ -329,6 +335,10 @@ function loadExportsRouter(options = {}) {
             }
             if (/FROM vehicle_costs/i.test(sql)) {
               state.vehicleCostQueryCount += 1;
+              state.vehicleCostsOnlyQueryCount += 1;
+              if (options.vehicleCostsError) {
+                throw new Error(options.vehicleCostsError);
+              }
               return { rows: fixture.vehicleCosts };
             }
             if (/FROM capital_assets/i.test(sql)) return { rows: [] };
@@ -1059,6 +1069,81 @@ test("route generate stores nonzero page count metadata and saves only the redac
     assert.equal(fixture.state.released, true);
   } finally {
     fixture.cleanup();
+  }
+});
+
+test("route secure-export generates a PDF via the same shared dataset pipeline as /generate", async () => {
+  const fixture = loadExportsRouter();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/exports/secure-export")
+      .buffer(true)
+      .parse(parseBinaryResponse)
+      .send({
+        dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" },
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers["content-type"], "application/pdf");
+    assert.match(response.body.toString("latin1"), /^%PDF-/);
+    // /secure-export historically queried vehicle_costs separately (after
+    // the shared batch) rather than as part of it; fetchExportSourceRows()
+    // reproduces that via tolerateMissingVehicleCosts, so the query still
+    // runs exactly once.
+    assert.equal(fixture.state.vehicleCostsOnlyQueryCount, 1);
+    assert.ok(Array.isArray(fixture.state.insertedSnapshot));
+    assert.equal(fixture.state.insertedSnapshot[4], "workpaper");
+    assert.equal(fixture.state.insertedSnapshot[5], "pdf");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+// Regression coverage for the fetchExportSourceRows() parameterization added
+// when /secure-export was unified onto it: /generate lets a vehicle_costs
+// query failure propagate (fatal), while /secure-export has always tolerated
+// it (e.g. migration not yet applied) by falling back to no vehicle cost
+// rows. The unification must preserve this pre-existing divergence exactly,
+// not silently pick one behavior for both routes.
+test("route secure-export tolerates a vehicle_costs query failure that route generate does not", async () => {
+  const secureFixture = loadExportsRouter({
+    vehicleCostsError: "relation \"vehicle_costs\" does not exist",
+  });
+  try {
+    const app = buildApp(secureFixture.router);
+    const response = await request(app)
+      .post("/api/exports/secure-export")
+      .buffer(true)
+      .parse(parseBinaryResponse)
+      .send({
+        dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" },
+      });
+
+    assert.equal(response.status, 200);
+    assert.match(response.body.toString("latin1"), /^%PDF-/);
+  } finally {
+    secureFixture.cleanup();
+  }
+
+  const generateFixture = loadExportsRouter({
+    vehicleCostsError: "relation \"vehicle_costs\" does not exist",
+  });
+  try {
+    const app = buildApp(generateFixture.router);
+    const response = await request(app)
+      .post("/api/exports/generate")
+      .buffer(true)
+      .parse(parseBinaryResponse)
+      .send({
+        grantToken: "grant_token_123",
+        taxId_jwe: "encrypted_tax_id",
+        certifiedByUser: true,
+      });
+
+    assert.equal(response.status, 500);
+  } finally {
+    generateFixture.cleanup();
   }
 });
 
