@@ -37,8 +37,6 @@ whenever `ENV_VARIABLE_REGISTRY` changes).
 | `RECEIPT_STORAGE_DIR` | Filesystem path receipts are persisted to. |
 | `INEX_LEDGER_SUPPORT_SECRET` | Shared secret gating the internal support API. |
 | `REDIS_URL` | Rate limiting is unconditionally required in production; missing this previously degraded silently to a per-instance in-memory limiter instead of failing startup. |
-| `PDF_WORKER_URL` | PDF export is a core, unconditionally-mounted feature; without this every export request fails at request time instead of at startup. |
-| `PDF_WORKER_SECRET` | Authenticates requests to the PDF worker. |
 | `EXPORT_PUBLIC_KEY_JWK` | Public key for verifying secure export grants; the crypto route degrades to 503 without it. |
 | `EXPORT_PRIVATE_KEY_JWK` | Private key for signing secure export grants. |
 | every Stripe price env in `services/stripePriceConfig.js` | Pricing/checkout resolution needs a real Stripe price ID for every plan/interval/currency/region combination. |
@@ -57,6 +55,7 @@ security gap:
 | `SUPPORT_INBOUND_WEBHOOK_SECRET` / `INBOUND_EMAIL_WEBHOOK_SECRET` | Support-reply inbound email webhook | `503 "Support inbound webhook is not configured."` |
 | `INBOUND_EMAIL_WEBHOOK_SECRET` | General inbound email webhook | `503` in the same way |
 | `SUPPORT_REPLY_HMAC_SECRET` | Signs support-reply email links | Only exercised by the inbound-email features above |
+| `PDF_WORKER_URL` / `PDF_WORKER_SECRET` | Would authenticate calls to the pdf-worker microservice via `dispatchPdfJob` | Not currently required for any live code path — live PDF export goes through `pdfGeneratorService.js`'s in-process `generatePdfExportPair` instead; nothing calls `dispatchPdfJob` today |
 
 Recommended supporting variables (not enforced by `envValidationService.js`,
 but worth setting in production):

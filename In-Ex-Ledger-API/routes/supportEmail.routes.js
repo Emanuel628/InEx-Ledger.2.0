@@ -9,12 +9,18 @@ const { asyncRoute } = require("../utils/apiError.js");
 const {
   parseSupportReplyToken
 } = require("../services/supportEmailService.js");
+const {
+  maskEmailLike,
+  maskRecipientList,
+  pickRecipientList,
+  pickFromAddress,
+  pickBody,
+  cleanInboundReplyBody,
+  describeInboundCaller,
+  createInboundWebhookVerifier
+} = require("../services/inboundWebhookVerificationService.js");
 
 const router = express.Router();
-
-const INBOUND_TIMESTAMP_TOLERANCE_SECONDS = 5 * 60;
-const INBOUND_REPLAY_TTL_MS = 5 * 60 * 1000;
-const inboundReplayCache = new Map();
 
 function getResendClient() {
   const key = String(process.env.RESEND_API_KEY || "").trim();
@@ -22,249 +28,28 @@ function getResendClient() {
   return new Resend(key);
 }
 
-function rawBodyUtf8(req) {
-  if (Buffer.isBuffer(req.body)) return req.body.toString("utf8");
-  if (typeof req.body === "string") return req.body;
-  return "";
-}
-
-function timingSafeStringEqual(a, b) {
-  const ab = Buffer.from(String(a || ""));
-  const bb = Buffer.from(String(b || ""));
-  if (ab.length !== bb.length) return false;
-  try {
-    return crypto.timingSafeEqual(ab, bb);
-  } catch (_) {
-    return false;
+// Preserves this route's original error wording while now pooling secrets
+// from both SUPPORT_INBOUND_WEBHOOK_SECRET and INBOUND_EMAIL_WEBHOOK_SECRET
+// (each may hold multiple comma-separated values for zero-downtime rotation)
+// — matching the multi-secret rotation support routes/email.routes.js already had.
+const supportInboundWebhookVerifier = createInboundWebhookVerifier({
+  envVarNames: ["SUPPORT_INBOUND_WEBHOOK_SECRET", "INBOUND_EMAIL_WEBHOOK_SECRET"],
+  messages: {
+    unconfigured: "Support inbound webhook is not configured.",
+    malformedTimestamp: "Malformed support webhook timestamp.",
+    toleranceWindow: "Support webhook timestamp outside tolerance window.",
+    invalidSignature: "Invalid support webhook signature.",
+    replayed: "Replayed support webhook signature.",
+    missingSignatureHeaders: "Missing support webhook signature headers.",
+    invalidSecret: "Invalid support webhook secret.",
+    missingSignature: "Missing support webhook signature.",
+    invalidJson: "Support webhook payload is not valid JSON.",
+    invalidPayloadShape: "Support webhook payload must be a JSON object."
   }
-}
-
-function maskEmailLike(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const match = raw.match(/<([^>]+)>/);
-  const address = (match ? match[1] : raw).trim().toLowerCase();
-  const [local, domain] = address.split("@");
-  if (!local || !domain) {
-    return raw.slice(0, 3) + "***";
-  }
-  const localPrefix = local.length <= 2 ? `${local[0] || "*"}*` : `${local.slice(0, 2)}***`;
-  const domainParts = domain.split(".");
-  const domainName = domainParts.shift() || "";
-  const maskedDomain = domainName.length <= 2 ? `${domainName[0] || "*"}*` : `${domainName.slice(0, 2)}***`;
-  return `${localPrefix}@${[maskedDomain, ...domainParts].join(".")}`;
-}
-
-function maskRecipientList(recipients = []) {
-  return recipients.map((recipient) => maskEmailLike(recipient)).filter(Boolean);
-}
-
-function timingSafeB64Equal(a, b) {
-  try {
-    const ab = Buffer.from(String(a || ""), "base64");
-    const bb = Buffer.from(String(b || ""), "base64");
-    if (ab.length === 0 || ab.length !== bb.length) return false;
-    return crypto.timingSafeEqual(ab, bb);
-  } catch (_) {
-    return false;
-  }
-}
-
-function verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody) {
-  const keyMaterial = secret.startsWith("whsec_") ? secret.slice("whsec_".length) : secret;
-
-  let keyBytes;
-  try {
-    keyBytes = Buffer.from(keyMaterial, "base64");
-  } catch (_) {
-    return false;
-  }
-
-  if (!keyBytes.length) return false;
-
-  const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
-  const expected = crypto.createHmac("sha256", keyBytes).update(signedContent).digest("base64");
-
-  const provided = String(svixSignature || "")
-    .split(" ")
-    .map((part) => (part.includes(",") ? part.split(",")[1] : part))
-    .filter(Boolean);
-
-  return provided.some((sig) => timingSafeB64Equal(sig, expected));
-}
-
-function pruneReplayCache(nowMs) {
-  for (const [signature, recordedAt] of inboundReplayCache.entries()) {
-    if (nowMs - recordedAt > INBOUND_REPLAY_TTL_MS) {
-      inboundReplayCache.delete(signature);
-    }
-  }
-}
-
-function computeInboundSignature(secret, timestampHeader, rawBody) {
-  return crypto
-    .createHmac("sha256", secret)
-    .update(`${timestampHeader}.${rawBody}`)
-    .digest("hex");
-}
-
-function timingSafeHexEqual(a, b) {
-  try {
-    const ab = Buffer.from(String(a || ""), "hex");
-    const bb = Buffer.from(String(b || ""), "hex");
-    if (ab.length === 0 || ab.length !== bb.length) return false;
-    return crypto.timingSafeEqual(ab, bb);
-  } catch (_) {
-    return false;
-  }
-}
+});
 
 function verifySupportInboundRequest(req, nowMs = Date.now()) {
-  const secret = String(process.env.SUPPORT_INBOUND_WEBHOOK_SECRET || process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
-
-  if (!secret) {
-    return { ok: false, status: 503, error: "Support inbound webhook is not configured." };
-  }
-
-  const rawBody = rawBodyUtf8(req);
-  const svixId = String(req.get("svix-id") || "").trim();
-  const svixTimestamp = String(req.get("svix-timestamp") || "").trim();
-  const svixSignature = String(req.get("svix-signature") || "").trim();
-  const timestampHeader = String(req.get("x-inbound-timestamp") || "").trim();
-  const signatureHeader = String(req.get("x-inbound-signature") || "").trim();
-  const legacySecretHeader = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
-  const allowLegacyFallback = process.env.NODE_ENV !== "production" || process.env.ALLOW_INBOUND_EMAIL_SECRET_FALLBACK === "true";
-
-  if (svixId && svixTimestamp && svixSignature) {
-    const timestampSeconds = Number.parseInt(svixTimestamp, 10);
-    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
-      return { ok: false, status: 400, error: "Malformed support webhook timestamp." };
-    }
-
-    const nowSeconds = Math.floor(nowMs / 1000);
-    if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
-      return { ok: false, status: 401, error: "Support webhook timestamp outside tolerance window." };
-    }
-
-    if (!verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody)) {
-      return { ok: false, status: 401, error: "Invalid support webhook signature." };
-    }
-
-    pruneReplayCache(nowMs);
-    const replayKey = `support-svix:${svixId}`;
-    if (inboundReplayCache.has(replayKey)) {
-      return { ok: false, status: 409, error: "Replayed support webhook signature." };
-    }
-    inboundReplayCache.set(replayKey, nowMs);
-  } else if (timestampHeader || signatureHeader) {
-    if (!timestampHeader || !signatureHeader) {
-      return { ok: false, status: 400, error: "Missing support webhook signature headers." };
-    }
-
-    const timestampSeconds = Number.parseInt(timestampHeader, 10);
-    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
-      return { ok: false, status: 400, error: "Malformed support webhook timestamp." };
-    }
-
-    const nowSeconds = Math.floor(nowMs / 1000);
-    if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
-      return { ok: false, status: 401, error: "Support webhook timestamp outside tolerance window." };
-    }
-
-    const expectedSignature = computeInboundSignature(secret, timestampHeader, rawBody);
-    if (!timingSafeHexEqual(signatureHeader, expectedSignature)) {
-      return { ok: false, status: 401, error: "Invalid support webhook signature." };
-    }
-
-    pruneReplayCache(nowMs);
-    const replayKey = `support-custom:${signatureHeader}`;
-    if (inboundReplayCache.has(replayKey)) {
-      return { ok: false, status: 409, error: "Replayed support webhook signature." };
-    }
-    inboundReplayCache.set(replayKey, nowMs);
-  } else if (allowLegacyFallback && legacySecretHeader) {
-    if (!timingSafeStringEqual(legacySecretHeader, secret)) {
-      return { ok: false, status: 401, error: "Invalid support webhook secret." };
-    }
-  } else {
-    return { ok: false, status: 401, error: "Missing support webhook signature." };
-  }
-
-  let payload = {};
-  try {
-    payload = rawBody ? JSON.parse(rawBody) : {};
-  } catch (_) {
-    return { ok: false, status: 400, error: "Support webhook payload is not valid JSON." };
-  }
-
-  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-    return { ok: false, status: 400, error: "Support webhook payload must be a JSON object." };
-  }
-
-  return { ok: true, payload };
-}
-
-function describeInboundCaller(req) {
-  const forwardedFor = String(req.get("x-forwarded-for") || "").trim();
-  return {
-    userAgent: req.get("user-agent") || null,
-    ip: req.ip || null,
-    hasForwardedFor: Boolean(forwardedFor),
-    forwardedForHopCount: forwardedFor ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).length : 0,
-    hasSvixHeaders: Boolean(req.get("svix-signature") || req.get("svix-id")),
-    hasCustomHeaders: Boolean(req.get("x-inbound-signature") || req.get("x-inbound-timestamp")),
-    hasLegacyHeaders: Boolean(req.get("x-inbound-secret") || req.get("x-webhook-secret"))
-  };
-}
-
-function pickRecipientList(payload) {
-  const out = [];
-
-  function collect(value) {
-    if (!value) return;
-
-    if (typeof value === "string") {
-      out.push(value);
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      for (const entry of value) collect(entry);
-      return;
-    }
-
-    if (value.email) collect(value.email);
-    if (value.address) collect(value.address);
-    if (value.raw) collect(value.raw);
-    if (value.text) collect(value.text);
-    if (value.value) collect(value.value);
-    if (value.to) collect(value.to);
-    if (value.recipients) collect(value.recipients);
-    if (value.rcpt_to) collect(value.rcpt_to);
-  }
-
-  const candidates = [
-    payload?.to,
-    payload?.data?.to,
-    payload?.recipient,
-    payload?.data?.recipient,
-    payload?.recipients,
-    payload?.data?.recipients,
-    payload?.envelope?.to,
-    payload?.data?.envelope?.to,
-    payload?.envelope?.recipients,
-    payload?.data?.envelope?.recipients,
-    payload?.envelope?.rcpt_to,
-    payload?.data?.envelope?.rcpt_to,
-    payload?.headers?.to,
-    payload?.headers?.To,
-    payload?.data?.headers?.to,
-    payload?.data?.headers?.To
-  ];
-
-  for (const candidate of candidates) collect(candidate);
-
-  return [...new Set(out.map((item) => String(item).trim()).filter(Boolean))];
+  return supportInboundWebhookVerifier.verify(req, nowMs);
 }
 
 function extractTokenFromRecipient(recipient) {
@@ -279,54 +64,6 @@ function extractTokenFromRecipient(recipient) {
   if (plus < 0) return null;
 
   return local.slice(plus + 1);
-}
-
-function pickFromAddress(payload) {
-  const f = payload?.from || payload?.data?.from;
-  if (typeof f === "string") return { email: f, name: null };
-  if (Array.isArray(f) && f[0]) return { email: f[0].email || f[0].address || null, name: f[0].name || null };
-  if (f?.email) return { email: f.email, name: f.name || null };
-  if (f?.address) return { email: f.address, name: f.name || null };
-  return { email: null, name: null };
-}
-
-function pickBody(payload) {
-  return String(payload?.text || payload?.plain || payload?.body || "")
-    .slice(0, 50000)
-    || String(payload?.html || "").slice(0, 50000);
-}
-
-function cleanInboundReplyBody(rawBody) {
-  const body = String(rawBody || "").replace(/\r\n/g, "\n").trim();
-  if (!body) return "";
-
-  const cutMarkers = [
-    /^On .+ wrote:$/im,
-    /^From:\s.+$/im,
-    /^Sent:\s.+$/im,
-    /^To:\s.+$/im,
-    /^Subject:\s.+$/im,
-    /^-{2,}\s*Original Message\s*-{2,}$/im,
-    /^_{5,}$/im
-  ];
-
-  let cutIndex = -1;
-
-  for (const marker of cutMarkers) {
-    const match = body.match(marker);
-    if (match && typeof match.index === "number") {
-      if (cutIndex === -1 || match.index < cutIndex) {
-        cutIndex = match.index;
-      }
-    }
-  }
-
-  return (cutIndex >= 0 ? body.slice(0, cutIndex) : body)
-    .split("\n")
-    .filter((line) => !line.trim().startsWith(">"))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 async function fetchReceivedEmailContent(payload) {

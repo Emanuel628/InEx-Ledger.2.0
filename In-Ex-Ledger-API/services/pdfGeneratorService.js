@@ -2438,15 +2438,11 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
 
 // ─── PHASE 2 SCHEDULE PAGES ───────────────────────────────────────────────────
 
+const VEHICLE_AUDIT_SCHEDULE_ROWS_PER_PAGE = 28;
+
 function buildVehicleAuditSchedule(vehicleClaims, currency, labels, region) {
   if (!vehicleClaims || vehicleClaims.length === 0) return [];
   const isCA = normalizeRegionCode(region) === "CA";
-  const canvas = new PdfCanvas();
-  const header = drawReportHeader(canvas, {
-    title: "Auto Audit Support Schedule",
-    subtitle: isCA ? "CRA vehicle expense claim details (per-transaction)" : "IRS vehicle expense claim details (per-transaction)",
-    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
-  });
 
   const cols = [
     { key: "date", label: "Date", x: 40, width: 68 },
@@ -2457,66 +2453,70 @@ function buildVehicleAuditSchedule(vehicleClaims, currency, labels, region) {
     { key: "deduction", label: "Deduction", x: 522, width: 50, align: "right" }
   ];
 
-  let y = header.contentStartY - 10;
-  canvas.drawSectionHeader("Vehicle Claim Detail", 40, y);
-  y -= 24;
-  canvas.drawTableHeader(cols, y);
-  y -= 18;
+  const totalDeduction = vehicleClaims.reduce((sum, claim) => sum + Number(claim.calculated_deduction || 0), 0);
+  const chunks = chunkArray(vehicleClaims, VEHICLE_AUDIT_SCHEDULE_ROWS_PER_PAGE);
 
-  let totalDeduction = 0;
-  vehicleClaims.forEach((claim, index) => {
-    const isMileage = claim.claim_method === "mileage";
-    const detail = isMileage
-      ? `${Number(claim.distance || 0).toFixed(1)} ${claim.distance_unit || "mi"}`
-      : `${Number(claim.business_use_pct || 0).toFixed(1)}%`;
-    const rate = isMileage && claim.tax_year_rate
-      ? `$${Number(claim.tax_year_rate).toFixed(4)}`
-      : "-";
-    const deductionAmt = Number(claim.calculated_deduction || 0);
-    totalDeduction += deductionAmt;
+  return chunks.map((chunk, chunkIndex) => {
+    const isLastChunk = chunkIndex === chunks.length - 1;
+    const canvas = new PdfCanvas();
+    const header = drawReportHeader(canvas, {
+      title: chunkIndex === 0 ? "Auto Audit Support Schedule" : "Auto Audit Support Schedule - continued",
+      subtitle: isCA ? "CRA vehicle expense claim details (per-transaction)" : "IRS vehicle expense claim details (per-transaction)",
+      badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
+    });
 
-    if (y < PAGE.bottom + 24) {
-      canvas.addFooter(1, 1, "Auto Audit Support Schedule continued");
-      // For simplicity, truncate at page bottom; full multi-page is future work
-      return;
+    let y = header.contentStartY - 10;
+    if (chunkIndex === 0) {
+      canvas.drawSectionHeader("Vehicle Claim Detail", 40, y);
+      y -= 24;
+    }
+    canvas.drawTableHeader(cols, y);
+    y -= 18;
+
+    chunk.forEach((claim, index) => {
+      const isMileage = claim.claim_method === "mileage";
+      const detail = isMileage
+        ? `${Number(claim.distance || 0).toFixed(1)} ${claim.distance_unit || "mi"}`
+        : `${Number(claim.business_use_pct || 0).toFixed(1)}%`;
+      const rate = isMileage && claim.tax_year_rate
+        ? `$${Number(claim.tax_year_rate).toFixed(4)}`
+        : "-";
+      const deductionAmt = Number(claim.calculated_deduction || 0);
+
+      canvas.drawTableRow(cols, {
+        date: normalizePdfDate(claim.transaction_date || ""),
+        description: truncateText(claim.description || "(No description)", 28),
+        method: isMileage ? "Mileage" : "Actual %",
+        detail,
+        rate,
+        deduction: formatCurrencyForPdf(deductionAmt, currency)
+      }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
+      y -= 13;
+    });
+
+    if (isLastChunk) {
+      y -= 10;
+      canvas.setStrokeGray(COLORS.mid);
+      canvas.drawLine(40, y + 6, 572, y + 6);
+      canvas.setStrokeGray(COLORS.black);
+      canvas.text(40, y - 4, `Total audited vehicle deduction: ${formatCurrencyForPdf(totalDeduction, currency)}`, 9, "F2");
+      y -= 24;
+      canvas.drawCard(40, y, 532, 68, "Method Reference", [
+        isCA
+          ? "Canadian self-employed motor vehicle claims use actual expenses with business-use allocation. Mileage logs shown in this package are support only."
+          : "Mileage: IRS standard mileage rate applied. Actual: gross amount × business-use %. Use one method consistently for the tax year until per-vehicle elections are supported."
+      ], { maxChars: 90 });
     }
 
-    canvas.drawTableRow(cols, {
-      date: normalizePdfDate(claim.transaction_date || ""),
-      description: truncateText(claim.description || "(No description)", 28),
-      method: isMileage ? "Mileage" : "Actual %",
-      detail,
-      rate,
-      deduction: formatCurrencyForPdf(deductionAmt, currency)
-    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
-    y -= 13;
+    return canvas;
   });
-
-  y -= 10;
-  canvas.setStrokeGray(COLORS.mid);
-  canvas.drawLine(40, y + 6, 572, y + 6);
-  canvas.setStrokeGray(COLORS.black);
-  canvas.text(40, y - 4, `Total audited vehicle deduction: ${formatCurrencyForPdf(totalDeduction, currency)}`, 9, "F2");
-  y -= 24;
-  canvas.drawCard(40, y, 532, 68, "Method Reference", [
-    isCA
-      ? "Mileage: CRA per-km rate applied (tiered: first 5,000 km / remainder). Actual: gross amount × business-use %. CRA Form T777 or T2200 required."
-      : "Mileage: IRS standard mileage rate applied. Actual: gross amount × business-use %. IRS Form 4562 may be required for first-year vehicles.",
-    "Rates stored per tax year. Run VALIDATE CONSTRAINT after data cleanup to enable query-planner optimization."
-  ], { maxChars: 90 });
-
-  return [canvas];
 }
+
+const CAPITAL_ASSET_SCHEDULE_ROWS_PER_PAGE = 28;
 
 function buildCapitalAssetSchedule(capitalAssets, currency, labels, region) {
   if (!capitalAssets || capitalAssets.length === 0) return [];
   const isCA = normalizeRegionCode(region) === "CA";
-  const canvas = new PdfCanvas();
-  const header = drawReportHeader(canvas, {
-    title: isCA ? "CCA Schedule - Capital Cost Allowance" : "MACRS / Section 179 Depreciation Schedule",
-    subtitle: isCA ? "T2125 Part 13 — CCA schedule (current tax year)" : "Schedule C Line 13 — Depreciation and Section 179",
-    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
-  });
 
   const cols = [
     { key: "name", label: "Asset", x: 40, width: 154 },
@@ -2527,160 +2527,62 @@ function buildCapitalAssetSchedule(capitalAssets, currency, labels, region) {
     { key: "remaining", label: "UCC / Basis", x: 528, width: 44, align: "right" }
   ];
 
-  let y = header.contentStartY - 10;
-  canvas.drawSectionHeader("Asset Register", 40, y);
-  y -= 24;
-  canvas.drawTableHeader(cols, y);
-  y -= 18;
+  const totalCurrentDepreciation = capitalAssets.reduce((sum, asset) => sum + Number(asset.current_year_depreciation || 0), 0);
+  const totalRemainingBasis = capitalAssets.reduce((sum, asset) => sum + Number(asset.remaining_basis || 0), 0);
+  const chunks = chunkArray(capitalAssets, CAPITAL_ASSET_SCHEDULE_ROWS_PER_PAGE);
 
-  let totalCurrentDepreciation = 0;
-  let totalRemainingBasis = 0;
+  return chunks.map((chunk, chunkIndex) => {
+    const isLastChunk = chunkIndex === chunks.length - 1;
+    const canvas = new PdfCanvas();
+    const header = drawReportHeader(canvas, {
+      title: chunkIndex === 0
+        ? (isCA ? "CCA Schedule - Capital Cost Allowance" : "MACRS / Section 179 Depreciation Schedule")
+        : (isCA ? "CCA Schedule - continued" : "MACRS / Section 179 Depreciation Schedule - continued"),
+      subtitle: isCA ? "T2125 Part 13 — CCA schedule (current tax year)" : "Schedule C Line 13 — Depreciation and Section 179",
+      badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
+    });
 
-  capitalAssets.forEach((asset, index) => {
-    const currentDepr = Number(asset.current_year_depreciation || 0);
-    const remaining = Number(asset.remaining_basis || 0);
-    totalCurrentDepreciation += currentDepr;
-    totalRemainingBasis += remaining;
+    let y = header.contentStartY - 10;
+    if (chunkIndex === 0) {
+      canvas.drawSectionHeader("Asset Register", 40, y);
+      y -= 24;
+    }
+    canvas.drawTableHeader(cols, y);
+    y -= 18;
 
-    if (y < PAGE.bottom + 24) return; // truncate at page bottom
+    chunk.forEach((asset, index) => {
+      const currentDepr = Number(asset.current_year_depreciation || 0);
+      const remaining = Number(asset.remaining_basis || 0);
 
-    canvas.drawTableRow(cols, {
-      name: truncateText(asset.name || "", 26),
-      class: asset.cca_class || asset.macrs_class || "-",
-      cost: formatCurrencyForPdf(asset.original_cost, currency),
-      prior: formatCurrencyForPdf(asset.prior_depreciation, currency),
-      current: formatCurrencyForPdf(currentDepr, currency),
-      remaining: formatCurrencyForPdf(remaining, currency)
-    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
-    y -= 13;
-  });
+      canvas.drawTableRow(cols, {
+        name: truncateText(asset.name || "", 26),
+        class: asset.cca_class || asset.macrs_class || "-",
+        cost: formatCurrencyForPdf(asset.original_cost, currency),
+        prior: formatCurrencyForPdf(asset.prior_depreciation, currency),
+        current: formatCurrencyForPdf(currentDepr, currency),
+        remaining: formatCurrencyForPdf(remaining, currency)
+      }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
+      y -= 13;
+    });
 
-  y -= 10;
-  canvas.setStrokeGray(COLORS.mid);
-  canvas.drawLine(40, y + 6, 572, y + 6);
-  canvas.setStrokeGray(COLORS.black);
-  canvas.text(40, y - 4, `Total current-year depreciation: ${formatCurrencyForPdf(totalCurrentDepreciation, currency)}   Remaining UCC / basis: ${formatCurrencyForPdf(totalRemainingBasis, currency)}`, 9, "F2");
-  y -= 28;
+    if (isLastChunk) {
+      y -= 10;
+      canvas.setStrokeGray(COLORS.mid);
+      canvas.drawLine(40, y + 6, 572, y + 6);
+      canvas.setStrokeGray(COLORS.black);
+      canvas.text(40, y - 4, `Total current-year depreciation: ${formatCurrencyForPdf(totalCurrentDepreciation, currency)}   Remaining UCC / basis: ${formatCurrencyForPdf(totalRemainingBasis, currency)}`, 9, "F2");
+      y -= 28;
 
-  canvas.drawCard(40, y, 532, 78, "Depreciation Notes", [
-    isCA
-      ? "CCA uses declining-balance rates with a mandatory 50% first-year rule (CCRA IT-285R2). Assets in Class 12 (100%) and Class 14.1 (5%) use straight-line. Total added to T2125 line 9936."
-      : "MACRS uses IRS Rev. Proc. 87-57 tables with half-year convention. Section 179 deduction taken in full in the election year. Total carried to Schedule C line 13.",
-    "Equipment transactions categorized as 'equipment_capital_asset' have deductibleAmount = 0 in the ledger; this schedule supplies the actual deduction."
-  ], { maxChars: 92 });
-
-  return [canvas];
-}
-
-function buildQuickMethodRemittancePage(qmSchedule, currency, labels) {
-  if (!qmSchedule) return [];
-  const canvas = new PdfCanvas();
-  const header = drawReportHeader(canvas, {
-    title: "CRA Quick Method Remittance Schedule",
-    subtitle: "ETA s. 227 — Simplified accounting for small businesses",
-    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }, { text: "QUICK METHOD", variant: "neutral" }]
-  });
-
-  let y = header.contentStartY - 10;
-  canvas.drawCard(40, y, 252, 118, "Remittance Calculation", [
-    `Gross revenues (incl. HST/GST): ${formatCurrencyForPdf(qmSchedule.grossSalesInclTax, currency)}`,
-    `Remittance rate (${String(qmSchedule.provinceGroup || "").replace(/_/g, "/")} ${qmSchedule.supplyType}): ${(Number(qmSchedule.remittanceRate) * 100).toFixed(1)}%`,
-    `Net tax to remit: ${formatCurrencyForPdf(qmSchedule.netTaxToRemit, currency)}`,
-    `Tax collected from customers: ${formatCurrencyForPdf(qmSchedule.taxCollected, currency)}`
-  ], { maxChars: 34 });
-
-  canvas.drawCard(320, y, 252, 118, "Method Parameters", [
-    `Province / group: ${qmSchedule.province || "-"}`,
-    `Supply type: ${qmSchedule.supplyType || "-"}`,
-    `Tax year: ${qmSchedule.taxYear || "-"}`,
-    `HST/GST rate: ${(Number(qmSchedule.hstRate) * 100).toFixed(0)}%`
-  ], { maxChars: 34 });
-
-  y -= 138;
-  canvas.drawCard(40, y, 532, 110, "Quick Method — ITC Treatment", [
-    "Under the Quick Method, ITCs on business expenses (other than capital property) are NOT claimed.",
-    "The expense amounts in the transaction ledger represent the full cost including GST/HST paid — this is correct under ETA s. 227.",
-    "The 1% credit on the first $30,000 of eligible supplies (ETA s. 227(6)) is applied separately by CRA.",
-    qmSchedule.note || ""
-  ], { maxChars: 90 });
-
-  y -= 130;
-  canvas.drawCard(40, y, 532, 68, "Comparison", [
-    `Tax collected: ${formatCurrencyForPdf(qmSchedule.taxCollected, currency)}  |  Remittance: ${formatCurrencyForPdf(qmSchedule.netTaxToRemit, currency)}  |  Net benefit: ${formatCurrencyForPdf(qmSchedule.taxCollected - qmSchedule.netTaxToRemit, currency)}`,
-    "Confirm with preparer that the Quick Method election is current and that annual revenues are under the $400,000 threshold."
-  ], { maxChars: 92 });
-
-  return [canvas];
-}
-
-// Override with stricter launch-safe behavior for vehicle and Quick Method workpapers.
-function buildVehicleAuditSchedule(vehicleClaims, currency, labels, region) {
-  if (!vehicleClaims || vehicleClaims.length === 0) return [];
-  const isCA = normalizeRegionCode(region) === "CA";
-  const canvas = new PdfCanvas();
-  const header = drawReportHeader(canvas, {
-    title: "Auto Audit Support Schedule",
-    subtitle: isCA ? "CRA vehicle expense claim details (per-transaction)" : "IRS vehicle expense claim details (per-transaction)",
-    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
-  });
-
-  const cols = [
-    { key: "date", label: "Date", x: 40, width: 68 },
-    { key: "description", label: "Description", x: 116, width: 174 },
-    { key: "method", label: "Method", x: 298, width: 62 },
-    { key: "detail", label: "Distance / Pct", x: 368, width: 90 },
-    { key: "rate", label: "Rate", x: 466, width: 48 },
-    { key: "deduction", label: "Deduction", x: 522, width: 50, align: "right" }
-  ];
-
-  let y = header.contentStartY - 10;
-  canvas.drawSectionHeader("Vehicle Claim Detail", 40, y);
-  y -= 24;
-  canvas.drawTableHeader(cols, y);
-  y -= 18;
-
-  let totalDeduction = 0;
-  vehicleClaims.forEach((claim, index) => {
-    const isMileage = claim.claim_method === "mileage";
-    const detail = isMileage
-      ? `${Number(claim.distance || 0).toFixed(1)} ${claim.distance_unit || "mi"}`
-      : `${Number(claim.business_use_pct || 0).toFixed(1)}%`;
-    const rate = isMileage && claim.tax_year_rate
-      ? `$${Number(claim.tax_year_rate).toFixed(4)}`
-      : "-";
-    const deductionAmt = Number(claim.calculated_deduction || 0);
-    totalDeduction += deductionAmt;
-
-    if (y < PAGE.bottom + 24) {
-      canvas.addFooter(1, 1, "Auto Audit Support Schedule continued");
-      return;
+      canvas.drawCard(40, y, 532, 78, "Depreciation Notes", [
+        isCA
+          ? "CCA uses declining-balance rates with a mandatory 50% first-year rule (CCRA IT-285R2). Assets in Class 12 (100%) and Class 14.1 (5%) use straight-line. Total added to T2125 line 9936."
+          : "MACRS uses IRS Rev. Proc. 87-57 tables with half-year convention. Section 179 deduction taken in full in the election year. Total carried to Schedule C line 13.",
+        "Equipment transactions categorized as 'equipment_capital_asset' have deductibleAmount = 0 in the ledger; this schedule supplies the actual deduction."
+      ], { maxChars: 92 });
     }
 
-    canvas.drawTableRow(cols, {
-      date: normalizePdfDate(claim.transaction_date || ""),
-      description: truncateText(claim.description || "(No description)", 28),
-      method: isMileage ? "Mileage" : "Actual %",
-      detail,
-      rate,
-      deduction: formatCurrencyForPdf(deductionAmt, currency)
-    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
-    y -= 13;
+    return canvas;
   });
-
-  y -= 10;
-  canvas.setStrokeGray(COLORS.mid);
-  canvas.drawLine(40, y + 6, 572, y + 6);
-  canvas.setStrokeGray(COLORS.black);
-  canvas.text(40, y - 4, `Total audited vehicle deduction: ${formatCurrencyForPdf(totalDeduction, currency)}`, 9, "F2");
-  y -= 24;
-  canvas.drawCard(40, y, 532, 68, "Method Reference", [
-    isCA
-      ? "Canadian self-employed motor vehicle claims use actual expenses with business-use allocation. Mileage logs shown in this package are support only."
-      : "Mileage: IRS standard mileage rate applied. Actual: gross amount × business-use %. Use one method consistently for the tax year until per-vehicle elections are supported.",
-    "Rates stored per tax year. Run VALIDATE CONSTRAINT after data cleanup to enable query-planner optimization."
-  ], { maxChars: 90 });
-
-  return [canvas];
 }
 
 function buildQuickMethodRemittancePage(qmSchedule, currency, labels) {
@@ -2841,7 +2743,8 @@ function buildHomeOfficeWorksheetPage(worksheet, currency, labels, region) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildFooterText(labels, reportId, generatedAt, isSecure, pageNumber, totalPages, legalName, taxId) {
-  return truncateText(`${safeValue(legalName, labels.footer_brand)} | ${maskTaxId(taxId)} | ${reportId} | ${formatReportTimestamp(generatedAt)} | ${isSecure ? labels.secure_badge : labels.redacted_badge} | Page ${pageNumber}/${totalPages}`, 110);
+  const taxIdDisplay = isSecure ? maskTaxId(taxId) : "Withheld";
+  return truncateText(`${safeValue(legalName, labels.footer_brand)} | ${taxIdDisplay} | ${reportId} | ${formatReportTimestamp(generatedAt)} | ${isSecure ? labels.secure_badge : labels.redacted_badge} | Page ${pageNumber}/${totalPages}`, 110);
 }
 
 function buildObject(id, body) {
@@ -3106,6 +3009,10 @@ module.exports = {
     buildChecklistItems,
     isWorkpaperReady,
     buildExclusionSummary,
-    getTaxMappingRules
+    getTaxMappingRules,
+    buildFooterText,
+    maskTaxId,
+    buildVehicleAuditSchedule,
+    buildCapitalAssetSchedule
   }
 };

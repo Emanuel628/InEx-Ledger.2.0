@@ -128,31 +128,82 @@ async function fetchUserDisplayName(userId) {
   return String(result.rows[0]?.name || "").trim();
 }
 
-async function fetchExportSourceRows(businessId, startDate, endDate) {
+// options lets callers reproduce two historically-diverged query shapes that
+// existed prior to /secure-export being unified onto this helper:
+//  - includeExtendedTransactionFields: /generate's transaction SELECT also
+//    fetches description_encrypted (so encrypted descriptions get decrypted
+//    below), exchange_date, converted_amount, and the per-transaction
+//    review_notes column. /secure-export historically omitted all four.
+//  - includeReviewerJoins: /generate's transaction_review_states query joins
+//    `users` to attach created_by_name/resolved_by_name and also selects
+//    created_at; /secure-export historically selected a narrower column set
+//    with no joins.
+//  - includeBusinessId: /generate's businesses SELECT includes `id`;
+//    /secure-export historically did not.
+//  - tolerateMissingVehicleCosts: /generate lets a vehicle_costs query
+//    failure propagate (part of the Promise.all below); /secure-export
+//    historically ran that query separately, after the rest, and swallowed
+//    failures (e.g. migration not yet applied) by falling back to no rows.
+// Defaults reproduce /generate's (and /dataset's, and /history/:id/csv's)
+// existing behavior unchanged.
+async function fetchExportSourceRows(businessId, startDate, endDate, options = {}) {
+  const {
+    includeExtendedTransactionFields = true,
+    includeReviewerJoins = true,
+    includeBusinessId = true,
+    tolerateMissingVehicleCosts = false,
+  } = options;
+
   const taxYear =
     Number(String(endDate || "").slice(0, 4)) || new Date().getFullYear();
 
-  const [
-    txResult,
-    accountResult,
-    categoryResult,
-    receiptResult,
-    mileageResult,
-    vehicleCostResult,
-    bizResult,
-    vehicleClaimResult,
-    capitalAssetResult,
-    supportArtifactResult,
-    reviewStateResult,
-  ] = await Promise.all([
-    pool.query(
-      `SELECT id, account_id, category_id, amount, type, description, description_encrypted, date, note,
+  const transactionColumns = includeExtendedTransactionFields
+    ? `id, account_id, category_id, amount, type, description, description_encrypted, date, note,
                 currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
                 indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
                 review_status, review_notes, payer_name, tax_form_type,
                 category_mapping_reason, category_mapping_confidence,
                 receipt_status, receipt_missing_reason, business_purpose, supporting_evidence,
-                receipt_status_confirmed_at, receipt_status_confirmed_by
+                receipt_status_confirmed_at, receipt_status_confirmed_by`
+    : `id, account_id, category_id, amount, type, description, date, note,
+                currency, source_amount, exchange_rate, tax_treatment,
+                indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
+                review_status, payer_name, tax_form_type,
+                category_mapping_reason, category_mapping_confidence,
+                receipt_status, receipt_missing_reason, business_purpose, supporting_evidence,
+                receipt_status_confirmed_at, receipt_status_confirmed_by`;
+
+  const businessColumns = includeBusinessId
+    ? `id, name, region, province, operating_name, business_activity_code,
+                fiscal_year_start, address, tax_id, accounting_method,
+                material_participation, gst_hst_registered, gst_hst_number, gst_hst_method,
+                business_type`
+    : `name, region, province, operating_name, business_activity_code,
+                fiscal_year_start, address, tax_id, accounting_method,
+                material_participation, gst_hst_registered, gst_hst_number, gst_hst_method,
+                business_type`;
+
+  const reviewStateQuery = includeReviewerJoins
+    ? `SELECT trs.id, trs.transaction_id, trs.issue_code, trs.issue_severity, trs.issue_status,
+                trs.review_notes, trs.resolved_at, trs.updated_at, trs.created_at,
+                COALESCE(creator.display_name, creator.full_name, creator.email) AS created_by_name,
+                COALESCE(resolver.display_name, resolver.full_name, resolver.email) AS resolved_by_name
+           FROM transaction_review_states trs
+           LEFT JOIN users creator ON creator.id = trs.created_by_user_id
+           LEFT JOIN users resolver ON resolver.id = trs.resolved_by_user_id
+          WHERE trs.business_id = $1`
+    : `SELECT id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at
+           FROM transaction_review_states
+          WHERE business_id = $1`;
+
+  const vehicleCostsQuery = `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
+         FROM vehicle_costs
+         WHERE business_id = $1 AND entry_date >= $2 AND entry_date <= $3
+         ORDER BY entry_date ASC, created_at ASC`;
+
+  const queries = {
+    tx: pool.query(
+      `SELECT ${transactionColumns}
          FROM transactions
          WHERE business_id = $1
            AND date >= $2 AND date <= $3
@@ -162,43 +213,34 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
          ORDER BY date ASC, created_at ASC`,
       [businessId, startDate, endDate],
     ),
-    pool.query(`SELECT id, name, type FROM accounts WHERE business_id = $1`, [
-      businessId,
-    ]),
-    pool.query(
+    accounts: pool.query(
+      `SELECT id, name, type FROM accounts WHERE business_id = $1`,
+      [businessId],
+    ),
+    categories: pool.query(
       `SELECT id, name, kind, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1`,
       [businessId],
     ),
-    pool.query(
+    receipts: pool.query(
       `SELECT r.id, r.transaction_id, r.filename
          FROM receipts r
          JOIN transactions t ON t.id = r.transaction_id
          WHERE r.business_id = $1 AND t.date >= $2 AND t.date <= $3 AND t.deleted_at IS NULL`,
       [businessId, startDate, endDate],
     ),
-    pool.query(
+    mileage: pool.query(
       `SELECT id, trip_date, purpose, destination, miles, km, odometer_start, odometer_end
          FROM mileage WHERE business_id = $1 AND trip_date >= $2 AND trip_date <= $3
          ORDER BY trip_date ASC`,
       [businessId, startDate, endDate],
     ),
-    pool.query(
-      `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
-         FROM vehicle_costs
-         WHERE business_id = $1 AND entry_date >= $2 AND entry_date <= $3
-         ORDER BY entry_date ASC, created_at ASC`,
-      [businessId, startDate, endDate],
-    ),
-    pool.query(
-      `SELECT id, name, region, province, operating_name, business_activity_code,
-                fiscal_year_start, address, tax_id, accounting_method,
-                material_participation, gst_hst_registered, gst_hst_number, gst_hst_method,
-                business_type
+    business: pool.query(
+      `SELECT ${businessColumns}
            FROM businesses WHERE id = $1`,
       [businessId],
     ),
     // Phase 2: vehicle claim details — join transactions to attach date + description for PDF rendering
-    pool.query(
+    vehicleClaims: pool.query(
       `SELECT ved.*, t.date AS transaction_date, t.description AS description
          FROM vehicle_expense_details ved
          JOIN transactions t ON t.id = ved.transaction_id
@@ -208,31 +250,64 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
       [businessId, startDate, endDate],
     ),
     // Phase 2: capital assets for the tax year derived from endDate
-    pool.query(
+    capitalAssets: pool.query(
       `SELECT * FROM capital_assets
          WHERE business_id = $1 AND tax_year = $2 AND is_disposed = FALSE
          ORDER BY purchase_date ASC, name ASC`,
       [businessId, taxYear],
     ),
-    pool.query(
+    supportArtifacts: pool.query(
       `SELECT id, transaction_id, artifact_type, filename, mime_type, storage_path, review_status, notes, uploaded_at
            FROM support_artifacts
           WHERE business_id = $1
             AND transaction_id IS NOT NULL`,
       [businessId],
     ),
-    pool.query(
-      `SELECT trs.id, trs.transaction_id, trs.issue_code, trs.issue_severity, trs.issue_status,
-                trs.review_notes, trs.resolved_at, trs.updated_at, trs.created_at,
-                COALESCE(creator.display_name, creator.full_name, creator.email) AS created_by_name,
-                COALESCE(resolver.display_name, resolver.full_name, resolver.email) AS resolved_by_name
-           FROM transaction_review_states trs
-           LEFT JOIN users creator ON creator.id = trs.created_by_user_id
-           LEFT JOIN users resolver ON resolver.id = trs.resolved_by_user_id
-          WHERE trs.business_id = $1`,
-      [businessId],
-    ),
-  ]);
+    reviewStates: pool.query(reviewStateQuery, [businessId]),
+  };
+
+  if (!tolerateMissingVehicleCosts) {
+    queries.vehicleCosts = pool.query(vehicleCostsQuery, [
+      businessId,
+      startDate,
+      endDate,
+    ]);
+  }
+
+  const resolvedEntries = await Promise.all(
+    Object.entries(queries).map(async ([key, queryPromise]) => [
+      key,
+      await queryPromise,
+    ]),
+  );
+  const resolved = Object.fromEntries(resolvedEntries);
+
+  const txResult = resolved.tx;
+  const accountResult = resolved.accounts;
+  const categoryResult = resolved.categories;
+  const receiptResult = resolved.receipts;
+  const mileageResult = resolved.mileage;
+  const bizResult = resolved.business;
+  const vehicleClaimResult = resolved.vehicleClaims;
+  const capitalAssetResult = resolved.capitalAssets;
+  const supportArtifactResult = resolved.supportArtifacts;
+  const reviewStateResult = resolved.reviewStates;
+
+  let vehicleCostResult = resolved.vehicleCosts;
+  if (tolerateMissingVehicleCosts) {
+    try {
+      vehicleCostResult = await pool.query(vehicleCostsQuery, [
+        businessId,
+        startDate,
+        endDate,
+      ]);
+    } catch (vcErr) {
+      logError("vehicle_costs query failed (migration pending?)", {
+        err: vcErr.message,
+      });
+      vehicleCostResult = { rows: [] };
+    }
+  }
 
   const transactions = txResult.rows.map((row) => {
     let resolvedDescription = row.description;
@@ -286,6 +361,104 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
     capitalAssetTxMap,
     taxYear,
   };
+}
+
+// Shared by /generate and /secure-export: Quick Method remittance schedule,
+// Regular Method GST/HST reconciliation, and the Home Office worksheet.
+// `logLabelPrefix` preserves each route's existing (distinct) log message
+// text on failure -- these computations are best-effort/non-fatal in both
+// callers, so a failure here must never throw.
+async function computeComplianceSchedules({
+  businessId,
+  business,
+  region,
+  categories,
+  transactions,
+  taxYear,
+  logLabelPrefix = "",
+}) {
+  // Phase 2: compute Quick Method remittance schedule if applicable
+  let quickMethodSchedule = null;
+  if (
+    region === "ca" &&
+    business.gst_hst_registered === true &&
+    business.gst_hst_method === "quick"
+  ) {
+    try {
+      const quickMethodSupply = inferQuickMethodSupplyType(
+        transactions,
+        categories,
+        business.business_activity_code || "",
+      );
+      const grossSalesInclTax = transactions
+        .filter((t) => String(t.type || "").toLowerCase() === "income")
+        .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
+      quickMethodSchedule = await buildQuickMethodSchedule({
+        businessId,
+        province: business.province || "ON",
+        supplyType: quickMethodSupply.supplyType,
+        supplyTypeSource: quickMethodSupply.source,
+        taxYear,
+        grossSalesInclTax,
+        businessActivityCode: business.business_activity_code || "",
+      });
+      if (
+        quickMethodSchedule &&
+        quickMethodSupply.warning &&
+        !quickMethodSchedule.warning
+      ) {
+        quickMethodSchedule.warning = quickMethodSupply.warning;
+      }
+    } catch (qmErr) {
+      logError(
+        `${logLabelPrefix}Quick Method schedule computation failed (non-fatal)`,
+        { err: qmErr.message },
+      );
+    }
+  }
+
+  // Phase 6: compute Regular Method GST/HST reconciliation if applicable
+  let regularMethodSchedule = null;
+  if (
+    region === "ca" &&
+    business.gst_hst_registered === true &&
+    business.gst_hst_method === "regular"
+  ) {
+    try {
+      regularMethodSchedule = buildRegularMethodSchedule({
+        transactions,
+        taxYear,
+        province: business.province || "",
+      });
+    } catch (rmErr) {
+      logError(
+        `${logLabelPrefix}Regular Method schedule computation failed (non-fatal)`,
+        { err: rmErr.message },
+      );
+    }
+  }
+
+  // Phase 6: compute the Home Office worksheet when structured inputs exist.
+  let homeOfficeWorksheet = null;
+  try {
+    const homeOfficeRow = await getHomeOfficeWorksheet(businessId, taxYear);
+    if (homeOfficeRow) {
+      homeOfficeWorksheet = buildHomeOfficeWorksheet({
+        worksheet: homeOfficeRow,
+        transactions,
+        categories,
+        region,
+        taxYear,
+      });
+    }
+  } catch (hoErr) {
+    logError(
+      `${logLabelPrefix}Home Office worksheet computation failed (non-fatal)`,
+      { err: hoErr.message },
+    );
+  }
+
+  return { quickMethodSchedule, regularMethodSchedule, homeOfficeWorksheet };
 }
 
 async function storeCompletedExport({
@@ -704,86 +877,15 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     const reportId = createPdfReportId(generatedAt);
     const actorDisplayName = await fetchUserDisplayName(user.id);
 
-    // Phase 2: compute Quick Method remittance schedule if applicable
-    let quickMethodSchedule = null;
-    if (
-      region === "ca" &&
-      business.gst_hst_registered === true &&
-      business.gst_hst_method === "quick"
-    ) {
-      try {
-        const quickMethodSupply = inferQuickMethodSupplyType(
-          sourceRows.transactions,
-          categories,
-          business.business_activity_code || "",
-        );
-        const grossSalesInclTax = sourceRows.transactions
-          .filter((t) => String(t.type || "").toLowerCase() === "income")
-          .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
-        quickMethodSchedule = await buildQuickMethodSchedule({
-          businessId,
-          province: business.province || "ON",
-          supplyType: quickMethodSupply.supplyType,
-          supplyTypeSource: quickMethodSupply.source,
-          taxYear: sourceRows.taxYear,
-          grossSalesInclTax,
-          businessActivityCode: business.business_activity_code || "",
-        });
-        if (
-          quickMethodSchedule &&
-          quickMethodSupply.warning &&
-          !quickMethodSchedule.warning
-        ) {
-          quickMethodSchedule.warning = quickMethodSupply.warning;
-        }
-      } catch (qmErr) {
-        logError("Quick Method schedule computation failed (non-fatal)", {
-          err: qmErr.message,
-        });
-      }
-    }
-
-    // Phase 6: compute Regular Method GST/HST reconciliation if applicable
-    let regularMethodSchedule = null;
-    if (
-      region === "ca" &&
-      business.gst_hst_registered === true &&
-      business.gst_hst_method === "regular"
-    ) {
-      try {
-        regularMethodSchedule = buildRegularMethodSchedule({
-          transactions: sourceRows.transactions,
-          taxYear: sourceRows.taxYear,
-          province: business.province || "",
-        });
-      } catch (rmErr) {
-        logError("Regular Method schedule computation failed (non-fatal)", {
-          err: rmErr.message,
-        });
-      }
-    }
-
-    // Phase 6: compute the Home Office worksheet when structured inputs exist.
-    let homeOfficeWorksheet = null;
-    try {
-      const homeOfficeRow = await getHomeOfficeWorksheet(
+    const { quickMethodSchedule, regularMethodSchedule, homeOfficeWorksheet } =
+      await computeComplianceSchedules({
         businessId,
-        sourceRows.taxYear,
-      );
-      if (homeOfficeRow) {
-        homeOfficeWorksheet = buildHomeOfficeWorksheet({
-          worksheet: homeOfficeRow,
-          transactions: sourceRows.transactions,
-          categories,
-          region,
-          taxYear: sourceRows.taxYear,
-        });
-      }
-    } catch (hoErr) {
-      logError("Home Office worksheet computation failed (non-fatal)", {
-        err: hoErr.message,
+        business,
+        region,
+        categories,
+        transactions: sourceRows.transactions,
+        taxYear: sourceRows.taxYear,
       });
-    }
 
     const sharedOptions = {
       transactions: sourceRows.transactions,
@@ -1450,149 +1552,41 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
         });
     }
 
-    const taxYear =
-      Number(String(dateRange.endDate || "").slice(0, 4)) ||
-      new Date().getFullYear();
-    const [
-      txResult,
-      accountResult,
-      categoryResult,
-      receiptResult,
-      mileageResult,
-      bizResult,
-      supportArtifactResult,
-      reviewStateResult,
-      vehicleClaimResult,
-      capitalAssetResult,
-    ] = await Promise.all([
-      pool.query(
-        `SELECT id, account_id, category_id, amount, type, description, date, note,
-                  currency, source_amount, exchange_rate, tax_treatment,
-                  indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
-                  review_status, payer_name, tax_form_type,
-                  category_mapping_reason, category_mapping_confidence,
-                  receipt_status, receipt_missing_reason, business_purpose, supporting_evidence,
-                  receipt_status_confirmed_at, receipt_status_confirmed_by
-           FROM transactions
-           WHERE business_id = $1
-             AND date >= $2 AND date <= $3
-             AND deleted_at IS NULL
-             AND (is_void = false OR is_void IS NULL)
-             AND (is_adjustment = false OR is_adjustment IS NULL)
-           ORDER BY date ASC, created_at ASC`,
-        [businessId, dateRange.startDate, dateRange.endDate],
-      ),
-      pool.query(`SELECT id, name, type FROM accounts WHERE business_id = $1`, [
-        businessId,
-      ]),
-      pool.query(
-        `SELECT id, name, kind, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1`,
-        [businessId],
-      ),
-      pool.query(
-        `SELECT r.id, r.transaction_id, r.filename
-           FROM receipts r
-           JOIN transactions t ON t.id = r.transaction_id
-           WHERE r.business_id = $1
-             AND t.date >= $2 AND t.date <= $3
-             AND t.deleted_at IS NULL`,
-        [businessId, dateRange.startDate, dateRange.endDate],
-      ),
-      pool.query(
-        `SELECT id, trip_date, purpose, destination, miles, km, odometer_start, odometer_end
-           FROM mileage
-           WHERE business_id = $1
-             AND trip_date >= $2 AND trip_date <= $3
-           ORDER BY trip_date ASC`,
-        [businessId, dateRange.startDate, dateRange.endDate],
-      ),
-      pool.query(
-        `SELECT name, region, province, operating_name, business_activity_code,
-                  fiscal_year_start, address, tax_id, accounting_method,
-                  material_participation, gst_hst_registered, gst_hst_number, gst_hst_method,
-                  business_type
-             FROM businesses WHERE id = $1`,
-        [businessId],
-      ),
-      pool.query(
-        `SELECT id, transaction_id, artifact_type, filename, mime_type, storage_path, review_status, notes, uploaded_at
-             FROM support_artifacts
-            WHERE business_id = $1
-              AND transaction_id IS NOT NULL`,
-        [businessId],
-      ),
-      pool.query(
-        `SELECT id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at
-             FROM transaction_review_states
-            WHERE business_id = $1`,
-        [businessId],
-      ),
-      pool.query(
-        `SELECT ved.*, t.date AS transaction_date, t.description AS description
-             FROM vehicle_expense_details ved
-             JOIN transactions t ON t.id = ved.transaction_id
-            WHERE ved.business_id = $1
-              AND t.date >= $2 AND t.date <= $3
-              AND t.deleted_at IS NULL`,
-        [businessId, dateRange.startDate, dateRange.endDate],
-      ),
-      pool.query(
-        `SELECT * FROM capital_assets
-            WHERE business_id = $1 AND tax_year = $2 AND is_disposed = FALSE
-            ORDER BY purchase_date ASC, name ASC`,
-        [businessId, taxYear],
-      ),
-    ]);
-
-    let vehicleCostResult = { rows: [] };
-    try {
-      vehicleCostResult = await pool.query(
-        `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
-         FROM vehicle_costs
-         WHERE business_id = $1
-           AND entry_date >= $2 AND entry_date <= $3
-         ORDER BY entry_date ASC, created_at ASC`,
-        [businessId, dateRange.startDate, dateRange.endDate],
-      );
-    } catch (vcErr) {
-      logError("vehicle_costs query failed (migration pending?)", {
-        err: vcErr.message,
-      });
-    }
-
-    const business = bizResult.rows[0] || {};
+    // Historically /secure-export re-implemented the entire ~10-table
+    // dataset fetch + map-building inline instead of calling
+    // fetchExportSourceRows() (shared with /generate). The options below
+    // reproduce that pre-existing (narrower) query shape exactly -- see the
+    // comment above fetchExportSourceRows() for what each flag preserves.
+    const sourceRows = await fetchExportSourceRows(
+      businessId,
+      dateRange.startDate,
+      dateRange.endDate,
+      {
+        includeExtendedTransactionFields: false,
+        includeReviewerJoins: false,
+        includeBusinessId: false,
+        tolerateMissingVehicleCosts: true,
+      },
+    );
+    const taxYear = sourceRows.taxYear;
+    const business = sourceRows.business || {};
     const region = String(business.region || "us").toLowerCase();
     const jurisdiction = region === "ca" ? "CA" : "US";
-    const categories = categoryResult.rows.map((c) => ({
+    const categories = sourceRows.categories.map((c) => ({
       ...c,
       taxLabel: region === "ca" ? c.tax_map_ca || "" : c.tax_map_us || "",
     }));
-    const supportArtifactMap = new Map();
-    for (const row of supportArtifactResult.rows) {
-      if (!row.transaction_id) continue;
-      const current = supportArtifactMap.get(row.transaction_id) || [];
-      current.push(row);
-      supportArtifactMap.set(row.transaction_id, current);
-    }
-    const vehicleClaimMap = new Map(
-      vehicleClaimResult.rows.map((row) => [row.transaction_id, row]),
-    );
-    const capitalAssetTxMap = new Map(
-      capitalAssetResult.rows
-        .filter((row) => row.transaction_id)
-        .map((row) => [row.transaction_id, row]),
-    );
     const dataset = buildNormalizedExportDataset({
-      transactions: txResult.rows,
-      accounts: accountResult.rows,
+      transactions: sourceRows.transactions,
+      accounts: sourceRows.accounts,
       categories,
-      receipts: receiptResult.rows,
-      supportArtifactMap,
-      reviewStateRows: reviewStateResult.rows,
-      mileage: mileageResult.rows,
-      vehicleCosts: vehicleCostResult.rows,
-      vehicleClaimMap,
-      capitalAssetTxMap,
+      receipts: sourceRows.receipts,
+      supportArtifactMap: sourceRows.supportArtifactMap,
+      reviewStateRows: sourceRows.reviewStateRows,
+      mileage: sourceRows.mileage,
+      vehicleCosts: sourceRows.vehicleCosts,
+      vehicleClaimMap: sourceRows.vehicleClaimMap,
+      capitalAssetTxMap: sourceRows.capitalAssetTxMap,
       business,
       region,
       province: business.province || "",
@@ -1638,92 +1632,25 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const generatedAt = new Date().toISOString();
     const reportId = createPdfReportId(generatedAt);
 
-    let quickMethodSchedule = null;
-    if (
-      region === "ca" &&
-      business.gst_hst_registered === true &&
-      business.gst_hst_method === "quick"
-    ) {
-      try {
-        const quickMethodSupply = inferQuickMethodSupplyType(
-          txResult.rows,
-          categories,
-          business.business_activity_code || "",
-        );
-        const grossSalesInclTax = txResult.rows
-          .filter((t) => String(t.type || "").toLowerCase() === "income")
-          .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
-        quickMethodSchedule = await buildQuickMethodSchedule({
-          businessId,
-          province: business.province || "ON",
-          supplyType: quickMethodSupply.supplyType,
-          supplyTypeSource: quickMethodSupply.source,
-          taxYear,
-          grossSalesInclTax,
-          businessActivityCode: business.business_activity_code || "",
-        });
-        if (
-          quickMethodSchedule &&
-          quickMethodSupply.warning &&
-          !quickMethodSchedule.warning
-        ) {
-          quickMethodSchedule.warning = quickMethodSupply.warning;
-        }
-      } catch (qmErr) {
-        logError(
-          "Secure export Quick Method schedule computation failed (non-fatal)",
-          { err: qmErr.message },
-        );
-      }
-    }
-
-    let regularMethodSchedule = null;
-    if (
-      region === "ca" &&
-      business.gst_hst_registered === true &&
-      business.gst_hst_method === "regular"
-    ) {
-      try {
-        regularMethodSchedule = buildRegularMethodSchedule({
-          transactions: txResult.rows,
-          taxYear,
-          province: business.province || "",
-        });
-      } catch (rmErr) {
-        logError(
-          "Secure export Regular Method schedule computation failed (non-fatal)",
-          { err: rmErr.message },
-        );
-      }
-    }
-
-    let homeOfficeWorksheet = null;
-    try {
-      const homeOfficeRow = await getHomeOfficeWorksheet(businessId, taxYear);
-      if (homeOfficeRow) {
-        homeOfficeWorksheet = buildHomeOfficeWorksheet({
-          worksheet: homeOfficeRow,
-          transactions: txResult.rows,
-          categories,
-          region,
-          taxYear,
-        });
-      }
-    } catch (hoErr) {
-      logError(
-        "Secure export Home Office worksheet computation failed (non-fatal)",
-        { err: hoErr.message },
-      );
-    }
+    const { quickMethodSchedule, regularMethodSchedule, homeOfficeWorksheet } =
+      await computeComplianceSchedules({
+        businessId,
+        business,
+        region,
+        categories,
+        transactions: sourceRows.transactions,
+        taxYear,
+        logLabelPrefix: "Secure export ",
+      });
 
     const sharedOptions = {
-      transactions: txResult.rows,
-      accounts: accountResult.rows,
+      transactions: sourceRows.transactions,
+      accounts: sourceRows.accounts,
       categories,
-      receipts: receiptResult.rows,
-      supportArtifactMap,
-      mileage: mileageResult.rows,
-      vehicleCosts: vehicleCostResult.rows,
+      receipts: sourceRows.receipts,
+      supportArtifactMap: sourceRows.supportArtifactMap,
+      mileage: sourceRows.mileage,
+      vehicleCosts: sourceRows.vehicleCosts,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
       exportLang,
@@ -1745,10 +1672,10 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       reportId,
       region,
       province: business.province || "",
-      reviewStateRows: reviewStateResult.rows,
-      vehicleClaimMap,
-      capitalAssets: capitalAssetResult.rows,
-      capitalAssetTxMap,
+      reviewStateRows: sourceRows.reviewStateRows,
+      vehicleClaimMap: sourceRows.vehicleClaimMap,
+      capitalAssets: sourceRows.capitalAssets,
+      capitalAssetTxMap: sourceRows.capitalAssetTxMap,
       quickMethodSchedule,
       regularMethodSchedule,
       homeOfficeWorksheet,
@@ -1791,10 +1718,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       datasetHash,
       certifiedByUser,
       includedTransactionIds: dataset.rows.map((row) => row.id),
-      includedArtifactIds: [
-        ...receiptResult.rows.map((row) => row.id).filter(Boolean),
-        ...supportArtifactResult.rows.map((row) => row.id).filter(Boolean),
-      ],
+      includedArtifactIds: collectExportArtifactIds(sourceRows),
     });
     logInfo("Secure export PDF generated", {
       userId: user.id,

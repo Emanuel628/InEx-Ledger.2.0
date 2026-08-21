@@ -15,6 +15,7 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { loadAnalytics, type AnalyticsSummary } from '../lib/analyticsApi'
+import { formatMoney as sharedFormatMoney, getActiveCurrency } from '../lib/money'
 
 const emptyAnalytics: AnalyticsSummary = {
   income: 0,
@@ -333,19 +334,7 @@ function csvCell(value: string | number) {
 }
 
 function formatMoney(value: number) {
-  return value.toLocaleString(getMoneyLocale(), {
-    style: 'currency',
-    currency: getActiveCurrency(),
-    maximumFractionDigits: 0,
-  })
-}
-
-function getActiveCurrency() {
-  return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
-}
-
-function getMoneyLocale() {
-  return getActiveCurrency() === 'CAD' ? 'en-CA' : 'en-US'
+  return sharedFormatMoney(value, getActiveCurrency(), { maximumFractionDigits: 0 })
 }
 
 export default Analytics

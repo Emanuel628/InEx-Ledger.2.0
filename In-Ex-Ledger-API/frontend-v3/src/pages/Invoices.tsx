@@ -20,6 +20,7 @@ import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import useBodyModalLock from '../hooks/useBodyModalLock'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
+import { formatMoney, getActiveCurrency } from '../lib/money'
 import {
   blankInvoiceDraft,
   deleteInvoice,
@@ -584,18 +585,6 @@ function formatMonth(value: string) {
     return value
   }
   return parsed.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-}
-
-function formatMoney(value: number, currency = getActiveCurrency()) {
-  const normalizedCurrency = currency.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
-  return value.toLocaleString(normalizedCurrency === 'CAD' ? 'en-CA' : 'en-US', {
-    style: 'currency',
-    currency: normalizedCurrency,
-  })
-}
-
-function getActiveCurrency() {
-  return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
 }
 
 function getPaginationPages(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {

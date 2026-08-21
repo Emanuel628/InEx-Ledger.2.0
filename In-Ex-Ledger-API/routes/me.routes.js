@@ -795,10 +795,11 @@ router.delete("/", accountDeleteLimiter, asyncRoute(async (req, res) => {
     if (legacyConstraintResult.rows[0]?.has_legacy_constraints) {
       await client.query("ROLLBACK");
       transactionOpen = false;
-      return res.status(500).json({
-        error: "Failed to delete account.",
-        detail: "Database migration 045_drop_cpa_audit_user_fks.sql must be applied before account deletion can succeed."
+      logError("DELETE /me: legacy CPA-audit FK constraints still present", {
+        userId: req.user.id,
+        detail: "Migration 045_drop_cpa_audit_user_fks.sql must be applied before account deletion can succeed."
       });
+      return res.status(500).json({ error: "Failed to delete account. Please try again later." });
     }
 
     const receiptFiles = await client.query(
@@ -984,21 +985,7 @@ router.delete("/", accountDeleteLimiter, asyncRoute(async (req, res) => {
       constraint: err.constraint,
       table: err.table
     });
-    const cpaAuditConstraint = String(err?.constraint || "");
-    if (
-      err?.code === "23503" &&
-      /cpa_audit_logs_(owner_user_id|actor_user_id)_fkey/i.test(cpaAuditConstraint)
-    ) {
-      return res.status(500).json({
-        error: "Failed to delete account.",
-        detail: "Database migration 045_drop_cpa_audit_user_fks.sql must be applied before account deletion can succeed."
-      });
-    }
-
-    res.status(500).json({
-      error: "Failed to delete account.",
-      detail: err?.code ? `Database error code: ${err.code}` : "Unexpected server error."
-    });
+    res.status(500).json({ error: "Failed to delete account. Please try again later." });
   } finally {
     client.release();
   }

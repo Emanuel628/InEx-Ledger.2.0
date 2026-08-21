@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { loadTaxSetAside } from '../lib/analyticsApi'
 import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
 import {
   loadTransactionPageData,
@@ -32,6 +33,7 @@ export default function useTransactionsPageData() {
   const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
   const [taxProfile, setTaxProfile] = useState<BusinessTaxProfile | null>(null)
+  const [taxSetAside, setTaxSetAside] = useState<number | null>(null)
   const [accountingLock, setAccountingLock] = useState<AccountingLock | null>(null)
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueResponse>({ queue: [] })
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([])
@@ -52,7 +54,7 @@ export default function useTransactionsPageData() {
     setLoadingData(true)
     setDataError('')
     try {
-      const [pageData, lockState] = await Promise.all([
+      const [pageData, lockState, taxSetAsideValue] = await Promise.all([
         loadTransactionPageData({
           limit: pageSize,
           offset: (currentPage - 1) * pageSize,
@@ -64,6 +66,7 @@ export default function useTransactionsPageData() {
           endDate: endDateFilter,
         }),
         loadAccountingLock().catch(() => null),
+        loadTaxSetAside().catch(() => null),
       ])
       setTransactionRows(pageData.transactions)
       setTransactionTotal(pageData.total)
@@ -71,6 +74,7 @@ export default function useTransactionsPageData() {
       setAccountOptions(pageData.accounts)
       setCategoryOptions(pageData.categories)
       setTaxProfile(pageData.taxProfile)
+      setTaxSetAside(taxSetAsideValue)
       setAccountingLock(lockState)
       setReviewQueue(pageData.reviewQueue)
       setRecurringTemplates(pageData.recurringTemplates)
@@ -115,6 +119,7 @@ export default function useTransactionsPageData() {
     accountOptions,
     categoryOptions,
     taxProfile,
+    taxSetAside,
     accountingLock,
     reviewQueue,
     recurringTemplates,

@@ -452,7 +452,7 @@ test("account deletion returns 403 when MFA reauthentication token is invalid", 
   }
 });
 
-test("account deletion returns migration hint when cpa_audit_logs foreign key blocks deletion", async () => {
+test("account deletion returns a generic error (no migration filename or DB internals leaked) when cpa_audit_logs foreign key blocks deletion", async () => {
   const fixture = loadMeRouter({
     deleteError: {
       code: "23503",
@@ -468,13 +468,15 @@ test("account deletion returns migration hint when cpa_audit_logs foreign key bl
       .send({ password: "CorrectHorseBatteryStaple1!" });
 
     assert.equal(response.status, 500);
-    assert.match(response.body?.detail || "", /045_drop_cpa_audit_user_fks\.sql/i);
+    assert.doesNotMatch(JSON.stringify(response.body || {}), /045_drop_cpa_audit_user_fks\.sql/i);
+    assert.equal(response.body?.detail, undefined);
+    assert.equal(response.body?.error, "Failed to delete account. Please try again later.");
   } finally {
     fixture.cleanup();
   }
 });
 
-test("account deletion returns 500 with database error code when XX000 internal error occurs", async () => {
+test("account deletion returns a generic error (no raw DB error code leaked) when an internal error occurs", async () => {
   const fixture = loadMeRouter({
     deleteError: {
       code: "XX000",
@@ -489,7 +491,9 @@ test("account deletion returns 500 with database error code when XX000 internal 
       .send({ password: "CorrectHorseBatteryStaple1!" });
 
     assert.equal(response.status, 500);
-    assert.match(response.body?.detail || "", /XX000/i);
+    assert.doesNotMatch(JSON.stringify(response.body || {}), /XX000/i);
+    assert.equal(response.body?.detail, undefined);
+    assert.equal(response.body?.error, "Failed to delete account. Please try again later.");
   } finally {
     fixture.cleanup();
   }
@@ -525,7 +529,9 @@ test("account deletion fails fast when legacy cpa_audit_logs constraints still e
       .send({ password: "CorrectHorseBatteryStaple1!" });
 
     assert.equal(response.status, 500);
-    assert.match(response.body?.detail || "", /045_drop_cpa_audit_user_fks\.sql/i);
+    assert.doesNotMatch(JSON.stringify(response.body || {}), /045_drop_cpa_audit_user_fks\.sql/i);
+    assert.equal(response.body?.detail, undefined);
+    assert.equal(response.body?.error, "Failed to delete account. Please try again later.");
     assert.ok(
       !fixture.state.queries.some(({ sql }) => /DELETE FROM users WHERE id = \$1 RETURNING id/i.test(sql)),
       "route must stop before deleting users when legacy constraints still exist"

@@ -31,6 +31,7 @@ import {
   type MileageKind,
   type MileageSummary,
 } from '../lib/mileageApi'
+import { formatMoney as sharedFormatMoney, getActiveCurrency } from '../lib/money'
 import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
 
 const emptySummary: MileageSummary = {
@@ -669,11 +670,7 @@ function formatMonth(value: string) {
 }
 
 function formatMoney(value: number) {
-  return value.toLocaleString(getMoneyLocale(), {
-    style: 'currency',
-    currency: getActiveCurrency(),
-    maximumFractionDigits: 0,
-  })
+  return sharedFormatMoney(value, getActiveCurrency(), { maximumFractionDigits: 0 })
 }
 
 function isMileageLocked(entry: MileageEntry, lock: AccountingLock | null) {
@@ -692,14 +689,6 @@ function formatMonthDate(value: string) {
     return value || 'the locked period'
   }
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function getActiveCurrency() {
-  return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
-}
-
-function getMoneyLocale() {
-  return getActiveCurrency() === 'CAD' ? 'en-CA' : 'en-US'
 }
 
 function isCanadaBusiness(region?: string | null, currency?: string | null) {

@@ -1,10 +1,10 @@
 // AR/AP shared logic service (V2/Business)
-const db = require('../db');
+const { pool } = require('../db');
 
 // Returns AR/AP summary for a business, including aging buckets
 async function getArApSummary(businessId) {
   // AR aging buckets (invoices)
-  const arAging = await db.query(
+  const arAging = await pool.query(
     `SELECT
       SUM(CASE WHEN due_date >= CURRENT_DATE THEN total_amount ELSE 0 END) AS current,
       SUM(CASE WHEN due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - INTERVAL '30 days' THEN total_amount ELSE 0 END) AS overdue_1_30,
@@ -15,7 +15,7 @@ async function getArApSummary(businessId) {
     [businessId]
   );
   // AP aging buckets (bills)
-  const apAging = await db.query(
+  const apAging = await pool.query(
     `SELECT
       SUM(CASE WHEN due_date >= CURRENT_DATE THEN total_amount ELSE 0 END) AS current,
       SUM(CASE WHEN due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - INTERVAL '30 days' THEN total_amount ELSE 0 END) AS overdue_1_30,

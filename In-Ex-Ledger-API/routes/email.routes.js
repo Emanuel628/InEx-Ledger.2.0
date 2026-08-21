@@ -44,6 +44,16 @@ const {
 } = require("../services/invoiceEmailService.js");
 const { parseSupportReplyToken } = require("../services/supportEmailService.js");
 const { sendInvoiceOwnerActivityEmail } = require("../services/invoiceOwnerEmailService.js");
+const {
+  maskEmailLike,
+  maskRecipientList,
+  pickRecipientList,
+  pickFromAddress,
+  pickBody,
+  cleanInboundReplyBody,
+  describeInboundCaller,
+  createInboundWebhookVerifier
+} = require("../services/inboundWebhookVerificationService.js");
 
 const router = express.Router();
 function getResendClient() {
@@ -101,102 +111,6 @@ async function fetchReceivedEmailContent(payload) {
   return result?.data || null;
 }
 
-function timingSafeStringEqual(a, b) {
-  const ab = Buffer.from(String(a || ""));
-  const bb = Buffer.from(String(b || ""));
-  if (ab.length !== bb.length) return false;
-  try {
-    return crypto.timingSafeEqual(ab, bb);
-  } catch (_) {
-    return false;
-  }
-}
-
-function pickRecipientList(payload) {
-  const out = [];
-
-  function collect(value) {
-    if (!value) return;
-
-    if (typeof value === "string") {
-      out.push(value);
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      for (const entry of value) {
-        collect(entry);
-      }
-      return;
-    }
-
-    if (value.email) collect(value.email);
-    if (value.address) collect(value.address);
-    if (value.raw) collect(value.raw);
-    if (value.text) collect(value.text);
-
-    if (value.value) collect(value.value);
-
-    if (value.to) collect(value.to);
-    if (value.recipients) collect(value.recipients);
-    if (value.rcpt_to) collect(value.rcpt_to);
-  }
-
-  const candidates = [
-    payload?.to,
-    payload?.data?.to,
-    payload?.recipient,
-    payload?.data?.recipient,
-    payload?.recipients,
-    payload?.data?.recipients,
-    payload?.envelope?.to,
-    payload?.data?.envelope?.to,
-    payload?.envelope?.recipients,
-    payload?.data?.envelope?.recipients,
-    payload?.envelope?.rcpt_to,
-    payload?.data?.envelope?.rcpt_to,
-    payload?.headers?.to,
-    payload?.headers?.To,
-    payload?.data?.headers?.to,
-    payload?.data?.headers?.To
-  ];
-
-  for (const candidate of candidates) {
-    collect(candidate);
-  }
-
-  return [...new Set(out.map((item) => String(item).trim()).filter(Boolean))];
-}
-
-function pickFromAddress(payload) {
-  const f = payload?.from || payload?.data?.from;
-  if (typeof f === "string") return { email: f, name: null };
-  if (Array.isArray(f) && f[0]) return { email: f[0].email || f[0].address || null, name: f[0].name || null };
-  if (f?.email) return { email: f.email, name: f.name || null };
-  if (f?.address) return { email: f.address, name: f.name || null };
-  return { email: null, name: null };
-}
-
-function maskEmailLike(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const match = raw.match(/<([^>]+)>/);
-  const address = (match ? match[1] : raw).trim().toLowerCase();
-  const [local, domain] = address.split("@");
-  if (!local || !domain) {
-    return raw.slice(0, 3) + "***";
-  }
-  const localPrefix = local.length <= 2 ? `${local[0] || "*"}*` : `${local.slice(0, 2)}***`;
-  const domainParts = domain.split(".");
-  const domainName = domainParts.shift() || "";
-  const maskedDomain = domainName.length <= 2 ? `${domainName[0] || "*"}*` : `${domainName.slice(0, 2)}***`;
-  return `${localPrefix}@${[maskedDomain, ...domainParts].join(".")}`;
-}
-
-function maskRecipientList(recipients = []) {
-  return recipients.map((recipient) => maskEmailLike(recipient)).filter(Boolean);
-}
-
 function buildInboundNotification({ invoice, from, subject, body }) {
   const senderLabel = from?.name
     ? `${from.name} <${from.email || ""}>`.trim()
@@ -227,265 +141,15 @@ function buildInboundNotification({ invoice, from, subject, body }) {
   };
 }
 
-function pickBody(payload) {
-  return String(payload?.text || payload?.plain || payload?.body || "")
-    .slice(0, 50000)
-    || String(payload?.html || "").slice(0, 50000);
-}
-
-function cleanInboundReplyBody(rawBody) {
-  const body = String(rawBody || "").replace(/\r\n/g, "\n").trim();
-
-  if (!body) return "";
-
-  const cutMarkers = [
-    /^On .+ wrote:$/im,
-    /^From:\s.+$/im,
-    /^Sent:\s.+$/im,
-    /^To:\s.+$/im,
-    /^Subject:\s.+$/im,
-    /^-{2,}\s*Original Message\s*-{2,}$/im,
-    /^_{5,}$/im
-  ];
-
-  let cutIndex = -1;
-
-  for (const marker of cutMarkers) {
-    const match = body.match(marker);
-    if (match && typeof match.index === "number") {
-      if (cutIndex === -1 || match.index < cutIndex) {
-        cutIndex = match.index;
-      }
-    }
-  }
-
-  let cleaned = cutIndex >= 0 ? body.slice(0, cutIndex) : body;
-
-  cleaned = cleaned
-    .split("\n")
-    .filter((line) => !line.trim().startsWith(">"))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  return cleaned;
-}
-
-const INBOUND_TIMESTAMP_TOLERANCE_SECONDS = 5 * 60;
-const INBOUND_REPLAY_TTL_MS = 5 * 60 * 1000;
-const inboundReplayCache = new Map();
-
-function pruneReplayCache(nowMs) {
-  for (const [signature, recordedAt] of inboundReplayCache.entries()) {
-    if (nowMs - recordedAt > INBOUND_REPLAY_TTL_MS) {
-      inboundReplayCache.delete(signature);
-    }
-  }
-}
-
-function rememberSignature(signature, nowMs) {
-  inboundReplayCache.set(signature, nowMs);
-}
-
-function hasSeenSignature(signature) {
-  return inboundReplayCache.has(signature);
-}
-
-function computeInboundSignature(secret, timestampHeader, rawBody) {
-  return crypto
-    .createHmac("sha256", secret)
-    .update(`${timestampHeader}.${rawBody}`)
-    .digest("hex");
-}
-
-function timingSafeHexEqual(a, b) {
-  try {
-    const ab = Buffer.from(String(a || ""), "hex");
-    const bb = Buffer.from(String(b || ""), "hex");
-    if (ab.length === 0 || ab.length !== bb.length) return false;
-    return crypto.timingSafeEqual(ab, bb);
-  } catch (_) {
-    return false;
-  }
-}
-
-function timingSafeB64Equal(a, b) {
-  try {
-    const ab = Buffer.from(String(a || ""), "base64");
-    const bb = Buffer.from(String(b || ""), "base64");
-    if (ab.length === 0 || ab.length !== bb.length) return false;
-    return crypto.timingSafeEqual(ab, bb);
-  } catch (_) {
-    return false;
-  }
-}
-
-// Resend signs inbound webhooks with Svix (https://docs.svix.com). The request
-// carries three headers — svix-id, svix-timestamp and svix-signature — where
-// svix-signature is a space-delimited list of "v1,<base64sig>" entries. The
-// signing secret looks like "whsec_<base64>"; the bytes after the prefix are
-// the HMAC-SHA256 key. The signed content is `${id}.${timestamp}.${rawBody}`.
-function verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody) {
-  const keyMaterial = secret.startsWith("whsec_") ? secret.slice("whsec_".length) : secret;
-
-  let keyBytes;
-  try {
-    keyBytes = Buffer.from(keyMaterial, "base64");
-  } catch (_) {
-    return false;
-  }
-  if (!keyBytes.length) return false;
-
-  const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
-  const expected = crypto.createHmac("sha256", keyBytes).update(signedContent).digest("base64");
-
-  const provided = String(svixSignature || "")
-    .split(" ")
-    .map((part) => (part.includes(",") ? part.split(",")[1] : part))
-    .filter(Boolean);
-
-  return provided.some((sig) => timingSafeB64Equal(sig, expected));
-}
-
-function rawBodyUtf8(req) {
-  if (Buffer.isBuffer(req.body)) {
-    return req.body.toString("utf8");
-  }
-  if (typeof req.body === "string") {
-    return req.body;
-  }
-  return "";
-}
-
-function resolveInboundWebhookSecrets() {
-  const rawValues = [
-    process.env.INBOUND_EMAIL_WEBHOOK_SECRET,
-    process.env.SUPPORT_INBOUND_WEBHOOK_SECRET
-  ];
-
-  return [...new Set(
-    rawValues
-      .flatMap((value) => String(value || "").split(","))
-      .map((value) => String(value || "").trim())
-      .filter(Boolean)
-  )];
-}
+// Secrets from both INBOUND_EMAIL_WEBHOOK_SECRET and SUPPORT_INBOUND_WEBHOOK_SECRET
+// (each may hold multiple comma-separated values for zero-downtime rotation)
+// are pooled together, so this endpoint accepts either family of secret.
+const inboundEmailWebhookVerifier = createInboundWebhookVerifier({
+  envVarNames: ["INBOUND_EMAIL_WEBHOOK_SECRET", "SUPPORT_INBOUND_WEBHOOK_SECRET"]
+});
 
 function verifyInboundEmailRequest(req, nowMs = Date.now()) {
-  const secrets = resolveInboundWebhookSecrets();
-
-  if (!secrets.length) {
-    return { ok: false, status: 503, error: "Inbound email webhook is not configured." };
-  }
-
-  const rawBody = rawBodyUtf8(req);
-  const svixId = String(req.get("svix-id") || "").trim();
-  const svixTimestamp = String(req.get("svix-timestamp") || "").trim();
-  const svixSignature = String(req.get("svix-signature") || "").trim();
-  const timestampHeader = String(req.get("x-inbound-timestamp") || "").trim();
-  const signatureHeader = String(req.get("x-inbound-signature") || "").trim();
-  const legacySecretHeader = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
-  const allowLegacyFallback = process.env.NODE_ENV !== "production" || process.env.ALLOW_INBOUND_EMAIL_SECRET_FALLBACK === "true";
-
-  if (svixId && svixTimestamp && svixSignature) {
-    // Resend (Svix) signed webhook — the standard setup when Resend's inbound
-    // webhook posts directly to this endpoint.
-    const timestampSeconds = Number.parseInt(svixTimestamp, 10);
-    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
-      return { ok: false, status: 400, error: "Malformed webhook timestamp." };
-    }
-
-    const nowSeconds = Math.floor(nowMs / 1000);
-    if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
-      return { ok: false, status: 401, error: "Webhook timestamp outside tolerance window." };
-    }
-
-    const signatureValid = secrets.some((secret) =>
-      verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody)
-    );
-    if (!signatureValid) {
-      return { ok: false, status: 401, error: "Invalid webhook signature." };
-    }
-
-    pruneReplayCache(nowMs);
-    const replayKey = `svix:${svixId}`;
-    if (hasSeenSignature(replayKey)) {
-      return { ok: false, status: 409, error: "Replayed webhook signature." };
-    }
-    rememberSignature(replayKey, nowMs);
-  } else if (timestampHeader || signatureHeader) {
-    if (!timestampHeader || !signatureHeader) {
-      return { ok: false, status: 400, error: "Missing webhook signature headers." };
-    }
-
-    const timestampSeconds = Number.parseInt(timestampHeader, 10);
-    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
-      return { ok: false, status: 400, error: "Malformed webhook timestamp." };
-    }
-
-    const nowSeconds = Math.floor(nowMs / 1000);
-    if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
-      return { ok: false, status: 401, error: "Webhook timestamp outside tolerance window." };
-    }
-
-    const signatureValid = secrets.some((secret) => {
-      const expectedSignature = computeInboundSignature(secret, timestampHeader, rawBody);
-      return timingSafeHexEqual(signatureHeader, expectedSignature);
-    });
-    if (!signatureValid) {
-      return { ok: false, status: 401, error: "Invalid webhook signature." };
-    }
-
-    pruneReplayCache(nowMs);
-    if (hasSeenSignature(signatureHeader)) {
-      return { ok: false, status: 409, error: "Replayed webhook signature." };
-    }
-    rememberSignature(signatureHeader, nowMs);
-  } else if (allowLegacyFallback && legacySecretHeader) {
-    // Dev-only fallback: pre-signing clients (local scripts, manual smoke
-    // tests) may still send the static secret. Never accepted in production.
-    const secretMatched = secrets.some((secret) => timingSafeStringEqual(legacySecretHeader, secret));
-    if (!secretMatched) {
-      return { ok: false, status: 401, error: "Invalid webhook secret." };
-    }
-  } else {
-    return { ok: false, status: 401, error: "Missing webhook signature." };
-  }
-
-  let payload = {};
-  if (rawBody) {
-    try {
-      payload = JSON.parse(rawBody);
-      if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-        return { ok: false, status: 400, error: "Webhook payload must be a JSON object." };
-      }
-    } catch (_) {
-      return { ok: false, status: 400, error: "Webhook payload is not valid JSON." };
-    }
-  }
-
-  return { ok: true, payload };
-}
-
-/**
- * Describe who is calling the inbound webhook, for diagnostics. Captures the
- * caller's User-Agent and source IP plus WHICH signature-header family is
- * present — never the secret or signature values themselves. This lets us
- * identify the forwarder/service posting to the endpoint when requests are
- * rejected.
- */
-function describeInboundCaller(req) {
-  const forwardedFor = String(req.get("x-forwarded-for") || "").trim();
-  return {
-    userAgent: req.get("user-agent") || null,
-    ip: req.ip || null,
-    hasForwardedFor: Boolean(forwardedFor),
-    forwardedForHopCount: forwardedFor ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).length : 0,
-    // Header families present (booleans only — values are never logged):
-    hasSvixHeaders: Boolean(req.get("svix-signature") || req.get("svix-id")),
-    hasCustomHeaders: Boolean(req.get("x-inbound-signature") || req.get("x-inbound-timestamp")),
-    hasLegacyHeaders: Boolean(req.get("x-inbound-secret") || req.get("x-webhook-secret"))
-  };
+  return inboundEmailWebhookVerifier.verify(req, nowMs);
 }
 
 /**

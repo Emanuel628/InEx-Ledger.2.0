@@ -18,7 +18,7 @@ headline number):
 Percentage = sum of item scores across Phases 1-10, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 54.0 / 92 action items (~59%)
+## Overall: 65.5 / 92 action items (~71%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -1091,7 +1091,7 @@ test that had been failing identically since PR 13).
   pass (clean: only the two new architecture docs above were untracked, both
   intentional). `.gitignore` coverage for `test-results/`/`storage/`/logs re-confirmed.
 
-## Phase 11 - Independent Code-Only Review (2026-08-18): Critical And High Severity — 0 / 12
+## Phase 11 - Independent Code-Only Review (2026-08-18): Critical And High Severity — 11.5 / 12
 
 Found by a fresh, code-only review after Phase 10 closed: five parallel background
 agents each read one slice of the codebase in full (`routes/`, `services/`,
@@ -1104,82 +1104,166 @@ invalid"; tracing the actual call chain showed the fake-PDF code path is dead/un
 not live — the real bug is a required-but-unused microservice, not broken customer
 exports).
 
-- [ ] `services/projectService.js` and `services/billableExpenseService.js` call
+- [x] `services/projectService.js` and `services/billableExpenseService.js` call
   `db.any()`/`db.one()`/`db.oneOrNone()`/`db.result()` — a pg-promise API `db.js` does
   not implement (it exports a plain `pg.Pool` as `pool`, no such methods on the module
-  itself). Every function in both services throws `TypeError` on every call. Confirmed
+  itself). Every function in both services threw `TypeError` on every call. Confirmed
   wired into live, mounted routes (`routes/projects.routes.js`,
   `routes/billable-expenses.routes.js`, gated behind `ENABLE_V2_BUSINESS`) — the entire
-  Projects and Billable Expenses feature area is 100% non-functional whenever that flag
-  is on.
-- [ ] `services/pdfGeneratorService.js`'s `buildFooterText()` calls `maskTaxId(taxId)`
+  Projects and Billable Expenses feature area was 100% non-functional whenever that flag
+  is on. **Fixed**: switched both files to `const { pool } = require('../db'); pool.query(...)`,
+  the working pattern used elsewhere in this codebase. While fixing this, found the exact
+  same bug in `services/vendorService.js`, `customerService.js`, `invoiceService.js`,
+  `services/billService.js`, and `services/arApService.js` — all five called
+  `db.query(...)` on the same non-existent method, so the entire V2/Business tier
+  (Vendors, Customers, Invoices, Bills, AR/AP summary) was equally broken, not just
+  Projects/Billable Expenses as originally scoped. Fixed all five the same way. New
+  `tests/v2BusinessCrudServices.test.js` (8 tests) proves every function in all 7
+  services now reaches `pool.query` — confirmed regression-proving by reverting the fix
+  and re-running: all 8 fail with the original `TypeError` on the old code.
+- [x] `services/pdfGeneratorService.js`'s `buildFooterText()` calls `maskTaxId(taxId)`
   unconditionally, ignoring the `isSecure` flag, so the "Redacted Export" variant still
-  prints the first 5 characters of the real SSN/EIN on every page footer — confirmed
-  `resolvedTaxId` is resolved once, upstream of the `isSecure` branch, with no redaction
-  applied for the redacted path.
-- [ ] Same file: `buildVehicleAuditSchedule` and `buildCapitalAssetSchedule` use `return`
+  printed the first 5 characters of the real SSN/EIN on every page footer. **Fixed**:
+  footer now shows `"Withheld"` when `!isSecure`, matching the identity page's own
+  existing redaction convention.
+- [x] Same file: `buildVehicleAuditSchedule` and `buildCapitalAssetSchedule` use `return`
   inside a `.forEach()` callback when a page fills up — this only skips one iteration,
   not the whole loop, so once a page fills, every remaining vehicle claim / capital
-  asset is silently dropped from the CPA audit schedule instead of flowing to a new
-  page, while the footer keeps being redrawn at the same position for each dropped row.
-- [ ] `pdf-worker/` is a deployed, CI-tested microservice that `services/envValidationService.js`
-  requires via `PDF_WORKER_URL`/`PDF_WORKER_SECRET` in production, with a comment
+  asset was silently dropped from the CPA audit schedule instead of flowing to a new
+  page, while the footer kept being redrawn at the same position for each dropped row.
+  **Fixed**: both functions now paginate for real, chunking rows and rendering one
+  `PdfCanvas` per page (mirroring this same file's own working `buildUnresolvedExceptionPages`
+  pattern), with totals/notes only drawn on the last page. Also found and removed:
+  `buildVehicleAuditSchedule` and `buildQuickMethodRemittancePage` were each declared
+  *twice* in this file — function-declaration hoisting meant the second (buggy, for the
+  vehicle schedule) declaration silently won and the first was 100% dead code; deleted
+  the dead duplicates and kept the real content from whichever copy was live/current.
+  Also removed a stray, nonsensical "Run VALIDATE CONSTRAINT after data cleanup..."
+  engineering comment that had been shipping as customer-facing PDF content. New
+  `tests/pdfGeneratorAuditSchedules.test.js` (6 tests, exported via `__private`) proves
+  the tax-ID redaction and real pagination (60 claims → multiple pages, every claim's
+  description present somewhere in the output, totals only on the last page) —
+  confirmed regression-proving the same way (all 6 fail against the pre-fix code).
+- [x] `pdf-worker/` is a deployed, CI-tested microservice that `services/envValidationService.js`
+  required via `PDF_WORKER_URL`/`PDF_WORKER_SECRET` in production, with a comment
   claiming exports fail without it — but `pdfWorkerClient.js`'s `dispatchPdfJob` (the
   only caller of the worker) is never invoked anywhere in `routes/` or `services/`;
   `routes/exports.routes.js` calls `pdfGeneratorService.js`'s in-process
-  `generatePdfExportPair` directly instead. The worker is dead weight the env-validator
-  still pretends is load-bearing, and if it were ever called, `buildPdfContent()`
-  returns a plain UTF-8 text buffer (box-drawing characters, no PDF object structure) —
-  not a valid PDF — that would be served as `Content-Type: application/pdf`. Separately,
-  its IP allowlist middleware trusts `X-Forwarded-For`'s first entry unconditionally
-  with no trusted-proxy validation, so it's trivially spoofable by any external caller.
-- [ ] `frontend-v3/src/pages/Exports.tsx`'s "Custom" date-range preset button has no
+  `generatePdfExportPair` directly instead. **Fixed the misleading-required-env part**:
+  moved `PDF_WORKER_URL`/`PDF_WORKER_SECRET` from the production-required tier to
+  `OPTIONAL_FEATURE_ENV_VARIABLES` with an honest reason string, updated
+  `Docs/PRODUCTION-READINESS.md`'s mirrored table and `tests/envValidationService.test.js`
+  to match. **Also fixed two real security bugs in the worker itself** (since it's still
+  a deployed, reachable service even though unreferenced by this app today): `getRemoteIp()`
+  now only trusts `X-Forwarded-For` when an explicit `PDF_WORKER_TRUSTED_PROXY_HOPS` env
+  var configures how many trusted hops are in front of it (default 0 = raw socket address
+  only, closing the trivial IP-spoofing bypass), and the worker-token comparison now uses
+  `crypto.timingSafeEqual` instead of `!==`, matching this codebase's own convention
+  elsewhere (`middleware/requireSupportSecret.js`). **Not fixed**: `buildPdfContent()`
+  still doesn't produce a real PDF (plain UTF-8 text, no PDF object structure) — left
+  as-is since the function is confirmed dead code with no live caller; rewriting a fake
+  PDF generator that nothing calls wasn't judged worth the risk/effort in this pass.
+- [x] `frontend-v3/src/pages/Exports.tsx`'s "Custom" date-range preset button had no
   `onClick` handler at all — a dead, clickable-looking control — and the
-  `className="is-selected"` preset highlight is hardcoded onto the "YTD" button, so it
-  never moves when "Last tax year" or "Q1" is clicked instead.
-- [ ] `frontend-v3/src/pages/Invoices.tsx`'s `formatMoney()` normalizes any currency
+  `className="is-selected"` preset highlight was hardcoded onto the "YTD" button, so it
+  never moved when "Last tax year" or "Q1" was clicked instead. **Fixed**: added a
+  `datePreset` state that all three preset buttons and the "Custom" button set on click
+  (and that manually editing the Start/End date inputs also flips to `'custom'`), with
+  the `is-selected` class now driven by that state instead of hardcoded.
+- [x] `frontend-v3/src/pages/Invoices.tsx`'s `formatMoney()` normalizes any currency
   that isn't `'CAD'` to `'USD'`, but the invoice currency `<select>` offers
-  USD/CAD/EUR/GBP/AUD — an invoice created in EUR/GBP/AUD silently displays its
-  subtotal/tax/total with a `$` symbol instead of the real currency, both in the create
-  form and the invoice list.
-- [ ] `frontend-v3/src/components/transactions/RecurringTemplatesWorkflow.tsx`'s
-  `getActiveCurrency()` is hardcoded to `return 'USD'` unconditionally, unlike every
+  USD/CAD/EUR/GBP/AUD — an invoice created in EUR/GBP/AUD silently displayed its
+  subtotal/tax/total with a `$` symbol instead of the real currency. **Fixed** as part of
+  a new shared `frontend-v3/src/lib/money.ts` (see the next two items and Phase 13's
+  first item) — the shared `formatMoney` passes any valid ISO 4217 currency code through
+  to `Intl`/`toLocaleString` as-is instead of collapsing non-CAD codes to USD.
+- [x] `frontend-v3/src/components/transactions/RecurringTemplatesWorkflow.tsx`'s
+  `getActiveCurrency()` was hardcoded to `return 'USD'` unconditionally, unlike every
   other page's identically-named helper (which reads the business's real currency off
-  `window.__LUNA_ME__`) — recurring template amounts always show `$` even for CAD
-  businesses.
-- [ ] `routes/exports.routes.js`'s `/secure-export` re-implements the entire ~10-table
+  `window.__LUNA_ME__`) — recurring template amounts always showed `$` even for CAD
+  businesses. **Fixed**: removed the local hardcoded copy entirely; now imports
+  `formatMoney` from the new shared `lib/money.ts`, which resolves the real business
+  currency.
+- [x] `routes/exports.routes.js`'s `/secure-export` re-implemented the entire ~10-table
   compliance dataset query, category/support-artifact/vehicle-claim map building, and
   GST/HST Quick/Regular Method + home-office worksheet computation independently,
   instead of reusing the shared `fetchExportSourceRows()` helper that `/generate`
-  already uses — this is compliance-critical tax logic duplicated across two paths that
-  must now be kept in sync by hand.
-- [ ] `routes/email.routes.js` and `routes/supportEmail.routes.js` independently
-  implement ~200 near-identical lines of HMAC/Svix signature verification and
+  already used. **Fixed**: `/secure-export` now calls `fetchExportSourceRows()` and a new
+  shared `computeComplianceSchedules()` helper (extracted from the duplicated
+  Quick/Regular Method + home-office blocks) instead of its own fork.
+  `fetchExportSourceRows()` gained an `options` parameter so each caller can reproduce
+  its own pre-existing, genuinely-different behavior exactly rather than silently picking
+  one: `/generate` selects extended transaction fields (`description_encrypted`,
+  `exchange_date`, `converted_amount`, `review_notes`) and reviewer-join columns that
+  `/secure-export` never selected, includes the business `id` in metadata where
+  `/secure-export` didn't, and fails hard (500) on a `vehicle_costs` query error where
+  `/secure-export` has always tolerated that failure — all four differences were found,
+  preserved exactly as they were, and are not part of what's now shared. Two new
+  regression tests in `tests/exportsRegression.test.js` (35 total, all passing) prove
+  `/secure-export` now goes through the shared pipeline and still tolerates the
+  `vehicle_costs` failure the same way it always did.
+- [x] `routes/email.routes.js` and `routes/supportEmail.routes.js` independently
+  implemented ~200 near-identical lines of HMAC/Svix signature verification and
   replay-protection (`verifySvixSignature`, `timingSafeHexEqual`, the whole
-  verify-request function, etc.) — and the two copies have already drifted:
-  `email.routes.js` accepts multiple comma-separated secrets for key rotation;
-  `supportEmail.routes.js` only checks a single secret.
-- [ ] `routes/me.routes.js`'s `DELETE /` (account deletion) leaks internal
+  verify-request function, etc.) — and the two copies had already drifted:
+  `email.routes.js` accepted multiple comma-separated secrets for key rotation;
+  `supportEmail.routes.js` only checked a single secret. **Fixed**: extracted the shared
+  logic into new `services/inboundWebhookVerificationService.js`
+  (`resolveWebhookSecrets`/`createInboundWebhookVerifier` plus the individual
+  timing-safe/signature helpers), with per-route error-message overrides so each route's
+  existing user-facing text is unchanged. Both routes now support multi-secret rotation —
+  `supportEmail.routes.js` gains the capability it was missing. New
+  `tests/inboundWebhookVerificationService.test.js` (29 tests) covers every extracted
+  helper plus route-level proof that multi-secret rotation now works identically on both
+  routes; all pre-existing webhook tests for both routes still pass unmodified (52/52
+  total across the touched test files).
+- [x] `routes/me.routes.js`'s `DELETE /` (account deletion) leaked internal
   deployment/schema state to the authenticated caller on error: a pre-flight check
-  returns the literal migration filename (`045_drop_cpa_audit_user_fks.sql`) in the JSON
-  error body if that migration hasn't been applied, and the catch-all fallback for the
-  same condition returns `` `Database error code: ${err.code}` `` directly to the client
-  on any other unexpected failure.
-- [ ] `frontend-v3/src/lib/transactionsApi.ts`'s `resolveEstimatedTaxProfile`/
-  `estimatedCanadianRate` hardcode a flat 28% US rate and a per-province Canadian rate
-  table client-side, which `pages/Transactions.tsx` multiplies against a page-local
+  returned the literal migration filename (`045_drop_cpa_audit_user_fks.sql`) in the JSON
+  error body if that migration hadn't been applied, and the catch-all fallback for the
+  same condition returned `` `Database error code: ${err.code}` `` directly to the client
+  on any other unexpected failure. **Fixed**: both paths now return a generic
+  `"Failed to delete account. Please try again later."` to the client; the same detail
+  that used to leak is still captured server-side via the route's existing `logError`
+  call, so nothing was lost for debugging. Updated `tests/accountDeletion.test.js`'s
+  three affected tests to assert the leak is gone instead of asserting it was present.
+- [x] `frontend-v3/src/lib/transactionsApi.ts`'s `resolveEstimatedTaxProfile`/
+  `estimatedCanadianRate` hardcoded a flat 28% US rate and a per-province Canadian rate
+  table client-side, which `pages/Transactions.tsx` multiplied against a page-local
   net-total to show an "estimated tax" figure — independent of, and inconsistent with,
   the backend's real `se_tax_estimate` already surfaced via `lib/analyticsApi.ts` and
-  shown on Analytics/Dashboard. Two independently-computed tax estimates can legitimately
-  disagree in a product where users may rely on this number for withholding/quarterly
-  decisions, and the hardcoded bracket rates have no update path and will go stale every
-  tax year.
-- [ ] `services/vendorService.js`, `customerService.js`, `invoiceService.js`, and
+  shown on Analytics/Dashboard. **Fixed**: added `loadTaxSetAside()` to `analyticsApi.ts`
+  (fetches just `se_tax_estimate` without the extra cash-flow request `loadAnalytics()`
+  also makes), wired it into `useTransactionsPageData`, and Transactions.tsx now displays
+  that real backend value directly instead of computing its own. `resolveEstimatedTaxProfile`
+  was simplified to only derive the display label (e.g. "ON tax estimate") — the
+  fabricated `rate`/`note` fields and the `estimatedCanadianRate` table were deleted
+  entirely. Updated two tests (`frontendV3ApiContracts.test.js`,
+  `frontendV3Wiring.test.js`) that had been pinning the old hardcoded-rate behavior as
+  expected — one of them literally asserted the exact per-province rates as correct,
+  which was pinning the bug itself; both now assert the new backend-sourced behavior.
+- [~] `services/vendorService.js`, `customerService.js`, `invoiceService.js`, and
   `services/billService.js` hard-`DELETE ... RETURNING id` financial records with no
   amount/currency/length validation before insert and no audit trail — unlike the
   careful soft-delete + `audit_events` + accounting-lock-check pattern
   (`transactionAuditService.js`, `accountingLockService.js`) used everywhere else in the
-  app for transactions.
+  app for transactions. **Validation fixed**: new `services/v2BusinessValidationService.js`
+  (`V2BusinessValidationError`, 400-status, following the existing
+  `BillingValidationError` convention) validates required fields, UUID shape, amounts
+  (finite/non-negative/bounded), currency codes, dates, and status enums in all four
+  services' create/update paths; `routes/*.routes.js` for all four need no changes since
+  `asyncRoute` already forwards the new error type to the central handler as a 400. New
+  `tests/v2BusinessValidationService.test.js` (28 tests) and
+  `tests/v2BusinessServicesValidationAndDelete.test.js` prove invalid input is rejected
+  before any query runs. **Audit-trail/soft-delete half deliberately NOT done**: checked
+  `db/migrations/20260419_create_v2_business_tables.sql` — `vendors`/`customers`/`bills`/
+  `invoices` have no `deleted_at` or any audit column, and no later migration adds one
+  (the one soft-delete migration that exists, `20260513_add_invoice_soft_delete.sql`,
+  targets the separate, older `invoices_v1` Pro-plan table, not this one). Rather than
+  inventing a schema migration in this pass, each hard-delete function now carries a code
+  comment naming the gap and pointing at `transactionAuditService.js` as the parity
+  target — a real follow-up item, not silently dropped. Scored `[~]` rather than `[x]`
+  for this reason.
 
 ## Phase 12 - Independent Code-Only Review (2026-08-18): Backend Consistency And Concurrency — 0 / 12
 
@@ -2783,3 +2867,80 @@ problems, not launch-blocking on their own, but worth closing before they compou
   what shipped, but an honest reflection that a fresh independent pass found
   substantially more real work than the prior phases' scope covered. Fixing
   Phase 11-14 items is follow-up work, tracked here but not yet started.
+
+- **PR 51**: Phase 11, 11.5/12. Worked through Phase 11 in the most
+  efficient order available: the one confirmed-critical item first (a
+  100%-broken feature), then batched the rest across direct edits and three
+  parallel background implementation agents for the largest, most
+  self-contained backend refactors (webhook-verification dedup,
+  `/secure-export` dedup, AR/AP validation) — each agent's actual file
+  changes were independently spot-verified (`node -c`, targeted
+  `node --test` runs, and for the delegated work, re-reading the real diffs)
+  before being trusted into this PR, per this file's own "verify, don't
+  assume" discipline.
+
+  Fixing item 1 (the critical `db.any`/`db.query` bug) surfaced a bigger
+  problem than originally scoped: the identical bug existed in
+  `vendorService.js`, `customerService.js`, `invoiceService.js`,
+  `billService.js`, and `arApService.js` too — the entire V2/Business tier
+  (Vendors, Customers, Invoices, Bills, AR/AP summary), not just
+  Projects/Billable Expenses, was 100% non-functional. All seven services
+  were fixed the same way and proven with a new regression test file
+  (`tests/v2BusinessCrudServices.test.js`) confirmed to fail against the
+  pre-fix code and pass against the fix.
+
+  Fixing item 2 (the PDF redacted-export tax-ID leak) and item 3 (silent
+  CPA-schedule row-truncation) in the same file surfaced dead code: two
+  functions (`buildVehicleAuditSchedule`, `buildQuickMethodRemittancePage`)
+  were each declared twice, with function-hoisting silently picking the
+  second (buggy) copy — both dead first copies were deleted, and truncation
+  was replaced with real multi-page chunking mirroring this file's own
+  existing working pattern.
+
+  Fixing item 4 (the pdf-worker item) split into what was and wasn't worth
+  doing: the false "required in production" env-validation claim was
+  corrected (moved to the optional-feature tier with an honest reason,
+  keeping `Docs/PRODUCTION-READINESS.md` in sync per its own stated rule),
+  and two real security bugs in the still-deployed worker were fixed
+  (spoofable `X-Forwarded-For` trust, non-timing-safe secret comparison) —
+  but the worker's fake-PDF-content generator itself was deliberately left
+  alone since it's confirmed dead code with no live caller.
+
+  Items 5-7 (Exports.tsx's dead "Custom" button and stuck preset highlight,
+  Invoices.tsx's currency-collapsing bug, RecurringTemplatesWorkflow.tsx's
+  hardcoded USD) were fixed together as one cohesive frontend pass: a new
+  shared `frontend-v3/src/lib/money.ts` centralizes `formatMoney`/
+  `getActiveCurrency` (removing the duplicated-and-buggy per-page copies
+  that let two of these three bugs ship undetected — this is the same root
+  cause flagged separately as Phase 13's first item), plus the Exports.tsx
+  date-preset state fix.
+
+  Item 11 (the frontend's own hardcoded, stale-every-tax-year tax-bracket
+  estimate diverging from the backend's real `se_tax_estimate`) was fixed by
+  adding `loadTaxSetAside()` to `analyticsApi.ts` and wiring the real
+  backend figure into the Transactions page in place of the local
+  computation — the fabricated per-province rate table was deleted outright.
+  This required updating two tests that had been pinning the old bug as
+  expected behavior, including one that literally asserted the exact
+  per-province hardcoded rates were correct.
+
+  Item 12 (AR/AP hard-delete with no validation or audit trail) is the one
+  item scored `[~]` rather than `[x]`: validation was added in full (new
+  `services/v2BusinessValidationService.js`, wired into all four services),
+  but the soft-delete/audit-trail half was deliberately not implemented
+  after confirming via the actual migrations
+  (`db/migrations/20260419_create_v2_business_tables.sql`) that none of
+  these four tables have the schema columns soft-delete would need — adding
+  a migration was judged out of proportion for this pass, so each hard-delete
+  function now carries a code comment naming the gap instead of silently
+  leaving it undocumented.
+
+  Full suite via `npm run test:all`: **1719/1719 passing** (plus 3/3 ASVS
+  controls) — 73 more than the prior 1646 baseline, all new regression
+  coverage for this PR's fixes. Frontend verified via `tsc -b` (clean) and
+  `npm run build` (clean); no frontend test harness exists in this repo to
+  extend, so type-checking plus a production build is this codebase's
+  established verification bar for frontend-only changes. Phase 11 goes
+  from 0/12 to **11.5/12**. Overall recomputed from the checklist markers
+  (65 `[x]` + 1 `[~]` + 26 `[ ]` = 92 total, matching every phase header's
+  own sum): **65.5/92 (~71%)**.

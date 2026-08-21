@@ -34,12 +34,6 @@ const ENV_VARIABLE_REGISTRY = [
     tier: "production",
     reason: "middleware/rateLimiter.js's isRateLimitingRequired() is unconditionally true in production, so a missing REDIS_URL previously only failed by silently degrading to a per-instance in-memory limiter instead of failing startup."
   },
-  {
-    name: "PDF_WORKER_URL",
-    tier: "production",
-    reason: "PDF export is a core, unconditionally-mounted feature; without this every export request fails at request time (pdfWorkerClient.js throws) instead of at startup."
-  },
-  { name: "PDF_WORKER_SECRET", tier: "production", reason: "Authenticates requests to the PDF worker." },
   { name: "EXPORT_PUBLIC_KEY_JWK", tier: "production", reason: "Public key for verifying secure export grants; crypto.routes.js degrades to 503 without it." },
   { name: "EXPORT_PRIVATE_KEY_JWK", tier: "production", reason: "Private key for signing secure export grants." }
 ];
@@ -63,6 +57,10 @@ const OPTIONAL_FEATURE_ENV_VARIABLES = [
   {
     names: ["SUPPORT_REPLY_HMAC_SECRET"],
     reason: "Signs support-reply email links (services/emailPreferencesService.js, services/supportEmailService.js). Only exercised by the inbound-email features above."
+  },
+  {
+    names: ["PDF_WORKER_URL", "PDF_WORKER_SECRET"],
+    reason: "Would authenticate calls to the pdf-worker microservice via services/pdfWorkerClient.js's dispatchPdfJob, but nothing in routes/ or services/ currently calls dispatchPdfJob -- live PDF export goes through services/pdfGeneratorService.js's in-process generatePdfExportPair instead. Not currently required for any live code path; kept optional in case the worker is wired back in."
   }
 ];
 
