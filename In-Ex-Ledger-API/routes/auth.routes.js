@@ -18,8 +18,6 @@ const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForUser } = require("../services/subscriptionService.js");
 const {
-  ACCESS_TOKEN_COOKIE,
-  COOKIE_OPTIONS,
   isLegacyScryptHash,
   verifyPassword
 } = require("../utils/authUtils.js");
@@ -74,6 +72,23 @@ const {
   hashRefreshToken,
   hashMfaTrustToken
 } = require("../services/authSecurityService.js");
+const {
+  ACCESS_TOKEN_EXPIRY_SECONDS,
+  GLOBAL_MFA_TRUST_COOKIE,
+  MFA_TRUST_COOKIE,
+  MFA_TRUST_EXPIRY_MS,
+  REFRESH_TOKEN_COOKIE,
+  REFRESH_TOKEN_EXPIRY_MS,
+  clearAccessCookie,
+  clearGlobalMfaTrustCookie,
+  clearMfaTrustCookie,
+  clearRefreshCookie,
+  hasValidGlobalMfaTrustCookie,
+  setAccessCookie,
+  setGlobalMfaTrustCookie,
+  setMfaTrustCookie,
+  setRefreshCookie
+} = require("../services/authCookieService.js");
 
 const router = express.Router();
 
@@ -108,18 +123,9 @@ const tokenRefreshLimiter = createTokenRefreshLimiter();
 /* =========================================================
    3. CONSTANTS & COOKIE CONFIGURATION
    ========================================================= */
-const REFRESH_TOKEN_COOKIE = "refresh_token";
-const MFA_TRUST_COOKIE = "mfa_trust";
-const GLOBAL_MFA_TRUST_COOKIE = "mfa_global_trust";
-const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
-const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-const MFA_TRUST_EXPIRY_DAYS = Number(process.env.MFA_TRUST_EXPIRY_DAYS) || 14;
-const MFA_TRUST_EXPIRY_MS = MFA_TRUST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-const GLOBAL_MFA_TRUST_EXPIRY_SECONDS = Number(process.env.GLOBAL_MFA_TRUST_EXPIRY_SECONDS) || 14 * 24 * 60 * 60;
 const MFA_EMAIL_CODE_EXPIRY_MINUTES = Number(process.env.MFA_EMAIL_CODE_EXPIRY_MINUTES) || 15;
 const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
-const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 60 * 60;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
 const MAX_MFA_ATTEMPTS = Math.max(3, Number(process.env.MAX_MFA_ATTEMPTS) || 8);
 const MFA_REAUTH_TOKEN_EXPIRY_SECONDS = Number(process.env.MFA_REAUTH_TOKEN_EXPIRY_SECONDS) || 5 * 60;
@@ -785,76 +791,6 @@ async function verifyMfaEmailCode({
 
   await consumeMfaEmailChallenge(challenge.id);
   return { pending, challenge };
-}
-
-function setRefreshCookie(res, token, expiresAt) {
-  res.cookie(REFRESH_TOKEN_COOKIE, token, {
-    ...COOKIE_OPTIONS,
-    expires: expiresAt
-  });
-}
-
-function clearRefreshCookie(res) {
-  res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
-}
-
-function setAccessCookie(res, token) {
-  res.cookie(ACCESS_TOKEN_COOKIE, token, {
-    ...COOKIE_OPTIONS,
-    maxAge: ACCESS_TOKEN_EXPIRY_SECONDS * 1000
-  });
-}
-
-function clearAccessCookie(res) {
-  res.clearCookie(ACCESS_TOKEN_COOKIE, COOKIE_OPTIONS);
-}
-
-function setMfaTrustCookie(res, token, expiresAt) {
-  res.cookie(MFA_TRUST_COOKIE, token, {
-    ...COOKIE_OPTIONS,
-    expires: expiresAt
-  });
-}
-
-function clearMfaTrustCookie(res) {
-  res.clearCookie(MFA_TRUST_COOKIE, COOKIE_OPTIONS);
-}
-
-function getUserAgentHash(req) {
-  return hashValue(String(req.get("user-agent") || "").trim().slice(0, 512));
-}
-
-function setGlobalMfaTrustCookie(res, req) {
-  const token = signToken(
-    {
-      purpose: "global_mfa_trust",
-      user_agent_hash: getUserAgentHash(req)
-    },
-    GLOBAL_MFA_TRUST_EXPIRY_SECONDS
-  );
-
-  res.cookie(GLOBAL_MFA_TRUST_COOKIE, token, {
-    ...COOKIE_OPTIONS,
-    maxAge: GLOBAL_MFA_TRUST_EXPIRY_SECONDS * 1000
-  });
-}
-
-function clearGlobalMfaTrustCookie(res) {
-  res.clearCookie(GLOBAL_MFA_TRUST_COOKIE, COOKIE_OPTIONS);
-}
-
-function hasValidGlobalMfaTrustCookie(req) {
-  const token = String(req.cookies?.[GLOBAL_MFA_TRUST_COOKIE] || "").trim();
-  if (!token) {
-    return false;
-  }
-
-  try {
-    const payload = verifyToken(token);
-    return payload?.purpose === "global_mfa_trust" && payload?.user_agent_hash === getUserAgentHash(req);
-  } catch (_) {
-    return false;
-  }
 }
 
 async function createRefreshToken(userId, { mfaAuthenticated = false, req = null } = {}) {

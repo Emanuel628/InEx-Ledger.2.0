@@ -1153,22 +1153,15 @@ test("legacy auth defaults avoid rapid v3 session expiry and refresh throttling"
     `JWT access tokens should last at least 30 minutes by default to avoid rapid v3 session expiry, got ${expirySeconds}s`
   );
 
-  // auth.routes.js's access-token cookie maxAge and rateLimitTiers.js's
-  // refresh-endpoint limit aren't exported, so these stay source checks --
-  // but assert on the actual numeric magnitude rather than pinning the
-  // literal `60 * 60` / `120` formatting, which would break on any
-  // legitimate retuning that keeps the value reasonable.
-  const authRoutes = fs.readFileSync(path.join(repoRoot, "routes", "auth.routes.js"), "utf8");
-  const accessTokenMatch = authRoutes.match(
-    /ACCESS_TOKEN_EXPIRY_SECONDS = Number\(process\.env\.ACCESS_TOKEN_EXPIRY_SECONDS\) \|\| (\d+) \* (\d+)/
-  );
-  assert.ok(accessTokenMatch, "auth.routes.js should define a numeric default for ACCESS_TOKEN_EXPIRY_SECONDS");
-  const defaultAccessTokenSeconds = Number(accessTokenMatch[1]) * Number(accessTokenMatch[2]);
+  const authCookieService = require(path.join(repoRoot, "services", "authCookieService.js"));
+  const defaultAccessTokenSeconds = authCookieService.ACCESS_TOKEN_EXPIRY_SECONDS;
   assert.ok(
     defaultAccessTokenSeconds >= 30 * 60,
     `the access-token cookie's default maxAge should last at least 30 minutes, got ${defaultAccessTokenSeconds}s`
   );
 
+  // rateLimitTiers.js's refresh-endpoint limit is not exported, so this stays
+  // a source check on numeric magnitude rather than exact formatting.
   const rateLimitTiers = fs.readFileSync(path.join(repoRoot, "middleware", "rateLimitTiers.js"), "utf8");
   const refreshLimiterMatch = rateLimitTiers.match(/max:\s*(\d+)[\s\S]{0,80}keyPrefix:\s*"rl:refresh"/);
   assert.ok(refreshLimiterMatch, "rateLimitTiers.js should define a refresh-endpoint rate limit");
