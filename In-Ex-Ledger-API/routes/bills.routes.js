@@ -6,14 +6,13 @@ const billService = require('../services/billService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
-const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 const { isUuid } = require('../api/utils/v2HttpValidators');
 const { ApiError, asyncRoute } = require('../utils/apiError.js');
 
 const BILL_STATUS_VALUES = new Set(['draft', 'open', 'sent', 'partial', 'paid', 'void']);
 
-router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+router.use(requireAuth);
 router.use(createDataApiLimiter({ keyPrefix: 'rl:v2:bills' }));
 router.use((req, res, next) => (
 	["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
@@ -113,7 +112,7 @@ router.delete('/:id', asyncRoute(async (req, res) => {
 	if (!isUuid(req.params.id)) {
 		throw new ApiError(400, 'Invalid bill id.');
 	}
-	const deleted = await billService.deleteBill(businessId, req.params.id);
+	const deleted = await billService.deleteBill(businessId, req.params.id, { userId: req.user?.id || null });
 	if (!deleted) {
 		throw new ApiError(404, 'Bill not found.');
 	}

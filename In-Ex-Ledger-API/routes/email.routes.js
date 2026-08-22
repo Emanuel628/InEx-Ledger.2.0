@@ -36,7 +36,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { Resend } = require("resend");
 const { pool } = require("../db.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { logWarn, logInfo } = require("../utils/logger.js");
 const { asyncRoute } = require("../utils/apiError.js");
 const {
   extractTokenFromRecipient,
@@ -221,7 +221,6 @@ router.post("/inbound", asyncRoute(async (req, res) => {
     return res.status(200).json({ ok: true, ignored: "no_matching_invoice" });
   }
 
-  try {
     let invoice = null;
     let ownerId = null;
     let rootMessageId = supportThreadId || null;
@@ -268,22 +267,22 @@ router.post("/inbound", asyncRoute(async (req, res) => {
       }
     }
 
-const from = pickFromAddress(receivedEmail || payload);
+    const from = pickFromAddress(receivedEmail || payload);
     const subject = String(
-  receivedEmail?.subject ||
-  payload?.subject ||
-  payload?.data?.subject ||
-  (invoice ? `Re: Invoice ${invoice.invoice_number}` : "Re: Support Request")
-).slice(0, 200);
+      receivedEmail?.subject ||
+      payload?.subject ||
+      payload?.data?.subject ||
+      (invoice ? `Re: Invoice ${invoice.invoice_number}` : "Re: Support Request")
+    ).slice(0, 200);
 
-const rawBody =
-  String(receivedEmail?.text || "").trim() ||
-  String(receivedEmail?.html || "").trim() ||
-  pickBody(payload).trim();
+    const rawBody =
+      String(receivedEmail?.text || "").trim() ||
+      String(receivedEmail?.html || "").trim() ||
+      pickBody(payload).trim();
 
-const body =
-  cleanInboundReplyBody(rawBody).slice(0, 50000) ||
-  "(reply received — body not included in Resend webhook metadata)";
+    const body =
+      cleanInboundReplyBody(rawBody).slice(0, 50000) ||
+  "(reply received - body not included in Resend webhook metadata)";
 
     const messageId = crypto.randomUUID();
     await pool.query(
@@ -327,12 +326,12 @@ const body =
     );
 
     logInfo("inbound email webhook: external reply stored", {
-  invoiceId: invoice?.id || null,
-  supportThreadId: rootMessageId,
-  messageId,
-  from: maskEmailLike(from.email),
-  fetchedBody: !!receivedEmail,
-  bodyLength: body.length
+      invoiceId: invoice?.id || null,
+      supportThreadId: rootMessageId,
+      messageId,
+      from: maskEmailLike(from.email),
+      fetchedBody: !!receivedEmail,
+      bodyLength: body.length
     });
     if (invoice) {
       await sendInvoiceOwnerActivityEmail({
@@ -355,18 +354,6 @@ const body =
       support_thread_id: rootMessageId,
       message_id: messageId
     });
-  } catch (err) {
-    throw err;
-  }
 }));
-
-router.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
-  if (status >= 500) {
-    logError("inbound email webhook error:", err.message);
-  }
-  const error = status < 500 ? err.message : "Internal server error";
-  res.status(status).json({ ok: false, error });
-});
 
 module.exports = router;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   archiveMessage,
   deleteMessage,
@@ -46,8 +46,12 @@ export default function useMessagesPageData() {
   const [typeFilter, setTypeFilter] = useState<'All' | MessageType>('All')
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
+  const refreshRequestSeq = useRef(0)
+  const threadRequestSeq = useRef(0)
 
   async function refreshMessages() {
+    const requestId = refreshRequestSeq.current + 1
+    refreshRequestSeq.current = requestId
     setLoadingData(true)
     setDataError('')
     try {
@@ -57,17 +61,25 @@ export default function useMessagesPageData() {
         loadArchivedMessages(),
         loadUnreadCounts(),
       ])
+      if (requestId !== refreshRequestSeq.current) {
+        return
+      }
       setInbox(nextInbox)
       setSent(nextSent)
       setArchived(nextArchived)
       setUnreadCounts(counts)
     } catch (error) {
+      if (requestId !== refreshRequestSeq.current) {
+        return
+      }
       setDataError(error instanceof Error ? error.message : 'Unable to load messages.')
       setInbox([])
       setSent([])
       setArchived([])
     } finally {
-      setLoadingData(false)
+      if (requestId === refreshRequestSeq.current) {
+        setLoadingData(false)
+      }
     }
   }
 
@@ -117,16 +129,27 @@ export default function useMessagesPageData() {
   }, [laneMessages, searchTerm, statusFilter, typeFilter])
 
   async function openThread(thread: MessageRecord) {
+    const requestId = threadRequestSeq.current + 1
+    threadRequestSeq.current = requestId
     setSelectedThread(thread)
     setThreadMessages([])
     try {
       const messages = await loadMessageThread(thread.id)
+      if (requestId !== threadRequestSeq.current) {
+        return
+      }
       setThreadMessages(messages)
       if (thread.unread) {
         await markMessageRead(thread.id)
+        if (requestId !== threadRequestSeq.current) {
+          return
+        }
         void refreshMessages()
       }
     } catch (error) {
+      if (requestId !== threadRequestSeq.current) {
+        return
+      }
       setDataError(error instanceof Error ? error.message : 'Unable to open message.')
     }
   }

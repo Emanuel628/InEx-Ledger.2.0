@@ -17,6 +17,24 @@ test("ApiError carries a status, message, and optional code", () => {
   assert.equal(withCode.code, "some_conflict");
 });
 
+test("ApiError carries optional public response fields", () => {
+  const err = new ApiError(409, "Locked.", {
+    code: "accounting_period_locked",
+    responseFields: { code: "accounting_period_locked", locked_through_date: "2026-08-01" }
+  });
+
+  assert.deepEqual(err.responseFields, {
+    code: "accounting_period_locked",
+    locked_through_date: "2026-08-01"
+  });
+});
+
+test("ApiError can explicitly expose a public 500 fallback message", () => {
+  const err = new ApiError(500, "Failed to start checkout.", { expose: true });
+
+  assert.equal(err.expose, true);
+});
+
 test("asyncRoute forwards a resolved handler's result without calling next", async () => {
   let nextCalled = false;
   const handler = asyncRoute(async (req, res) => {

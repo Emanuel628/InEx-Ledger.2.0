@@ -25,6 +25,38 @@ const {
 
 Module._load = originalLoad;
 
+function loadBankConnectionServiceWithDecrypt(decryptImpl) {
+  const servicePath = require.resolve("../services/bankConnectionService.js");
+  delete require.cache[servicePath];
+  Module._load = function (request, parent, isMain) {
+    if (request === "./encryptionService.js" || /encryptionService\.js$/.test(request)) {
+      return {
+        encrypt: (v) => `enc:${v}`,
+        decrypt: decryptImpl
+      };
+    }
+    return originalLoad(request, parent, isMain);
+  };
+  try {
+    return require("../services/bankConnectionService.js");
+  } finally {
+    Module._load = originalLoad;
+    delete require.cache[servicePath];
+  }
+}
+
+function captureWarns(fn) {
+  const originalWarn = console.warn;
+  const calls = [];
+  console.warn = (...args) => calls.push(args);
+  try {
+    const result = fn();
+    return { calls, result };
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
 function makePool(rowsByCall = []) {
   let i = 0;
   return {
@@ -97,6 +129,22 @@ test("decryptAccessToken returns null when no token stored", () => {
   assert.equal(decryptAccessToken(null), null);
   assert.equal(decryptAccessToken({}), null);
   assert.equal(decryptAccessToken({ access_token_encrypted: "enc:hello" }), "hello");
+});
+
+test("decryptAccessToken logs decrypt failures without leaking stored tokens", () => {
+  const service = loadBankConnectionServiceWithDecrypt(() => {
+    throw new Error("bad auth tag");
+  });
+  const encryptedToken = "enc:plaid-access-token";
+
+  const { calls, result } = captureWarns(() =>
+    service.decryptAccessToken({ access_token_encrypted: encryptedToken })
+  );
+
+  assert.equal(result, null);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "[InEx][WARN] Bank access token decrypt failed");
+  assert.equal(JSON.stringify(calls).includes(encryptedToken), false);
 });
 
 test("normalizeImportedTransaction produces canonical shape from Plaid-style payload", () => {

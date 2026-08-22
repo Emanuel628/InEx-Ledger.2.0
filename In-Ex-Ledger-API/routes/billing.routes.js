@@ -40,7 +40,7 @@ const {
 } = require("../services/signInSecurityService.js");
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
-const { asyncRoute } = require("../utils/apiError.js");
+const { ApiError, asyncRoute } = require("../utils/apiError.js");
 const {
   getStripeSecretKey,
   stripeRequest,
@@ -1084,6 +1084,16 @@ function isMockBillingAllowed() {
   return mockEnabled && !isProduction && !isLiveStripeKey;
 }
 
+function toBillingMutationApiError(err, fallbackMessage) {
+  if (err instanceof BillingValidationError) {
+    return new ApiError(400, err.message);
+  }
+  if (err?.status && err.status < 500) {
+    return err;
+  }
+  return new ApiError(500, fallbackMessage, { expose: true });
+}
+
 router.get("/mock-v1", requireAuth, async (_req, res) => {
   if (!isMockBillingAllowed()) {
     return res.status(404).json({ error: "Not found." });
@@ -1095,9 +1105,9 @@ router.post(
   "/mock-v1",
   requireAuth,
   requireCsrfProtection,
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     if (!isMockBillingAllowed()) {
-      return res.status(404).json({ error: "Not found." });
+      throw new ApiError(404, "Not found.");
     }
     try {
       const businessId = await resolveBusinessIdForUser(req.user);
@@ -1117,9 +1127,9 @@ router.post(
       res.json({ subscription });
     } catch (err) {
       logError("POST /api/billing/mock-v1 error:", err.message);
-      res.status(500).json({ error: "Failed to activate mock V1." });
+      throw new ApiError(500, "Failed to activate mock V1.");
     }
-  },
+  }),
 );
 
 router.post(
@@ -1127,7 +1137,7 @@ router.post(
   requireAuth,
   requireCsrfProtection,
   billingMutationLimiter,
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     try {
       const checkoutAttemptId = String(
         req.body?.checkoutAttemptId || "",
@@ -1178,12 +1188,12 @@ router.post(
         subscription.stripeSubscriptionId &&
         (blockingStatus === "past_due" || blockingStatus === "unpaid")
       ) {
-        return res.status(409).json({
-          error:
+        throw new ApiError(
+          409,
             blockingStatus === "unpaid"
               ? "This account has an unpaid Stripe subscription. Update the payment method in Subscription before starting another checkout."
-              : "This account already has a past-due Stripe subscription. Resolve the existing billing issue in Subscription before starting another checkout.",
-        });
+              : "This account already has a past-due Stripe subscription. Resolve the existing billing issue in Subscription before starting another checkout."
+        );
       }
 
       if (
@@ -1191,10 +1201,7 @@ router.post(
         !subscription.cancelAtPeriodEnd &&
         !subscription.isCanceledWithRemainingAccess
       ) {
-        return res.status(409).json({
-          error:
-            "This account already has paid Pro access or an overlapping paid period. Use Subscription to manage it instead of starting another checkout.",
-        });
+        throw new ApiError(409, "This account already has paid Pro access or an overlapping paid period. Use Subscription to manage it instead of starting another checkout.");
       }
 
       if (
@@ -1202,10 +1209,7 @@ router.post(
         subscription.stripeSubscriptionId &&
         !subscription.isTrialing
       ) {
-        return res.status(409).json({
-          error:
-            "This Pro subscription is already active and scheduled to end. Use Keep Pro active instead of starting another checkout.",
-        });
+        throw new ApiError(409, "This Pro subscription is already active and scheduled to end. Use Keep Pro active instead of starting another checkout.");
       }
 
       const billingContext = await resolveBillingContext(
@@ -1264,10 +1268,7 @@ router.post(
             blockingSubscription,
           );
         }
-        return res.status(409).json({
-          error:
-            "This account already has an active or overlapping Stripe subscription. Manage it from Subscription instead of starting another checkout.",
-        });
+        throw new ApiError(409, "This account already has an active or overlapping Stripe subscription. Manage it from Subscription instead of starting another checkout.");
       }
       const requestedReturnPath = normalizeInternalReturnPath(
         req.body?.returnPath,
@@ -1359,12 +1360,9 @@ router.post(
       res.status(200).json({ url: session.url, id: session.id });
     } catch (err) {
       logError("POST /api/billing/checkout-session error:", err.message);
-      const status = err instanceof BillingValidationError ? 400 : 500;
-      res.status(status).json({
-        error: status === 400 ? err.message : "Failed to start checkout.",
-      });
+      throw toBillingMutationApiError(err, "Failed to start checkout.");
     }
-  },
+  }),
 );
 
 router.post(
@@ -1372,7 +1370,7 @@ router.post(
   requireAuth,
   requireCsrfProtection,
   billingMutationLimiter,
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     try {
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
       const subscription =
@@ -1415,9 +1413,9 @@ router.post(
       res.status(200).json({ url: session.url });
     } catch (err) {
       logError("POST /api/billing/customer-portal error:", err.message);
-      res.status(500).json({ error: "Failed to open billing portal." });
+      throw new ApiError(500, "Failed to open billing portal.");
     }
-  },
+  }),
 );
 
 router.post(
@@ -1425,7 +1423,7 @@ router.post(
   requireAuth,
   requireCsrfProtection,
   billingMutationLimiter,
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     try {
       const mutationAttemptId = requireMutationAttemptId(req.body?.mutationAttemptId);
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
@@ -1433,9 +1431,7 @@ router.post(
         await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
 
       if (!subscription?.stripeSubscriptionId) {
-        return res
-          .status(409)
-          .json({ error: "No active Stripe subscription found." });
+        throw new ApiError(409, "No active Stripe subscription found.");
       }
 
       await stripeRequest(
@@ -1471,12 +1467,9 @@ router.post(
       res.status(200).json({ subscription: updated });
     } catch (err) {
       logError("POST /api/billing/customer-portal/cancel error:", err.message);
-      const status = err instanceof BillingValidationError ? 400 : 500;
-      res.status(status).json({
-        error: status === 400 ? err.message : "Failed to cancel subscription.",
-      });
+      throw toBillingMutationApiError(err, "Failed to cancel subscription.");
     }
-  },
+  }),
 );
 
 router.post(
@@ -1484,7 +1477,7 @@ router.post(
   requireAuth,
   requireCsrfProtection,
   billingMutationLimiter,
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     try {
       const mutationAttemptId = requireMutationAttemptId(req.body?.mutationAttemptId);
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
@@ -1567,9 +1560,7 @@ router.post(
         requestedBillingInterval !== currentTerms.billingInterval
       ) {
         if (!baseItem?.id) {
-          return res
-            .status(409)
-            .json({ error: "No active Stripe base subscription item found." });
+          throw new ApiError(409, "No active Stripe base subscription item found.");
         }
         updatePayload["items[0][id]"] = baseItem.id;
         updatePayload["items[0][price]"] = resolveBasePriceIdForTerms(
@@ -1627,12 +1618,9 @@ router.post(
       res.status(200).json({ subscription });
     } catch (err) {
       logError("POST /api/billing/resume error:", err.message);
-      const status = err instanceof BillingValidationError ? 400 : 500;
-      res.status(status).json({
-        error: status === 400 ? err.message : "Failed to resume subscription.",
-      });
+      throw toBillingMutationApiError(err, "Failed to resume subscription.");
     }
-  },
+  }),
 );
 
 router.post(
@@ -1640,7 +1628,7 @@ router.post(
   requireAuth,
   requireCsrfProtection,
   billingMutationLimiter,
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     try {
       const mutationAttemptId = requireMutationAttemptId(req.body?.mutationAttemptId);
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
@@ -1708,12 +1696,9 @@ router.post(
       res.status(200).json({ subscription: updated });
     } catch (err) {
       logError("POST /api/billing/cancel error:", err.message);
-      const status = err instanceof BillingValidationError ? 400 : 500;
-      res.status(status).json({
-        error: status === 400 ? err.message : "Failed to cancel subscription.",
-      });
+      throw toBillingMutationApiError(err, "Failed to cancel subscription.");
     }
-  },
+  }),
 );
 
 function getAddonPriceIds() {
@@ -1825,7 +1810,7 @@ router.post(
   requireAuth,
   requireCsrfProtection,
   billingMutationLimiter,
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     try {
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
       let subscription =
@@ -1847,29 +1832,20 @@ router.post(
       }
 
       if (!hasActiveProAccess) {
-        return res.status(403).json({
-          error:
-            "Additional business slots require an active Pro subscription.",
-        });
+        throw new ApiError(403, "Additional business slots require an active Pro subscription.");
       }
       if (
         !subscription.stripeSubscriptionId ||
         !subscription.stripeCustomerId
       ) {
-        return res
-          .status(409)
-          .json({ error: "No active Stripe subscription found." });
+        throw new ApiError(409, "No active Stripe subscription found.");
       }
 
       const additionalBusinesses = normalizeAdditionalBusinesses(
         req.body?.additionalBusinesses,
       );
       if (additionalBusinesses <= 0) {
-        return res
-          .status(400)
-          .json({
-            error: "additionalBusinesses must be a positive whole number.",
-          });
+        throw new ApiError(400, "additionalBusinesses must be a positive whole number.");
       }
 
       const stripeSub = await stripeGet(
@@ -1929,15 +1905,9 @@ router.post(
         "POST /api/billing/additional-businesses/checkout error:",
         err.message,
       );
-      const status = err instanceof BillingValidationError ? 400 : 500;
-      res.status(status).json({
-        error:
-          status === 400
-            ? err.message
-            : "Failed to start business slot checkout.",
-      });
+      throw toBillingMutationApiError(err, "Failed to start business slot checkout.");
     }
-  },
+  }),
 );
 
 router.patch(
@@ -1945,7 +1915,7 @@ router.patch(
   requireAuth,
   requireCsrfProtection,
   billingMutationLimiter,
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     try {
       const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
       let subscription =
@@ -1967,22 +1937,13 @@ router.patch(
       }
 
       if (!hasActiveProAccess) {
-        return res.status(403).json({
-          error:
-            "Additional business slots require an active Pro subscription.",
-        });
+        throw new ApiError(403, "Additional business slots require an active Pro subscription.");
       }
       if (subscription.cancelAtPeriodEnd && !subscription.isTrialing) {
-        return res.status(409).json({
-          error:
-            "Cannot change business slots while cancellation is pending. Resume Pro to make changes.",
-        });
+        throw new ApiError(409, "Cannot change business slots while cancellation is pending. Resume Pro to make changes.");
       }
       if (subscription.isCanceledWithRemainingAccess) {
-        return res.status(409).json({
-          error:
-            "Your Pro subscription has already been canceled. Start a new Pro subscription before changing business slots.",
-        });
+        throw new ApiError(409, "Your Pro subscription has already been canceled. Start a new Pro subscription before changing business slots.");
       }
       if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
         const additionalBusinesses = normalizeAdditionalBusinesses(
@@ -2005,9 +1966,7 @@ router.patch(
         return res.status(200).json({ subscription: updated });
       }
       if (!subscription.stripeSubscriptionId) {
-        return res
-          .status(409)
-          .json({ error: "No active Stripe subscription found." });
+        throw new ApiError(409, "No active Stripe subscription found.");
       }
 
       const additionalBusinesses = normalizeAdditionalBusinesses(
@@ -2125,13 +2084,9 @@ router.patch(
       res.status(200).json({ subscription: updated });
     } catch (err) {
       logError("PATCH /api/billing/additional-businesses error:", err.message);
-      const status = err instanceof BillingValidationError ? 400 : 500;
-      res.status(status).json({
-        error:
-          status === 400 ? err.message : "Failed to update business slots.",
-      });
+      throw toBillingMutationApiError(err, "Failed to update business slots.");
     }
-  },
+  }),
 );
 
 router.get(

@@ -2504,7 +2504,7 @@ function buildVehicleAuditSchedule(vehicleClaims, currency, labels, region) {
       canvas.drawCard(40, y, 532, 68, "Method Reference", [
         isCA
           ? "Canadian self-employed motor vehicle claims use actual expenses with business-use allocation. Mileage logs shown in this package are support only."
-          : "Mileage: IRS standard mileage rate applied. Actual: gross amount × business-use %. Use one method consistently for the tax year until per-vehicle elections are supported."
+          : "Mileage: IRS standard mileage rate applied. Actual: gross amount x business-use %. Use one method consistently for the tax year until per-vehicle elections are supported."
       ], { maxChars: 90 });
     }
 

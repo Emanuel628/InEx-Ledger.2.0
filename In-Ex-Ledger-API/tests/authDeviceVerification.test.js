@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("crypto");
+const fs = require("node:fs");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
@@ -20,6 +21,16 @@ const {
 const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const AUTH_ROUTE_PATH = require.resolve("../routes/auth.routes.js");
+
+test("auth email-code MFA verification uses one shared challenge verifier", () => {
+  const source = fs.readFileSync(AUTH_ROUTE_PATH, "utf8");
+  assert.equal((source.match(/async function verifyMfaEmailCode/g) || []).length, 1);
+  assert.equal((source.match(/findActiveMfaEmailChallenge\(/g) || []).length, 2);
+  assert.equal((source.match(/recordFailedMfaEmailAttempt\(/g) || []).length, 2);
+  assert.equal((source.match(/consumeMfaEmailChallenge\(/g) || []).length, 2);
+  assert.equal((source.match(/hashMfaEmailCode\(code\) !== String\(challenge\.code_hash/g) || []).length, 1);
+  assert.equal((source.match(/await verifyMfaEmailCode\(\{/g) || []).length, 5);
+});
 
 function makeHash(value) {
   return crypto.createHash("sha256").update(String(value || "")).digest("hex");

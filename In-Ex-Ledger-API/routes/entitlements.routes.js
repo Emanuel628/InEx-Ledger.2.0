@@ -1,9 +1,9 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { resolveBusinessIdForUser, listBusinessesForUser } = require('../api/utils/resolveBusinessIdForUser.js');
-const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require('../services/subscriptionService.js');
+const { getSubscriptionSnapshotForBusiness } = require('../services/subscriptionService.js');
 const { getUsageSummary } = require('../services/basicPlanUsageService.js');
-const { getPlanDefinition } = require('../config/planCatalog.js');
+const { PLAN_CODES, getPlanDefinition } = require('../config/planCatalog.js');
 const { pool } = require('../db.js');
 const { asyncRoute } = require('../utils/apiError.js');
 
@@ -56,8 +56,8 @@ router.get('/plan-context', asyncRoute(async (req, res) => {
       active: activeBusinessCount
     },
     upgrade: {
-      available: definition.code === PLAN_PRO || definition.code === PLAN_BUSINESS ? false : true,
-      targetPlan: PLAN_PRO,
+      available: definition.code === PLAN_CODES.PRO || definition.code === PLAN_CODES.BUSINESS ? false : true,
+      targetPlan: PLAN_CODES.PRO,
       targetName: 'Pro'
     }
   });

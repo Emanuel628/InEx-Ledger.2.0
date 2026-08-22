@@ -569,29 +569,40 @@ async function assertUnlockedBusinessDates(businessId, ...dates) {
   return lockState;
 }
 
-function handleTransactionMutationError(res, err, fallbackMessage) {
+function toTransactionMutationApiError(err, fallbackMessage) {
   if (err instanceof AccountingPeriodLockedError) {
-    return res.status(err.status).json({
-      error: err.message,
+    return new ApiError(err.status, err.message, {
       code: err.code,
-      locked_through_date: err.lockedThroughDate,
-      transaction_date: err.transactionDate
+      responseFields: {
+        code: err.code,
+        locked_through_date: err.lockedThroughDate,
+        transaction_date: err.transactionDate
+      }
     });
   }
 
   if (err instanceof BasicPlanLimitError) {
-    return res.status(err.statusCode).json({
-      error: err.message,
+    return new ApiError(err.statusCode, err.message, {
       code: err.code,
-      ...err.details
+      responseFields: {
+        code: err.code,
+        ...err.details
+      }
     });
   }
 
   if (err instanceof ReceiptStatusValidationError) {
-    return res.status(err.status).json({ error: err.message, code: err.code });
+    return new ApiError(err.status, err.message, {
+      code: err.code,
+      responseFields: { code: err.code }
+    });
   }
 
-  return res.status(500).json({ error: fallbackMessage });
+  if (err?.status && err.status < 500) {
+    return err;
+  }
+
+  return new ApiError(500, fallbackMessage, { expose: true });
 }
 
 function hasAdvancedTransactionPayload(normalized, fallbackCurrency) {
@@ -693,7 +704,7 @@ router.get("/", asyncRoute(async (req, res) => {
   });
 }));
 
-router.post("/", async (req, res) => {
+router.post("/", asyncRoute(async (req, res) => {
   let client = null;
   let businessId = null;
   try {
@@ -702,13 +713,15 @@ router.post("/", async (req, res) => {
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
     if (!validation.valid) {
-      return res.status(400).json({ error: validation.message });
+      throw new ApiError(400, validation.message);
     }
     if (
       hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
       !hasFeatureAccess(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS)
     ) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS));
+      throw new ApiError(403, "This feature requires a plan upgrade.", {
+        responseFields: buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS)
+      });
     }
 
     const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
@@ -721,7 +734,7 @@ router.post("/", async (req, res) => {
       [account_id, businessId]
     );
     if (accountCheck.rowCount === 0) {
-      return res.status(400).json({ error: "account_id does not belong to your business" });
+      throw new ApiError(400, "account_id does not belong to your business");
     }
 
     const mappedCategoryId = await resolveCategoryId(
@@ -731,7 +744,7 @@ router.post("/", async (req, res) => {
     );
 
     if (!mappedCategoryId) {
-      return res.status(400).json({ error: "category_id is invalid" });
+      throw new ApiError(400, "category_id is invalid");
     }
 
     // Acquire a per-business advisory lock so the count check and INSERT are
@@ -804,11 +817,11 @@ router.post("/", async (req, res) => {
   } catch (err) {
     if (client) await client.query("ROLLBACK").catch(() => {});
     logError("POST /transactions error", buildRouteErrorContext(req, err, { businessId }));
-    return handleTransactionMutationError(res, err, "Failed to save transaction.");
+    throw toTransactionMutationApiError(err, "Failed to save transaction.");
   } finally {
     if (client) client.release();
   }
-});
+}));
 
 router.get("/mapping-rules", asyncRoute(async (req, res) => {
   const businessId = await resolveBusinessIdForUser(req.user);
@@ -886,9 +899,9 @@ router.delete("/mapping-rules/:ruleId", asyncRoute(async (req, res) => {
   res.json({ deleted: true, id: req.params.ruleId });
 }));
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid transaction ID." });
+    throw new ApiError(400, "Invalid transaction ID.");
   }
   let businessId = null;
   try {
@@ -897,13 +910,15 @@ router.put("/:id", async (req, res) => {
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
     if (!validation.valid) {
-      return res.status(400).json({ error: validation.message });
+      throw new ApiError(400, validation.message);
     }
     if (
       hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
       !hasFeatureAccess(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS)
     ) {
-      return res.status(403).json(buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS));
+      throw new ApiError(403, "This feature requires a plan upgrade.", {
+        responseFields: buildFeatureRequiresPlanResponse(subscription, FEATURE_KEYS.EDGE_CASE_TOOLS)
+      });
     }
     const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
 
@@ -916,7 +931,7 @@ router.put("/:id", async (req, res) => {
       [req.params.id, businessId]
     );
     if (originalResult.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
     await assertUnlockedBusinessDates(businessId, originalResult.rows[0].date, date);
 
@@ -925,12 +940,12 @@ router.put("/:id", async (req, res) => {
       [account_id, businessId]
     );
     if (accountCheck.rowCount === 0) {
-      return res.status(400).json({ error: "account_id does not belong to your business" });
+      throw new ApiError(400, "account_id does not belong to your business");
     }
 
     const mappedCategoryId = await resolveCategoryId(businessId, category_id, type);
     if (!mappedCategoryId) {
-      return res.status(400).json({ error: "category_id is invalid" });
+      throw new ApiError(400, "category_id is invalid");
     }
 
     const storedDescription = buildStoredDescriptionColumns(description);
@@ -1009,7 +1024,7 @@ router.put("/:id", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
     const originalTxn = originalResult.rows[0];
     if (
@@ -1038,11 +1053,11 @@ router.put("/:id", async (req, res) => {
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     logError("PUT /transactions/:id error", buildRouteErrorContext(req, err, { businessId }));
-    return handleTransactionMutationError(res, err, "Failed to update transaction.");
+    throw toTransactionMutationApiError(err, "Failed to update transaction.");
   }
-});
+}));
 
-router.delete("/bulk-delete-all", async (req, res) => {
+router.delete("/bulk-delete-all", asyncRoute(async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const ownerCheck = await pool.query(
@@ -1050,11 +1065,11 @@ router.delete("/bulk-delete-all", async (req, res) => {
       [businessId, req.user.id]
     );
     if (!ownerCheck.rowCount) {
-      return res.status(403).json({ error: "Only the business owner can delete all transactions." });
+      throw new ApiError(403, "Only the business owner can delete all transactions.");
     }
     const confirm = String(req.body?.confirm || "").trim();
     if (confirm !== "DELETE") {
-      return res.status(400).json({ error: "Confirmation required. Send { confirm: 'DELETE' }." });
+      throw new ApiError(400, "Confirmation required. Send { confirm: 'DELETE' }.");
     }
     const rawAccountId = String(req.body?.accountId || "").trim();
     const accountId = rawAccountId && rawAccountId !== "ALL" ? rawAccountId : null;
@@ -1064,7 +1079,7 @@ router.delete("/bulk-delete-all", async (req, res) => {
         [accountId, businessId]
       );
       if (!accountCheck.rowCount) {
-        return res.status(404).json({ error: "Account not found for this business." });
+        throw new ApiError(404, "Account not found for this business.");
       }
     }
     const lockState = await loadAccountingLockState(pool, businessId);
@@ -1083,10 +1098,12 @@ router.delete("/bulk-delete-all", async (req, res) => {
         lockedTransactionParams
       );
       if (lockedTransaction.rowCount > 0) {
-        return res.status(409).json({
-          error: "Some transactions are in a locked accounting period and cannot be deleted.",
+        throw new ApiError(409, "Some transactions are in a locked accounting period and cannot be deleted.", {
           code: "ACCOUNTING_PERIOD_LOCKED",
-          locked_through_date: lockState.lockedThroughDate
+          responseFields: {
+            code: "ACCOUNTING_PERIOD_LOCKED",
+            locked_through_date: lockState.lockedThroughDate
+          }
         });
       }
     }
@@ -1121,13 +1138,16 @@ router.delete("/bulk-delete-all", async (req, res) => {
     res.json({ message: `Deleted ${result.rowCount} transaction(s).`, count: result.rowCount });
   } catch (err) {
     logError("DELETE /transactions/bulk-delete-all error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to delete transactions." });
+    if (err.status && err.status < 500) {
+      throw err;
+    }
+    throw new ApiError(500, "Failed to delete transactions.");
   }
-});
+}));
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid transaction ID." });
+    throw new ApiError(400, "Invalid transaction ID.");
   }
   let businessId = null;
   try {
@@ -1138,7 +1158,7 @@ router.delete("/:id", async (req, res) => {
     );
 
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
     await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
 
@@ -1151,7 +1171,7 @@ router.delete("/:id", async (req, res) => {
     });
 
     if (!archived) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
     void invalidateSnapshotsForBusiness({
       businessId,
@@ -1161,11 +1181,11 @@ router.delete("/:id", async (req, res) => {
     res.json({ message: "Transaction deleted." });
   } catch (err) {
     logError("DELETE /transactions/:id error", buildRouteErrorContext(req, err, { businessId }));
-    return handleTransactionMutationError(res, err, "Failed to delete transaction.");
+    throw toTransactionMutationApiError(err, "Failed to delete transaction.");
   }
-});
+}));
 
-router.post("/undo-delete", async (req, res) => {
+router.post("/undo-delete", asyncRoute(async (req, res) => {
   let businessId = null;
   try {
     businessId = await resolveBusinessIdForUser(req.user);
@@ -1183,7 +1203,7 @@ router.post("/undo-delete", async (req, res) => {
     );
 
     if (candidate.rowCount === 0) {
-      return res.status(404).json({ error: "No archived transaction is available to restore." });
+      throw new ApiError(404, "No archived transaction is available to restore.");
     }
 
     await assertUnlockedBusinessDates(businessId, candidate.rows[0].date);
@@ -1196,7 +1216,7 @@ router.post("/undo-delete", async (req, res) => {
     });
 
     if (!restored) {
-      return res.status(404).json({ error: "No archived transaction is available to restore." });
+      throw new ApiError(404, "No archived transaction is available to restore.");
     }
 
     const remainingUndoCount = await countRestorableArchivedTransactions({
@@ -1217,9 +1237,9 @@ router.post("/undo-delete", async (req, res) => {
     }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
   } catch (err) {
     logError("POST /transactions/undo-delete error", buildRouteErrorContext(req, err, { businessId }));
-    return handleTransactionMutationError(res, err, "Failed to restore transaction.");
+    throw toTransactionMutationApiError(err, "Failed to restore transaction.");
   }
-});
+}));
 
 router.get("/undo-delete-status", asyncRoute(async (req, res) => {
   const businessId = await resolveBusinessIdForUser(req.user);
@@ -1315,13 +1335,13 @@ router.get("/exchange-rate-reference", async (req, res) => {
   }
 });
 
-router.patch("/:id/review-status", async (req, res) => {
+router.patch("/:id/review-status", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid transaction ID." });
+    throw new ApiError(400, "Invalid transaction ID.");
   }
   const status = String(req.body?.review_status || "").trim().toLowerCase();
   if (!isTransactionReviewStatus(status)) {
-    return res.status(400).json({ error: `review_status must be one of ${transactionReviewStatusList()}` });
+    throw new ApiError(400, `review_status must be one of ${transactionReviewStatusList()}`);
   }
 
   let businessId = null;
@@ -1339,7 +1359,7 @@ router.patch("/:id/review-status", async (req, res) => {
       [req.params.id, businessId]
     );
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
     await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
 
@@ -1367,16 +1387,16 @@ router.patch("/:id/review-status", async (req, res) => {
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     logError("PATCH /transactions/:id/review-status error", buildRouteErrorContext(req, err, { businessId }));
-    return handleTransactionMutationError(res, err, "Failed to update review status.");
+    throw toTransactionMutationApiError(err, "Failed to update review status.");
   }
-});
+}));
 
-router.patch("/:id/cleared", async (req, res) => {
+router.patch("/:id/cleared", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid transaction ID." });
+    throw new ApiError(400, "Invalid transaction ID.");
   }
   if (typeof req.body?.cleared !== "boolean") {
-    return res.status(400).json({ error: "cleared must be true or false" });
+    throw new ApiError(400, "cleared must be true or false");
   }
 
   let businessId = null;
@@ -1388,7 +1408,7 @@ router.patch("/:id/cleared", async (req, res) => {
     );
 
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
 
     await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
@@ -1411,7 +1431,7 @@ router.patch("/:id/cleared", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
     void invalidateSnapshotsForBusiness({
       businessId,
@@ -1421,9 +1441,9 @@ router.patch("/:id/cleared", async (req, res) => {
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     logError("PATCH /transactions/:id/cleared error", buildRouteErrorContext(req, err, { businessId }));
-    return handleTransactionMutationError(res, err, "Failed to update cleared status.");
+    throw toTransactionMutationApiError(err, "Failed to update cleared status.");
   }
-});
+}));
 
 // receipt_status can never be set to 'attached' through this endpoint — that
 // value is only ever derived from an actual receipt file being on record
@@ -1432,9 +1452,9 @@ router.patch("/:id/cleared", async (req, res) => {
 // receipt is missing (with a reason) or not required (with a business
 // purpose), or resetting back to pending. It never touches `cleared`, amount,
 // category, or any other transaction field.
-router.patch("/:id/receipt-status", async (req, res) => {
+router.patch("/:id/receipt-status", asyncRoute(async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid transaction ID." });
+    throw new ApiError(400, "Invalid transaction ID.");
   }
 
   try {
@@ -1464,13 +1484,17 @@ router.patch("/:id/receipt-status", async (req, res) => {
       [req.params.id, businessId]
     );
     if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
     if (Number(existing.rows[0].receipt_count || 0) > 0) {
-      return res.status(409).json({
-        error: "This transaction already has a receipt file on record. Remove it before changing the receipt status manually.",
-        code: "receipt_status_conflict"
-      });
+      throw new ApiError(
+        409,
+        "This transaction already has a receipt file on record. Remove it before changing the receipt status manually.",
+        {
+          code: "receipt_status_conflict",
+          responseFields: { code: "receipt_status_conflict" }
+        }
+      );
     }
     await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
 
@@ -1514,7 +1538,7 @@ router.patch("/:id/receipt-status", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
+      throw new ApiError(404, "Transaction not found.");
     }
 
     void invalidateSnapshotsForBusiness({
@@ -1534,9 +1558,9 @@ router.patch("/:id/receipt-status", async (req, res) => {
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     logError("PATCH /transactions/:id/receipt-status error", buildRouteErrorContext(req, err));
-    return handleTransactionMutationError(res, err, "Failed to update receipt status.");
+    throw toTransactionMutationApiError(err, "Failed to update receipt status.");
   }
-});
+}));
 
 /* =========================================================
    CSV IMPORT  —  POST /transactions/import/csv
@@ -1557,9 +1581,9 @@ const csvUpload = multer({
   }
 });
 
-router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
+router.post("/import/csv", csvUpload.single("file"), asyncRoute(async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: "CSV file is required." });
+    throw new ApiError(400, "CSV file is required.");
   }
 
   let client = null;
@@ -1574,7 +1598,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 
     const accountId = String(req.body?.account_id || "").trim();
     if (!accountId || !UUID_REGEX.test(accountId)) {
-      return res.status(400).json({ error: "account_id is required and must be a valid UUID." });
+      throw new ApiError(400, "account_id is required and must be a valid UUID.");
     }
 
     const skipDuplicates = String(req.body?.skip_duplicates ?? "true").toLowerCase() !== "false";
@@ -1583,7 +1607,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     // Either bound may be empty; an empty bound means "no limit on that side".
     const dateRange = parseImportDateRange(req.body || {});
     if (dateRange.error) {
-      return res.status(400).json({ error: dateRange.error });
+      throw new ApiError(400, dateRange.error);
     }
     const filterStartDate = dateRange.startDate;
     const filterEndDate = dateRange.endDate;
@@ -1593,7 +1617,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       [accountId, businessId]
     );
     if (accountCheck.rowCount === 0) {
-      return res.status(400).json({ error: "account_id does not belong to your business." });
+      throw new ApiError(400, "account_id does not belong to your business.");
     }
 
     const { region, currency: fallbackCurrency } = await getBusinessRegionAndCurrency(businessId);
@@ -1606,20 +1630,20 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     const csvText = req.file.buffer.toString("utf-8").replace(/^\uFEFF/, "");
     const rows = parseCsv(csvText);
     if (rows.length === 0) {
-      return res.status(400).json({ error: "CSV file is empty or could not be parsed." });
+      throw new ApiError(400, "CSV file is empty or could not be parsed.");
     }
 
     const headers = Object.keys(rows[0]);
     const cols = detectColumns(headers);
 
     if (!cols.dateCol) {
-      return res.status(400).json({ error: "Could not detect a date column. Expected a column named 'date', 'transaction_date', or similar." });
+      throw new ApiError(400, "Could not detect a date column. Expected a column named 'date', 'transaction_date', or similar.");
     }
     if (!cols.descCol) {
-      return res.status(400).json({ error: "Could not detect a description column. Expected 'description', 'payee', 'memo', or similar." });
+      throw new ApiError(400, "Could not detect a description column. Expected 'description', 'payee', 'memo', or similar.");
     }
     if (!cols.amountCol && !cols.withdrawalCol && !cols.depositCol) {
-      return res.status(400).json({ error: "Could not detect an amount column. Expected 'amount', 'withdrawal', 'deposit', or similar." });
+      throw new ApiError(400, "Could not detect an amount column. Expected 'amount', 'withdrawal', 'deposit', or similar.");
     }
 
     async function getOrCreateCsvCategory(db, categoryCache, name, kind) {
@@ -1908,13 +1932,6 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     });
   } catch (err) {
     if (client) await client.query("ROLLBACK").catch(() => {});
-    if (err instanceof BasicPlanLimitError) {
-      return res.status(err.statusCode).json({
-        error: err.message,
-        code: err.code,
-        ...err.details
-      });
-    }
     if (businessId) {
       void sendBookkeepingActivityEmail({
         businessId,
@@ -1928,11 +1945,11 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       });
     }
     logError("POST /transactions/import/csv error", buildRouteErrorContext(req, err, { businessId }));
-    res.status(500).json({ error: "CSV import failed." });
+    throw toTransactionMutationApiError(err, "CSV import failed.");
   } finally {
     if (client) client.release();
   }
-});
+}));
 
 /* =========================================================
    IMPORT BATCH HISTORY  —  GET /transactions/import/history
@@ -1946,20 +1963,20 @@ router.get("/import/history", asyncRoute(async (req, res) => {
 /* =========================================================
    UNDO IMPORT BATCH  —  POST /transactions/import/:id/revert
    ========================================================= */
-router.post("/import/:id/revert", async (req, res) => {
+router.post("/import/:id/revert", asyncRoute(async (req, res) => {
   const batchId = String(req.params.id || "").trim();
   if (!UUID_REGEX.test(batchId)) {
-    return res.status(400).json({ error: "Invalid import batch id." });
+    throw new ApiError(400, "Invalid import batch id.");
   }
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const batch = await getImportBatch(pool, businessId, batchId);
     if (!batch) {
-      return res.status(404).json({ error: "Import batch not found." });
+      throw new ApiError(404, "Import batch not found.");
     }
     if (batch.status === "reverted") {
-      return res.status(409).json({ error: "This import batch has already been reverted." });
+      throw new ApiError(409, "This import batch has already been reverted.");
     }
 
     const lockState = await loadAccountingLockState(pool, businessId);
@@ -1977,12 +1994,15 @@ router.post("/import/:id/revert", async (req, res) => {
     });
   } catch (err) {
     if (err && err.code === "accounting_period_locked") {
-      return res.status(409).json({ error: err.message, code: err.code });
+      throw new ApiError(409, err.message, {
+        code: err.code,
+        responseFields: { code: err.code }
+      });
     }
     logError("POST /transactions/import/:id/revert error", buildRouteErrorContext(req, err));
-    res.status(500).json({ error: "Failed to revert import batch." });
+    throw new ApiError(500, "Failed to revert import batch.");
   }
-});
+}));
 
 /* =========================================================
    TAX SUMMARIES  —  GET /transactions/tax-summary/payers

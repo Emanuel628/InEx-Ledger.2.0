@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useState } from 'react'
 import {
   Archive,
   ChevronDown,
@@ -18,12 +18,10 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import useBodyModalLock from '../hooks/useBodyModalLock'
+import useFileAttachments from '../hooks/useFileAttachments'
 import useMessagesPageData, { type ComposeMessagePayload, type MessagesLaneLabel } from '../hooks/useMessagesPageData'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import type { MessageRecord, MessageType } from '../lib/messagesApi'
-
-const MAX_REPLY_ATTACHMENT_BYTES = 10 * 1024 * 1024
-const MAX_MESSAGE_ATTACHMENTS = 5
 
 const laneIcons: Record<MessagesLaneLabel, LucideIcon> = {
   Inbox: Mail,
@@ -348,31 +346,18 @@ function MessageDetailModal({
   onReply: (thread: MessageRecord, body: string, attachments: File[]) => Promise<void>
 }) {
   const [replyBody, setReplyBody] = useState('')
-  const [attachments, setAttachments] = useState<File[]>([])
-  const [attachmentError, setAttachmentError] = useState('')
   const [sending, setSending] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const {
+    attachments,
+    attachmentError,
+    fileInputRef,
+    handleAttachmentChange,
+    removeAttachment,
+    clearAttachments,
+    maxAttachments,
+    accept,
+  } = useFileAttachments()
   const visibleMessages = messages.length ? messages : [thread]
-
-  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || [])
-    event.target.value = ''
-    if (!files.length) return
-    if (attachments.length + files.length > MAX_MESSAGE_ATTACHMENTS) {
-      setAttachmentError(`You can attach up to ${MAX_MESSAGE_ATTACHMENTS} files.`)
-      return
-    }
-    if (files.some((file) => file.size > MAX_REPLY_ATTACHMENT_BYTES)) {
-      setAttachmentError('Each attachment must be 10 MB or smaller.')
-      return
-    }
-    setAttachmentError('')
-    setAttachments((current) => [...current, ...files])
-  }
-
-  function removeAttachment(index: number) {
-    setAttachments((current) => current.filter((_, fileIndex) => fileIndex !== index))
-  }
 
   async function submitReply() {
     if (!replyBody.trim()) return
@@ -380,7 +365,7 @@ function MessageDetailModal({
     try {
       await onReply(thread, replyBody, attachments)
       setReplyBody('')
-      setAttachments([])
+      clearAttachments()
     } finally {
       setSending(false)
     }
@@ -454,11 +439,11 @@ function MessageDetailModal({
               type="file"
               multiple
               className="visually-hidden"
-              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.txt,.csv,.doc,.docx,.xls,.xlsx"
+              accept={accept}
               onChange={handleAttachmentChange}
             />
             <div className="message-reply-actions">
-              <button className="secondary-button" type="button" disabled={attachments.length >= MAX_MESSAGE_ATTACHMENTS} onClick={() => fileInputRef.current?.click()}>
+              <button className="secondary-button" type="button" disabled={attachments.length >= maxAttachments} onClick={() => fileInputRef.current?.click()}>
                 <Paperclip size={17} />
                 {attachments.length ? 'Add another attachment' : 'Attach'}
               </button>
@@ -487,30 +472,16 @@ function ComposeModal({
   const [cc, setCc] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
-  const [attachments, setAttachments] = useState<File[]>([])
-  const [attachmentError, setAttachmentError] = useState('')
   const [sending, setSending] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-
-  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || [])
-    event.target.value = ''
-    if (!files.length) return
-    if (attachments.length + files.length > MAX_MESSAGE_ATTACHMENTS) {
-      setAttachmentError(`You can attach up to ${MAX_MESSAGE_ATTACHMENTS} files.`)
-      return
-    }
-    if (files.some((file) => file.size > MAX_REPLY_ATTACHMENT_BYTES)) {
-      setAttachmentError('Each attachment must be 10 MB or smaller.')
-      return
-    }
-    setAttachmentError('')
-    setAttachments((current) => [...current, ...files])
-  }
-
-  function removeAttachment(index: number) {
-    setAttachments((current) => current.filter((_, fileIndex) => fileIndex !== index))
-  }
+  const {
+    attachments,
+    attachmentError,
+    fileInputRef,
+    handleAttachmentChange,
+    removeAttachment,
+    maxAttachments,
+    accept,
+  } = useFileAttachments()
 
   async function submitForm() {
     setSending(true)
@@ -598,13 +569,13 @@ function ComposeModal({
             type="file"
             multiple
             className="visually-hidden"
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.txt,.csv,.doc,.docx,.xls,.xlsx"
+            accept={accept}
             onChange={handleAttachmentChange}
           />
         </form>
 
         <div className="message-modal-actions">
-          <button className="secondary-button compose-attach-button" type="button" disabled={attachments.length >= MAX_MESSAGE_ATTACHMENTS} onClick={() => fileInputRef.current?.click()}>
+          <button className="secondary-button compose-attach-button" type="button" disabled={attachments.length >= maxAttachments} onClick={() => fileInputRef.current?.click()}>
             <Paperclip size={17} />
             {attachments.length ? 'Add another attachment' : 'Attach'}
           </button>

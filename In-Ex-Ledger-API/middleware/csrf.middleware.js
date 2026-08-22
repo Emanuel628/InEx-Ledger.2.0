@@ -3,6 +3,7 @@ const path = require("path");
 
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "x-csrf-token";
+const CSRF_ERROR_CODE = "csrf_invalid";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const CSRF_COOKIE_OPTIONS = {
   httpOnly: false,
@@ -98,7 +99,10 @@ function requireCsrfProtection(req, res, next) {
     !isValidCsrfToken(headerToken) ||
     !timingSafeEqualString(cookieToken, headerToken)
   ) {
-    return res.status(403).json({ error: "CSRF token missing or invalid." });
+    return res.status(403).json({
+      error: "CSRF token missing or invalid.",
+      code: CSRF_ERROR_CODE
+    });
   }
 
   return next();
@@ -107,6 +111,7 @@ function requireCsrfProtection(req, res, next) {
 module.exports = {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
+  CSRF_ERROR_CODE,
   generateCsrfToken,
   isValidCsrfToken,
   ensureCsrfCookie,

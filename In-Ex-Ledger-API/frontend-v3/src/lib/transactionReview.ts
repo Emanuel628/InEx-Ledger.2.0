@@ -3,7 +3,7 @@ import type { Transaction } from './transactionsApi'
 export function reviewLabelsFor(transaction: Transaction) {
   return normalizeReviewLabels(transaction.reviewIssues.flatMap((issue) => {
     const directLabels = issue.issueLabels?.map(reviewText).filter(Boolean) || []
-    const entryLabels = issue.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode)).filter(Boolean) || []
+    const entryLabels = issue.issueEntries?.map((entry) => reviewLabelForIssueEntry(entry)).filter(Boolean) || []
     const summaries = [issue.supportSummary, issue.reviewNotes].map(reviewText).filter(Boolean)
 
     return [...directLabels, ...entryLabels, ...summaries]
@@ -47,6 +47,10 @@ export function hasReviewFor(labels: string[], patterns: RegExp[]) {
 }
 
 function canonicalReviewLabel(label: string) {
+  const structuredLabel = canonicalReviewLabelForIssueCode(label)
+  if (structuredLabel) {
+    return structuredLabel
+  }
   if (/description|merchant|vendor|memo|payer/i.test(label) && /missing|required|needed|blank|empty|add/i.test(label)) {
     return 'Description is missing'
   }
@@ -57,6 +61,23 @@ function canonicalReviewLabel(label: string) {
     return 'Tax mapping needed'
   }
   return label
+}
+
+function reviewLabelForIssueEntry(entry: { issueCode?: string; label?: string }) {
+  return canonicalReviewLabelForIssueCode(entry.issueCode) || reviewText(entry.label) || reviewText(entry.issueCode)
+}
+
+function canonicalReviewLabelForIssueCode(issueCode: unknown) {
+  switch (String(issueCode || '').trim().toLowerCase()) {
+    case 'needs_receipt_support':
+      return 'Receipt or support missing'
+    case 'needs_category':
+      return 'Tax mapping needed'
+    case 'final_confirmation_needed':
+      return 'Final confirmation needed'
+    default:
+      return ''
+  }
 }
 
 function reviewLabelKey(label: string) {

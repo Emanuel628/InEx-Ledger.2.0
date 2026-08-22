@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ROUTE_PATH = require.resolve("../routes/transactions.routes.js");
 
@@ -139,6 +140,7 @@ function loadRouter({ effectiveTier = "free" } = {}) {
     const app = express();
     app.use(express.json());
     app.use("/api/transactions", router);
+    attachCentralErrorHandler(app);
     return {
       app,
       cleanup() {

@@ -53,6 +53,23 @@ const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
   ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx"
 ]);
 
+function serializeInvoice(row) {
+  if (!row) {
+    return row;
+  }
+
+  const dueDate = String(row.due_date || "").slice(0, 10);
+  const isOverdue =
+    String(row.status || "").toLowerCase() === "sent" &&
+    dueDate &&
+    dueDate < new Date().toISOString().slice(0, 10);
+
+  return {
+    ...row,
+    status: isOverdue ? "overdue" : row.status
+  };
+}
+
 function attachmentFileFilter(_req, file, cb) {
   const ext = path.extname(String(file?.originalname || "")).toLowerCase();
   const mime = String(file?.mimetype || "").toLowerCase();
@@ -227,7 +244,7 @@ router.get("/", asyncRoute(async (req, res) => {
     params
   );
 
-  res.json(result.rows);
+  res.json(result.rows.map(serializeInvoice));
 }));
 
 /* ── POST /api/invoices-v1 ── create invoice */
@@ -276,7 +293,7 @@ router.post("/", asyncRoute(async (req, res) => {
     throw new ApiError(409, "Could not generate a unique invoice number. Please try again.");
   }
 
-  res.status(201).json(createdInvoice);
+  res.status(201).json(serializeInvoice(createdInvoice));
 }));
 
 /* ── GET /api/invoices-v1/:id ── get single invoice */
@@ -292,7 +309,7 @@ router.get("/:id", asyncRoute(async (req, res) => {
   );
   if (!result.rowCount) throw new ApiError(404, "Invoice not found.");
 
-  res.json(result.rows[0]);
+  res.json(serializeInvoice(result.rows[0]));
 }));
 
 /* ── PUT /api/invoices-v1/:id ── update invoice */
@@ -332,7 +349,7 @@ router.put("/:id", asyncRoute(async (req, res) => {
      req.params.id, businessId]
   );
 
-  res.json(result.rows[0]);
+  res.json(serializeInvoice(result.rows[0]));
 }));
 
 /* ── PATCH /api/invoices-v1/:id/status ── mark sent/paid/void */
@@ -352,7 +369,7 @@ router.patch("/:id/status", asyncRoute(async (req, res) => {
   );
   if (!result.rowCount) throw new ApiError(404, "Invoice not found.");
 
-  res.json(result.rows[0]);
+  res.json(serializeInvoice(result.rows[0]));
 }));
 
 /* ── POST /api/invoices-v1/:id/send ── email the invoice to the customer */

@@ -775,7 +775,9 @@ router.get("/", asyncRoute(async (req, res) => {
 router.post("/provision-add-on", asyncRoute(async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) {
-    return res.status(400).json({ success: false, error: "Business name is required." });
+    throw new ApiError(400, "Business name is required.", {
+      responseFields: { success: false }
+    });
   }
 
   const client = await pool.connect();
@@ -791,9 +793,8 @@ router.post("/provision-add-on", asyncRoute(async (req, res) => {
       (subscription?.isPaid || subscription?.isTrialing);
 
     if (!hasActiveProAccess) {
-      return res.status(403).json({
-        success: false,
-        error: "Adding a business requires an active Pro subscription."
+      throw new ApiError(403, "Adding a business requires an active Pro subscription.", {
+        responseFields: { success: false }
       });
     }
 
@@ -863,8 +864,11 @@ router.post("/provision-add-on", asyncRoute(async (req, res) => {
         });
       }
     }
+    if (err.status && err.status < 500) {
+      throw err;
+    }
     logError("POST /businesses/provision-add-on error:", err.message);
-    res.status(500).json({ success: false, error: "Failed to add business." });
+    throw new ApiError(500, "Failed to add business.");
   } finally {
     client.release();
   }
@@ -919,12 +923,14 @@ router.post("/", asyncRoute(async (req, res) => {
 
     if (businessCount >= maxBusinessesAllowed) {
       await client.query("ROLLBACK");
-      return res.status(402).json({
-        error: buildBusinessLimitError(subscription, maxBusinessesAllowed),
+      throw new ApiError(402, buildBusinessLimitError(subscription, maxBusinessesAllowed), {
         code: "additional_business_payment_required",
-        max_businesses_allowed: maxBusinessesAllowed,
-        current_business_count: businessCount,
-        subscription
+        responseFields: {
+          code: "additional_business_payment_required",
+          max_businesses_allowed: maxBusinessesAllowed,
+          current_business_count: businessCount,
+          subscription
+        }
       });
     }
 
@@ -1022,7 +1028,7 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, asyncRoute(asy
   const businessId = req.params.id;
 
   if (!password) {
-    return res.status(400).json({ error: "Password is required to delete a business." });
+    throw new ApiError(400, "Password is required to delete a business.");
   }
 
   try {
@@ -1032,7 +1038,7 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, asyncRoute(asy
       [businessId, req.user.id]
     );
     if (!ownerCheck.rowCount) {
-      return res.status(404).json({ error: "Business not found." });
+      throw new ApiError(404, "Business not found.");
     }
     const businessName = ownerCheck.rows[0]?.name || "Business";
 
@@ -1050,9 +1056,7 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, asyncRoute(asy
     );
     const currentBusinessCount = Number(countCheck.rows[0]?.count || 0);
     if (currentBusinessCount <= 1) {
-      return res.status(409).json({
-        error: "You cannot delete your only business account. Delete your account instead."
-      });
+      throw new ApiError(409, "You cannot delete your only business account. Delete your account instead.");
     }
     const nextBusinessCount = Math.max(currentBusinessCount - 1, 1);
     const nextAdditionalBusinesses = Math.max(nextBusinessCount - 1, 0);
@@ -1076,11 +1080,11 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, asyncRoute(asy
       [req.user.id]
     );
     if (!userRow.rowCount) {
-      return res.status(404).json({ error: "User not found." });
+      throw new ApiError(404, "User not found.");
     }
     const { match } = await verifyPassword(password, userRow.rows[0].password_hash);
     if (!match) {
-      return res.status(401).json({ error: "Incorrect password." });
+      throw new ApiError(401, "Incorrect password.");
     }
 
     // Delete in a transaction. Must clear recurring_transactions before accounts/categories
@@ -1243,7 +1247,10 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, asyncRoute(asy
     });
   } catch (err) {
     logError("DELETE /businesses/:id error:", err.message);
-    res.status(500).json({ error: "Failed to delete business." });
+    if (err.status && err.status < 500) {
+      throw err;
+    }
+    throw new ApiError(500, "Failed to delete business.");
   }
 }));
 

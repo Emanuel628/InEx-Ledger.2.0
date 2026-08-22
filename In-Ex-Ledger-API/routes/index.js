@@ -7,9 +7,8 @@ const {
 } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
   getSubscriptionSnapshotForBusiness,
-  PLAN_PRO,
-  PLAN_BUSINESS,
 } = require("../services/subscriptionService.js");
+const { PLAN_CODES } = require("../config/planCatalog.js");
 const {
   requireV2BusinessEnabled,
   requireV2Entitlement,
@@ -45,7 +44,7 @@ router.get(
   asyncRoute(async (req, res, next) => {
     try {
       const tier = await getEffectiveTierForRequest(req);
-      if (tier !== PLAN_PRO && tier !== PLAN_BUSINESS) {
+      if (tier !== PLAN_CODES.PRO && tier !== PLAN_CODES.BUSINESS) {
         return res.json([]);
       }
       return next();

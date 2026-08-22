@@ -14,15 +14,8 @@
  *     is ever called.
  *   - create()/update() still succeed for valid input and pass sane values
  *     through to pool.query.
- *   - delete* remain hard deletes (`DELETE ... RETURNING id`) -- the
- *     `vendors`/`customers`/`invoices`/`bills` tables have no
- *     `deleted_at`/audit columns (see db/migrations/20260419_create_v2_
- *     business_tables.sql), so soft-delete parity with `transactions`
- *     (services/transactionAuditService.js) was intentionally left as a
- *     flagged follow-up rather than an invented schema change in this pass.
- *     These tests pin that decision down: if a future change adds
- *     deleted_at columns and switches these to soft delete, they should be
- *     updated (not silently left asserting hard-delete SQL).
+ *   - delete* soft-delete records with actor metadata instead of hard
+ *     deleting financial rows and cascading payment history.
  */
 
 const test = require("node:test");
@@ -112,19 +105,24 @@ test("vendorService.createVendor/updateVendor succeed for valid input", async ()
   assert.equal(capturedQueries.length, 2);
 });
 
-test("vendorService.deleteVendor still issues a hard DELETE (no soft-delete columns exist)", async () => {
+test("vendorService.deleteVendor soft-deletes with actor metadata", async () => {
   const { service, capturedQueries } = loadServiceWithFakePool(
     "../services/vendorService.js",
-    (sql) => {
-      assert.match(sql, /^\s*DELETE FROM vendors/i);
-      assert.doesNotMatch(sql, /deleted_at/i);
+    (sql, params) => {
+      assert.match(sql, /^\s*UPDATE vendors/i);
+      assert.match(sql, /deleted_at = now\(\)/i);
+      assert.match(sql, /deleted_by_id = \$3/i);
+      assert.match(sql, /deleted_reason = \$4/i);
+      assert.match(sql, /deleted_at IS NULL/i);
+      assert.equal(params[2], "user-1");
+      assert.equal(params[3], "user_deleted");
       return { rows: [{ id: "vendor-1" }], rowCount: 1 };
     }
   );
-  const deleted = await service.deleteVendor("biz-1", "vendor-1");
+  const deleted = await service.deleteVendor("biz-1", "vendor-1", { userId: "user-1" });
   assert.equal(deleted, true);
   assert.equal(capturedQueries.length, 1);
-  assert.match(capturedQueries[0].sql, /DELETE/i);
+  assert.doesNotMatch(capturedQueries[0].sql, /\bDELETE\b/i);
 });
 
 // ---------------------------------------------------------------------------
@@ -151,15 +149,20 @@ test("customerService.createCustomer succeeds for valid input", async () => {
   assert.deepEqual(created, row);
 });
 
-test("customerService.deleteCustomer still issues a hard DELETE (no soft-delete columns exist)", async () => {
+test("customerService.deleteCustomer soft-deletes with actor metadata", async () => {
   const { service } = loadServiceWithFakePool(
     "../services/customerService.js",
-    (sql) => {
-      assert.match(sql, /^\s*DELETE FROM customers/i);
+    (sql, params) => {
+      assert.match(sql, /^\s*UPDATE customers/i);
+      assert.match(sql, /deleted_at = now\(\)/i);
+      assert.match(sql, /deleted_by_id = \$3/i);
+      assert.match(sql, /deleted_reason = \$4/i);
+      assert.match(sql, /deleted_at IS NULL/i);
+      assert.equal(params[2], "user-1");
       return { rows: [{ id: "cust-1" }], rowCount: 1 };
     }
   );
-  assert.equal(await service.deleteCustomer("biz-1", "cust-1"), true);
+  assert.equal(await service.deleteCustomer("biz-1", "cust-1", { userId: "user-1" }), true);
 });
 
 // ---------------------------------------------------------------------------
@@ -226,15 +229,20 @@ test("invoiceService.createInvoice/updateInvoice succeed for valid input", async
   assert.equal(capturedQueries.length, 2);
 });
 
-test("invoiceService.deleteInvoice still issues a hard DELETE (no soft-delete columns exist)", async () => {
+test("invoiceService.deleteInvoice soft-deletes without cascading payment history", async () => {
   const { service } = loadServiceWithFakePool(
     "../services/invoiceService.js",
-    (sql) => {
-      assert.match(sql, /^\s*DELETE FROM invoices/i);
+    (sql, params) => {
+      assert.match(sql, /^\s*UPDATE invoices/i);
+      assert.match(sql, /deleted_at = now\(\)/i);
+      assert.match(sql, /deleted_by_id = \$3/i);
+      assert.match(sql, /deleted_reason = \$4/i);
+      assert.match(sql, /deleted_at IS NULL/i);
+      assert.equal(params[2], "user-1");
       return { rows: [{ id: "inv-1" }], rowCount: 1 };
     }
   );
-  assert.equal(await service.deleteInvoice("biz-1", "inv-1"), true);
+  assert.equal(await service.deleteInvoice("biz-1", "inv-1", { userId: "user-1" }), true);
 });
 
 // ---------------------------------------------------------------------------
@@ -291,13 +299,33 @@ test("billService.createBill/updateBill succeed for valid input", async () => {
   assert.equal(capturedQueries.length, 2);
 });
 
-test("billService.deleteBill still issues a hard DELETE (no soft-delete columns exist)", async () => {
+test("billService.deleteBill soft-deletes without cascading payment history", async () => {
   const { service } = loadServiceWithFakePool(
     "../services/billService.js",
-    (sql) => {
-      assert.match(sql, /^\s*DELETE FROM bills/i);
+    (sql, params) => {
+      assert.match(sql, /^\s*UPDATE bills/i);
+      assert.match(sql, /deleted_at = now\(\)/i);
+      assert.match(sql, /deleted_by_id = \$3/i);
+      assert.match(sql, /deleted_reason = \$4/i);
+      assert.match(sql, /deleted_at IS NULL/i);
+      assert.equal(params[2], "user-1");
       return { rows: [{ id: "bill-1" }], rowCount: 1 };
     }
   );
-  assert.equal(await service.deleteBill("biz-1", "bill-1"), true);
+  assert.equal(await service.deleteBill("biz-1", "bill-1", { userId: "user-1" }), true);
+});
+
+test("V2 business services filter soft-deleted rows from list/get/update queries", () => {
+  for (const relativePath of [
+    "../services/vendorService.js",
+    "../services/customerService.js",
+    "../services/invoiceService.js",
+    "../services/billService.js"
+  ]) {
+    const source = require("node:fs").readFileSync(require.resolve(relativePath), "utf8");
+    assert.match(source, /list\w+\(businessId\)[\s\S]*deleted_at IS NULL/);
+    assert.match(source, /get\w+\(businessId,[\s\S]*deleted_at IS NULL/);
+    assert.match(source, /update\w+\(businessId,[\s\S]*deleted_at IS NULL RETURNING \*/);
+    assert.doesNotMatch(source, /\bDELETE FROM (vendors|customers|invoices|bills)\b/i);
+  }
 });

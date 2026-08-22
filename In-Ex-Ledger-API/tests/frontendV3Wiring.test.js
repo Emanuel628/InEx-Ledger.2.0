@@ -200,7 +200,7 @@ test("v3 API client preserves multipart bodies and retries stale CSRF once", asy
     if (urlString === "/api/upload") {
       const attempt = calls.filter((call) => call.url === "/api/upload").length;
       if (attempt === 1) {
-        return new Response(JSON.stringify({ error: "CSRF token missing or invalid." }), { status: 403 });
+        return new Response(JSON.stringify({ error: "Session write token expired.", code: "csrf_invalid" }), { status: 403 });
       }
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
@@ -227,6 +227,23 @@ test("v3 API client preserves multipart bodies and retries stale CSRF once", asy
     false,
     "FormData bodies must not get an explicit Content-Type -- the browser needs to set the multipart boundary itself"
   );
+});
+
+test("v3 API client uses a machine-readable CSRF code before the legacy message fallback", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "lib", "apiClient.ts"), "utf8");
+
+  assert.match(source, /data\.code === 'csrf_invalid'/);
+  assert.match(source, /data\.error === 'CSRF token missing or invalid\.'/);
+  assert.doesNotMatch(source, /return\s+data\.error === 'CSRF token missing or invalid\.'/);
+});
+
+test("v3 API client keeps CSRF and auth retry sequencing in one helper", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "lib", "apiClient.ts"), "utf8");
+
+  assert.match(source, /async function fetchWithAuthRetry\(url: string, init: RequestInit = \{\}\)/);
+  assert.equal((source.match(/fetchWithAuthRetry\(url, init\)/g) || []).length, 2);
+  assert.equal((source.match(/await refreshCsrfToken\(\)/g) || []).length, 1);
+  assert.equal((source.match(/await refreshAccessToken\(\)/g) || []).length, 1);
 });
 
 test("v3 app routes use bare canonical paths and browser back drives page state", () => {
@@ -380,6 +397,8 @@ test("v3 transactions page data orchestration stays in its hook", () => {
   assert.match(hookSource, /loadTransactionUndoStatus/);
   assert.match(hookSource, /loadAccountingLock\(\)\.catch\(\(\) => null\)/);
   assert.match(hookSource, /TRANSACTION_PAGE_SIZE_KEY/);
+  assert.match(hookSource, /const refreshRequestSeq = useRef\(0\)/);
+  assert.match(hookSource, /requestId !== refreshRequestSeq\.current/);
 });
 
 test("v3 messages page data orchestration stays in its hook", () => {
@@ -406,6 +425,10 @@ test("v3 messages page data orchestration stays in its hook", () => {
   }
   assert.match(hookSource, /export type MessagesLaneLabel/);
   assert.match(hookSource, /export type ComposeMessagePayload/);
+  assert.match(hookSource, /const refreshRequestSeq = useRef\(0\)/);
+  assert.match(hookSource, /const threadRequestSeq = useRef\(0\)/);
+  assert.match(hookSource, /requestId !== refreshRequestSeq\.current/);
+  assert.match(hookSource, /requestId !== threadRequestSeq\.current/);
 });
 
 test("v3 frontend dependencies are pinned", () => {
@@ -544,9 +567,17 @@ test("v3 money formatters use the active business currency on app pages", () => 
   // RecurringTemplatesWorkflow.tsx's hardcoded 'USD' ship undetected. Both
   // are now sourced from one shared module, lib/money.ts.
   const moneyLibSource = fs.readFileSync(path.join(frontendRoot, "lib", "money.ts"), "utf8");
-  assert.match(moneyLibSource, /window\.__LUNA_ME__\?\.business\?\.currency/, "the real active-currency source of truth must live in lib/money.ts");
+  const appSource = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
+  assert.match(moneyLibSource, /export function setActiveCurrency/);
   assert.match(moneyLibSource, /export function getActiveCurrency/);
   assert.match(moneyLibSource, /export function formatMoney/);
+  assert.doesNotMatch(`${moneyLibSource}\n${appSource}`, /__LUNA_ME__/);
+  assert.match(appSource, /setActiveCurrency\(authUser\?\.business\?\.currency\)/);
+
+  const moneyLib = loadLibModule(path.join("lib", "money.ts"));
+  moneyLib.setActiveCurrency("eur");
+  assert.equal(moneyLib.getActiveCurrency(), "EUR", "active non-CAD business currencies must not be downgraded to USD");
+  assert.match(moneyLib.formatMoney(1234), /€/, "default money formatting must use the active business currency");
 
   for (const page of ["Transactions.tsx", "Analytics.tsx", "Mileage.tsx", "Invoices.tsx", "Exports.tsx"]) {
     const source = fs.readFileSync(path.join(frontendRoot, "pages", page), "utf8");
@@ -560,11 +591,118 @@ test("v3 money formatters use the active business currency on app pages", () => 
 
   const invoicesApiSource = fs.readFileSync(path.join(frontendRoot, "lib", "invoicesApi.ts"), "utf8");
   const invoicesSource = fs.readFileSync(path.join(frontendRoot, "pages", "Invoices.tsx"), "utf8");
+  const invoicesApi = loadLibModule(path.join("lib", "invoicesApi.ts"), {
+    require(specifier) {
+      if (specifier === "./apiClient") {
+        return { apiRequest: async () => { throw new Error("apiRequest should not be called"); } };
+      }
+      if (specifier === "./money") {
+        return moneyLib;
+      }
+      throw new Error(`Unexpected require('${specifier}')`);
+    }
+  });
 
   assert.match(invoicesApiSource, /blankInvoiceDraft\(currency = 'USD'\)/);
-  assert.match(invoicesApiSource, /currency\.toUpperCase\(\) === 'CAD' \? 'CAD' : 'USD'/);
+  assert.doesNotMatch(invoicesApiSource, /currency\.toUpperCase\(\) === 'CAD' \? 'CAD' : 'USD'/);
+  assert.equal(invoicesApi.blankInvoiceDraft("EUR").currency, "EUR", "new invoice drafts must preserve supported non-CAD currencies");
+  const mapStatusMatch = invoicesApiSource.match(/function mapStatus[\s\S]*?\n}/);
+  assert.ok(mapStatusMatch, "invoicesApi.ts should define mapStatus");
+  assert.match(mapStatusMatch[0], /normalized === 'overdue'/);
+  assert.doesNotMatch(mapStatusMatch[0], /new Date\(/);
+  assert.doesNotMatch(mapStatusMatch[0], /dueDate|due_date/);
   assert.match(invoicesSource, /blankInvoiceDraft\(currency\)/);
   assert.doesNotMatch(invoicesSource, /function formatMoney\(value: number, currency = 'USD'\)/);
+});
+
+test("v3 attachment pickers share one hook and one limit contract", () => {
+  const hookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useFileAttachments.ts"), "utf8");
+  const messagesSource = fs.readFileSync(path.join(frontendRoot, "pages", "Messages.tsx"), "utf8");
+  const invoicesSource = fs.readFileSync(path.join(frontendRoot, "pages", "Invoices.tsx"), "utf8");
+
+  assert.match(hookSource, /export const MAX_FILE_ATTACHMENT_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(hookSource, /export const MAX_FILE_ATTACHMENTS = 5/);
+  assert.match(messagesSource, /import useFileAttachments from '\.\.\/hooks\/useFileAttachments'/);
+  assert.match(invoicesSource, /import useFileAttachments from '\.\.\/hooks\/useFileAttachments'/);
+  assert.equal((messagesSource.match(/useFileAttachments\(\)/g) || []).length, 2);
+  assert.equal((invoicesSource.match(/useFileAttachments\(\)/g) || []).length, 1);
+  assert.doesNotMatch(`${messagesSource}\n${invoicesSource}`, /MAX_(?:REPLY|MESSAGE|INVOICE)_ATTACH/);
+  assert.doesNotMatch(`${messagesSource}\n${invoicesSource}`, /10 \* 1024 \* 1024/);
+});
+
+test("v3 shared utility modules replace page-local CSV, download, pagination, and Canada helpers", () => {
+  const pages = {
+    Subscription: fs.readFileSync(path.join(frontendRoot, "pages", "Subscription.tsx"), "utf8"),
+    Analytics: fs.readFileSync(path.join(frontendRoot, "pages", "Analytics.tsx"), "utf8"),
+    Transactions: fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8"),
+    Mileage: fs.readFileSync(path.join(frontendRoot, "pages", "Mileage.tsx"), "utf8"),
+    Invoices: fs.readFileSync(path.join(frontendRoot, "pages", "Invoices.tsx"), "utf8"),
+    AppShell: fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8")
+  };
+
+  assert.doesNotMatch(pages.Subscription, /function csvCell/);
+  assert.doesNotMatch(pages.Analytics, /function csvCell/);
+  assert.match(pages.Subscription, /from '\.\.\/lib\/browserDownload'/);
+  assert.match(pages.Analytics, /from '\.\.\/lib\/browserDownload'/);
+  assert.match(pages.Transactions, /from '\.\.\/lib\/pagination'/);
+  assert.match(pages.Mileage, /from '\.\.\/lib\/pagination'/);
+  assert.match(pages.Invoices, /from '\.\.\/lib\/pagination'/);
+  assert.doesNotMatch(pages.Transactions, /function getPaginationPages/);
+  assert.doesNotMatch(pages.Mileage, /function getPaginationPages/);
+  assert.doesNotMatch(pages.Invoices, /function getPaginationPages/);
+  assert.match(pages.Mileage, /from '\.\.\/lib\/businessLocale'/);
+  assert.match(pages.AppShell, /from '\.\.\/lib\/businessLocale'/);
+  assert.doesNotMatch(pages.Mileage, /function isCanadaBusiness/);
+  assert.doesNotMatch(pages.AppShell, /function isCanadaBusiness/);
+});
+
+test("browser download, pagination, and business locale helpers preserve behavior", () => {
+  const clickedDownloads = [];
+  const browserDownload = loadLibModule(path.join("lib", "browserDownload.ts"), {
+    Blob,
+    URL: {
+      createObjectURL(blob) {
+        assert.ok(blob instanceof Blob);
+        return "blob:test-download";
+      },
+      revokeObjectURL(url) {
+        assert.equal(url, "blob:test-download");
+      }
+    },
+    document: {
+      body: {
+        appendChild(anchor) {
+          anchor.appended = true;
+        }
+      },
+      createElement(tagName) {
+        assert.equal(tagName, "a");
+        return {
+          href: "",
+          download: "",
+          click() {
+            clickedDownloads.push({ href: this.href, download: this.download, appended: this.appended === true });
+          },
+          remove() {
+            this.removed = true;
+          }
+        };
+      }
+    }
+  });
+  const pagination = loadLibModule(path.join("lib", "pagination.ts"));
+  const businessLocale = loadLibModule(path.join("lib", "businessLocale.ts"));
+
+  assert.equal(
+    browserDownload.buildCsv([["plain", "has,comma"], ["has\"quote", "line\nbreak"]]),
+    'plain,"has,comma"\n"has""quote","line\nbreak"'
+  );
+  browserDownload.downloadCsv([["Name"], ["InEx"]], "report.csv");
+  assert.deepEqual(clickedDownloads, [{ href: "blob:test-download", download: "report.csv", appended: true }]);
+  assert.deepEqual(Array.from(pagination.getPaginationPages(5, 10)), [1, "ellipsis", 4, 5, 6, "ellipsis", 10]);
+  assert.equal(businessLocale.isCanadaBusiness("CA", "USD"), true);
+  assert.equal(businessLocale.isCanadaBusiness("US", "CAD"), true);
+  assert.equal(businessLocale.isCanadaBusiness("US", "USD"), false);
 });
 
 test("v3 settings normalizes business profile fields before saving", () => {
@@ -678,7 +816,23 @@ test("v3 transactions use Categories page source for dropdowns and clean review 
   assert.match(apiSource, /function mapCategoryOption/);
   assert.match(apiSource, /category\.is_active !== false/);
   assert.match(reviewSource, /function normalizeReviewLabels/);
+  assert.match(reviewSource, /function canonicalReviewLabelForIssueCode/);
   assert.match(reviewSource, /\^mapped\$/i);
+  const reviewLib = loadLibModule(path.join("lib", "transactionReview.ts"));
+  assert.deepEqual(
+    reviewLib.reviewLabelsFor({
+      description: "Fuel purchase",
+      reviewIssues: [{
+        issueLabels: [],
+        issueEntries: [
+          { issueCode: "needs_category", label: "Backend wording changed" },
+          { issueCode: "needs_receipt_support", label: "Attach evidence wording changed" },
+          { issueCode: "final_confirmation_needed", label: "Confirm wording changed" }
+        ]
+      }]
+    }),
+    ["Tax mapping needed", "Receipt or support missing", "Final confirmation needed"]
+  );
   assert.match(reviewPanelSource, /Mapping: \{reviewText\(item\.categoryReason\)\}/);
   assert.match(pageSource, /tax-profile-note/);
   assert.match(cssSource, /\.tax-profile-note/);

@@ -11,7 +11,7 @@ const {
 
 async function listCustomers(businessId) {
   const result = await pool.query(
-    'SELECT * FROM customers WHERE business_id = $1 ORDER BY created_at DESC',
+    'SELECT * FROM customers WHERE business_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC',
     [businessId]
   );
   return result.rows;
@@ -38,7 +38,7 @@ async function createCustomer(businessId, data) {
 
 async function getCustomer(businessId, customerId) {
   const result = await pool.query(
-    'SELECT * FROM customers WHERE business_id = $1 AND id = $2',
+    'SELECT * FROM customers WHERE business_id = $1 AND id = $2 AND deleted_at IS NULL',
     [businessId, customerId]
   );
   return result.rows[0] || null;
@@ -48,24 +48,24 @@ async function updateCustomer(businessId, customerId, data) {
   const v = validateCustomerInput(data);
   const result = await pool.query(
     `UPDATE customers SET name = $1, email = $2, phone = $3, address = $4, updated_at = now()
-     WHERE business_id = $5 AND id = $6 RETURNING *`,
+     WHERE business_id = $5 AND id = $6 AND deleted_at IS NULL RETURNING *`,
     [v.name, v.email, v.phone, v.address, businessId, customerId]
   );
   return result.rows[0] || null;
 }
 
-// NOTE: hard delete. The `customers` table (db/migrations/20260419_create_
-// v2_business_tables.sql) has no `deleted_at`/audit columns, unlike
-// `transactions` (see services/transactionAuditService.js, which soft-deletes
-// via deleted_at/is_void/deleted_by_id/deleted_reason). Adding soft-delete
-// parity here would require a new migration adding those columns to
-// `customers` (and updating listCustomers/getCustomer to filter them out) --
-// that schema change is out of scope for this pass and is left as a flagged
-// follow-up rather than invented ad hoc against real financial data.
-async function deleteCustomer(businessId, customerId) {
+async function deleteCustomer(businessId, customerId, { userId = null, reason = 'user_deleted' } = {}) {
   const result = await pool.query(
-    'DELETE FROM customers WHERE business_id = $1 AND id = $2 RETURNING id',
-    [businessId, customerId]
+    `UPDATE customers
+        SET deleted_at = now(),
+            deleted_by_id = $3,
+            deleted_reason = $4,
+            updated_at = now()
+      WHERE business_id = $1
+        AND id = $2
+        AND deleted_at IS NULL
+      RETURNING id`,
+    [businessId, customerId, userId, reason]
   );
   return result.rowCount > 0;
 }

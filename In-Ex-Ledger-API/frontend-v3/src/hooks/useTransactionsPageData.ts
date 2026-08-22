@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadTaxSetAside } from '../lib/analyticsApi'
 import { loadAccountingLock, type AccountingLock } from '../lib/settingsApi'
 import {
@@ -49,8 +49,11 @@ export default function useTransactionsPageData() {
   const [currentPage, setCurrentPage] = useState(1)
   const [undoCount, setUndoCount] = useState(0)
   const [undoMessage, setUndoMessage] = useState('')
+  const refreshRequestSeq = useRef(0)
 
   const refreshPageData = useCallback(async () => {
+    const requestId = refreshRequestSeq.current + 1
+    refreshRequestSeq.current = requestId
     setLoadingData(true)
     setDataError('')
     try {
@@ -68,6 +71,9 @@ export default function useTransactionsPageData() {
         loadAccountingLock().catch(() => null),
         loadTaxSetAside().catch(() => null),
       ])
+      if (requestId !== refreshRequestSeq.current) {
+        return
+      }
       setTransactionRows(pageData.transactions)
       setTransactionTotal(pageData.total)
       setTransactionSummary(pageData.summary)
@@ -80,6 +86,9 @@ export default function useTransactionsPageData() {
       setRecurringTemplates(pageData.recurringTemplates)
       void loadTransactionUndoStatus().then(setUndoCount).catch(() => setUndoCount(0))
     } catch (error) {
+      if (requestId !== refreshRequestSeq.current) {
+        return
+      }
       setDataError(error instanceof Error ? error.message : 'Unable to load transactions.')
       setTransactionRows([])
       setTransactionTotal(0)
@@ -89,7 +98,9 @@ export default function useTransactionsPageData() {
       setReviewQueue({ queue: [] })
       setRecurringTemplates([])
     } finally {
-      setLoadingData(false)
+      if (requestId === refreshRequestSeq.current) {
+        setLoadingData(false)
+      }
     }
   }, [accountFilter, categoryFilter, currentPage, endDateFilter, pageSize, searchTerm, startDateFilter, statusFilter])
 

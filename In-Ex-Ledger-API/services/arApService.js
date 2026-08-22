@@ -1,30 +1,29 @@
 // AR/AP shared logic service (V2/Business)
 const { pool } = require('../db');
 
+const agingBucketProjection = `
+      SUM(CASE WHEN due_date >= CURRENT_DATE THEN total_amount ELSE 0 END) AS current,
+      SUM(CASE WHEN due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - INTERVAL '30 days' THEN total_amount ELSE 0 END) AS overdue_1_30,
+      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '30 days' AND due_date >= CURRENT_DATE - INTERVAL '60 days' THEN total_amount ELSE 0 END) AS overdue_31_60,
+      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '60 days' AND due_date >= CURRENT_DATE - INTERVAL '90 days' THEN total_amount ELSE 0 END) AS overdue_61_90,
+      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '90 days' THEN total_amount ELSE 0 END) AS overdue_90_plus`;
+
+const agingTables = new Set(['invoices', 'bills']);
+
+function agingSummaryQuery(tableName) {
+  if (!agingTables.has(tableName)) {
+    throw new Error(`Unsupported AR/AP aging table: ${tableName}`);
+  }
+  return `SELECT${agingBucketProjection}
+     FROM ${tableName} WHERE business_id = $1 AND status IN ('open','sent','partial')`;
+}
+
 // Returns AR/AP summary for a business, including aging buckets
 async function getArApSummary(businessId) {
   // AR aging buckets (invoices)
-  const arAging = await pool.query(
-    `SELECT
-      SUM(CASE WHEN due_date >= CURRENT_DATE THEN total_amount ELSE 0 END) AS current,
-      SUM(CASE WHEN due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - INTERVAL '30 days' THEN total_amount ELSE 0 END) AS overdue_1_30,
-      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '30 days' AND due_date >= CURRENT_DATE - INTERVAL '60 days' THEN total_amount ELSE 0 END) AS overdue_31_60,
-      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '60 days' AND due_date >= CURRENT_DATE - INTERVAL '90 days' THEN total_amount ELSE 0 END) AS overdue_61_90,
-      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '90 days' THEN total_amount ELSE 0 END) AS overdue_90_plus
-     FROM invoices WHERE business_id = $1 AND status IN ('open','sent','partial')`,
-    [businessId]
-  );
+  const arAging = await pool.query(agingSummaryQuery('invoices'), [businessId]);
   // AP aging buckets (bills)
-  const apAging = await pool.query(
-    `SELECT
-      SUM(CASE WHEN due_date >= CURRENT_DATE THEN total_amount ELSE 0 END) AS current,
-      SUM(CASE WHEN due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - INTERVAL '30 days' THEN total_amount ELSE 0 END) AS overdue_1_30,
-      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '30 days' AND due_date >= CURRENT_DATE - INTERVAL '60 days' THEN total_amount ELSE 0 END) AS overdue_31_60,
-      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '60 days' AND due_date >= CURRENT_DATE - INTERVAL '90 days' THEN total_amount ELSE 0 END) AS overdue_61_90,
-      SUM(CASE WHEN due_date < CURRENT_DATE - INTERVAL '90 days' THEN total_amount ELSE 0 END) AS overdue_90_plus
-     FROM bills WHERE business_id = $1 AND status IN ('open','sent','partial')`,
-    [businessId]
-  );
+  const apAging = await pool.query(agingSummaryQuery('bills'), [businessId]);
   return {
     ar: {
       current: Number(arAging.rows[0].current) || 0,
@@ -44,5 +43,6 @@ async function getArApSummary(businessId) {
 }
 
 module.exports = {
+  agingSummaryQuery,
   getArApSummary
 };

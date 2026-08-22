@@ -1,4 +1,5 @@
 import { apiBlobRequest, apiRequest } from './apiClient'
+import { downloadBlob } from './browserDownload'
 
 export type ExportFormat = 'pdf' | 'csv_basic' | 'csv_full' | 'csv_excluded' | 'csv_category_summary'
 export type ExportMode = 'draft' | 'workpaper' | 'finalized'
@@ -229,17 +230,6 @@ function base64UrlEncode(buffer: ArrayBuffer | Uint8Array) {
     binary += String.fromCharCode(byte)
   })
   return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
 }
 
 function buildExportFilename(settings: ExportSettings) {

@@ -6,11 +6,10 @@ const customerService = require('../services/customerService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
-const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 const { isUuid } = require('../api/utils/v2HttpValidators');
 const { ApiError, asyncRoute } = require('../utils/apiError.js');
 
-router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+router.use(requireAuth);
 router.use(createDataApiLimiter({ keyPrefix: 'rl:v2:customers' }));
 router.use((req, res, next) => (
 	["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
@@ -74,7 +73,7 @@ router.delete('/:id', asyncRoute(async (req, res) => {
 	if (!isUuid(req.params.id)) {
 		throw new ApiError(400, 'Invalid customer id.');
 	}
-	const deleted = await customerService.deleteCustomer(businessId, req.params.id);
+	const deleted = await customerService.deleteCustomer(businessId, req.params.id, { userId: req.user?.id || null });
 	if (!deleted) {
 		throw new ApiError(404, 'Customer not found.');
 	}

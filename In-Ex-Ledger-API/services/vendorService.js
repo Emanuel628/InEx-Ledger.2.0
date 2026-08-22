@@ -11,7 +11,7 @@ const {
 
 async function listVendors(businessId) {
   const result = await pool.query(
-    'SELECT * FROM vendors WHERE business_id = $1 ORDER BY created_at DESC',
+    'SELECT * FROM vendors WHERE business_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC',
     [businessId]
   );
   return result.rows;
@@ -38,7 +38,7 @@ async function createVendor(businessId, data) {
 
 async function getVendor(businessId, vendorId) {
   const result = await pool.query(
-    'SELECT * FROM vendors WHERE business_id = $1 AND id = $2',
+    'SELECT * FROM vendors WHERE business_id = $1 AND id = $2 AND deleted_at IS NULL',
     [businessId, vendorId]
   );
   return result.rows[0] || null;
@@ -48,24 +48,24 @@ async function updateVendor(businessId, vendorId, data) {
   const v = validateVendorInput(data);
   const result = await pool.query(
     `UPDATE vendors SET name = $1, email = $2, phone = $3, address = $4, updated_at = now()
-     WHERE business_id = $5 AND id = $6 RETURNING *`,
+     WHERE business_id = $5 AND id = $6 AND deleted_at IS NULL RETURNING *`,
     [v.name, v.email, v.phone, v.address, businessId, vendorId]
   );
   return result.rows[0] || null;
 }
 
-// NOTE: hard delete. The `vendors` table (db/migrations/20260419_create_v2_
-// business_tables.sql) has no `deleted_at`/audit columns, unlike
-// `transactions` (see services/transactionAuditService.js, which soft-deletes
-// via deleted_at/is_void/deleted_by_id/deleted_reason). Adding soft-delete
-// parity here would require a new migration adding those columns to
-// `vendors` (and updating listVendors/getVendor to filter them out) -- that
-// schema change is out of scope for this pass and is left as a flagged
-// follow-up rather than invented ad hoc against real financial data.
-async function deleteVendor(businessId, vendorId) {
+async function deleteVendor(businessId, vendorId, { userId = null, reason = 'user_deleted' } = {}) {
   const result = await pool.query(
-    'DELETE FROM vendors WHERE business_id = $1 AND id = $2 RETURNING id',
-    [businessId, vendorId]
+    `UPDATE vendors
+        SET deleted_at = now(),
+            deleted_by_id = $3,
+            deleted_reason = $4,
+            updated_at = now()
+      WHERE business_id = $1
+        AND id = $2
+        AND deleted_at IS NULL
+      RETURNING id`,
+    [businessId, vendorId, userId, reason]
   );
   return result.rowCount > 0;
 }

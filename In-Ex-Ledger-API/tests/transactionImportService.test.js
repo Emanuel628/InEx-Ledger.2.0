@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 
 const {
   findDuplicateCandidates,
+  revertImportBatch,
   normalizeDescription,
   __private: { addDays, normalizeSource }
 } = require("../services/transactionImportService.js");
@@ -15,6 +16,42 @@ function makeFakePool(rows = []) {
     async query(sql, params) {
       this.queries.push({ sql, params });
       return { rows, rowCount: rows.length };
+    }
+  };
+}
+
+function makeTransactionalPool({ failOnImportUpdate = false, lockedCount = 0 } = {}) {
+  const calls = [];
+  const client = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
+        return { rows: [], rowCount: 0 };
+      }
+      if (/SELECT COUNT\(\*\)::int AS n/.test(sql)) {
+        return { rows: [{ n: lockedCount }], rowCount: 1 };
+      }
+      if (/UPDATE transactions/.test(sql)) {
+        return { rows: [{ id: "tx-1" }, { id: "tx-2" }], rowCount: 2 };
+      }
+      if (/UPDATE transaction_imports/.test(sql)) {
+        if (failOnImportUpdate) throw new Error("import update failed");
+        return { rows: [], rowCount: 1 };
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    },
+    releaseCalled: false,
+    release() {
+      this.releaseCalled = true;
+    }
+  };
+
+  return {
+    calls,
+    client,
+    async connect() {
+      calls.push({ sql: "CONNECT" });
+      return client;
     }
   };
 }
@@ -85,4 +122,40 @@ test("findDuplicateCandidates falls back to exact date match when description is
     description: ""
   });
   assert.equal(candidates.length, 1);
+});
+
+test("revertImportBatch updates transactions and import row in one transaction", async () => {
+  const pool = makeTransactionalPool();
+
+  const result = await revertImportBatch(pool, {
+    businessId: "biz-1",
+    batchId: "batch-1",
+    userId: "user-1"
+  });
+
+  assert.deepEqual(result, { revertedCount: 2 });
+  assert.deepEqual(
+    pool.calls.map((call) => call.sql === "CONNECT" ? "CONNECT" : call.sql.trim().split(/\s+/).slice(0, 2).join(" ")),
+    ["CONNECT", "BEGIN", "UPDATE transactions", "UPDATE transaction_imports", "COMMIT"]
+  );
+  assert.equal(pool.client.releaseCalled, true);
+});
+
+test("revertImportBatch rolls back when the import-row update fails", async () => {
+  const pool = makeTransactionalPool({ failOnImportUpdate: true });
+
+  await assert.rejects(
+    () => revertImportBatch(pool, {
+      businessId: "biz-1",
+      batchId: "batch-1",
+      userId: "user-1"
+    }),
+    /import update failed/
+  );
+
+  assert.deepEqual(
+    pool.calls.map((call) => call.sql === "CONNECT" ? "CONNECT" : call.sql.trim().split(/\s+/).slice(0, 2).join(" ")),
+    ["CONNECT", "BEGIN", "UPDATE transactions", "UPDATE transaction_imports", "ROLLBACK"]
+  );
+  assert.equal(pool.client.releaseCalled, true);
 });

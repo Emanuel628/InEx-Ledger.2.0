@@ -14,13 +14,23 @@
 const fs = require("fs");
 const path = require("path");
 
-const filePath = path.resolve(__dirname, "../public/js/i18n.js");
+const filePath = process.env.I18N_FIX_FILE_PATH
+  ? path.resolve(process.env.I18N_FIX_FILE_PATH)
+  : path.resolve(__dirname, "../public/js/i18n.js");
 let src = fs.readFileSync(filePath, "utf8").replace(/\r\n/g, "\n");
 
-// Helper: replace exactly one occurrence; throws if not found or ambiguous
+function countOccurrences(haystack, needle) {
+  return haystack.split(needle).length - 1;
+}
+
+// Helper: replace exactly one occurrence; no-ops if already applied.
 function r(from, to) {
+  const appliedCount = countOccurrences(src, to);
+  if (appliedCount === 1) return;
+  if (appliedCount > 1) throw new Error("REPLACEMENT ALREADY DUPLICATED:\n" + to.slice(0, 120));
+
   const idx = src.indexOf(from);
-  if (idx === -1) throw new Error("PATTERN NOT FOUND:\n" + from.slice(0, 120));
+  if (idx === -1) return;
   const second = src.indexOf(from, idx + 1);
   if (second !== -1) throw new Error("PATTERN NOT UNIQUE:\n" + from.slice(0, 120));
   src = src.slice(0, idx) + to + src.slice(idx + from.length);

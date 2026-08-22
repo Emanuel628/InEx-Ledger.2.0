@@ -733,10 +733,10 @@ router.post(
   }),
 );
 
-router.post("/generate", exportGrantLimiter, async (req, res) => {
+router.post("/generate", exportGrantLimiter, asyncRoute(async (req, res) => {
   const token = req.body?.grantToken;
   if (!token) {
-    return res.status(400).json({ error: "grantToken is required." });
+    throw new ApiError(400, "grantToken is required.");
   }
 
   let grantPayload;
@@ -744,9 +744,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
   try {
     grantPayload = await verifyExportGrant(token);
   } catch (err) {
-    return res
-      .status(401)
-      .json({ error: err.message || "Invalid grant token." });
+    throw new ApiError(401, err.message || "Invalid grant token.");
   }
 
   if (
@@ -754,13 +752,11 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       String(grantPayload.exportType || "").toLowerCase(),
     )
   ) {
-    return res.status(400).json({ error: "Unsupported export type." });
+    throw new ApiError(400, "Unsupported export type.");
   }
 
   if (grantPayload.includeTaxId && !req.body?.taxId_jwe) {
-    return res
-      .status(400)
-      .json({ error: "taxId_jwe is required when includeTaxId is true." });
+    throw new ApiError(400, "taxId_jwe is required when includeTaxId is true.");
   }
 
   const user = req.user;
@@ -771,9 +767,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     grantPayload.businessId !== businessId ||
     grantPayload.userId !== user.id
   ) {
-    return res
-      .status(403)
-      .json({ error: "Grant token does not match requester." });
+    throw new ApiError(403, "Grant token does not match requester.");
   }
 
   try {
@@ -783,9 +777,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       !DATE_PATTERN.test(grantStartDate) ||
       !DATE_PATTERN.test(grantEndDate)
     ) {
-      return res
-        .status(400)
-        .json({ error: "Grant token contains invalid date range." });
+      throw new ApiError(400, "Grant token contains invalid date range.");
     }
 
     const exportType = String(grantPayload.exportType || "pdf").toLowerCase();
@@ -812,12 +804,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
 
     const certifiedByUser = Boolean(req.body?.certifiedByUser);
     if (includeTaxId && !certifiedByUser) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "certifiedByUser must be acknowledged to include Tax ID in the export.",
-        });
+      throw new ApiError(400, "certifiedByUser must be acknowledged to include Tax ID in the export.");
     }
 
     const dataset = buildNormalizedExportDataset({
@@ -851,10 +838,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       requestedMode === "finalized" &&
       !finalization.eligibleForFinalization
     ) {
-      return res.status(409).json({
-        error:
-          "This export is not eligible for finalized CPA package status yet.",
-        finalization,
+      throw new ApiError(409, "This export is not eligible for finalized CPA package status yet.", {
+        responseFields: { finalization }
       });
     }
     const datasetHash = hashValue({
@@ -935,9 +920,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
 
     if (exportType !== "pdf") {
       if (includeTaxId) {
-        return res
-          .status(400)
-          .json({ error: "Tax ID may not be requested for CSV exports." });
+        throw new ApiError(400, "Tax ID may not be requested for CSV exports.");
       }
 
       const csvBuffer = buildCsvBundle(dataset, {
@@ -1099,14 +1082,12 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     return res.send(fullPdfBuffer);
   } catch (err) {
     if (err?.status) {
-      return res.status(err.status).json({
-        error: err.message,
-        missingFields: Array.isArray(err.missingFields)
-          ? err.missingFields
-          : undefined,
-        missingFieldKeys: Array.isArray(err.missingFieldKeys)
-          ? err.missingFieldKeys
-          : undefined,
+      throw new ApiError(err.status, err.message, {
+        responseFields: {
+          ...(err.responseFields || {}),
+          ...(Array.isArray(err.missingFields) ? { missingFields: err.missingFields } : {}),
+          ...(Array.isArray(err.missingFieldKeys) ? { missingFieldKeys: err.missingFieldKeys } : {})
+        }
       });
     }
     runBestEffortExportSideEffect("Export failed email failed", () => sendExportFailedEmail({
@@ -1126,9 +1107,9 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       body: sanitizedBody,
       err: err.message,
     });
-    return res.status(500).json({ error: "Failed to generate export." });
+    throw new ApiError(500, "Failed to generate export.");
   }
-});
+}));
 
 router.get(
   "/history",
@@ -1491,7 +1472,7 @@ router.get("/history/:id/csv", exportGrantLimiter, async (req, res) => {
 // POST /exports/secure-export — single-step secure PDF export for the Secure Export Modal.
 // Accepts an encrypted tax ID (JWE) and date range, generates a PDF, and returns it directly.
 // Sensitive fields (ssn, sin, taxId_jwe) are redacted from all log output.
-router.post("/secure-export", secureExportLimiter, async (req, res) => {
+router.post("/secure-export", secureExportLimiter, asyncRoute(async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
   // Minted once per request so it identifies this one generation attempt --
   // used as the export-email dedupe identity on the failure path below,
@@ -1512,28 +1493,22 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
 
     const dateRange = validateDateRange(req.body?.dateRange);
     if (!dateRange) {
-      return res
-        .status(400)
-        .json({ error: "Valid startDate and endDate are required." });
+      throw new ApiError(400, "Valid startDate and endDate are required.");
     }
 
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, FEATURE_KEYS.PDF_EXPORTS)) {
-      return res
-        .status(403)
-        .json(
-          buildFeatureRequiresPlanResponse(
-            subscription,
-            FEATURE_KEYS.PDF_EXPORTS,
-          ),
-        );
+      throw new ApiError(403, "This feature requires a plan upgrade.", {
+        responseFields: buildFeatureRequiresPlanResponse(
+          subscription,
+          FEATURE_KEYS.PDF_EXPORTS,
+        )
+      });
     }
 
     const includeTaxId = Boolean(req.body?.includeTaxId);
     if (includeTaxId && !req.body?.taxId_jwe) {
-      return res
-        .status(400)
-        .json({ error: "taxId_jwe is required when includeTaxId is true." });
+      throw new ApiError(400, "taxId_jwe is required when includeTaxId is true.");
     }
 
     const exportLang = req.body?.language || "en";
@@ -1544,12 +1519,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     );
     const certifiedByUser = Boolean(req.body?.certifiedByUser);
     if (includeTaxId && !certifiedByUser) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "certifiedByUser must be acknowledged to include Tax ID in the export.",
-        });
+      throw new ApiError(400, "certifiedByUser must be acknowledged to include Tax ID in the export.");
     }
 
     // Historically /secure-export re-implemented the entire ~10-table
@@ -1607,10 +1577,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       requestedMode === "finalized" &&
       !finalization.eligibleForFinalization
     ) {
-      return res.status(409).json({
-        error:
-          "This export is not eligible for finalized CPA package status yet.",
-        finalization,
+      throw new ApiError(409, "This export is not eligible for finalized CPA package status yet.", {
+        responseFields: { finalization }
       });
     }
     const datasetHash = hashValue({
@@ -1757,14 +1725,12 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     return res.send(fullPdfBuffer);
   } catch (err) {
     if (err?.status) {
-      return res.status(err.status).json({
-        error: err.message,
-        missingFields: Array.isArray(err.missingFields)
-          ? err.missingFields
-          : undefined,
-        missingFieldKeys: Array.isArray(err.missingFieldKeys)
-          ? err.missingFieldKeys
-          : undefined,
+      throw new ApiError(err.status, err.message, {
+        responseFields: {
+          ...(err.responseFields || {}),
+          ...(Array.isArray(err.missingFields) ? { missingFields: err.missingFields } : {}),
+          ...(Array.isArray(err.missingFieldKeys) ? { missingFieldKeys: err.missingFieldKeys } : {})
+        }
       });
     }
     runBestEffortExportSideEffect("Export failed email failed", () => sendExportFailedEmail({
@@ -1777,11 +1743,11 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       exportAttemptId,
     }), { userId: user?.id, businessId, exportType: "pdf", route: "secure_export" });
     logError("Secure export error", { body: sanitizedBody, err: err.message });
-    return res.status(500).json({ error: "Failed to generate secure export." });
+    throw new ApiError(500, "Failed to generate secure export.");
   }
-});
+}));
 
-router.delete("/history/:id", exportGrantLimiter, async (req, res) => {
+router.delete("/history/:id", exportGrantLimiter, asyncRoute(async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
@@ -1802,7 +1768,7 @@ router.delete("/history/:id", exportGrantLimiter, async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(404).json({ error: "Export not found." });
+      throw new ApiError(404, "Export not found.");
     }
 
     const filePath = rows[0].file_path || null;
@@ -1847,9 +1813,12 @@ router.delete("/history/:id", exportGrantLimiter, async (req, res) => {
       file_cleanup: fileCleanup.status,
     });
   } catch (err) {
+    if (err?.status && err.status < 500) {
+      throw err;
+    }
     logError("Export delete error", { err: err.message });
-    return res.status(500).json({ error: "Failed to delete export." });
+    throw new ApiError(500, "Failed to delete export.");
   }
-});
+}));
 
 module.exports = router;

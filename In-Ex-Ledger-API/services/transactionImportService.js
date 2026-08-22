@@ -173,51 +173,68 @@ async function revertImportBatch(pool, {
   userId,
   lockState
 }) {
-  const lockedDate = lockState?.lockedThroughDate || null;
-  if (lockedDate) {
-    const locked = await pool.query(
-      `SELECT COUNT(*)::int AS n
-         FROM transactions
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const lockedDate = lockState?.lockedThroughDate || null;
+    if (lockedDate) {
+      const locked = await client.query(
+        `SELECT COUNT(*)::int AS n
+           FROM transactions
+          WHERE business_id = $1
+            AND import_batch_id = $2
+            AND deleted_at IS NULL
+            AND date <= $3::date`,
+        [businessId, batchId, lockedDate]
+      );
+      if ((locked.rows[0]?.n || 0) > 0) {
+        const err = new Error("Some transactions in this import batch fall within a locked accounting period and cannot be reverted.");
+        err.status = 409;
+        err.code = "accounting_period_locked";
+        throw err;
+      }
+    }
+
+    const updated = await client.query(
+      `UPDATE transactions
+          SET deleted_at = NOW(),
+              is_void = true,
+              voided_at = NOW(),
+              voided_by_id = $3,
+              deleted_by_id = $3,
+              deleted_reason = COALESCE(deleted_reason, 'import_batch_reverted')
         WHERE business_id = $1
           AND import_batch_id = $2
           AND deleted_at IS NULL
-          AND date <= $3::date`,
-      [businessId, batchId, lockedDate]
+        RETURNING id`,
+      [businessId, batchId, userId || null]
     );
-    if ((locked.rows[0]?.n || 0) > 0) {
-      const err = new Error("Some transactions in this import batch fall within a locked accounting period and cannot be reverted.");
-      err.status = 409;
-      err.code = "accounting_period_locked";
-      throw err;
+
+    await client.query(
+      `UPDATE transaction_imports
+          SET status = 'reverted',
+              reverted_at = NOW(),
+              reverted_by_user_id = $2
+        WHERE id = $1
+          AND business_id = $3`,
+      [batchId, userId || null, businessId]
+    );
+
+    await client.query("COMMIT");
+    return { revertedCount: updated.rowCount };
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackErr) {
+      console.error("[InEx][ERROR] Import batch revert rollback failed", {
+        errorName: rollbackErr?.name || "Error",
+        message: rollbackErr?.message || "Unknown rollback error"
+      });
     }
+    throw err;
+  } finally {
+    client.release();
   }
-
-  const updated = await pool.query(
-    `UPDATE transactions
-        SET deleted_at = NOW(),
-            is_void = true,
-            voided_at = NOW(),
-            voided_by_id = $3,
-            deleted_by_id = $3,
-            deleted_reason = COALESCE(deleted_reason, 'import_batch_reverted')
-      WHERE business_id = $1
-        AND import_batch_id = $2
-        AND deleted_at IS NULL
-      RETURNING id`,
-    [businessId, batchId, userId || null]
-  );
-
-  await pool.query(
-    `UPDATE transaction_imports
-        SET status = 'reverted',
-            reverted_at = NOW(),
-            reverted_by_user_id = $2
-      WHERE id = $1
-        AND business_id = $3`,
-    [batchId, userId || null, businessId]
-  );
-
-  return { revertedCount: updated.rowCount };
 }
 
 module.exports = {

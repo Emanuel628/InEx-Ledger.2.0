@@ -226,6 +226,9 @@ test("arApService.getArApSummary reaches pool.query and aggregates AR/AP aging b
 
   const summary = await service.getArApSummary("biz-1");
   assert.equal(capturedQueries.length, 2);
+  assert.match(service.agingSummaryQuery("invoices"), /FROM invoices WHERE business_id = \$1/);
+  assert.match(service.agingSummaryQuery("bills"), /FROM bills WHERE business_id = \$1/);
+  assert.throws(() => service.agingSummaryQuery("transactions"), /Unsupported AR\/AP aging table/);
   assert.deepEqual(summary, {
     ar: { current: 100, overdue_1_30: 50, overdue_31_60: 0, overdue_61_90: 0, overdue_90_plus: 0 },
     ap: { current: 40, overdue_1_30: 0, overdue_31_60: 10, overdue_61_90: 0, overdue_90_plus: 0 }

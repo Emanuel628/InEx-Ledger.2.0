@@ -1,5 +1,6 @@
 import { apiBlobRequest, apiRequest } from './apiClient'
 import { getCurrentUser } from './authApi'
+import { downloadBlob } from './browserDownload'
 
 export type BusinessProfile = {
   id: string
@@ -123,14 +124,7 @@ export async function savePrivacySettings(settings: PrivacySettings) {
 
 export async function exportAccountData(format: 'json' | 'csv') {
   const blob = await apiBlobRequest(`/api/privacy/export?format=${format}`, { method: 'POST' })
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `inex-ledger-account-data.${format}`
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  window.URL.revokeObjectURL(url)
+  downloadBlob(blob, `inex-ledger-account-data.${format}`)
 }
 
 export async function completeOnboarding(draft: OnboardingDraft) {

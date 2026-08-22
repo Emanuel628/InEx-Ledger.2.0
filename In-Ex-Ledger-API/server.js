@@ -314,12 +314,12 @@ const ALLOWED_ORIGINS = [
     : [])
 ];
 
-logInfo('SYSTEM START: INEX_LEDGER_PROD_2026');
+logInfo('Server startup initialized');
 
 const PORT = process.env.PORT || 8080;
 const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 15000);
-logInfo(`NETWORK: Port assigned: ${PORT}`);
-logInfo('SECURITY: JWT_SECRET detected:', { detected: !!process.env.JWT_SECRET });
+logInfo('Server port configured', { port: PORT });
+logInfo('JWT secret configuration checked', { configured: !!process.env.JWT_SECRET });
 
 let dbState = 'starting';
 let dbLastError = null;
@@ -608,9 +608,14 @@ app.use((err, req, res, next) => {
     ...(err.routeParams && { params: err.routeParams }),
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
-  const message = status < 500 ? err.message : 'Internal server error';
+  const message = status < 500 || err.expose ? err.message : 'Internal server error';
+  const responseFields =
+    status < 500 && err.responseFields && typeof err.responseFields === 'object'
+      ? err.responseFields
+      : {};
   res.status(status).json({
     error: message,
+    ...responseFields,
     ...(status >= 500 && req.requestId ? { requestId: req.requestId } : {})
   });
 });

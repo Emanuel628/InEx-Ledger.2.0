@@ -34,12 +34,7 @@ import useV3PhraseTranslations from './hooks/useV3PhraseTranslations'
 import { getStoredLanguage, getUserLanguage, setStoredLanguage, translate, type AppLanguage } from './lib/i18n'
 import { normalizeInternalPath, normalizeLegacyAppV3Path, resolvePageFromInternalPath } from './lib/navigation'
 import { PlanProvider } from './context/PlanContext'
-
-declare global {
-  interface Window {
-    __LUNA_ME__?: AuthUser | null
-  }
-}
+import { setActiveCurrency } from './lib/money'
 
 export type AppPage =
   | 'Transactions'
@@ -269,7 +264,7 @@ function App() {
   }
 
   useEffect(() => {
-    window.__LUNA_ME__ = authUser
+    setActiveCurrency(authUser?.business?.currency)
   }, [authUser])
 
   useEffect(() => {

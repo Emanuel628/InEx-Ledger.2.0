@@ -19,7 +19,6 @@ function getSigningSecret() {
     String(process.env.EMAIL_PREFERENCES_SECRET || "").trim()
     || String(process.env.SUPPORT_REPLY_HMAC_SECRET || "").trim()
     || String(process.env.JWT_SECRET || "").trim()
-    || "inex-ledger-email-preferences"
   );
 }
 
@@ -32,8 +31,12 @@ function base64UrlDecode(value) {
 }
 
 function signPayload(serialized) {
+  const secret = getSigningSecret();
+  if (!secret) {
+    return "";
+  }
   return crypto
-    .createHmac("sha256", getSigningSecret())
+    .createHmac("sha256", secret)
     .update(serialized)
     .digest("base64url");
 }
@@ -47,6 +50,9 @@ function createUnsubscribeToken({ userId, scope = "optional_emails", expiresInDa
   if (!payload.u) {
     return "";
   }
+  if (!getSigningSecret()) {
+    return "";
+  }
   const serialized = JSON.stringify(payload);
   return `${base64UrlEncode(serialized)}.${signPayload(serialized)}`;
 }
@@ -54,6 +60,9 @@ function createUnsubscribeToken({ userId, scope = "optional_emails", expiresInDa
 function verifyUnsubscribeToken(token, expectedScope = "optional_emails") {
   const raw = String(token || "").trim();
   if (!raw.includes(".")) {
+    return null;
+  }
+  if (!getSigningSecret()) {
     return null;
   }
   const [encoded, providedSignature] = raw.split(".", 2);

@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-bulk-delete-all";
 process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret-bulk-delete-all";
@@ -146,6 +147,7 @@ function loadTransactionsRouterWithState({
     const app = express();
     app.use(express.json());
     app.use("/api/transactions", router);
+    attachCentralErrorHandler(app);
     return { app, state };
   } finally {
     Module._load = originalLoad;

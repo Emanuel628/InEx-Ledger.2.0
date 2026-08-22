@@ -11,6 +11,13 @@ const MAX_INSTITUTION_LEN = 200;
 const MAX_EXTERNAL_ID_LEN = 255;
 const MAX_ERROR_LEN = 500;
 
+function logAccessTokenDecryptFailure(err) {
+  console.warn("[InEx][WARN] Bank access token decrypt failed", {
+    errorName: err?.name || "Error",
+    message: err?.message || "Unknown decrypt error"
+  });
+}
+
 function clamp(value, max) {
   if (value === null || value === undefined) return null;
   const s = String(value);
@@ -109,7 +116,8 @@ function decryptAccessToken(connection) {
   if (!connection?.access_token_encrypted) return null;
   try {
     return decrypt(connection.access_token_encrypted);
-  } catch (_) {
+  } catch (err) {
+    logAccessTokenDecryptFailure(err);
     return null;
   }
 }

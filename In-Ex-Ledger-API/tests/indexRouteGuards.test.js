@@ -165,3 +165,25 @@ test("index exports/history fails closed when the tier lookup fails", async () =
     fixture.cleanup();
   }
 });
+
+test("V2 child routers do not duplicate the parent business entitlement middleware", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const apiRoot = path.join(__dirname, "..");
+  const indexSource = fs.readFileSync(path.join(apiRoot, "routes", "index.js"), "utf8");
+
+  assert.match(indexSource, /const businessTierOnly = \[requireV2BusinessEnabled, requireV2Entitlement\]/);
+  for (const routeFile of [
+    "vendors.routes.js",
+    "customers.routes.js",
+    "invoices.routes.js",
+    "bills.routes.js",
+    "projects.routes.js",
+    "billable-expenses.routes.js",
+  ]) {
+    const source = fs.readFileSync(path.join(apiRoot, "routes", routeFile), "utf8");
+    assert.doesNotMatch(source, /requireV2BusinessEnabled/);
+    assert.doesNotMatch(source, /requireV2Entitlement/);
+    assert.match(source, /router\.use\(requireAuth\)/);
+  }
+});

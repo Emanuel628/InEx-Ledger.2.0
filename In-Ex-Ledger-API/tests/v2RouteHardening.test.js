@@ -32,6 +32,7 @@ function loadRouter(routePath, routeName) {
             return res.status(401).json({ error: "Authentication required" });
           }
           req.user = { id: "00000000-0000-4000-8000-000000009001" };
+          req.business = { id: "00000000-0000-4000-8000-000000009002" };
           next();
         }
       };
@@ -55,17 +56,6 @@ function loadRouter(routePath, routeName) {
             }
             next();
           };
-        }
-      };
-    }
-    if (requestName === "../api/utils/requireV2BusinessEnabled" || /requireV2BusinessEnabled\.js$/.test(requestName)) {
-      return {
-        requireV2BusinessEnabled(req, _res, next) {
-          req.business = { id: "00000000-0000-4000-8000-000000009002" };
-          next();
-        },
-        requireV2Entitlement(_req, _res, next) {
-          next();
         }
       };
     }

@@ -11,12 +11,32 @@
  * and both bugs at the source.
  */
 
+export function normalizeCurrencyCode(currency: unknown, fallback = 'USD'): string {
+  const normalized = String(currency || '').trim().toUpperCase()
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : fallback
+}
+
+let activeCurrency = 'USD'
+
+export function setActiveCurrency(currency: unknown) {
+  activeCurrency = normalizeCurrencyCode(currency)
+}
+
 export function getActiveCurrency(): string {
-  return window.__LUNA_ME__?.business?.currency?.toUpperCase() === 'CAD' ? 'CAD' : 'USD'
+  return activeCurrency
 }
 
 export function getMoneyLocale(currency: string = getActiveCurrency()): string {
-  return currency.toUpperCase() === 'CAD' ? 'en-CA' : 'en-US'
+  switch (normalizeCurrencyCode(currency)) {
+    case 'CAD':
+      return 'en-CA'
+    case 'AUD':
+      return 'en-AU'
+    case 'GBP':
+      return 'en-GB'
+    default:
+      return 'en-US'
+  }
 }
 
 export interface FormatMoneyOptions {
@@ -38,7 +58,7 @@ export function formatMoney(
   currency: string = getActiveCurrency(),
   options: FormatMoneyOptions = {}
 ): string {
-  const normalizedCurrency = String(currency || getActiveCurrency()).toUpperCase()
+  const normalizedCurrency = normalizeCurrencyCode(currency, getActiveCurrency())
   const locale = getMoneyLocale(normalizedCurrency)
   const formatted = Math.abs(value).toLocaleString(locale, {
     style: 'currency',

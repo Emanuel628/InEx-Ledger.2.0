@@ -135,49 +135,25 @@ function buildReceiptsApp({ poolQuery, logEvents }) {
   }
 }
 
-test("GET /api/receipts heals missing receipt metadata columns and retries the list query", async () => {
+test("GET /api/receipts does not run DDL when receipt metadata columns are missing", async () => {
   let selectCalls = 0;
-  const repairStatements = [];
+  const ddlStatements = [];
   const logEvents = [];
 
   async function poolQuery(sql) {
     const text = String(sql || "");
 
-    if (/information_schema\.columns/i.test(text)) {
-      return { rows: [], rowCount: 0 };
-    }
-
-    if (/ALTER\s+TABLE\s+receipts/i.test(text) || /ADD\s+COLUMN/i.test(text)) {
-      repairStatements.push(text);
+    if (/ALTER\s+TABLE\s+receipts/i.test(text) || /ADD\s+COLUMN/i.test(text) || /UPDATE\s+receipts/i.test(text)) {
+      ddlStatements.push(text);
       return { rows: [], rowCount: 0 };
     }
 
     if (/SELECT\s+r\.id/i.test(text) && /FROM\s+receipts\s+r/i.test(text)) {
       selectCalls += 1;
-      if (selectCalls === 1) {
-        const err = new Error("column r.file_hash does not exist");
-        err.code = "42703";
-        err.column = "file_hash";
-        throw err;
-      }
-
-      return {
-        rowCount: 1,
-        rows: [{
-          id: TEST_RECEIPT_ID,
-          business_id: TEST_BUSINESS_ID,
-          business_name: "Test Business",
-          transaction_id: null,
-          filename: "receipt.pdf",
-          mime_type: "application/pdf",
-          storage_path: null,
-          uploaded_at: "2026-05-19T12:00:00.000Z",
-          created_at: "2026-05-19T12:00:00.000Z",
-          file_hash: "abc123",
-          has_file_bytes: false,
-          file_bytes: Buffer.from("must-not-leak")
-        }]
-      };
+      const err = new Error("column r.file_hash does not exist");
+      err.code = "42703";
+      err.column = "file_hash";
+      throw err;
     }
 
     throw new Error(`Unexpected SQL in receipt resilience test: ${text.slice(0, 160)}`);
@@ -187,19 +163,28 @@ test("GET /api/receipts heals missing receipt metadata columns and retries the l
   try {
     const res = await request(app).get("/api/receipts");
 
-    assert.equal(res.status, 200);
-    assert.equal(selectCalls, 2, "receipt list query should retry once after healing schema drift");
-    assert.ok(repairStatements.length > 0, "schema healing should run before retrying the receipt list query");
-    assert.ok(
-      repairStatements.some((statement) => /file_hash|storage_path|file_bytes|uploaded_at/i.test(statement)),
-      "schema healing should target receipt metadata/storage columns"
+    assert.equal(res.status, 500);
+    assert.equal(selectCalls, 1, "receipt list query must not be retried after schema drift");
+    assert.equal(ddlStatements.length, 0, "receipt list must not run DDL or backfill statements");
+    const errorLog = logEvents.find((event) => event.level === "error");
+    assert.ok(errorLog, "missing schema should be logged for migration/operator visibility");
+    const diagnostic = errorLog.args.find(
+      (arg) => arg && typeof arg === "object" && !(arg instanceof Error) && arg.code === "42703"
     );
-    assert.equal(res.body.length, 1);
-    assert.equal(res.body[0].id, TEST_RECEIPT_ID);
-    assert.equal(Object.prototype.hasOwnProperty.call(res.body[0], "file_bytes"), false);
+    assert.equal(diagnostic?.column, "file_hash");
   } finally {
     restore();
   }
+});
+
+test("receipts route keeps schema ownership in migrations, not GET handlers", () => {
+  const source = require("node:fs").readFileSync(RECEIPTS_ROUTE_PATH, "utf8");
+
+  assert.doesNotMatch(source, /function\s+ensureReceiptListSchema/);
+  assert.doesNotMatch(source, /ALTER\s+TABLE\s+receipts/i);
+  assert.doesNotMatch(source, /ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS/i);
+  assert.doesNotMatch(source, /information_schema\.columns/i);
+  assert.doesNotMatch(source, /UPDATE\s+receipts\s+SET\s+uploaded_at/i);
 });
 
 test("GET /api/receipts logs structured diagnostics for unrecoverable database errors", async () => {

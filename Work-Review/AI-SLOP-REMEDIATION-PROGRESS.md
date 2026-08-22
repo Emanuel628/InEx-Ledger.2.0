@@ -15,10 +15,10 @@ headline number):
   re-verified line-by-line. Half credit until confirmed.
 - `[ ]` = 0 — Not started, no evidence found on `main`.
 
-Percentage = sum of item scores across Phases 1-10, divided by total item count.
+Percentage = sum of item scores across Phases 1-14, divided by total item count.
 Phase 0 is a standing process rule, not a checklist item, so it is not counted.
 
-## Overall: 65.5 / 92 action items (~71%)
+## Overall: 92 / 92 action items (100%)
 
 ## Phase 0 - Safety Rules (process rule, always active, not counted)
 
@@ -1091,7 +1091,7 @@ test that had been failing identically since PR 13).
   pass (clean: only the two new architecture docs above were untracked, both
   intentional). `.gitignore` coverage for `test-results/`/`storage/`/logs re-confirmed.
 
-## Phase 11 - Independent Code-Only Review (2026-08-18): Critical And High Severity — 11.5 / 12
+## Phase 11 - Independent Code-Only Review (2026-08-18): Critical And High Severity - 12 / 12
 
 Found by a fresh, code-only review after Phase 10 closed: five parallel background
 agents each read one slice of the codebase in full (`routes/`, `services/`,
@@ -1242,134 +1242,224 @@ exports).
   `frontendV3Wiring.test.js`) that had been pinning the old hardcoded-rate behavior as
   expected — one of them literally asserted the exact per-province rates as correct,
   which was pinning the bug itself; both now assert the new backend-sourced behavior.
-- [~] `services/vendorService.js`, `customerService.js`, `invoiceService.js`, and
+- [x] `services/vendorService.js`, `customerService.js`, `invoiceService.js`, and
   `services/billService.js` hard-`DELETE ... RETURNING id` financial records with no
-  amount/currency/length validation before insert and no audit trail — unlike the
-  careful soft-delete + `audit_events` + accounting-lock-check pattern
-  (`transactionAuditService.js`, `accountingLockService.js`) used everywhere else in the
-  app for transactions. **Validation fixed**: new `services/v2BusinessValidationService.js`
-  (`V2BusinessValidationError`, 400-status, following the existing
-  `BillingValidationError` convention) validates required fields, UUID shape, amounts
-  (finite/non-negative/bounded), currency codes, dates, and status enums in all four
-  services' create/update paths; `routes/*.routes.js` for all four need no changes since
-  `asyncRoute` already forwards the new error type to the central handler as a 400. New
-  `tests/v2BusinessValidationService.test.js` (28 tests) and
-  `tests/v2BusinessServicesValidationAndDelete.test.js` prove invalid input is rejected
-  before any query runs. **Audit-trail/soft-delete half deliberately NOT done**: checked
-  `db/migrations/20260419_create_v2_business_tables.sql` — `vendors`/`customers`/`bills`/
-  `invoices` have no `deleted_at` or any audit column, and no later migration adds one
-  (the one soft-delete migration that exists, `20260513_add_invoice_soft_delete.sql`,
-  targets the separate, older `invoices_v1` Pro-plan table, not this one). Rather than
-  inventing a schema migration in this pass, each hard-delete function now carries a code
-  comment naming the gap and pointing at `transactionAuditService.js` as the parity
-  target — a real follow-up item, not silently dropped. Scored `[~]` rather than `[x]`
-  for this reason.
+  amount/currency/length validation before insert and no audit trail - unlike the
+  careful soft-delete + audit-metadata pattern used for transactions. **Validation fixed**:
+  new `services/v2BusinessValidationService.js` (`V2BusinessValidationError`, 400-status,
+  following the existing `BillingValidationError` convention) validates required fields,
+  UUID shape, amounts (finite/non-negative/bounded), currency codes, dates, and status
+  enums in all four services' create/update paths; `routes/*.routes.js` for all four need
+  no changes since `asyncRoute` already forwards the new error type to the central handler
+  as a 400. **Soft-delete/audit metadata now fixed**:
+  `db/migrations/20260822_add_v2_business_soft_delete_columns.sql` adds `deleted_at`,
+  `deleted_by_id`, and `deleted_reason` to all four V2 financial tables plus active-row
+  indexes. The four services now filter `deleted_at IS NULL` in list/get/update paths and
+  replace hard `DELETE` statements with `UPDATE ... deleted_at = now()` while routes pass
+  `req.user.id` into the service delete calls. `tests/v2BusinessServicesValidationAndDelete.test.js`
+  now proves invalid input is rejected before any query, delete paths soft-delete with
+  actor metadata, and hard deletes are not issued.
 
-## Phase 12 - Independent Code-Only Review (2026-08-18): Backend Consistency And Concurrency — 0 / 12
+## Phase 12 - Independent Code-Only Review (2026-08-18): Backend Consistency And Concurrency - 12 / 12
 
 Medium-severity backend findings from the same review pass — real quality/consistency
 problems, not launch-blocking on their own, but worth closing before they compound.
 
-- [ ] Inconsistent `asyncRoute`/`ApiError` usage within the same files: GET routes in
+- [x] Inconsistent `asyncRoute`/`ApiError` usage within the same files: GET routes in
   `transactions.routes.js`, `exports.routes.js`, `businesses.routes.js`, and
   `billing.routes.js` use the shared helper; most mutation routes (POST/PUT/PATCH/DELETE)
   in the same four files hand-roll `try/catch` with manual status codes instead, with no
   functional reason for the split.
-- [ ] `routes/auth.routes.js` — the "resolve pending token → look up active challenge →
+  **Fixed**: converted the audited mutation routes in all four files onto the shared
+  `asyncRoute`/`ApiError` path while preserving real rollback, compensation, export-failure
+  email, and Stripe-webhook acknowledgement contracts. `ApiError` now supports explicit
+  public response fields for expected 4xx details and explicit exposed fallback messages
+  where a route historically returned a public 500 message. `tests/phase12RouteConsistency.test.js`
+  guards the four-file mutation-route consistency contract.
+- [x] `routes/auth.routes.js` — the "resolve pending token → look up active challenge →
   check attempt count → compare code hash → record failure / consume" MFA email-code
   sequence is duplicated near-identically 5 times (`mfa/reauth`, `mfa/enable`,
   `mfa/disable`, `mfa/verify`, `verify-email/confirm-code`).
-- [ ] `requireV2BusinessEnabled`/`requireV2Entitlement` run twice per request on the six
+  **Fixed**: extracted `verifyMfaEmailCode()` as the one route-local owner of pending
+  token validation, active challenge lookup, attempt-limit handling, failed-attempt
+  recording, hash comparison, and challenge consumption. The five handlers now pass
+  only their purpose-specific expectations and message text. `tests/authDeviceVerification.test.js`
+  guards the single-helper ownership and the auth/MFA/email-code suites cover behavior.
+- [x] `requireV2BusinessEnabled`/`requireV2Entitlement` run twice per request on the six
   V2 sub-routers: once from `routes/index.js`'s `...businessTierOnly` mount, and again
   from each sub-router's own `router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement)`.
-- [ ] `routes/internalSupport.routes.js`, `supportEmail.routes.js`, and
+  **Fixed**: removed the duplicated V2 feature/entitlement middleware from the six child
+  routers while keeping each router's own `requireAuth` guard. `routes/index.js` remains
+  the single owner for the V2 business-tier gate; `tests/indexRouteGuards.test.js`,
+  `tests/v2RouteErrors.test.js`, and `tests/v2RouteHardening.test.js` cover the mount
+  contract, auth independence, CSRF, limiter, and error behavior.
+- [x] `routes/internalSupport.routes.js`, `supportEmail.routes.js`, and
   `email.routes.js` each define their own router-local `router.use((err, req, res, next) => ...)`
   error handler that re-implements — nearly line-for-line — the status/message-hiding
   logic already centralized in `server.js`'s error handler.
-- [ ] `routes/receipts.routes.js`'s `ensureReceiptListSchema()` issues
+  **Fixed**: removed the three router-local error handlers and the no-op rethrow wrappers in `supportEmail.routes.js`/`email.routes.js`; standalone route tests now attach `attachCentralErrorHandler()` to mirror production. `tests/phase14Polish.test.js` guards against reintroducing local `(err, req, res, next)` handlers or `catch (err) { throw err; }` wrappers.
+- [x] `routes/receipts.routes.js`'s `ensureReceiptListSchema()` issues
   `ALTER TABLE receipts ADD COLUMN IF NOT EXISTS` plus a backfill `UPDATE` reactively
-  from inside `GET /` whenever a "column does not exist" Postgres error is caught — DDL
+  from inside `GET /` whenever a "column does not exist" Postgres error is caught - DDL
   triggered from live read traffic instead of a migration step.
-- [ ] `routes/analytics.routes.js` has ~700 lines of CPP/CPP2/SE-tax computation and
+  **Fixed**: removed `ensureReceiptListSchema()` and the live-read DDL/backfill retry.
+  `GET /api/receipts` now surfaces schema errors through the central error path with
+  structured diagnostics; `tests/receiptResilience.test.js` proves missing metadata
+  columns return 500 without any `ALTER TABLE`, information-schema probe, or backfill.
+- [x] `routes/analytics.routes.js` has ~700 lines of CPP/CPP2/SE-tax computation and
   quarter-over-quarter/seasonal-deviation analysis embedded directly in route handlers,
   unlike every comparable domain area (mileage, vehicle claims, capital assets, home
   office, Quick/Regular Method) which delegates to a `services/*` module — this leaves
   the file's tax math untestable independent of Express.
-- [ ] Check-then-act races with no locking: `services/basicPlanUsageService.js`'s
+  **Fixed**: extracted analytics response shaping, trailing-month bucketing, self-employment
+  tax estimates, recurring monthly-equivalent math, seasonal-deviation insights, and
+  what-if validation/projection into `services/analyticsService.js`. The route now owns
+  HTTP middleware, business resolution, feature gating, and SQL calls only. `tests/analyticsService.test.js`
+  covers the service math directly and guards against reintroducing those computations
+  into `routes/analytics.routes.js`; `tests/analyticsRouteErrors.test.js` keeps the route
+  error/empty-response contracts covered.
+- [x] Check-then-act races with no locking: `services/basicPlanUsageService.js`'s
   `assertCanCreateTransactions`/`assertCanUploadReceipts`/`assertCanImportCsvRows` count
   usage and return an allowance with nothing enforcing it atomically, so concurrent
   requests can jointly exceed a Basic-tier business's monthly caps; and
   `services/vehicleClaimService.js`'s `assertConsistentClaimMethodForYear` SELECTs-then-
   throws with no lock around the later insert, so two concurrent claim submissions for
   the same tax year can both pass the "one method per year" check before either commits.
-- [ ] Silent, unlogged decryption failures for sensitive financial identifiers in three
+  **Fixed**: Basic-plan transaction, receipt, and CSV-import enforcement now takes a
+  per-business/per-period advisory transaction lock and re-reads usage before allowing
+  inserts. Vehicle claim upserts now run in one transaction with a per-business/tax-year
+  advisory lock, then check the existing method and upsert on the same client.
+  Focused service and caller-route tests cover the locked paths.
+- [x] Silent, unlogged decryption failures for sensitive financial identifiers in three
   services: `gstHstNumberService.js`'s `decryptGstHstNumber`, `taxIdService.js`'s
   `decryptTaxId`, and `bankConnectionService.js`'s `decryptAccessToken` each swallow any
-  decrypt error into a bare `return null` with zero logging — a botched
+  decrypt error into a bare `return null` with zero logging - a botched
   `FIELD_ENCRYPTION_KEY` rotation would be indistinguishable from "no value was ever
   stored" and silently blank out tax IDs/GST-HST numbers/bank tokens app-wide.
-- [ ] `services/transactionImportService.js`'s `revertImportBatch` issues two separate
+  **Fixed**: `decryptGstHstNumber()`, `decryptTaxId()` (current and legacy paths),
+  and `decryptAccessToken()` now emit sanitized warnings on decrypt failure without
+  logging encrypted or decrypted field values. Added regression coverage in
+  `tests/gstHstNumberService.test.js`, `tests/taxIdService.test.js`, and
+  `tests/bankConnectionService.test.js`.
+- [x] `services/transactionImportService.js`'s `revertImportBatch` issues two separate
   `UPDATE`s (soft-deleting the batch's transactions, then marking the import row
   `reverted`) with no `BEGIN`/`COMMIT` around them — a crash between the two leaves an
   inconsistent state for a feature whose whole purpose is auditable reversibility.
-- [ ] `db.js` duplicates `utils/dbSslConfig.js`'s DB SSL decision tree almost verbatim
+  **Fixed**: `revertImportBatch()` now acquires a client and wraps the locked-period
+  check, transaction soft-delete, and import-row status update in one `BEGIN`/`COMMIT`,
+  with rollback on any failure. `tests/transactionImportService.test.js` covers both
+  the commit path and rollback when the import-row update fails.
+- [x] `db.js` duplicates `utils/dbSslConfig.js`'s DB SSL decision tree almost verbatim
   instead of importing the already-shared, tested version — confirmed the shared util is
   currently consumed only by tests, not by the real runtime pool.
-- [ ] `pdf-worker/index.js` compares `WORKER_SECRET` with plain `!==` instead of a
+  **Fixed**: `db.js` now imports `buildSslConfig()` and `describeSslConfig()` from
+  `utils/dbSslConfig.js` for the runtime `pg.Pool` configuration and startup summary,
+  deleting the duplicate local implementation. `tests/dbSslConfig.test.js` now includes
+  a source guard that fails if `db.js` reintroduces a local `buildSslConfig()` or
+  `sslmodeFromUrl` decision tree.
+- [x] `pdf-worker/index.js` compares `WORKER_SECRET` with plain `!==` instead of a
   timing-safe comparison, inconsistent with every other secret/token comparison in the
   codebase (`csrf.middleware.js`, `requireSupportSecret.js`, `authUtils.js` all use
   timing-safe compares).
-- [ ] `scripts/i18n-fix.js` is still wired as a repeatable `npm run i18n:fix` command,
+  **Verified complete**: `pdf-worker/index.js` already compares equal-length token
+  buffers with `crypto.timingSafeEqual()`. Added `tests/pdfWorkerSecurity.test.js`
+  to guard against reverting to a plain `WORKER_SECRET !== ...` comparison.
+- [x] `scripts/i18n-fix.js` is still wired as a repeatable `npm run i18n:fix` command,
   but its replacements are already applied to `public/js/i18n.js` and its matcher only
   checks that the "from" text is unique, never whether the "to" text already exists —
   re-running it today would silently insert duplicate i18n keys rather than failing
   cleanly.
+  **Fixed**: the replacement helper now no-ops when a replacement is already applied
+  or an obsolete historical pattern has already been resolved with newer wording, and
+  still fails if replacement text is duplicated. The script accepts `I18N_FIX_FILE_PATH`
+  for tests; `tests/i18nFixScript.test.js` runs it twice against a temp copy and proves
+  the second run is idempotent.
 
-## Phase 13 - Independent Code-Only Review (2026-08-18): Frontend Duplication And Races — 0 / 7
+## Phase 13 - Independent Code-Only Review (2026-08-18): Frontend Duplication And Races - 7 / 7
 
-- [ ] Money-formatting/currency-resolution logic (`formatMoney`/`getActiveCurrency`) is
+- [x] Money-formatting/currency-resolution logic (`formatMoney`/`getActiveCurrency`) is
   independently redefined in 6 files (`pages/Transactions.tsx`, `pages/Mileage.tsx`,
   `pages/Analytics.tsx`, `pages/Invoices.tsx`, `pages/Exports.tsx`,
   `components/transactions/RecurringTemplatesWorkflow.tsx`) instead of one shared `lib`
   utility — this exact duplication is what let the Invoices and RecurringTemplatesWorkflow
   currency bugs in Phase 11 quietly diverge from the correct behavior undetected.
-- [ ] Attachment-picker validation (file-size/count limits, add/remove handlers) is
+  **Fixed and re-verified**: the shared `frontend-v3/src/lib/money.ts` is the only active
+  currency resolver/formatter import for the listed app pages/components, now exposes
+  `normalizeCurrencyCode()`, and preserves valid non-CAD active business currencies
+  (`EUR`, `GBP`, `AUD`, etc.) instead of collapsing them to USD. `blankInvoiceDraft()` now
+  uses the same normalizer. `tests/frontendV3Wiring.test.js` executes the real compiled TS
+  helpers with an `EUR` business and proves `getActiveCurrency()`, default `formatMoney()`,
+  and new invoice drafts all preserve EUR.
+- [x] Attachment-picker validation (file-size/count limits, add/remove handlers) is
   duplicated three times with independently-declared limits: `pages/Messages.tsx`'s
-  `MessageDetailModal` and `ComposeModal`, and `pages/Invoices.tsx`'s own copy — a
+  `MessageDetailModal` and `ComposeModal`, and `pages/Invoices.tsx`'s own copy - a
   shared `useFileAttachments` hook would remove ~90 duplicated lines and the risk of the
   limits drifting apart.
-- [ ] `frontend-v3/src/hooks/useTransactionsPageData.ts`'s `refreshPageData` and
+  **Fixed**: added shared `frontend-v3/src/hooks/useFileAttachments.ts` with the single
+  5-file / 10 MB / accepted-extension contract and wired both Messages attachment
+  pickers plus the Invoices drawer through it. `tests/frontendV3Wiring.test.js` guards
+  the shared hook usage and blocks local message/invoice attachment-limit constants.
+- [x] `frontend-v3/src/hooks/useTransactionsPageData.ts`'s `refreshPageData` and
   `frontend-v3/src/hooks/useMessagesPageData.ts`'s `openThread` have no
-  `AbortController`/ignore-flag/request-ordering guard — rapid filter/page changes or
+  `AbortController`/ignore-flag/request-ordering guard - rapid filter/page changes or
   fast thread-switching can let an earlier in-flight response resolve after a later one
   and silently overwrite fresher state with stale data.
-- [ ] `frontend-v3/src/lib/apiClient.ts`'s `isCsrfFailure` decides whether to retry
+  **Fixed**: both page-data hooks now use monotonically increasing `useRef` request
+  sequence IDs and skip state updates from stale transaction refresh, message refresh,
+  and thread-open responses. `tests/frontendV3Wiring.test.js` guards the sequence refs
+  and stale-response checks.
+- [x] `frontend-v3/src/lib/apiClient.ts`'s `isCsrfFailure` decides whether to retry
   solely by string-comparing the backend's exact error message
-  (`'CSRF token missing or invalid.'`) — a backend copy/wording change would silently
+  (`'CSRF token missing or invalid.'`) - a backend copy/wording change would silently
   stop the CSRF-refresh retry path from firing.
-- [ ] `frontend-v3/src/lib/invoicesApi.ts`'s `mapStatus` derives "Overdue" by comparing
+  **Fixed**: CSRF 403 responses now include stable `code: "csrf_invalid"`, and
+  `isCsrfFailure()` retries from that machine-readable code before falling back to the
+  legacy message. `tests/frontendV3Wiring.test.js` now proves the retry still fires when
+  the backend message changes, while `tests/csrfProtection.test.js` and
+  `tests/csrfE2E.test.js` pin the new response code.
+- [x] `frontend-v3/src/lib/invoicesApi.ts`'s `mapStatus` derives "Overdue" by comparing
   `dueDate` to the browser's local-timezone `new Date()` rather than trusting a
   backend-computed status, so the same invoice can show as "Sent" vs. "Overdue"
   depending on the viewer's timezone relative to the due-date boundary.
-- [ ] `frontend-v3/src/lib/transactionReview.ts`'s `canonicalReviewLabel` classifies
+  **Fixed**: `routes/invoices-v1.routes.js` now serializes sent invoices with past
+  due dates as read-time `status: "overdue"` without changing stored status values, and
+  `invoicesApi.ts` maps only the backend status string. `tests/invoicesV1Routes.test.js`
+  covers server-side overdue serialization; `tests/frontendV3Wiring.test.js` guards that
+  `mapStatus()` no longer uses browser dates.
+- [x] `frontend-v3/src/lib/transactionReview.ts`'s `canonicalReviewLabel` classifies
   which fields need review by regex-matching rendered label text
   (`/amount/i`, `/description|merchant|vendor/i`, etc.) instead of the structured
-  `issueCode` already present on `ReviewQueueItem.issueEntries` — any backend wording
+  `issueCode` already present on `ReviewQueueItem.issueEntries` - any backend wording
   change silently breaks which fields get flagged in this compliance-relevant workflow.
-- [ ] `frontend-v3/src/lib/apiClient.ts`'s `apiRequest` and `apiBlobRequest` each
+  **Fixed**: review issue entries now classify `needs_category`,
+  `needs_receipt_support`, and `final_confirmation_needed` from `issueCode` before using
+  human labels as a legacy fallback. `tests/frontendV3Wiring.test.js` executes the real
+  mapper with deliberately changed labels to prove structured codes drive the result.
+- [x] `frontend-v3/src/lib/apiClient.ts`'s `apiRequest` and `apiBlobRequest` each
   independently repeat the full CSRF-retry/401-refresh-retry sequence instead of sharing
-  one implementation — currently in sync, but any future fix to the retry semantics has
+  one implementation - currently in sync, but any future fix to the retry semantics has
   to be applied in both places by hand.
+  **Fixed**: both APIs now call one `fetchWithAuthRetry()` helper that owns the
+  CSRF-refresh and access-token-refresh sequence. `tests/frontendV3Wiring.test.js`
+  keeps the runtime retry behavior covered and adds a source guard that the retry calls
+  have one helper owner.
 
-## Phase 14 - Independent Code-Only Review (2026-08-18): Low Severity Polish And Dead Code — 0 / 7
+## Phase 14 - Independent Code-Only Review (2026-08-18): Low Severity Polish And Dead Code - 7 / 7
 
-- [ ] Small utilities duplicated verbatim across files instead of shared: CSV-cell
+- [x] Small utilities duplicated verbatim across files instead of shared: CSV-cell
   escaping (`pages/Subscription.tsx` / `pages/Analytics.tsx`), blob-download-and-click
   (`lib/exportsApi.ts` / `lib/settingsApi.ts`), `isCanadaBusiness`
   (`components/AppShell.tsx` / `pages/Mileage.tsx`), `getPaginationPages`
   (`pages/Transactions.tsx` / `pages/Mileage.tsx` / `pages/Invoices.tsx`), and the AR/AP
   aging-bucket `CASE/SUM` SQL in `services/arApService.js`.
-- [ ] Confirmed dead code: `pdfGeneratorService.js` declares `buildVehicleAuditSchedule`
+  **Fixed**: added `frontend-v3/src/lib/browserDownload.ts`,
+  `frontend-v3/src/lib/pagination.ts`, and `frontend-v3/src/lib/businessLocale.ts`,
+  then replaced each audited frontend duplicate with those helpers. Consolidated the
+  AR/AP aging projection through a single closed-set `agingSummaryQuery()` helper.
+  `tests/frontendV3Wiring.test.js` covers the shared helper behavior and source
+  ownership; `tests/v2BusinessCrudServices.test.js` covers AR/AP query ownership and
+  identifier rejection.
+- [x] Confirmed dead code: `pdfGeneratorService.js` declares `buildVehicleAuditSchedule`
   and `buildQuickMethodRemittancePage` twice each (function-declaration hoisting means
   the first ~140 lines of each pair never execute); `middleware/rateLimiter.js`'s
   `metrics = { increment() {} }` no-op stub is called from 4 sites but never wired to a
@@ -1378,25 +1468,33 @@ problems, not launch-blocking on their own, but worth closing before they compou
   imports `https` but never uses it; `supportEmail.routes.js` and `email.routes.js` each
   have a no-op `catch (err) { throw err; }` wrapping the whole handler, redundant with
   `asyncRoute`.
-- [ ] `pdfGeneratorService.js`'s live Auto Audit Support Schedule "Method Reference"
+  **Fixed/re-audited**: removed the live no-op rate-limit metrics stub and all call sites, removed the unused `https` import from receipts, and removed the no-op rethrow wrappers from the inbound email routes. Re-audit showed the duplicate PDF helper declarations are already gone and `requestEmailChange()` is used by `ChangeEmail.tsx`, so those subclaims are no longer live dead code. `tests/phase14Polish.test.js` guards the still-real removals.
+- [x] `pdfGeneratorService.js`'s live Auto Audit Support Schedule "Method Reference"
   card contains an out-of-place engineering instruction as customer-facing PDF content:
   "Run VALIDATE CONSTRAINT after data cleanup to enable query-planner optimization" —
   unrelated to vehicle deduction methodology, reads like leftover placeholder text.
-- [ ] `server.js` startup logs read as theatrical/AI-generated filler out of step with
+  **Verified complete**: the live Method Reference card now contains only domain-specific vehicle deduction methodology text, and `tests/phase14Polish.test.js` guards against the engineering instruction returning.
+- [x] `server.js` startup logs read as theatrical/AI-generated filler out of step with
   the rest of the file's structured logging convention (e.g.
   `'SYSTEM START: INEX_LEDGER_PROD_2026'`, `'SECURITY: JWT_SECRET detected:'`) —
   harmless (no secret value is actually logged) but stylistically inconsistent.
-- [ ] `window.__LUNA_ME__` (an old internal codename unrelated to the product name) is
+  **Fixed**: startup logging now uses plain structured messages (`Server startup initialized`, `Server port configured`, `JWT secret configuration checked`) and the polish guard test blocks the old theatrical strings.
+- [x] `window.__LUNA_ME__` (an old internal codename unrelated to the product name) is
   read directly off `window` by 4 pages (`Analytics.tsx`, `Mileage.tsx`, `Invoices.tsx`,
   `Transactions.tsx`) for business currency instead of via props/context, bypassing
-  React's normal data flow — deliberately wired in `App.tsx`, but an inconsistent escape
+  React's normal data flow - deliberately wired in `App.tsx`, but an inconsistent escape
   hatch a reviewer would ask to be routed through context.
-- [ ] `services/emailPreferencesService.js`'s `getSigningSecret()` falls back to a
+  **Fixed**: removed the global `window.__LUNA_ME__` handoff. `App.tsx` now pushes
+  `authUser.business.currency` through `setActiveCurrency()`, and the shared money helper
+  reads that explicit active-currency state. `tests/frontendV3Wiring.test.js` guards both
+  the setter path and absence of `__LUNA_ME__` in V3 source.
+- [x] `services/emailPreferencesService.js`'s `getSigningSecret()` falls back to a
   hardcoded literal secret (`"inex-ledger-email-preferences"`) if none of
   `EMAIL_PREFERENCES_SECRET`/`SUPPORT_REPLY_HMAC_SECRET`/`JWT_SECRET` are configured —
   low impact (forged tokens only unsubscribe from optional marketing email) but a
   hardcoded-secret anti-pattern.
-- [ ] Misc naming/structure nits: duplicate migration filename number prefixes (`007`,
+  **Fixed**: removed the hardcoded fallback; unsubscribe token creation now fails closed without a configured signing secret and verification rejects tokens in that state. `tests/phase14Polish.test.js` covers both fail-closed and explicit-secret behavior.
+- [x] Misc naming/structure nits: duplicate migration filename number prefixes (`007`,
   `026`, `045`, three separate `048_*.sql` files — alphabetical sort currently keeps
   execution order deterministic, but there's no single source of truth for "next
   migration number"); `subscriptionService.js`'s `PLAN_FREE`/`PLAN_BASIC` and
@@ -1405,6 +1503,14 @@ problems, not launch-blocking on their own, but worth closing before they compou
   `accountingLockService.js`'s `assertNoLockedPeriodTransactionsForCategory`/
   `assertNoLockedPeriodTransactionsForAccount` are near-duplicates differing only by
   column name; `invoiceEmailService.js` has an indentation break for ~40 lines.
+  **Fixed**: added `db/migrations/README.md` as the source of truth for new
+  `YYYYMMDD_*.sql` migration names and a guard that treats numeric-prefix files as
+  historical only. Removed the unused `PLAN_BASIC`/`PLAN_PRO` subscription-service
+  aliases and moved route-facing Pro/Business comparisons to `PLAN_CODES`. Moved the
+  `requirePlanFeature()` JSDoc to the correct function, consolidated the accounting
+  lock category/account reference query through one closed-set helper, and cleaned the
+  invoice reply-address comment/normalization block. `tests/phase14Polish.test.js` and
+  `tests/migrationFiles.test.js` guard the cleanup.
 
 ## PR Log
 
@@ -2868,7 +2974,7 @@ problems, not launch-blocking on their own, but worth closing before they compou
   substantially more real work than the prior phases' scope covered. Fixing
   Phase 11-14 items is follow-up work, tracked here but not yet started.
 
-- **PR 51**: Phase 11, 11.5/12. Worked through Phase 11 in the most
+- **PR 51**: Phase 11, 12/12. Worked through Phase 11 in the most
   efficient order available: the one confirmed-critical item first (a
   100%-broken feature), then batched the rest across direct edits and three
   parallel background implementation agents for the largest, most
@@ -2924,16 +3030,16 @@ problems, not launch-blocking on their own, but worth closing before they compou
   expected behavior, including one that literally asserted the exact
   per-province hardcoded rates were correct.
 
-  Item 12 (AR/AP hard-delete with no validation or audit trail) is the one
-  item scored `[~]` rather than `[x]`: validation was added in full (new
-  `services/v2BusinessValidationService.js`, wired into all four services),
-  but the soft-delete/audit-trail half was deliberately not implemented
-  after confirming via the actual migrations
-  (`db/migrations/20260419_create_v2_business_tables.sql`) that none of
-  these four tables have the schema columns soft-delete would need — adding
-  a migration was judged out of proportion for this pass, so each hard-delete
-  function now carries a code comment naming the gap instead of silently
-  leaving it undocumented.
+  Item 12 (AR/AP hard-delete with no validation or audit trail) is now fully
+  closed: validation was added in `services/v2BusinessValidationService.js`,
+  and the V2 financial tables now have soft-delete metadata via
+  `db/migrations/20260822_add_v2_business_soft_delete_columns.sql`.
+  `vendorService.js`, `customerService.js`, `invoiceService.js`, and
+  `billService.js` filter active rows with `deleted_at IS NULL` and replace
+  hard deletes with actor-stamped soft deletes; the V2 routes pass `req.user.id`
+  into those delete calls. `tests/v2BusinessServicesValidationAndDelete.test.js`
+  proves invalid input is rejected before any query, delete paths write
+  `deleted_at`/`deleted_by_id`/`deleted_reason`, and hard deletes are not issued.
 
   Full suite via `npm run test:all`: **1719/1719 passing** (plus 3/3 ASVS
   controls) — 73 more than the prior 1646 baseline, all new regression
@@ -2941,6 +3047,182 @@ problems, not launch-blocking on their own, but worth closing before they compou
   `npm run build` (clean); no frontend test harness exists in this repo to
   extend, so type-checking plus a production build is this codebase's
   established verification bar for frontend-only changes. Phase 11 goes
-  from 0/12 to **11.5/12**. Overall recomputed from the checklist markers
-  (65 `[x]` + 1 `[~]` + 26 `[ ]` = 92 total, matching every phase header's
-  own sum): **65.5/92 (~71%)**.
+  from 0/12 to **12/12**. Overall recomputed from the checklist markers
+  (66 `[x]` + 26 `[ ]` = 92 total, matching every phase header's own sum):
+  **66/92 (~72%)**.
+
+- **PR 52**: Phase 12 + Phase 13 follow-up, 2 items. Picked up where PR 51
+  left off and first re-verified the Phase 13 money/currency item instead of
+  trusting the prior source-shape-only coverage. Found one remaining real bug:
+  the shared `getActiveCurrency()` still preserved only CAD and collapsed
+  EUR/GBP/AUD active business currencies to USD. Fixed it by adding
+  `normalizeCurrencyCode()` in `frontend-v3/src/lib/money.ts`, preserving any
+  valid three-letter active currency, and wiring `blankInvoiceDraft()` through
+  the same normalizer. Strengthened `tests/frontendV3Wiring.test.js` so it
+  executes the real compiled TS helpers with an EUR business and proves active
+  currency, default formatting, and new invoice draft currency all stay EUR.
+
+  Also closed Phase 12's duplicated DB SSL decision-tree item: runtime `db.js`
+  now imports the already-tested `utils/dbSslConfig.js` helpers for the real
+  `pg.Pool` SSL config and startup summary, deleting the local duplicate
+  implementation. `tests/dbSslConfig.test.js` now guards against reintroducing
+  a local runtime `buildSslConfig()`/`sslmodeFromUrl` copy. Verification:
+  `node -c db.js`, `node --test tests/dbSslConfig.test.js
+  tests/frontendV3Wiring.test.js`, `npm --prefix frontend-v3 run build`, and
+  `npm run test:all` all passed. Phase 12 moves to **1/12**, Phase 13 moves to
+  **1/7**, and overall recomputes to **67.5/92 (~73%)**.
+
+- **PR 53**: Phase 12 backend consistency batch, 4 complete items, no half
+  credits. Closed the sensitive decrypt logging item by adding sanitized
+  warnings to GST/HST, tax-ID (current and legacy), and bank access-token
+  decrypt failure paths; tests prove failures return `null`, warn once, and do
+  not include stored encrypted values in logs. Closed the import revert atomicity
+  item by wrapping locked-period check, transaction soft-delete, and import-row
+  status update in one database transaction with rollback on failure. Verified
+  the pdf-worker shared-secret comparison is timing-safe and added a regression
+  source guard. Hardened `scripts/i18n-fix.js` so already-applied or obsolete
+  historical replacements do not duplicate keys, while duplicated replacement
+  text still fails; the new script test runs it twice against a temp copy.
+
+  Focused verification: `node --test tests/gstHstNumberService.test.js
+  tests/taxIdService.test.js tests/bankConnectionService.test.js
+  tests/transactionImportService.test.js tests/i18nFixScript.test.js
+  tests/pdfWorkerSecurity.test.js` passed. Phase 12 moves to **5/12** and
+  overall recomputes to **71.5/92 (~78%)**.
+
+- **PR 54**: Continued the no-half-credit cleanup and closed four more items
+  in this pass. Removed live-read DDL/backfill from `GET /api/receipts`, leaving
+  schema ownership to migrations and surfacing missing-column failures through
+  the central error path. Removed duplicated V2 business/entitlement middleware
+  from the six child routers so `routes/index.js` is the single owner for the
+  V2 gate while child routers still require auth. Replaced the frontend CSRF
+  retry's exact-message dependency with a stable backend `code: "csrf_invalid"`,
+  kept the old message only as a compatibility fallback, and centralized
+  `apiRequest`/`apiBlobRequest` retry sequencing in one helper.
+
+  Focused verification: `node --test tests/receiptResilience.test.js
+  tests/receiptUploadValidation.test.js tests/indexRouteGuards.test.js
+  tests/v2RouteErrors.test.js tests/v2RouteHardening.test.js` passed, and
+  `node --test tests/csrfProtection.test.js tests/csrfE2E.test.js
+  tests/frontendV3Wiring.test.js` passed; an additional focused
+  `node --test tests/frontendV3Wiring.test.js` plus
+  `npm --prefix frontend-v3 run build` passed after the retry-helper refactor.
+  Phase 12 moves to **8/12**, Phase 13 moves to **3/7**, and overall
+  recomputes to **81/92 (~88%)**.
+
+- **PR 55**: Continued with three complete items, no partial credits. Moved invoice
+  overdue determination out of browser-local time by having `invoices-v1` serialize
+  read-time `status: "overdue"` for sent past-due invoices while preserving the stored
+  status value. Switched transaction review labels to classify structured
+  `issueCode` values before falling back to human label text. Removed the old
+  `window.__LUNA_ME__` active-business handoff from V3 source; `App.tsx` now pushes the
+  active business currency into the shared money module via `setActiveCurrency()`.
+
+  Focused verification: `node --test tests/invoicesV1Routes.test.js
+  tests/frontendV3Wiring.test.js` passed, `node --test tests/frontendV3Wiring.test.js`
+  passed after the review/currency changes, and `npm --prefix frontend-v3 run build`
+  passed after each frontend change. Phase 13 moves to **5/7**, Phase 14 moves to
+  **5/7**, and overall recomputes to **84/92 (~91%)**.
+
+- **PR 56**: Closed the last two Phase 13 frontend duplication/race items. Extracted
+  the duplicated Messages/Invoices attachment picker state, limits, file input handling,
+  and removal behavior into `frontend-v3/src/hooks/useFileAttachments.ts`. Added
+  request-ordering guards to `useTransactionsPageData` and `useMessagesPageData` so
+  stale transaction refreshes, message refreshes, and message-thread loads cannot
+  overwrite newer state.
+
+  Focused verification: `node --test tests/frontendV3Wiring.test.js` passed and
+  `npm --prefix frontend-v3 run build` passed with the existing large-chunk warning.
+  Phase 13 moves to **7/7**, and overall recomputes to **86/92 (~93%)**.
+
+- **PR 57**: Closed the Phase 14 duplicated-small-utilities item without partial
+  credit. Shared CSV escaping/download behavior through `browserDownload.ts`, shared
+  pagination windows through `pagination.ts`, shared Canada/kilometer business detection
+  through `businessLocale.ts`, and reduced AR/AP aging SQL to one closed-set projection
+  builder.
+
+  Focused verification: `node --test tests/frontendV3Wiring.test.js` passed and
+  `node --test tests/v2BusinessCrudServices.test.js` passed. Phase 14 moves to
+  **6/7**, and overall recomputes to **87/92 (~95%)**.
+
+- **PR 58**: Closed the Phase 12 check-then-act race item. Basic-plan cap checks now
+  lock the business/month usage key and re-read counts inside the transaction before
+  route inserts proceed. Vehicle claim method election writes now run in a transaction
+  with a business/year advisory lock so the conflict check and upsert cannot race.
+
+  Focused verification: `node --test tests/basicPlanUsageService.test.js
+  tests/businessUsageService.test.js`, `node --test tests/vehicleClaimService.test.js
+  tests/vehicleClaimsRouteErrors.test.js`, `node --test tests/transactionCsvImportRoute.test.js
+  tests/recurringRouteValidation.test.js tests/receiptUploadValidation.test.js`, and
+  `node --test tests/transactionsFeatureGating.test.js tests/transactionsBulkDeleteAllRoute.test.js
+  tests/transactionReceiptStatusRoute.test.js` all passed. Phase 12 moves to
+  **9/12**, and overall recomputes to **88/92 (~96%)**.
+
+- **PR 59**: Closed the Phase 12 duplicated MFA email-code verification item. The
+  common pending-token/challenge/code/attempt/consume sequence now lives in
+  `verifyMfaEmailCode()`, while each caller keeps its own purpose checks, copy, and
+  post-verification side effects.
+
+  Focused verification: `node --test tests/authDeviceVerification.test.js
+  tests/authEmailChangeTokenHash.test.js tests/authRouteErrors.test.js` and
+  `node --test tests/authVerificationRedirect.test.js tests/accountDeletion.test.js
+  tests/csrfE2E.test.js` passed. Phase 12 moves to **10/12**, and overall recomputes
+  to **89/92 (~97%)**.
+
+- **PR 60**: Closed the Phase 14 misc naming/structure item without renaming applied
+  migrations. Added a migration naming policy and guard for date-prefixed new
+  migrations, removed unused plan alias exports, moved Pro/Business route comparisons
+  to `PLAN_CODES`, put the `requirePlanFeature()` JSDoc over the right function,
+  consolidated accounting-lock reference checks, and cleaned the invoice reply-address
+  helper/comment block.
+
+  Focused verification: `node --test tests/phase14Polish.test.js tests/migrationFiles.test.js
+  tests/subscriptionService.test.js tests/entitlementsRoutes.test.js tests/indexRouteGuards.test.js`
+  and `node --test tests/accountingControls.test.js tests/invoiceEmailService.test.js
+  tests/invoicesV1Routes.test.js tests/billingAddonManagement.test.js
+  tests/recurringRouteValidation.test.js tests/transactionsFeatureGating.test.js` passed.
+  Phase 14 moves to **7/7**, and overall recomputes to **90/92 (~98%)**.
+
+- **PR 61**: Closed the Phase 12 analytics-service extraction item with no partial
+  credit. Added `services/analyticsService.js` as the single owner for dashboard
+  response shaping, trailing-month bucketing, US/CA self-employment tax estimates,
+  cash-flow recurring monthly equivalents, seasonal deviation insights, and what-if
+  validation/projection. `routes/analytics.routes.js` now stays at the HTTP/query
+  boundary and delegates those calculations to the service.
+
+  Focused verification: `node --test tests/analyticsService.test.js
+  tests/analyticsRouteErrors.test.js` passed, `node -c routes/analytics.routes.js;
+  node -c services/analyticsService.js; node -c tests/analyticsService.test.js`
+  passed, and the analytics route source guard found no reintroduced service-owned
+  computation symbols. Phase 12 moves to **11/12**, and overall recomputes to
+  **91/92 (~99%)**.
+
+- **Tracker audit (2026-08-22)**: Re-read this progress file end to end after
+  PR 61 and corrected the stale Phase 11 PR-log wording that still described
+  the V2 soft-delete/audit item as partial. Recomputed every phase header
+  from the live checklist markers, excluding the historical PR log:
+  Phases 1-11 and 13-14 are fully closed, Phase 12 is **12/12**, and the
+  current live total is **92/92** with **0** half-credit markers and **0**
+  genuinely open items.
+
+- **PR 62**: Closed the final Phase 12 `asyncRoute`/`ApiError` consistency item
+  with no partial credit. Converted the audited mutation routes in
+  `routes/transactions.routes.js`, `routes/exports.routes.js`,
+  `routes/businesses.routes.js`, and `routes/billing.routes.js` to the shared
+  async error path, preserving functional local catches only for rollback,
+  compensation, export-failure side effects, and the Stripe webhook's distinct
+  acknowledgement contract. Extended `ApiError` and the production/test central
+  handlers to carry expected public response fields and explicit public fallback
+  500 messages without weakening the default generic 500 behavior.
+
+  Verification: `node --test tests/apiError.test.js tests/testPoolHelpers.test.js
+  tests/phase12RouteConsistency.test.js tests/transactionsBulkDeleteAllRoute.test.js
+  tests/transactionReceiptStatusRoute.test.js tests/transactionsCsvImportLimit.test.js
+  tests/transactionCsvImportRoute.test.js tests/exportsRegression.test.js
+  tests/businessRouteErrors.test.js tests/businessProvisionAddOn.test.js
+  tests/businessCreationLimit.test.js tests/billingMockRoutes.test.js
+  tests/billingAddonManagement.test.js tests/billingCurrencyResolution.test.js`
+  passed; `node --test tests/launchBlockers.test.js
+  tests/transactionsFeatureGating.test.js` passed; `npm run test:all` passed
+  with **1757/1757** node tests and **3/3** ASVS controls. Phase 12 moves to
+  **12/12**, and overall recomputes to **92/92 (100%)**.

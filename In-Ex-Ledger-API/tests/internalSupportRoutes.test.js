@@ -6,6 +6,7 @@ const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
 const fs = require("node:fs");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ROUTE_PATH = require.resolve("../routes/internalSupport.routes.js");
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -97,6 +98,7 @@ function loadInternalSupportRouterFixture({ queryImpl } = {}) {
   const app = express();
   app.use(express.json());
   app.use("/api/internal/support", router);
+  attachCentralErrorHandler(app);
 
   return {
     app,
@@ -159,7 +161,7 @@ test("internal support user lookup returns subscription and locale context", asy
   }
 });
 
-test("internal support user lookup returns 404 with the support envelope", async () => {
+test("internal support user lookup returns 404 through the central error handler", async () => {
   process.env.INEX_LEDGER_SUPPORT_SECRET = "support-secret-test";
   const fixture = loadInternalSupportRouterFixture();
 
@@ -169,13 +171,13 @@ test("internal support user lookup returns 404 with the support envelope", async
       .set("x-support-secret", "support-secret-test");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { ok: false, message: "User not found." });
+    assert.deepEqual(response.body, { error: "User not found." });
   } finally {
     fixture.cleanup();
   }
 });
 
-test("internal support routes hide unexpected failures behind the support envelope", async () => {
+test("internal support routes hide unexpected failures through the central error handler", async () => {
   process.env.INEX_LEDGER_SUPPORT_SECRET = "support-secret-test";
   const fixture = loadInternalSupportRouterFixture({
     queryImpl: async () => {
@@ -189,7 +191,7 @@ test("internal support routes hide unexpected failures behind the support envelo
       .set("x-support-secret", "support-secret-test");
 
     assert.equal(response.status, 500);
-    assert.deepEqual(response.body, { ok: false, message: "Internal server error" });
+    assert.deepEqual(response.body, { error: "Internal server error" });
   } finally {
     fixture.cleanup();
   }
@@ -231,7 +233,7 @@ test("internal support business lookup rejects malformed ids before DB access", 
       .set("x-support-secret", "support-secret-test");
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { ok: false, message: "Invalid business ID." });
+    assert.deepEqual(response.body, { error: "Invalid business ID." });
     assert.equal(fixture.state.queryCount, 0);
   } finally {
     fixture.cleanup();
@@ -248,7 +250,7 @@ test("internal support subscription lookup rejects malformed user ids before DB 
       .set("x-support-secret", "support-secret-test");
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { ok: false, message: "Invalid user ID." });
+    assert.deepEqual(response.body, { error: "Invalid user ID." });
     assert.equal(fixture.state.queryCount, 0);
   } finally {
     fixture.cleanup();

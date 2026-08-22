@@ -99,19 +99,19 @@ function loadFixture(routeKey) {
 
   Module._load = function patchedLoad(requestName, parent, isMain) {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
-      return { requireAuth(req, _res, next) { req.user = { id: "user_1" }; next(); } };
+      return {
+        requireAuth(req, _res, next) {
+          req.user = { id: "user_1" };
+          req.business = { id: "biz_1" };
+          next();
+        }
+      };
     }
     if (requestName === "../middleware/csrf.middleware.js" || /csrf\.middleware\.js$/.test(requestName)) {
       return { requireCsrfProtection: (_req, _res, next) => next() };
     }
     if (requestName === "../middleware/rate-limit.middleware.js" || /rate-limit\.middleware\.js$/.test(requestName)) {
       return { createDataApiLimiter: () => (_req, _res, next) => next() };
-    }
-    if (requestName === "../api/utils/requireV2BusinessEnabled" || /requireV2BusinessEnabled\.js$/.test(requestName)) {
-      return {
-        requireV2BusinessEnabled(req, _res, next) { req.business = { id: "biz_1" }; next(); },
-        requireV2Entitlement(_req, _res, next) { next(); }
-      };
     }
     if (requestName === config.servicePath || new RegExp(`${config.serviceName}\\.js$|${config.serviceName}$`).test(requestName)) {
       return {

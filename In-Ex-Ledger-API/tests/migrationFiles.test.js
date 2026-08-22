@@ -14,6 +14,62 @@ const {
 } = require("../db.js");
 
 const migrationsDir = path.join(__dirname, "..", "db", "migrations");
+const HISTORICAL_NUMERIC_PREFIX_MIGRATIONS = new Set([
+  "001_init_luna_business.sql",
+  "002_enforce_business_name_uniqueness.sql",
+  "003_add_receipt_storage.sql",
+  "004_create_refresh_tokens.sql",
+  "005_drop_accounts_name_unique_index.sql",
+  "006_add_receipt_file_hash.sql",
+  "007_add_marketing_email_opt_in.sql",
+  "007_add_user_columns.sql",
+  "008_create_exports.sql",
+  "009_create_auth_tokens.sql",
+  "010_create_export_grant_jtis.sql",
+  "011_business_and_user_profile.sql",
+  "012_create_business_subscriptions.sql",
+  "013_expand_business_profile.sql",
+  "014_add_category_color.sql",
+  "015_harden_core_data_paths.sql",
+  "016_add_transaction_cleared_flag.sql",
+  "017_create_recurring_transactions.sql",
+  "018_add_active_business_context.sql",
+  "019_create_cpa_access_grants.sql",
+  "020_create_cpa_audit_logs.sql",
+  "021_add_user_mfa.sql",
+  "022_create_mfa_trusted_devices.sql",
+  "023_create_mfa_email_challenges.sql",
+  "024_add_user_onboarding_state.sql",
+  "025_finalize_business_profile_columns.sql",
+  "026_create_user_privacy_settings.sql",
+  "026_fix_exports_schema.sql",
+  "027_add_user_data_residency.sql",
+  "028_add_encrypted_sensitive_fields.sql",
+  "029_add_transaction_audit_pivot.sql",
+  "030_add_privacy_consent_log.sql",
+  "031_add_cpa_license_verification.sql",
+  "032_cpa_ip_tracking_and_audit_immutability.sql",
+  "033_phase4_user_rights_and_audit_trail.sql",
+  "035_fix_schema_gaps.sql",
+  "036_drop_cpa_audit_business_fk.sql",
+  "037_add_cpa_edge_case_metadata.sql",
+  "038_create_messages.sql",
+  "039_add_analytics_opt_in.sql",
+  "040_add_accounting_period_locks_and_transaction_archival.sql",
+  "041_enforce_category_name_ci_unique.sql",
+  "042_add_transaction_soft_delete.sql",
+  "043_drop_goals.sql",
+  "044_add_performance_indexes.sql",
+  "045_add_refresh_token_mfa_authenticated.sql",
+  "045_drop_cpa_audit_user_fks.sql",
+  "046_add_1099_payer_fields_to_transactions.sql",
+  "047_add_signin_device_tracking_and_secure_reset_tokens.sql",
+  "048_add_cookie_consent_log.sql",
+  "048_fix_cpa_audit_fk_constraints.sql",
+  "048_reset_ip_based_signin_device_fingerprints.sql",
+  "049_create_stripe_webhook_events.sql",
+  "050_drop_cpa_audit_grant_id_fk.sql"
+]);
 const HISTORICAL_DESTRUCTIVE_MIGRATIONS = new Set([
   "002_enforce_business_name_uniqueness.sql",
   "015_harden_core_data_paths.sql",
@@ -43,6 +99,23 @@ function sqlWithoutComments(sql) {
 function containsDestructiveSql(sql) {
   return /\bDELETE\s+FROM\b|\bDROP\s+TABLE\b|\bDROP\s+CONSTRAINT\b|\bTRUNCATE\b/i.test(sqlWithoutComments(sql));
 }
+
+test("migration naming policy keeps historical numeric prefixes but requires date-prefixed new files", () => {
+  const readme = fs.readFileSync(path.join(migrationsDir, "README.md"), "utf8");
+  assert.match(readme, /YYYYMMDD_short_description\.sql/);
+  assert.match(readme, /Do not rename them/);
+
+  const numericPrefixFiles = fs
+    .readdirSync(migrationsDir)
+    .filter((file) => /^\d{3}_.+\.sql$/.test(file))
+    .sort();
+
+  assert.deepEqual(
+    numericPrefixFiles,
+    Array.from(HISTORICAL_NUMERIC_PREFIX_MIGRATIONS).sort(),
+    "new migrations must use YYYYMMDD_*.sql names; numeric prefixes are historical only"
+  );
+});
 
 test("migration 045 keeps original applied SQL shape", () => {
   const sql = readMigration("045_drop_cpa_audit_user_fks.sql");

@@ -32,11 +32,35 @@ test("attachCentralErrorHandler returns the error's own message for a <500 statu
   assert.deepEqual(response.body, { error: "Bad input." });
 });
 
+test("attachCentralErrorHandler includes public response fields for a <500 status", async () => {
+  const err = Object.assign(new Error("Locked."), {
+    status: 409,
+    responseFields: { code: "accounting_period_locked", locked_through_date: "2026-08-01" }
+  });
+  const response = await request(buildApp({ thrown: err })).get("/x");
+  assert.equal(response.status, 409);
+  assert.deepEqual(response.body, {
+    error: "Locked.",
+    code: "accounting_period_locked",
+    locked_through_date: "2026-08-01"
+  });
+});
+
 test("attachCentralErrorHandler hides the message behind a generic string for 500s", async () => {
   const err = new Error("stack trace with secrets");
   const response = await request(buildApp({ thrown: err })).get("/x");
   assert.equal(response.status, 500);
   assert.deepEqual(response.body, { error: "Internal server error" });
+});
+
+test("attachCentralErrorHandler exposes explicit public 500 fallback messages", async () => {
+  const err = Object.assign(new Error("Failed to start checkout."), {
+    status: 500,
+    expose: true
+  });
+  const response = await request(buildApp({ thrown: err })).get("/x");
+  assert.equal(response.status, 500);
+  assert.deepEqual(response.body, { error: "Failed to start checkout." });
 });
 
 test("attachCentralErrorHandler reads statusCode as a fallback for status", async () => {

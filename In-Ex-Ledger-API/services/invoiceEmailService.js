@@ -37,14 +37,6 @@ function getInvoiceFromEmail() {
 }
 
 /**
- * Returns the reply-to address pattern used for inbound replies.
- * If INVOICE_REPLY_BASE_EMAIL is "invoices@yourdomain.com", we plus-address
- * it with a signed token: "invoices+<token>@yourdomain.com".
- *
- * INVOICE_REPLY_BASE_EMAIL is optional: when unset, replies still work but
- * use a query-style suffix and inbound parsing relies on the To header only.
- */
-/**
  * Strip a value that was pasted with its own `KEY=` prefix. A surprisingly
  * common deploy mistake is putting the whole `INVOICE_REPLY_BASE_EMAIL=foo@bar`
  * line into the variable's VALUE field, which makes the reply address
@@ -55,6 +47,22 @@ function stripEnvAssignmentPrefix(value) {
   return String(value || "").replace(/^\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*/, "").trim();
 }
 
+function normalizeEmailAddress(value) {
+  const raw = String(value || "").trim();
+
+  // Handles: Name <email@example.com>
+  const bracketMatch = raw.match(/<([^>]+)>/);
+  const email = (bracketMatch ? bracketMatch[1] : raw).trim();
+
+  // Remove accidental angle brackets around the whole address/local part.
+  return email.replace(/[<>]/g, "").trim();
+}
+
+/**
+ * Returns the reply-to address pattern used for inbound replies.
+ * If INVOICE_REPLY_BASE_EMAIL is "invoices@yourdomain.com", we plus-address
+ * it with a signed token: "invoices+<token>@yourdomain.com".
+ */
 function getInvoiceReplyBaseEmail() {
   const raw = String(process.env.INVOICE_REPLY_BASE_EMAIL || "").trim();
   if (!raw) return null;
@@ -148,21 +156,6 @@ function parseReplyToken(token) {
   }
 
   return invoiceId;
-}
-
-/**
- * Build a reply-to address. Returns null when no INVOICE_REPLY_BASE_EMAIL
- * is configured (the caller should fall back to the From address).
- */
-function normalizeEmailAddress(value) {
-  const raw = String(value || "").trim();
-
-  // Handles: Name <email@example.com>
-  const bracketMatch = raw.match(/<([^>]+)>/);
-  const email = (bracketMatch ? bracketMatch[1] : raw).trim();
-
-  // Remove accidental angle brackets around the whole address/local part.
-  return email.replace(/[<>]/g, "").trim();
 }
 
 function normalizeRecipientList(value) {

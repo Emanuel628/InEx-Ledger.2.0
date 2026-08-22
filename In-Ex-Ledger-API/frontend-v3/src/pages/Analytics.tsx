@@ -15,6 +15,7 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import { loadAnalytics, type AnalyticsSummary } from '../lib/analyticsApi'
+import { downloadCsv as downloadCsvFile } from '../lib/browserDownload'
 import { formatMoney as sharedFormatMoney, getActiveCurrency } from '../lib/money'
 
 const emptyAnalytics: AnalyticsSummary = {
@@ -285,17 +286,13 @@ function AnalyticsExportModal({ analytics, onClose }: { analytics: AnalyticsSumm
   }))
 
   function downloadCsv() {
-    const csv = [
-      ['Month', 'Income', 'Expenses', 'Net'].join(','),
-      ...rows.map((row) => [row.month, row.income, row.expenses, row.net].map(csvCell).join(',')),
-    ].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'inex-ledger-analytics-insights.csv'
-    link.click()
-    URL.revokeObjectURL(url)
+    downloadCsvFile(
+      [
+        ['Month', 'Income', 'Expenses', 'Net'],
+        ...rows.map((row) => [row.month, row.income, row.expenses, row.net]),
+      ],
+      'inex-ledger-analytics-insights.csv'
+    )
   }
 
   return (
@@ -326,11 +323,6 @@ function AnalyticsExportModal({ analytics, onClose }: { analytics: AnalyticsSumm
       </section>
     </div>
   )
-}
-
-function csvCell(value: string | number) {
-  const text = String(value)
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 function formatMoney(value: number) {

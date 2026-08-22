@@ -148,8 +148,12 @@ function attachCentralErrorHandler(app, { logError } = {}) {
         ...(err.routeParams && { params: err.routeParams })
       });
     }
-    const message = status < 500 ? err.message : "Internal server error";
-    res.status(status).json({ error: message });
+    const message = status < 500 || err.expose ? err.message : "Internal server error";
+    const responseFields =
+      status < 500 && err.responseFields && typeof err.responseFields === "object"
+        ? err.responseFields
+        : {};
+    res.status(status).json({ error: message, ...responseFields });
   });
 }
 

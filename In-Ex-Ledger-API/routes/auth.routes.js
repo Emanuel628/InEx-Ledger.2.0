@@ -736,6 +736,57 @@ async function consumeMfaEmailChallenge(challengeId) {
   );
 }
 
+async function verifyMfaEmailCode({
+  mfaToken,
+  code,
+  user,
+  expectedPurpose,
+  validatePending = null,
+  tokenDecodeMessage = "Verification session expired. Start again.",
+  sessionExpiredMessage = "Verification session expired. Start again.",
+  codeExpiredMessage = "Verification code expired. Start again.",
+  tooManyAttemptsMessage = "Too many invalid verification attempts. Start again.",
+  invalidCodeMessage = "Invalid verification code."
+}) {
+  let pending;
+  try {
+    pending = verifyToken(mfaToken);
+  } catch (error) {
+    throw new ApiError(401, tokenDecodeMessage);
+  }
+
+  const pendingMatches =
+    pending?.purpose === expectedPurpose &&
+    pending?.id === user.id &&
+    pending?.email === user.email &&
+    (!validatePending || validatePending(pending));
+
+  if (!pendingMatches) {
+    throw new ApiError(401, sessionExpiredMessage);
+  }
+
+  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+  if (!challenge) {
+    throw new ApiError(401, codeExpiredMessage);
+  }
+
+  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
+    throw new ApiError(429, tooManyAttemptsMessage);
+  }
+
+  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
+    await recordFailedMfaEmailAttempt(challenge.id);
+    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
+      throw new ApiError(429, tooManyAttemptsMessage);
+    }
+    throw new ApiError(401, invalidCodeMessage);
+  }
+
+  await consumeMfaEmailChallenge(challenge.id);
+  return { pending, challenge };
+}
+
 function setRefreshCookie(res, token, expiresAt) {
   res.cookie(REFRESH_TOKEN_COOKIE, token, {
     ...COOKIE_OPTIONS,
@@ -1686,41 +1737,13 @@ router.post("/mfa/reauth", requireAuth, requireCsrfProtection, mfaVerifyLimiter,
     });
   }
 
-  let pending;
-  try {
-    pending = verifyToken(mfaToken);
-  } catch (error) {
-    throw new ApiError(401, "Verification session expired. Start again.");
-  }
-
-  if (
-    pending.purpose !== "mfa_sensitive_reauth" ||
-    pending.id !== user.id ||
-    pending.email !== user.email ||
-    pending.reason !== "account_delete"
-  ) {
-    throw new ApiError(401, "Verification session expired. Start again.");
-  }
-
-  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-  if (!challenge) {
-    throw new ApiError(401, "Verification code expired. Start again.");
-  }
-
-  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-    throw new ApiError(429, "Too many invalid verification attempts. Start again.");
-  }
-
-  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-    await recordFailedMfaEmailAttempt(challenge.id);
-    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-      throw new ApiError(429, "Too many invalid verification attempts. Start again.");
-    }
-    throw new ApiError(401, "Invalid verification code.");
-  }
-
-  await consumeMfaEmailChallenge(challenge.id);
+  await verifyMfaEmailCode({
+    mfaToken,
+    code,
+    user,
+    expectedPurpose: "mfa_sensitive_reauth",
+    validatePending: (pending) => pending.reason === "account_delete"
+  });
   const reauthToken = signToken(
     {
       purpose: "mfa_sensitive_reauth",
@@ -1765,36 +1788,12 @@ router.post("/mfa/enable", requireAuth, requireCsrfProtection, mfaVerifyLimiter,
     });
   }
 
-  let pending;
-  try {
-    pending = verifyToken(mfaToken);
-  } catch (error) {
-    throw new ApiError(401, "Verification session expired. Start again.");
-  }
-
-  if (pending.purpose !== "mfa_settings_enable" || pending.id !== user.id || pending.email !== user.email) {
-    throw new ApiError(401, "Verification session expired. Start again.");
-  }
-
-  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-  if (!challenge) {
-    throw new ApiError(401, "Verification code expired. Start again.");
-  }
-
-  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-    throw new ApiError(429, "Too many invalid verification attempts. Start again.");
-  }
-
-  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-    await recordFailedMfaEmailAttempt(challenge.id);
-    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-      throw new ApiError(429, "Too many invalid verification attempts. Start again.");
-    }
-    throw new ApiError(401, "Invalid verification code.");
-  }
-
-  await consumeMfaEmailChallenge(challenge.id);
+  await verifyMfaEmailCode({
+    mfaToken,
+    code,
+    user,
+    expectedPurpose: "mfa_settings_enable"
+  });
   await pool.query(
     `UPDATE users
         SET mfa_enabled = true,
@@ -1853,36 +1852,12 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
     });
   }
 
-  let pending;
-  try {
-    pending = verifyToken(mfaToken);
-  } catch (error) {
-    throw new ApiError(401, "Verification session expired. Start again.");
-  }
-
-  if (pending.purpose !== "mfa_settings_disable" || pending.id !== user.id || pending.email !== user.email) {
-    throw new ApiError(401, "Verification session expired. Start again.");
-  }
-
-  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-  if (!challenge) {
-    throw new ApiError(401, "Verification code expired. Start again.");
-  }
-
-  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-    throw new ApiError(429, "Too many invalid verification attempts. Start again.");
-  }
-
-  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-    await recordFailedMfaEmailAttempt(challenge.id);
-    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-      throw new ApiError(429, "Too many invalid verification attempts. Start again.");
-    }
-    throw new ApiError(401, "Invalid verification code.");
-  }
-
-  await consumeMfaEmailChallenge(challenge.id);
+  await verifyMfaEmailCode({
+    mfaToken,
+    code,
+    user,
+    expectedPurpose: "mfa_settings_disable"
+  });
   await pool.query(
     `UPDATE users
         SET mfa_enabled = false,
@@ -1935,25 +1910,16 @@ router.post("/mfa/verify", requireCsrfProtection, mfaVerifyLimiter, asyncRoute(a
       throw new ApiError(401, "MFA session is no longer valid.");
     }
 
-    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-    if (!challenge) {
-      throw new ApiError(401, "Verification code expired. Sign in again to get a new one.");
-    }
-
-    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-      throw new ApiError(429, "Too many invalid verification attempts. Sign in again to get a new code.");
-    }
-
-    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-      await recordFailedMfaEmailAttempt(challenge.id);
-      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-        throw new ApiError(429, "Too many invalid verification attempts. Sign in again to get a new code.");
-      }
-      throw new ApiError(401, "Invalid verification code.");
-    }
-
-    await consumeMfaEmailChallenge(challenge.id);
+    await verifyMfaEmailCode({
+      mfaToken,
+      code,
+      user,
+      expectedPurpose: "mfa_pending",
+      tokenDecodeMessage: "Invalid or expired MFA session.",
+      sessionExpiredMessage: "Invalid MFA session.",
+      codeExpiredMessage: "Verification code expired. Sign in again to get a new one.",
+      tooManyAttemptsMessage: "Too many invalid verification attempts. Sign in again to get a new code."
+    });
     const refreshedUser = await findUserById(user.id);
     if (refreshedUser.mfa_enabled && trustDevice) {
       const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);
@@ -2069,36 +2035,16 @@ router.post("/verify-email/confirm-code", requireAuth, requireCsrfProtection, mf
     throw new ApiError(404, "User not found");
   }
 
-  let pending;
-  try {
-    pending = verifyToken(mfaToken);
-  } catch (error) {
-    throw new ApiError(401, "Verification session expired. Request a new code.");
-  }
-
-  if (pending.purpose !== "signup_email_verify" || pending.id !== user.id || pending.email !== user.email) {
-    throw new ApiError(401, "Verification session expired. Request a new code.");
-  }
-
-  const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
-  if (!challenge) {
-    throw new ApiError(401, "Verification code expired. Request a new code.");
-  }
-
-  if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
-    throw new ApiError(429, "Too many invalid attempts. Request a new code.");
-  }
-
-  if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
-    const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
-    await recordFailedMfaEmailAttempt(challenge.id);
-    if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
-      throw new ApiError(429, "Too many invalid attempts. Request a new code.");
-    }
-    throw new ApiError(401, "Invalid verification code.");
-  }
-
-  await consumeMfaEmailChallenge(challenge.id);
+  await verifyMfaEmailCode({
+    mfaToken,
+    code,
+    user,
+    expectedPurpose: "signup_email_verify",
+    tokenDecodeMessage: "Verification session expired. Request a new code.",
+    sessionExpiredMessage: "Verification session expired. Request a new code.",
+    codeExpiredMessage: "Verification code expired. Request a new code.",
+    tooManyAttemptsMessage: "Too many invalid attempts. Request a new code."
+  });
   await pool.query(`UPDATE users SET email_verified = true WHERE id = $1`, [user.id]);
 
   const refreshedUser = await findUserById(user.id);

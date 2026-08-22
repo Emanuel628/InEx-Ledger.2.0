@@ -26,8 +26,8 @@ function validateClaimMethodForRegion(claimMethod, region) {
   return { normalizedRegion, method };
 }
 
-async function assertConsistentClaimMethodForYear({ businessId, taxYear, claimMethod, transactionId }) {
-  const result = await pool.query(
+async function assertConsistentClaimMethodForYear(db, { businessId, taxYear, claimMethod, transactionId }) {
+  const result = await db.query(
     `SELECT claim_method
        FROM vehicle_expense_details
       WHERE business_id = $1
@@ -40,6 +40,13 @@ async function assertConsistentClaimMethodForYear({ businessId, taxYear, claimMe
   if (existingMethod && existingMethod !== String(claimMethod || "").toLowerCase()) {
     throw new Error(`Vehicle claim method conflict for tax year ${taxYear}. Use one method per business tax year until per-vehicle elections are supported.`);
   }
+}
+
+async function lockVehicleClaimElection(db, businessId, taxYear) {
+  await db.query(
+    "SELECT pg_advisory_xact_lock(hashtext($1))",
+    [`vehicle-claim-election:${businessId}:${taxYear}`]
+  );
 }
 
 // Compute vehicle deduction variables without hitting the DB.
@@ -97,6 +104,7 @@ async function getVehicleClaimDetail(transactionId, businessId) {
 }
 
 async function upsertVehicleClaimDetail(transactionId, businessId, data) {
+  const client = await pool.connect();
   const {
     taxYear,
     claimMethod,
@@ -107,69 +115,84 @@ async function upsertVehicleClaimDetail(transactionId, businessId, data) {
     region
   } = data;
 
-  const { normalizedRegion, method } = validateClaimMethodForRegion(claimMethod, region);
-  await assertConsistentClaimMethodForYear({ businessId, taxYear, claimMethod: method, transactionId });
+  try {
+    await client.query("BEGIN");
+    await lockVehicleClaimElection(client, businessId, taxYear);
 
-  // For CRA mileage claims, accumulate km logged earlier this year so the
-  // 5,000 km tier threshold is applied correctly across the full tax year.
-  let priorYearKm = 0;
-  if (normalizedRegion === "CA" && method === "mileage") {
-    const priorRes = await pool.query(
-      `SELECT COALESCE(SUM(
-         CASE WHEN distance_unit = 'km' THEN distance
-              WHEN distance_unit = 'mi' THEN distance * 1.60934
-              ELSE 0 END
-       ), 0)::numeric AS prior_km
-       FROM vehicle_expense_details
-      WHERE business_id = $1
-        AND tax_year = $2
-        AND claim_method = 'mileage'
-        AND transaction_id != $3`,
-      [businessId, taxYear, transactionId]
-    );
-    priorYearKm = Number(priorRes.rows[0]?.prior_km || 0);
-  }
+    const { normalizedRegion, method } = validateClaimMethodForRegion(claimMethod, region);
+    await assertConsistentClaimMethodForYear(client, { businessId, taxYear, claimMethod: method, transactionId });
 
-  const { calculatedDeduction, taxYearRate } = computeVehicleDeduction({
-    claimMethod: method,
-    region: normalizedRegion,
-    taxYear,
-    distance,
-    distanceUnit,
-    amount,
-    businessUsePct,
-    priorYearKm
-  });
+    // For CRA mileage claims, accumulate km logged earlier this year so the
+    // 5,000 km tier threshold is applied correctly across the full tax year.
+    let priorYearKm = 0;
+    if (normalizedRegion === "CA" && method === "mileage") {
+      const priorRes = await client.query(
+        `SELECT COALESCE(SUM(
+           CASE WHEN distance_unit = 'km' THEN distance
+                WHEN distance_unit = 'mi' THEN distance * 1.60934
+                ELSE 0 END
+         ), 0)::numeric AS prior_km
+         FROM vehicle_expense_details
+        WHERE business_id = $1
+          AND tax_year = $2
+          AND claim_method = 'mileage'
+          AND transaction_id != $3`,
+        [businessId, taxYear, transactionId]
+      );
+      priorYearKm = Number(priorRes.rows[0]?.prior_km || 0);
+    }
 
-  const result = await pool.query(
-    `INSERT INTO vehicle_expense_details
-       (transaction_id, business_id, tax_year, claim_method,
-        distance, distance_unit, tax_year_rate,
-        business_use_pct, calculated_deduction, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-     ON CONFLICT (transaction_id) DO UPDATE SET
-       tax_year              = EXCLUDED.tax_year,
-       claim_method          = EXCLUDED.claim_method,
-       distance              = EXCLUDED.distance,
-       distance_unit         = EXCLUDED.distance_unit,
-       tax_year_rate         = EXCLUDED.tax_year_rate,
-       business_use_pct      = EXCLUDED.business_use_pct,
-       calculated_deduction  = EXCLUDED.calculated_deduction,
-       updated_at            = NOW()
-     RETURNING *`,
-    [
-      transactionId,
-      businessId,
+    const { calculatedDeduction, taxYearRate } = computeVehicleDeduction({
+      claimMethod: method,
+      region: normalizedRegion,
       taxYear,
-      method,
-      method === "mileage" ? distance : null,
-      method === "mileage" ? (distanceUnit || "mi") : null,
-      taxYearRate,
-      method === "actual" ? businessUsePct : null,
-      calculatedDeduction
-    ]
-  );
-  return result.rows[0];
+      distance,
+      distanceUnit,
+      amount,
+      businessUsePct,
+      priorYearKm
+    });
+
+    const result = await client.query(
+      `INSERT INTO vehicle_expense_details
+         (transaction_id, business_id, tax_year, claim_method,
+          distance, distance_unit, tax_year_rate,
+          business_use_pct, calculated_deduction, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+       ON CONFLICT (transaction_id) DO UPDATE SET
+         tax_year              = EXCLUDED.tax_year,
+         claim_method          = EXCLUDED.claim_method,
+         distance              = EXCLUDED.distance,
+         distance_unit         = EXCLUDED.distance_unit,
+         tax_year_rate         = EXCLUDED.tax_year_rate,
+         business_use_pct      = EXCLUDED.business_use_pct,
+         calculated_deduction  = EXCLUDED.calculated_deduction,
+         updated_at            = NOW()
+       RETURNING *`,
+      [
+        transactionId,
+        businessId,
+        taxYear,
+        method,
+        method === "mileage" ? distance : null,
+        method === "mileage" ? (distanceUnit || "mi") : null,
+        taxYearRate,
+        method === "actual" ? businessUsePct : null,
+        calculatedDeduction
+      ]
+    );
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackErr) {
+      logError("Vehicle claim transaction rollback failed:", rollbackErr);
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 module.exports = {
@@ -179,6 +202,7 @@ module.exports = {
   validateClaimMethodForRegion,
   __private: {
     normalizeRegion,
-    assertConsistentClaimMethodForYear
+    assertConsistentClaimMethodForYear,
+    lockVehicleClaimElection
   }
 };

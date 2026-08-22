@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ROUTE_PATH = require.resolve("../routes/transactions.routes.js");
 const TEST_TRANSACTION_ID = "00000000-0000-4000-8000-000000000201";
@@ -19,6 +20,7 @@ function buildApp(router) {
   const app = express();
   app.use(express.json());
   app.use("/api/transactions", router);
+  attachCentralErrorHandler(app);
   return app;
 }
 

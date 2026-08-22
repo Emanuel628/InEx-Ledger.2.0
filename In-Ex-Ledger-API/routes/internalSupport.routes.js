@@ -7,7 +7,7 @@ const {
   getSubscriptionSnapshotForBusiness
 } = require("../services/subscriptionService.js");
 const { getTrustedClientIp } = require("../services/requestIpService.js");
-const { logError, logInfo } = require("../utils/logger.js");
+const { logInfo } = require("../utils/logger.js");
 const { ApiError, asyncRoute } = require("../utils/apiError.js");
 
 const router = express.Router();
@@ -206,19 +206,5 @@ router.get("/users/:userId/subscription", asyncRoute(async (req, res) => {
     }
   });
 }));
-
-router.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
-  if (status >= 500) {
-    logError("Internal support route error", {
-      status,
-      method: req.method,
-      path: req.path,
-      message: err.message
-    });
-  }
-  const message = status < 500 ? err.message : "Internal server error";
-  res.status(status).json({ ok: false, message });
-});
 
 module.exports = router;

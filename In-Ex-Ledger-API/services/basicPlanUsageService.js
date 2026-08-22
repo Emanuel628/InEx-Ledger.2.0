@@ -41,6 +41,15 @@ function isBasicTier(subscription) {
   return (subscription?.effectiveTier || "free") === "free";
 }
 
+async function lockBusinessUsagePeriod(db, businessId, now = new Date()) {
+  const { start } = buildCurrentMonthWindow(now);
+  const periodStart = start.toISOString().slice(0, 10);
+  await db.query(
+    "SELECT pg_advisory_xact_lock(hashtext($1))",
+    [`basic-plan-usage:${businessId}:${periodStart}`]
+  );
+}
+
 /**
  * Live count of transactions created in the current month for a business.
  *
@@ -185,6 +194,10 @@ async function assertCanCreateTransactions(db, businessId, count = 1, options = 
     return state;
   }
 
+  await lockBusinessUsagePeriod(db, businessId, options.now || new Date());
+  state.used = await countCanonicalTransactionsCreatedThisMonth(db, businessId, options.now || new Date());
+  state.remaining = Math.max(state.limit - state.used, 0);
+
   if (state.used + requested > state.limit) {
     throw new BasicPlanLimitError(
       `You've reached your ${state.limit} Basic transactions for this month. Your records are safe. You can upgrade to Pro to keep adding more this month.`,
@@ -213,7 +226,9 @@ async function assertCanUploadReceipts(db, businessId, count = 1, options = {}) 
     return { enforced, limit, used: 0, remaining: enforced ? limit : Number.POSITIVE_INFINITY, subscription: effectiveSubscription };
   }
 
-  const period = await getOrCreateCurrentPeriod(db, businessId, options.now || new Date());
+  const now = options.now || new Date();
+  await lockBusinessUsagePeriod(db, businessId, now);
+  const period = await getOrCreateCurrentPeriod(db, businessId, now);
   const used = Number(period?.receipts_used || 0);
 
   if (used + requested > limit) {
@@ -253,6 +268,7 @@ async function assertCanImportCsvRows(db, businessId, validRowCount, options = {
     };
   }
 
+  await lockBusinessUsagePeriod(db, businessId, now);
   const transactionsUsed = await countCanonicalTransactionsCreatedThisMonth(db, businessId, now);
   const csvRowsUsed = await countCsvImportRowsThisMonth(db, businessId, now);
   const transactionSlotsRemaining = Math.max(BASIC_MONTHLY_TRANSACTION_LIMIT - transactionsUsed, 0);
@@ -292,6 +308,7 @@ module.exports = {
   buildCurrentMonthWindow,
   countCanonicalTransactionsCreatedThisMonth,
   countCsvImportRowsThisMonth,
+  lockBusinessUsagePeriod,
   getOrCreateCurrentPeriod,
   incrementReceiptUsage,
   getUsageSummary,

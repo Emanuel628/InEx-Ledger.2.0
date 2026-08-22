@@ -17,6 +17,14 @@ const { encrypt, decrypt } = require('./encryptionService');
 const LEGACY_PREFIX = 'enc:';
 const CURRENT_PREFIX = 'enc:v1:';
 
+function logDecryptFailure(kind, err) {
+  console.warn('[InEx][WARN] Tax ID decrypt failed', {
+    kind,
+    errorName: err?.name || 'Error',
+    message: err?.message || 'Unknown decrypt error'
+  });
+}
+
 function getLegacyKey() {
   const secret = String(process.env.TAX_ID_LEGACY_KEY || '').trim();
   if (!secret) {
@@ -38,7 +46,8 @@ function decryptLegacy(stored) {
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
     decipher.setAuthTag(authTag);
     return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
-  } catch {
+  } catch (err) {
+    logDecryptFailure('legacy', err);
     return null;
   }
 }
@@ -64,7 +73,8 @@ function decryptTaxId(stored) {
   if (stored.startsWith(CURRENT_PREFIX)) {
     try {
       return decrypt(stored);
-    } catch {
+    } catch (err) {
+      logDecryptFailure('current', err);
       return null;
     }
   }

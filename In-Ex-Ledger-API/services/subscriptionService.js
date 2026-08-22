@@ -5,10 +5,12 @@ const { PLAN_CODES, planHasFeature, getPlanLimit, getPlanDefinition } = require(
 
 const DEFAULT_TRIAL_DAYS = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
 const BILLING_PAST_DUE_GRACE_DAYS = Number(process.env.BILLING_PAST_DUE_GRACE_DAYS || 7);
+
+// Historical persisted plan_code values. Keep these names for subscription rows
+// and tests that assert the legacy storage contract; UI-facing names live in
+// config/planCatalog.js.
 const PLAN_FREE = PLAN_CODES.BASIC;
 const PLAN_V1 = PLAN_CODES.PRO;
-const PLAN_BASIC = PLAN_FREE;
-const PLAN_PRO = PLAN_V1;
 const PLAN_BUSINESS = PLAN_CODES.BUSINESS;
 
 function getPlanDisplayName(tier) {
@@ -414,8 +416,6 @@ function getFeatureLimit(subscription, limitKey) {
 module.exports = {
   PLAN_FREE,
   PLAN_V1,
-  PLAN_BASIC,
-  PLAN_PRO,
   PLAN_BUSINESS,
   ensureBusinessSubscription,
   deriveEffectiveState,

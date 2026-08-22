@@ -33,8 +33,13 @@ function loadService(subscription = { effectiveTier: "free" }) {
 function makeDb(handlers) {
   return {
     calls: 0,
+    lockCalls: 0,
     async query(sql) {
       this.calls += 1;
+      if (String(sql).includes("pg_advisory_xact_lock")) {
+        this.lockCalls += 1;
+        return { rows: [], rowCount: 1 };
+      }
       for (const [match, response] of handlers) {
         if (sql.includes(match)) {
           return typeof response === "function" ? response() : response;
@@ -71,6 +76,7 @@ test("assertCanUploadReceipts blocks Basic businesses at 25 receipts in a month"
       return true;
     }
   );
+  assert.equal(db.lockCalls, 1);
 });
 
 test("assertCanUploadReceipts allows a Basic business that is under the cap", async () => {
@@ -83,6 +89,7 @@ test("assertCanUploadReceipts allows a Basic business that is under the cap", as
   assert.equal(state.enforced, true);
   assert.equal(state.used, 10);
   assert.equal(state.remaining, 15);
+  assert.equal(db.lockCalls, 1);
 });
 
 test("assertCanUploadReceipts does not enforce or query for Pro businesses", async () => {
@@ -111,10 +118,11 @@ test("assertCanImportCsvRows blocks when valid rows exceed remaining transaction
       assert.equal(error.code, "basic_csv_import_limit_exceeded");
       assert.equal(error.details.csv_valid_rows, 82);
       assert.equal(error.details.transaction_slots_remaining, 30);
-      assert.equal(error.details.csv_import_rows_remaining, 50);
+  assert.equal(error.details.csv_import_rows_remaining, 50);
       return true;
     }
   );
+  assert.equal(db.lockCalls, 1);
 });
 
 test("assertCanImportCsvRows allows an import that fits the remaining allowance", async () => {
@@ -128,6 +136,7 @@ test("assertCanImportCsvRows allows an import that fits the remaining allowance"
   assert.equal(state.enforced, true);
   assert.equal(state.transactionSlotsRemaining, 50);
   assert.equal(state.csvImportRowsRemaining, 50);
+  assert.equal(db.lockCalls, 1);
 });
 
 test("assertCanImportCsvRows does not enforce or query for Pro businesses", async () => {
@@ -177,4 +186,5 @@ test("assertCanCreateTransactions still blocks Basic at the 50-transaction cap",
       return true;
     }
   );
+  assert.equal(db.lockCalls, 1);
 });

@@ -13,7 +13,7 @@ const {
 
 async function listInvoices(businessId) {
   const result = await pool.query(
-    'SELECT * FROM invoices WHERE business_id = $1 ORDER BY created_at DESC',
+    'SELECT * FROM invoices WHERE business_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC',
     [businessId]
   );
   return result.rows;
@@ -44,7 +44,7 @@ async function createInvoice(businessId, data) {
 
 async function getInvoice(businessId, invoiceId) {
   const result = await pool.query(
-    'SELECT * FROM invoices WHERE business_id = $1 AND id = $2',
+    'SELECT * FROM invoices WHERE business_id = $1 AND id = $2 AND deleted_at IS NULL',
     [businessId, invoiceId]
   );
   return result.rows[0] || null;
@@ -54,29 +54,24 @@ async function updateInvoice(businessId, invoiceId, data) {
   const v = validateInvoiceInput(data);
   const result = await pool.query(
     `UPDATE invoices SET customer_id = $1, number = $2, status = $3, issue_date = $4, due_date = $5, total_amount = $6, currency = $7, metadata = $8, updated_at = now()
-     WHERE business_id = $9 AND id = $10 RETURNING *`,
+     WHERE business_id = $9 AND id = $10 AND deleted_at IS NULL RETURNING *`,
     [v.customer_id, v.number, v.status, v.issue_date, v.due_date, v.total_amount, v.currency, v.metadata, businessId, invoiceId]
   );
   return result.rows[0] || null;
 }
 
-// NOTE: hard delete. The `invoices` table (db/migrations/20260419_create_v2_
-// business_tables.sql) has no `deleted_at`/audit columns. (A different table,
-// `invoices_v1` -- the older Pro-plan invoicing feature, unrelated to this
-// V2/Business `invoices` table -- got deleted_at/deleted_by columns via
-// db/migrations/20260513_add_invoice_soft_delete.sql; that migration does not
-// apply here.) Adding soft-delete parity with `transactions` (see
-// services/transactionAuditService.js) would require a new migration adding
-// those columns to `invoices` (and updating listInvoices/getInvoice to filter
-// them out) -- that schema change is out of scope for this pass and is left
-// as a flagged follow-up rather than invented ad hoc against real financial
-// data. Also note: `payments` rows reference invoices via ON DELETE CASCADE,
-// so a hard delete here silently deletes payment history too -- another
-// reason soft-delete parity matters and should be tracked.
-async function deleteInvoice(businessId, invoiceId) {
+async function deleteInvoice(businessId, invoiceId, { userId = null, reason = 'user_deleted' } = {}) {
   const result = await pool.query(
-    'DELETE FROM invoices WHERE business_id = $1 AND id = $2 RETURNING id',
-    [businessId, invoiceId]
+    `UPDATE invoices
+        SET deleted_at = now(),
+            deleted_by_id = $3,
+            deleted_reason = $4,
+            updated_at = now()
+      WHERE business_id = $1
+        AND id = $2
+        AND deleted_at IS NULL
+      RETURNING id`,
+    [businessId, invoiceId, userId, reason]
   );
   return result.rowCount > 0;
 }

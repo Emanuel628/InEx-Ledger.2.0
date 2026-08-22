@@ -80,3 +80,13 @@ test("describeSslConfig summarizes effective SSL settings without secrets", () =
     "enabled (rejectUnauthorized=true, customCA=true)"
   );
 });
+
+test("runtime db pool uses the shared SSL config helper", () => {
+  const dbSource = fs.readFileSync(path.join(__dirname, "..", "db.js"), "utf8");
+
+  assert.match(dbSource, /require\(['"]\.\/utils\/dbSslConfig['"]\)/);
+  assert.match(dbSource, /const sslConfig = buildSslConfig\(\)/);
+  assert.match(dbSource, /describeSslConfig\(sslConfig\)/);
+  assert.doesNotMatch(dbSource, /function buildSslConfig\(/);
+  assert.doesNotMatch(dbSource, /sslmodeFromUrl/);
+});

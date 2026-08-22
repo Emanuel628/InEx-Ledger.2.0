@@ -6,6 +6,7 @@ const crypto = require("node:crypto");
 const Module = require("node:module");
 const express = require("express");
 const request = require("supertest");
+const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 async function withEnv(overrides, fn) {
   const before = {};
@@ -100,6 +101,7 @@ function loadInboundEmailApp({ failInsert = false } = {}) {
     const app = express();
     app.use("/api/email/inbound", express.raw({ type: "*/*", limit: "256kb" }));
     app.use("/api/email", router);
+    attachCentralErrorHandler(app);
     return {
       app,
       state,
@@ -177,7 +179,7 @@ test("POST /api/email/inbound hides unexpected processing failures", async () =>
         .send(rawBody);
 
       assert.equal(res.status, 500);
-      assert.deepEqual(res.body, { ok: false, error: "Internal server error" });
+      assert.deepEqual(res.body, { error: "Internal server error" });
     } finally {
       fixture.cleanup();
     }

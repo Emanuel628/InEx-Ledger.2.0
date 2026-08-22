@@ -6,15 +6,7 @@ export type ApiRequestInit = RequestInit & {
 }
 
 export async function apiRequest<T>(url: string, init: ApiRequestInit = {}) {
-  let response = await fetchWithAuth(url, init)
-  if (response.status === 403 && await isCsrfFailure(response)) {
-    await refreshCsrfToken()
-    response = await fetchWithAuth(url, init)
-  }
-  if (response.status === 401 && await refreshAccessToken()) {
-    response = await fetchWithAuth(url, init)
-  }
-
+  const response = await fetchWithAuthRetry(url, init)
   const data = await readJson<T & { error?: string; code?: string; details?: unknown }>(response)
   if (!response.ok) {
     if (response.status === 401 && !init.skipAuthRedirect) {
@@ -27,15 +19,7 @@ export async function apiRequest<T>(url: string, init: ApiRequestInit = {}) {
 }
 
 export async function apiBlobRequest(url: string, init: RequestInit = {}) {
-  let response = await fetchWithAuth(url, init)
-  if (response.status === 403 && await isCsrfFailure(response)) {
-    await refreshCsrfToken()
-    response = await fetchWithAuth(url, init)
-  }
-  if (response.status === 401 && await refreshAccessToken()) {
-    response = await fetchWithAuth(url, init)
-  }
-
+  const response = await fetchWithAuthRetry(url, init)
   if (!response.ok) {
     const data = await readJson<{ error?: string; code?: string; details?: unknown }>(response)
     if (response.status === 401) {
@@ -59,6 +43,19 @@ export class ApiRequestError extends Error {
     this.code = code
     this.details = details
   }
+}
+
+async function fetchWithAuthRetry(url: string, init: RequestInit = {}) {
+  let response = await fetchWithAuth(url, init)
+  if (response.status === 403 && await isCsrfFailure(response)) {
+    await refreshCsrfToken()
+    response = await fetchWithAuth(url, init)
+  }
+  if (response.status === 401 && await refreshAccessToken()) {
+    response = await fetchWithAuth(url, init)
+  }
+
+  return response
 }
 
 async function fetchWithAuth(url: string, init: RequestInit = {}) {
@@ -119,8 +116,8 @@ async function refreshAccessToken() {
 }
 
 async function isCsrfFailure(response: Response) {
-  const data = await readJson<{ error?: string }>(response.clone())
-  return data.error === 'CSRF token missing or invalid.'
+  const data = await readJson<{ error?: string; code?: string }>(response.clone())
+  return data.code === 'csrf_invalid' || data.error === 'CSRF token missing or invalid.'
 }
 
 async function getCsrfToken() {

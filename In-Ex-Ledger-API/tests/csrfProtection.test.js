@@ -7,6 +7,7 @@ process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret";
 const {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
+  CSRF_ERROR_CODE,
   generateCsrfToken,
   isValidCsrfToken,
   ensureCsrfCookie,
@@ -80,7 +81,10 @@ test("unsafe requests are rejected without a matching CSRF header", async () => 
 
   assert.strictEqual(nextCalled, false);
   assert.strictEqual(res.statusCode, 403);
-  assert.deepStrictEqual(res.body, { error: "CSRF token missing or invalid." });
+  assert.deepStrictEqual(res.body, {
+    error: "CSRF token missing or invalid.",
+    code: CSRF_ERROR_CODE
+  });
 });
 
 test("unsafe requests succeed with matching signed cookie and header", async () => {

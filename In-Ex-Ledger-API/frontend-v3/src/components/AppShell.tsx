@@ -23,6 +23,7 @@ import {
 import type { AppPage, PageProps } from '../App'
 import { getCurrentUser } from '../lib/authApi'
 import { activateBusiness, loadBusinesses, type BusinessRecord } from '../lib/businessesApi'
+import { isCanadaBusiness } from '../lib/businessLocale'
 import { formatCountLabel, translate, type AppLanguage, type TranslationKey } from '../lib/i18n'
 import { loadUnreadCounts } from '../lib/messagesApi'
 
@@ -423,10 +424,6 @@ function buildNotifications(counts: { total?: number; messages?: number; support
 
 function LogoMark() {
   return <img src="/brand/inex-mark-onnavy.svg" alt="" aria-hidden="true" />
-}
-
-function isCanadaBusiness(region?: string | null, currency?: string | null) {
-  return String(region || '').toUpperCase() === 'CA' || String(currency || '').toUpperCase() === 'CAD'
 }
 
 export default AppShell

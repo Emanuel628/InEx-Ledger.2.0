@@ -1,4 +1,5 @@
 import { apiRequest } from './apiClient'
+import { normalizeCurrencyCode } from './money'
 
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Void'
 
@@ -149,7 +150,7 @@ export function blankInvoiceDraft(currency = 'USD'): InvoiceDraft {
     clientEmail: '',
     issueDate: new Date().toISOString().slice(0, 10),
     dueDate: '',
-    currency: currency.toUpperCase() === 'CAD' ? 'CAD' : 'USD',
+    currency: normalizeCurrencyCode(currency),
     taxRatePercent: '0',
     quantity: '1',
     unitPrice: '',
@@ -178,7 +179,7 @@ export function draftFromInvoice(invoice: InvoiceRecord): InvoiceDraft {
 
 function mapInvoice(row: LegacyInvoice): InvoiceRecord {
   const lineItems = parseLineItems(row.line_items)
-  const status = mapStatus(row.status, row.due_date)
+  const status = mapStatus(row.status)
   return {
     id: row.id,
     title: row.title || lineItems[0]?.description || row.invoice_number || 'Untitled invoice',
@@ -221,13 +222,11 @@ function normalizeLineItem(item: Record<string, unknown>): InvoiceLineItem {
   }
 }
 
-function mapStatus(status?: string | null, dueDate?: string | null): InvoiceStatus {
+function mapStatus(status?: string | null): InvoiceStatus {
   const normalized = String(status || 'draft').toLowerCase()
   if (normalized === 'paid') return 'Paid'
+  if (normalized === 'overdue') return 'Overdue'
   if (normalized === 'void') return 'Void'
-  if (normalized === 'sent' && dueDate && String(dueDate).slice(0, 10) < new Date().toISOString().slice(0, 10)) {
-    return 'Overdue'
-  }
   if (normalized === 'sent') return 'Sent'
   return 'Draft'
 }

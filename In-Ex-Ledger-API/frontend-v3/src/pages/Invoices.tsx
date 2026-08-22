@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -19,8 +19,10 @@ import {
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
 import useBodyModalLock from '../hooks/useBodyModalLock'
+import useFileAttachments from '../hooks/useFileAttachments'
 import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import { formatMoney, getActiveCurrency } from '../lib/money'
+import { getPaginationPages } from '../lib/pagination'
 import {
   blankInvoiceDraft,
   deleteInvoice,
@@ -341,9 +343,6 @@ function Invoices(props: PageProps) {
   )
 }
 
-const MAX_INVOICE_ATTACHMENT_BYTES = 10 * 1024 * 1024
-const MAX_INVOICE_ATTACHMENTS = 5
-
 function InvoiceDrawer({
   invoice,
   currency,
@@ -357,9 +356,16 @@ function InvoiceDrawer({
 }) {
   const [draft, setDraft] = useState<InvoiceDraft>(() => invoice ? draftFromInvoice(invoice) : blankInvoiceDraft(currency))
   const [error, setError] = useState('')
-  const [attachments, setAttachments] = useState<File[]>([])
-  const [attachmentError, setAttachmentError] = useState('')
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const {
+    attachments,
+    attachmentError,
+    fileInputRef,
+    handleAttachmentChange,
+    removeAttachment,
+    clearAttachments,
+    maxAttachments,
+    accept,
+  } = useFileAttachments()
   const subtotal = Number(draft.quantity || 0) * Number(draft.unitPrice || 0)
   const tax = subtotal * (Number(draft.taxRatePercent || 0) / 100)
   const total = subtotal + tax
@@ -367,32 +373,11 @@ function InvoiceDrawer({
   useEffect(() => {
     setDraft(invoice ? draftFromInvoice(invoice) : blankInvoiceDraft(currency))
     setError('')
-    setAttachments([])
-    setAttachmentError('')
+    clearAttachments()
   }, [currency, invoice])
 
   function updateDraft(field: keyof InvoiceDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }))
-  }
-
-  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || [])
-    event.target.value = ''
-    if (!files.length) return
-    if (attachments.length + files.length > MAX_INVOICE_ATTACHMENTS) {
-      setAttachmentError(`You can attach up to ${MAX_INVOICE_ATTACHMENTS} files.`)
-      return
-    }
-    if (files.some((file) => file.size > MAX_INVOICE_ATTACHMENT_BYTES)) {
-      setAttachmentError('Each attachment must be 10 MB or smaller.')
-      return
-    }
-    setAttachmentError('')
-    setAttachments((current) => [...current, ...files])
-  }
-
-  function removeAttachment(index: number) {
-    setAttachments((current) => current.filter((_, fileIndex) => fileIndex !== index))
   }
 
   function save(sendAfterSave: boolean) {
@@ -516,7 +501,7 @@ function InvoiceDrawer({
             type="file"
             multiple
             className="visually-hidden"
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.txt,.csv,.doc,.docx,.xls,.xlsx"
+            accept={accept}
             onChange={handleAttachmentChange}
           />
 
@@ -526,7 +511,7 @@ function InvoiceDrawer({
             <button
               className="secondary-button"
               type="button"
-              disabled={attachments.length >= MAX_INVOICE_ATTACHMENTS}
+              disabled={attachments.length >= maxAttachments}
               onClick={() => fileInputRef.current?.click()}
             >
               <Paperclip size={17} />
@@ -585,25 +570,6 @@ function formatMonth(value: string) {
     return value
   }
   return parsed.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-}
-
-function getPaginationPages(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1])
-  const sortedPages = Array.from(pages)
-    .filter((page) => page >= 1 && page <= totalPages)
-    .sort((a, b) => a - b)
-
-  return sortedPages.flatMap((page, index) => {
-    const previousPage = sortedPages[index - 1]
-    if (previousPage && page - previousPage > 1) {
-      return ['ellipsis' as const, page]
-    }
-    return [page]
-  })
 }
 
 export default Invoices

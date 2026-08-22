@@ -98,6 +98,38 @@ async function saveAccountingLockState(pool, businessId, userId, payload = {}) {
   return normalizeAccountingLockRow(result.rows[0] || null);
 }
 
+const LOCKED_REFERENCE_COLUMNS = new Set(["category_id", "account_id"]);
+
+async function assertNoLockedPeriodTransactionsForReference(pool, businessId, referenceColumn, referenceId, lockState) {
+  if (!LOCKED_REFERENCE_COLUMNS.has(referenceColumn)) {
+    throw new Error(`Unsupported locked-period transaction reference: ${referenceColumn}`);
+  }
+
+  const lockDate = normalizeDateOnly(lockState?.lockedThroughDate);
+  if (!lockDate || !referenceId) {
+    return;
+  }
+
+  const result = await pool.query(
+    `SELECT EXISTS(
+       SELECT 1 FROM transactions
+        WHERE ${referenceColumn} = $1
+          AND business_id = $2
+          AND date::date <= $3::date
+          AND deleted_at IS NULL
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+     ) AS has_locked`,
+    [referenceId, businessId, lockDate]
+  );
+
+  if (result.rows[0]?.has_locked) {
+    throw new AccountingPeriodLockedError({
+      lockedThroughDate: lockDate,
+      transactionDate: null
+    });
+  }
+}
+
 /**
  * Throws AccountingPeriodLockedError if any non-archived, non-adjustment
  * transaction inside the locked period references the given category.
@@ -109,29 +141,7 @@ async function saveAccountingLockState(pool, businessId, userId, payload = {}) {
  * @param {object|null} lockState - result of loadAccountingLockState
  */
 async function assertNoLockedPeriodTransactionsForCategory(pool, businessId, categoryId, lockState) {
-  const lockDate = normalizeDateOnly(lockState?.lockedThroughDate);
-  if (!lockDate || !categoryId) {
-    return;
-  }
-
-  const result = await pool.query(
-    `SELECT EXISTS(
-       SELECT 1 FROM transactions
-        WHERE category_id = $1
-          AND business_id = $2
-          AND date::date <= $3::date
-          AND deleted_at IS NULL
-          AND (is_adjustment = false OR is_adjustment IS NULL)
-     ) AS has_locked`,
-    [categoryId, businessId, lockDate]
-  );
-
-  if (result.rows[0]?.has_locked) {
-    throw new AccountingPeriodLockedError({
-      lockedThroughDate: lockDate,
-      transactionDate: null
-    });
-  }
+  return assertNoLockedPeriodTransactionsForReference(pool, businessId, "category_id", categoryId, lockState);
 }
 
 /**
@@ -145,29 +155,7 @@ async function assertNoLockedPeriodTransactionsForCategory(pool, businessId, cat
  * @param {object|null} lockState - result of loadAccountingLockState
  */
 async function assertNoLockedPeriodTransactionsForAccount(pool, businessId, accountId, lockState) {
-  const lockDate = normalizeDateOnly(lockState?.lockedThroughDate);
-  if (!lockDate || !accountId) {
-    return;
-  }
-
-  const result = await pool.query(
-    `SELECT EXISTS(
-       SELECT 1 FROM transactions
-        WHERE account_id = $1
-          AND business_id = $2
-          AND date::date <= $3::date
-          AND deleted_at IS NULL
-          AND (is_adjustment = false OR is_adjustment IS NULL)
-     ) AS has_locked`,
-    [accountId, businessId, lockDate]
-  );
-
-  if (result.rows[0]?.has_locked) {
-    throw new AccountingPeriodLockedError({
-      lockedThroughDate: lockDate,
-      transactionDate: null
-    });
-  }
+  return assertNoLockedPeriodTransactionsForReference(pool, businessId, "account_id", accountId, lockState);
 }
 
 module.exports = {
@@ -178,6 +166,7 @@ module.exports = {
   assertDateUnlocked,
   loadAccountingLockState,
   saveAccountingLockState,
+  assertNoLockedPeriodTransactionsForReference,
   assertNoLockedPeriodTransactionsForCategory,
   assertNoLockedPeriodTransactionsForAccount
 };

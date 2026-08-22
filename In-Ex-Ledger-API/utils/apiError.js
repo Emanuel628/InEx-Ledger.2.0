@@ -10,12 +10,16 @@
 // try/catch for compensation/rollback work or translating a lower-level error
 // (e.g. a DB constraint violation) into one of these.
 class ApiError extends Error {
-  constructor(status, message, { code } = {}) {
+  constructor(status, message, { code, expose = false, responseFields } = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.expose = Boolean(expose);
     if (code) {
       this.code = code;
+    }
+    if (responseFields && typeof responseFields === "object") {
+      this.responseFields = { ...responseFields };
     }
   }
 }

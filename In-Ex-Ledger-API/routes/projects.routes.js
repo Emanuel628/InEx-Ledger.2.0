@@ -4,13 +4,12 @@ const ProjectService = require('../services/projectService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
-const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 const { isUuid } = require('../api/utils/v2HttpValidators');
 const { ApiError, asyncRoute } = require('../utils/apiError.js');
 
-// All routes require V2 feature flag and entitlement
-router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+// V2 feature and entitlement checks run once at the parent routes/index.js mount.
+router.use(requireAuth);
 router.use(createDataApiLimiter({ keyPrefix: 'rl:v2:projects' }));
 router.use((req, res, next) => (
   ["POST", "PUT", "PATCH", "DELETE"].includes(req.method)

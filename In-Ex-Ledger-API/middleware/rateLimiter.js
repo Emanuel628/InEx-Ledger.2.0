@@ -22,10 +22,6 @@ let limiterHealth = {
   updatedAt: null
 };
 
-const metrics = {
-  increment() {}
-};
-
 function isProduction() {
   return process.env.NODE_ENV === "production";
 }
@@ -274,7 +270,6 @@ function buildFailHandler({ tier, windowSeconds, errorMessage }) {
       endpoint: req.originalUrl || req.path,
       tier
     });
-    metrics.increment("rate_limit.blocked", { tier });
     res.status(429).json({
       error: errorMessage || RETRY_ERROR_MESSAGE,
       retryAfter: reset
@@ -419,7 +414,6 @@ async function createLimiter({
         }
 
         attachHeaders(req, res, windowSeconds).catch(() => {});
-        metrics.increment("rate_limit.allowed", { tier: keyPrefix });
         return next();
       });
     };
@@ -461,7 +455,6 @@ async function createLimiter({
             return buildUnavailableLimiter()(req, res, next);
           }
           attachHeaders(req, res, windowSeconds).catch(() => {});
-          metrics.increment("rate_limit.allowed", { tier: keyPrefix });
           return next();
         });
       };
@@ -510,7 +503,6 @@ async function createLimiter({
       }
 
       attachHeaders(req, res, windowSeconds).catch(() => {});
-      metrics.increment("rate_limit.allowed", { tier: keyPrefix });
       return next();
     });
   };
@@ -580,7 +572,6 @@ module.exports = {
   createLimiter,
   getRateLimiterHealth,
   initializeRateLimiterProtection,
-  metrics,
   resetRateLimiterHealthForTests,
   setRedisClientOverride
 };

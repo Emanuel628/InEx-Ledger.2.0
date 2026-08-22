@@ -24,6 +24,7 @@ process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret-for-e2e";
 const {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
+  CSRF_ERROR_CODE,
   generateCsrfToken,
   ensureCsrfCookie,
   requireCsrfProtection
@@ -303,6 +304,7 @@ test("e2e CSRF: authenticated write WITHOUT CSRF token is rejected (403)", async
     res.body?.error?.toLowerCase().includes("csrf"),
     `Expected CSRF error message, got: ${JSON.stringify(res.body)}`
   );
+  assert.strictEqual(res.body?.code, CSRF_ERROR_CODE);
 });
 
 test("e2e CSRF: authenticated write with INVALID CSRF token is rejected (403)", async () => {
@@ -323,6 +325,7 @@ test("e2e CSRF: authenticated write with INVALID CSRF token is rejected (403)", 
     res.body?.error?.toLowerCase().includes("csrf"),
     `Expected CSRF error message, got: ${JSON.stringify(res.body)}`
   );
+  assert.strictEqual(res.body?.code, CSRF_ERROR_CODE);
 });
 
 test("e2e CSRF: authenticated write with MISMATCHED tokens is rejected (403)", async () => {
@@ -339,6 +342,7 @@ test("e2e CSRF: authenticated write with MISMATCHED tokens is rejected (403)", a
     .send({ amount: 100 });
 
   assert.strictEqual(res.status, 403, `Expected 403 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assert.strictEqual(res.body?.code, CSRF_ERROR_CODE);
 });
 
 test("e2e CSRF: unauthenticated request is rejected by auth middleware (401) before CSRF check", async () => {

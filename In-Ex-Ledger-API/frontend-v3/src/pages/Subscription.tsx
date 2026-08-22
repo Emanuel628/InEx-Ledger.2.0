@@ -19,6 +19,7 @@ import {
   type BillingPaymentMethod,
   type BillingPricing,
 } from '../lib/billingApi'
+import { downloadCsv } from '../lib/browserDownload'
 import { BASIC_LIMITS_NOTE, formatPlanPeriod, formatPlanPrice } from '../lib/planContent'
 
 function Subscription(props: PageProps) {
@@ -232,14 +233,7 @@ function Subscription(props: PageProps) {
         (invoice.currency || 'usd').toUpperCase(),
       ]),
     ]
-    const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'inex-ledger-subscription-invoices.csv'
-    link.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(rows, 'inex-ledger-subscription-invoices.csv')
   }
 
   return (
@@ -480,11 +474,6 @@ function formatPaymentMethod(method?: BillingPaymentMethod | null) {
     return `${method.bankName || 'Bank account'} ending ${method.last4 || '----'}`
   }
   return method.type || 'Payment method'
-}
-
-function csvCell(value: string | number) {
-  const text = String(value)
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 function readPreferredBillingInterval(): BillingInterval {

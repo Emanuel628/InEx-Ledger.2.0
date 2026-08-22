@@ -2,7 +2,6 @@ const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
 const crypto = require("crypto");
-const https = require("https");
 const express = require("express");
 const multer = require("multer");
 const { requireAuth } = require("../middleware/auth.middleware.js");
@@ -195,38 +194,6 @@ function getErrorDiagnostic(err) {
   };
 }
 
-function isRecoverableReceiptSchemaError(err) {
-  const message = String(err?.message || "").toLowerCase();
-  return err?.code === "42703" || /column\s+.*\s+does not exist/.test(message);
-}
-
-async function ensureReceiptListSchema() {
-  await pool.query(`
-    ALTER TABLE receipts
-      ADD COLUMN IF NOT EXISTS storage_path TEXT,
-      ADD COLUMN IF NOT EXISTS file_hash TEXT,
-      ADD COLUMN IF NOT EXISTS file_bytes BYTEA,
-      ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ DEFAULT now()
-  `);
-
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF EXISTS (
-        SELECT 1
-          FROM information_schema.columns
-         WHERE table_schema = 'public'
-           AND table_name = 'receipts'
-           AND column_name = 'created_at'
-      ) THEN
-        EXECUTE 'UPDATE receipts SET uploaded_at = COALESCE(uploaded_at, created_at, now()) WHERE uploaded_at IS NULL';
-      ELSE
-        UPDATE receipts SET uploaded_at = COALESCE(uploaded_at, now()) WHERE uploaded_at IS NULL;
-      END IF;
-    END $$
-  `);
-}
-
 function buildReceiptListSql() {
   // Transaction deletion is a soft delete (deleted_at), so the FK's
   // ON DELETE SET NULL never fires and r.transaction_id keeps pointing at
@@ -300,26 +267,15 @@ router.get("/", asyncRoute(async (req, res) => {
   }
 
   const sql = buildReceiptListSql();
-  let result;
-
   try {
-    result = await pool.query(sql, [scope.businessIds]);
+    const result = await pool.query(sql, [scope.businessIds]);
+    const rows = mapReceiptListRows(result.rows || []);
+    setNoStoreHeaders(res);
+    return res.status(200).json(rows);
   } catch (err) {
-    if (!isRecoverableReceiptSchemaError(err)) {
-      logError("Receipts load error:", getErrorDiagnostic(err));
-      throw err;
-    }
-
-    logWarn("Receipts schema drift detected; applying safe receipt metadata guards before retry", getErrorDiagnostic(err));
-    await ensureReceiptListSchema();
-    result = await pool.query(sql, [scope.businessIds]);
+    logError("Receipts load error:", getErrorDiagnostic(err));
+    throw err;
   }
-
-  const rows = mapReceiptListRows(result.rows || []);
-
-  setNoStoreHeaders(res);
-
-  return res.status(200).json(rows);
 }));
 
 /* =========================================================

@@ -13,7 +13,7 @@ const {
 
 async function listBills(businessId) {
   const result = await pool.query(
-    'SELECT * FROM bills WHERE business_id = $1 ORDER BY created_at DESC',
+    'SELECT * FROM bills WHERE business_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC',
     [businessId]
   );
   return result.rows;
@@ -44,7 +44,7 @@ async function createBill(businessId, data) {
 
 async function getBill(businessId, billId) {
   const result = await pool.query(
-    'SELECT * FROM bills WHERE business_id = $1 AND id = $2',
+    'SELECT * FROM bills WHERE business_id = $1 AND id = $2 AND deleted_at IS NULL',
     [businessId, billId]
   );
   return result.rows[0] || null;
@@ -54,27 +54,24 @@ async function updateBill(businessId, billId, data) {
   const v = validateBillInput(data);
   const result = await pool.query(
     `UPDATE bills SET vendor_id = $1, number = $2, status = $3, issue_date = $4, due_date = $5, total_amount = $6, currency = $7, metadata = $8, updated_at = now()
-     WHERE business_id = $9 AND id = $10 RETURNING *`,
+     WHERE business_id = $9 AND id = $10 AND deleted_at IS NULL RETURNING *`,
     [v.vendor_id, v.number, v.status, v.issue_date, v.due_date, v.total_amount, v.currency, v.metadata, businessId, billId]
   );
   return result.rows[0] || null;
 }
 
-// NOTE: hard delete. The `bills` table (db/migrations/20260419_create_v2_
-// business_tables.sql) has no `deleted_at`/audit columns, unlike
-// `transactions` (see services/transactionAuditService.js, which soft-deletes
-// via deleted_at/is_void/deleted_by_id/deleted_reason). Adding soft-delete
-// parity here would require a new migration adding those columns to `bills`
-// (and updating listBills/getBill to filter them out) -- that schema change
-// is out of scope for this pass and is left as a flagged follow-up rather
-// than invented ad hoc against real financial data. Also note: `payments`
-// rows reference bills via ON DELETE CASCADE, so a hard delete here silently
-// deletes payment history too -- another reason soft-delete parity matters
-// and should be tracked.
-async function deleteBill(businessId, billId) {
+async function deleteBill(businessId, billId, { userId = null, reason = 'user_deleted' } = {}) {
   const result = await pool.query(
-    'DELETE FROM bills WHERE business_id = $1 AND id = $2 RETURNING id',
-    [businessId, billId]
+    `UPDATE bills
+        SET deleted_at = now(),
+            deleted_by_id = $3,
+            deleted_reason = $4,
+            updated_at = now()
+      WHERE business_id = $1
+        AND id = $2
+        AND deleted_at IS NULL
+      RETURNING id`,
+    [businessId, billId, userId, reason]
   );
   return result.rowCount > 0;
 }

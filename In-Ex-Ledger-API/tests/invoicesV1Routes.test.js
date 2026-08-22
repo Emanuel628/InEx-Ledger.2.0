@@ -9,7 +9,7 @@ const { attachCentralErrorHandler } = require("./helpers/testPool.js");
 
 const ROUTE_PATH = require.resolve("../routes/invoices-v1.routes.js");
 
-function loadInvoicesRouter({ effectiveTier = "v1", failList = false } = {}) {
+function loadInvoicesRouter({ effectiveTier = "v1", failList = false, listRows = [] } = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
     insertAttempts: 0,
@@ -62,7 +62,7 @@ function loadInvoicesRouter({ effectiveTier = "v1", failList = false } = {}) {
                 throw new Error("connection reset");
               }
               state.listQueried = true;
-              return { rows: [], rowCount: 0 };
+              return { rows: listRows, rowCount: listRows.length };
             }
 
             if (/SELECT COALESCE\(/i.test(sql) && /FROM invoices_v1/i.test(sql)) {
@@ -197,6 +197,39 @@ test("Basic (free tier) can create an invoice -- invoicing is not plan-gated", a
 
     assert.equal(response.status, 201);
     assert.ok(fixture.state.insertAttempts >= 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("invoice list computes overdue status server-side without changing stored invoice statuses", async () => {
+  const fixture = loadInvoicesRouter({
+    listRows: [{
+      id: "00000000-0000-4000-8000-000000000451",
+      title: "Past due invoice",
+      invoice_number: "INV-2026-0001",
+      customer_name: "Client A",
+      customer_email: "client@example.test",
+      issue_date: "2026-01-01",
+      due_date: "2026-01-15",
+      status: "sent",
+      currency: "USD",
+      subtotal: "100.00",
+      tax_rate: "0",
+      tax_amount: "0",
+      total_amount: "100.00",
+      notes: null,
+      line_items: []
+    }]
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app).get("/api/invoices-v1");
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body[0].status, "overdue");
+    assert.equal(fixture.state.listQueried, true);
   } finally {
     fixture.cleanup();
   }
