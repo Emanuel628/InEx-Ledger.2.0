@@ -2,12 +2,10 @@
 
 const crypto = require("crypto");
 const { pool } = require("../db.js");
+const { isUuid } = require("../api/utils/v2HttpValidators.js");
 const {
   resolveCanonicalCategoryTemplate,
 } = require("./transactionCategorizationService.js");
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function deriveCategoryKindFromSlug(slug) {
   const normalized = String(slug ?? "").trim().toLowerCase();
@@ -84,7 +82,7 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
     return null;
   }
 
-  if (UUID_REGEX.test(raw)) {
+  if (isUuid(raw)) {
     return raw;
   }
 
