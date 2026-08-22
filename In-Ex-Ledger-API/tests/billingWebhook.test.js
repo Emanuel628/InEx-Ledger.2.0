@@ -8,6 +8,7 @@ const express = require("express");
 const request = require("supertest");
 
 const BILLING_ROUTE_PATH = require.resolve("../routes/billing.routes.js");
+const BILLING_WEBHOOK_SERVICE_PATH = require.resolve("../services/billingWebhookService.js");
 const WEBHOOK_SECRET = "whsec_test_billing_webhook_secret";
 
 function makeWebhookSignature(rawBody, secret) {
@@ -238,6 +239,7 @@ function loadBillingRouter(options = {}) {
   };
 
   delete require.cache[BILLING_ROUTE_PATH];
+  delete require.cache[BILLING_WEBHOOK_SERVICE_PATH];
   process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
   process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_billing_webhook";
   process.env.APP_BASE_URL = process.env.APP_BASE_URL || "https://app.inexledger.test";
@@ -262,6 +264,7 @@ function loadBillingRouter(options = {}) {
       state,
       cleanup() {
         delete require.cache[BILLING_ROUTE_PATH];
+        delete require.cache[BILLING_WEBHOOK_SERVICE_PATH];
         Module._load = originalLoad;
         global.fetch = originalFetch;
         delete process.env.STRIPE_WEBHOOK_SECRET;
@@ -271,6 +274,7 @@ function loadBillingRouter(options = {}) {
       }
     };
   } catch (err) {
+    delete require.cache[BILLING_WEBHOOK_SERVICE_PATH];
     Module._load = originalLoad;
     global.fetch = originalFetch;
     delete process.env.STRIPE_WEBHOOK_SECRET;

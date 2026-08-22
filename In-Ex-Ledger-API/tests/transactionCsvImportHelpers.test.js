@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 
 const ROUTE_PATH = require.resolve("../routes/transactions.routes.js");
+const CATEGORY_RESOLVER_PATH = require.resolve("../services/transactionCategoryResolver.js");
 const {
   parseCsv,
   detectColumns,
@@ -79,10 +80,12 @@ function loadTransactionRouteModuleWithDb(dbImpl = null) {
   };
 
   delete require.cache[ROUTE_PATH];
+  delete require.cache[CATEGORY_RESOLVER_PATH];
 
   try {
     return require("../routes/transactions.routes.js");
   } finally {
+    delete require.cache[CATEGORY_RESOLVER_PATH];
     Module._load = originalLoad;
   }
 }

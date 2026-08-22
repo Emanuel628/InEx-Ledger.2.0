@@ -1,19 +1,8 @@
-/**
- * Shared money formatting and currency resolution.
- *
- * Previously each page (Transactions, Mileage, Analytics, Invoices, Exports,
- * RecurringTemplatesWorkflow) redefined its own formatMoney/getActiveCurrency.
- * That duplication let two real bugs ship: Invoices.tsx collapsed every
- * non-CAD currency (including EUR/GBP/AUD, which its own currency <select>
- * offers) down to a hardcoded USD symbol, and RecurringTemplatesWorkflow.tsx
- * hardcoded getActiveCurrency() to always return 'USD' regardless of the
- * business's real currency. Centralizing this here removes the duplication
- * and both bugs at the source.
- */
+const VALID_CURRENCY_CODES = new Set(Intl.supportedValuesOf('currency'))
 
 export function normalizeCurrencyCode(currency: unknown, fallback = 'USD'): string {
   const normalized = String(currency || '').trim().toUpperCase()
-  return /^[A-Z]{3}$/.test(normalized) ? normalized : fallback
+  return VALID_CURRENCY_CODES.has(normalized) ? normalized : fallback
 }
 
 let activeCurrency = 'USD'
@@ -44,15 +33,7 @@ export interface FormatMoneyOptions {
   maximumFractionDigits?: number
 }
 
-/**
- * Formats a numeric amount as currency.
- *
- * Unlike the old per-page copies, this passes the given currency code
- * through to Intl formatting as-is (uppercased) rather than collapsing
- * anything that isn't CAD down to USD — any valid ISO 4217 code (USD, CAD,
- * EUR, GBP, AUD, ...) renders with its real symbol. When no currency is
- * given, falls back to the business's real active currency.
- */
+/** Formats a numeric amount using the active business currency by default. */
 export function formatMoney(
   value: number,
   currency: string = getActiveCurrency(),

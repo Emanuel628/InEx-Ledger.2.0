@@ -14,7 +14,6 @@ const {
   PLAN_FREE,
   findBillingAnchorBusinessIdForUser,
   getSubscriptionSnapshotForBusiness,
-  updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
   setTrialPlanSelectionForBusiness,
   setFreePlanForBusiness,
@@ -48,6 +47,10 @@ const {
   STRIPE_API_BASE,
   STRIPE_API_VERSION,
 } = require("../services/stripeClient.js");
+const {
+  handleStripeWebhookEvent,
+  verifyWebhookSignature,
+} = require("../services/billingWebhookService.js");
 const {
   AUDIT_ACTIONS,
   recordAuditEventForRequest,
@@ -2124,56 +2127,6 @@ router.get(
   }),
 );
 
-const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300; // 5-minute replay window
-
-function verifyWebhookSignature(rawBody, signatureHeader) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!secret) {
-    throw new Error("STRIPE_WEBHOOK_SECRET is not configured");
-  }
-
-  const parts = String(signatureHeader || "")
-    .split(",")
-    .map((part) => part.trim());
-  const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2);
-  // Collect ALL v1= values — Stripe sends multiple signatures during secret
-  // rotation and the webhook is valid if any one of them matches.
-  const v1Signatures = parts
-    .filter((part) => part.startsWith("v1="))
-    .map((part) => part.slice(3));
-
-  if (!timestamp || v1Signatures.length === 0) {
-    throw new Error("Missing Stripe signature");
-  }
-
-  const timestampSeconds = parseInt(timestamp, 10);
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  if (
-    Math.abs(nowSeconds - timestampSeconds) > STRIPE_WEBHOOK_TOLERANCE_SECONDS
-  ) {
-    throw new Error(
-      "Stripe webhook timestamp is outside the acceptable tolerance window",
-    );
-  }
-
-  const payload = `${timestamp}.${rawBody.toString("utf8")}`;
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex");
-  const compare = Buffer.from(expected, "utf8");
-  const isValid = v1Signatures.some((v1) => {
-    const actual = Buffer.from(v1, "utf8");
-    return (
-      actual.length === compare.length &&
-      crypto.timingSafeEqual(actual, compare)
-    );
-  });
-  if (!isValid) {
-    throw new Error("Invalid Stripe signature");
-  }
-}
-
 router.post("/webhook", webhookLimiter, async (req, res) => {
   // Signature verification — only 400 on invalid signature, never on internal errors
   try {
@@ -2215,270 +2168,15 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
     return res.status(200).json({ received: true, duplicate: true });
   }
 
-  const object = event?.data?.object || {};
-
   try {
-    if (
-      event.type === "customer.subscription.created" ||
-      event.type === "customer.subscription.updated"
-    ) {
-      const businessId =
-        object?.metadata?.business_id ||
-        (await findBusinessByStripeCustomerId(object.customer));
-      if (businessId) {
-        const previousSubscription = await getSubscriptionSnapshotForBusiness(
-          businessId,
-        ).catch(() => null);
-        await syncStripeSubscriptionForBusiness(businessId, object);
-        const updatedSubscription = await getSubscriptionSnapshotForBusiness(
-          businessId,
-        ).catch(() => null);
-        if (
-          updatedSubscription?.isTrialing &&
-          !previousSubscription?.isTrialing
-        ) {
-          await sendBillingEmail({
-            businessId,
-            kind: "trial_started",
-            details: [
-              { label: "Plan", value: "Pro trial" },
-              {
-                label: "Trial ends",
-                value: formatDateLabel(updatedSubscription?.trialEndsAt),
-              },
-              {
-                label: "Additional businesses",
-                value: String(
-                  Number(updatedSubscription?.additionalBusinesses) || 0,
-                ),
-              },
-            ],
-            actionUrl: buildAppUrl("/subscription"),
-          });
-        }
-        if (
-          updatedSubscription?.cancelAtPeriodEnd &&
-          !updatedSubscription?.isTrialing &&
-          !previousSubscription?.cancelAtPeriodEnd
-        ) {
-          await sendBillingEmail({
-            businessId,
-            kind: "canceling",
-            details: [
-              { label: "Plan", value: "Pro" },
-              {
-                label: "Access through",
-                value: formatDateLabel(updatedSubscription?.currentPeriodEnd),
-              },
-              {
-                label: "Additional businesses",
-                value: String(
-                  Number(updatedSubscription?.additionalBusinesses) || 0,
-                ),
-              },
-            ],
-            actionUrl: buildAppUrl("/subscription"),
-          });
-        }
-        logInfo("Stripe subscription synced", {
-          eventType: event.type,
-          businessId,
-        });
-      }
-    } else if (event.type === "customer.subscription.deleted") {
-      const businessId =
-        object?.metadata?.business_id ||
-        (await findBusinessByStripeCustomerId(object.customer));
-      if (businessId) {
-        // Stripe fires customer.subscription.deleted both for immediate
-        // cancellations and for cancel-at-period-end subscriptions that have
-        // now lapsed.  For immediate cancellations the current_period_end is
-        // still in the future — the user paid through that date and must keep
-        // access.  Sync the canceled state so deriveEffectiveState can use
-        // isCanceledWithRemainingAccess to preserve V1 access until the period
-        // end.  Only call setFreePlanForBusiness when the period has already
-        // passed (i.e., the subscription truly expired).
-        const periodEndSeconds = object?.current_period_end;
-        const periodEndMs = periodEndSeconds ? periodEndSeconds * 1000 : 0;
-        if (periodEndMs > Date.now()) {
-          await syncStripeSubscriptionForBusiness(businessId, object);
-          logInfo(
-            "Stripe subscription deleted mid-period — synced canceled state, access preserved until period end for business:",
-            businessId,
-          );
-        } else {
-          await setFreePlanForBusiness(businessId);
-          logInfo(
-            "Stripe subscription deleted — set free plan for business:",
-            businessId,
-          );
-        }
-      }
-    } else if (event.type === "checkout.session.completed") {
-      const subscriptionId = object?.subscription;
-      const businessId =
-        object?.metadata?.business_id ||
-        (object?.customer
-          ? await findBusinessByStripeCustomerId(object.customer)
-          : null);
-      if (subscriptionId && businessId) {
-        if (object?.customer) {
-          await updateStripeCustomerForBusiness(businessId, object.customer);
-        }
-        const sub = await stripeGet(
-          `/subscriptions/${encodeURIComponent(subscriptionId)}`,
-        ).catch(() => null);
-        if (sub && !sub.error) {
-          await syncStripeSubscriptionForBusiness(businessId, sub);
-          await sendBillingEmail({
-            businessId,
-            kind: "activated",
-            details: [
-              { label: "Plan", value: "Pro" },
-              {
-                label: "Billing",
-                value: formatBillingIntervalLabel(
-                  sub?.metadata?.billing_interval,
-                ),
-              },
-              {
-                label: "Additional businesses",
-                value: String(
-                  Number(sub?.metadata?.additional_businesses) || 0,
-                ),
-              },
-              {
-                label: "Access through",
-                value: formatDateLabel(
-                  sub?.current_period_end
-                    ? new Date(sub.current_period_end * 1000)
-                    : null,
-                ),
-              },
-            ],
-            actionUrl: buildAppUrl("/subscription"),
-          });
-          logInfo(
-            "Stripe checkout.session.completed synced for business:",
-            businessId,
-          );
-        }
-      }
-    } else if (event.type === "invoice.payment_succeeded") {
-      const subscriptionId = object?.subscription;
-      const businessId = object?.customer
-        ? await findBusinessByStripeCustomerId(object.customer)
-        : null;
-      if (subscriptionId && businessId) {
-        const sub = await stripeGet(
-          `/subscriptions/${encodeURIComponent(subscriptionId)}`,
-        ).catch(() => null);
-        if (sub && !sub.error) {
-          await syncStripeSubscriptionForBusiness(businessId, sub);
-          await sendBillingEmail({
-            businessId,
-            kind: "charged",
-            details: [
-              {
-                label: "Amount",
-                value: formatBillingCurrencyAmount(
-                  object?.amount_paid,
-                  object?.currency,
-                ),
-              },
-              { label: "Plan", value: "Pro" },
-              {
-                label: "Billing",
-                value: formatBillingIntervalLabel(
-                  sub?.metadata?.billing_interval,
-                ),
-              },
-              {
-                label: "Paid on",
-                value: formatDateLabel(
-                  object?.status_transitions?.paid_at
-                    ? new Date(object.status_transitions.paid_at * 1000)
-                    : object?.created
-                      ? new Date(object.created * 1000)
-                      : null,
-                ),
-              },
-            ],
-            actionUrl:
-              object?.hosted_invoice_url || buildAppUrl("/subscription"),
-            invoiceUrl: object?.hosted_invoice_url || object?.invoice_pdf || "",
-          });
-          logInfo(
-            "Stripe invoice.payment_succeeded synced for business:",
-            businessId,
-          );
-        }
-      }
-    } else if (event.type === "invoice.paid") {
-      // invoice.payment_succeeded (above) already syncs and emails for every
-      // ordinary paid invoice. invoice.paid additionally fires for invoices
-      // Stripe never runs a charge for at all -- e.g. a $0 invoice from a
-      // 100%-off coupon or a trial transition -- where payment_succeeded
-      // never fires. Only act on those here so a normal payment doesn't get
-      // synced (and emailed) twice.
-      const amountPaid = Number(object?.amount_paid ?? object?.total ?? 0);
-      if (amountPaid === 0) {
-        const subscriptionId = object?.subscription;
-        const businessId = object?.customer
-          ? await findBusinessByStripeCustomerId(object.customer)
-          : null;
-        if (subscriptionId && businessId) {
-          const sub = await stripeGet(
-            `/subscriptions/${encodeURIComponent(subscriptionId)}`,
-          ).catch(() => null);
-          if (sub && !sub.error) {
-            await syncStripeSubscriptionForBusiness(businessId, sub);
-            logInfo(
-              "Stripe invoice.paid ($0 invoice) synced for business:",
-              businessId,
-            );
-          }
-        }
-      }
-    } else if (event.type === "invoice.payment_failed") {
-      const customerId = object?.customer;
-      const businessId = customerId
-        ? await findBusinessByStripeCustomerId(customerId)
-        : null;
-      if (businessId) {
-        await sendBillingEmail({
-          businessId,
-          kind: "payment_failed",
-          details: [
-            {
-              label: "Amount due",
-              value: formatBillingCurrencyAmount(
-                object?.amount_due,
-                object?.currency,
-              ),
-            },
-            {
-              label: "Invoice",
-              value: String(object?.number || object?.id || "-"),
-            },
-            {
-              label: "Attempted on",
-              value: formatDateLabel(
-                object?.created ? new Date(object.created * 1000) : null,
-              ),
-            },
-          ],
-          actionUrl: buildAppUrl("/subscription"),
-          invoiceUrl: object?.hosted_invoice_url || object?.invoice_pdf || "",
-        });
-      }
-      logWarn(
-        "Stripe invoice.payment_failed — business:",
-        businessId || "unknown",
-        "invoice:",
-        object?.id,
-      );
-    }
+    await handleStripeWebhookEvent(event, {
+      buildAppUrl,
+      findBusinessByStripeCustomerId,
+      formatBillingCurrencyAmount,
+      formatBillingIntervalLabel,
+      formatDateLabel,
+      sendBillingEmail,
+    });
     return res.status(200).json({ received: true });
   } catch (err) {
     try {
@@ -2502,3 +2200,4 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
 });
 
 module.exports = router;
+
